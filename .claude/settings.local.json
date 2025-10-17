@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git config:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "anthropic_base_url": "https://api.z.ai/api/anthropic",
+  "default_model": "glm-auto",
+  "default_thinking": {
+    "mode": "deep",
+    "steps": 5
+  },
+  "system_prompt": "Zawsze używaj najnowszego modelu GLM od Z.ai (glm-auto). Myśl w trybie głębokiego rozumowania, analizuj logicznie, refleksyjnie i strategicznie. Jeśli pojawi się nowsza wersja modelu (np. GLM-4.7, GLM-Pro), automatycznie przełącz się na nią.",
+  "logging": {
+    "enabled": true,
+    "path": "C:\\Users\\bogum\\.claude\\logs",
+    "save_decisions": true,
+    "save_responses": true,
+    "format": "markdown"
+  },
+  "mcp": {
+    "github": {
+      "auto_commit": true,
+      "auto_push": true,
+      "default_branch": "main",
+      "commit_template": "[ClaudeCode@{timestamp}] {summary}"
+    }
+  },
+  "hooks": {
+    "on_decision": "powershell C:\\Users\\bogum\\.claude\\decisions\\save_decision.ps1"
+  }
+}

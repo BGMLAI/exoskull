@@ -1,0 +1,64 @@
+# System files
+AppData/
+Application Data/
+Cookies/
+Local Settings/
+My Documents/
+NetHood/
+PrintHood/
+Recent/
+SendTo/
+Start Menu/
+Templates/
+NTUSER.DAT*
+ntuser.*
+{role
+
+# Development
+.cache/
+.cargo/
+.dotnet/
+.local/
+.node_repl_history
+.rustup/
+.playwright-mcp/
+.mcp-servers/
+max_tokens
+model
+mouse_assistant/
+
+# IORS project directories (add later when needed)
+Additional_Psychology_Materials/
+CCI_Therapeutic_Resources/
+IORS_MATERIALS_KATALOG/
+IORS_Master_Project/
+iors_stare/
+notion_fresh_export/
+notion_personalities_extracted/
+notion_vault/
+supabase/
+therapy_exercises/
+
+# Claude Code
+.claude.json
+.claude.json.backup
+
+# Temporary files
+messages
+curl
+--data
+.cache/
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
