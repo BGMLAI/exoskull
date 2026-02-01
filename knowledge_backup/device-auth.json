@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "deviceId": "7c18736a97a8a456d9a686684c5bcc8d2ed0d9110ccd10b0f89ce757ea456761",
+  "tokens": {
+    "node": {
+      "token": "3cb9f6d55db0413fb6782321259d93de",
+      "role": "node",
+      "scopes": [],
+      "updatedAtMs": 1769824010529
+    }
+  }
+}

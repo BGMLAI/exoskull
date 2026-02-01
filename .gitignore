@@ -1,0 +1,11 @@
+teoria tyrolki/
+lumpX.pro/
+lumpX.pro-claude/
+.env
+node_modules/
+*.env.local
+.env.local
+.env
+.tmp/link_validation_report.md
+ovh_manager/ovh_credentials.json
+exoskull-app/README.md

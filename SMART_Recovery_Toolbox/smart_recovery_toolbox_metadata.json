@@ -1,0 +1,95 @@
+{
+  "source": "SMART Recovery",
+  "description": "SMART Recovery Toolbox - 14 therapeutic tools for addiction recovery",
+  "url": "https://smartrecovery.org/toolbox",
+  "download_date": "2025-10-16T23:33:51.554336",
+  "total_tools": 14,
+  "downloaded_tools": 14,
+  "total_size_mb": 0.68,
+  "tools": {
+    "ABC Exercise": {
+      "status": "success",
+      "filename": "ABC Exercise.pdf",
+      "size": 60449,
+      "description": "Rooted in Rational Emotive Behavior Therapy's practice of outlining events to understand them and change behavior"
+    },
+    "Cost Benefit Analysis (CBA)": {
+      "status": "success",
+      "filename": "Cost Benefit Analysis CBA.pdf",
+      "size": 46678,
+      "description": "Useful to take a look at the positives and negatives of a behavior"
+    },
+    "Create a Change Plan": {
+      "status": "success",
+      "filename": "Create a Change Plan.pdf",
+      "size": 51028,
+      "description": "Worksheet to identify steps you can take to your envisioned future"
+    },
+    "Define Your Values (Hierarchy of Values)": {
+      "status": "success",
+      "filename": "Define Your Values Hierarchy of Values.pdf",
+      "size": 44877,
+      "description": "Provides a structured way to write down your values and focus on what matters most"
+    },
+    "Disputing Unhelpful Beliefs": {
+      "status": "success",
+      "filename": "Disputing Unhelpful Beliefs.pdf",
+      "size": 48265,
+      "description": "Guides individuals through identifying and challenging beliefs that might fuel addictive behaviors"
+    },
+    "Explore New Pursuits and Passions": {
+      "status": "success",
+      "filename": "Explore New Pursuits and Passions.pdf",
+      "size": 50326,
+      "description": "Help identify pursuits and passions that can bring pleasure back into your life"
+    },
+    "Five Questions": {
+      "status": "success",
+      "filename": "Five Questions.pdf",
+      "size": 45366,
+      "description": "Explores how to go about getting what you want with direct guidance questions"
+    },
+    "Goal Setting": {
+      "status": "success",
+      "filename": "Goal Setting.pdf",
+      "size": 41599,
+      "description": "Can help build clear and effective goals that connect to your values"
+    },
+    "Lifestyle Balance Wheel": {
+      "status": "success",
+      "filename": "Lifestyle Balance Wheel.pdf",
+      "size": 62593,
+      "description": "Help understand each area of your life and change perspective where you feel stuck"
+    },
+    "Personify and Disarm": {
+      "status": "success",
+      "filename": "Personify and Disarm.pdf",
+      "size": 43140,
+      "description": "Creates a helpful boundary by personifying urges to make them more manageable"
+    },
+    "Practice Self-compassion": {
+      "status": "success",
+      "filename": "Practice Self-compassion.pdf",
+      "size": 57692,
+      "description": "Helps meet tough emotions like shame and guilt with care instead of judgment"
+    },
+    "Put DENTS in Your Urges": {
+      "status": "success",
+      "filename": "Put DENTS in Your Urges.pdf",
+      "size": 45299,
+      "description": "Provides an easy way to remember effective ways to manage urges (Deny/Delay, Escape, Neutralize, Tasks, Swap)"
+    },
+    "Setting Healthy Boundaries": {
+      "status": "success",
+      "filename": "Setting Healthy Boundaries.pdf",
+      "size": 48126,
+      "description": "Help protect time, energy, and well-being to support long-term change"
+    },
+    "Urge Log": {
+      "status": "success",
+      "filename": "Urge Log.pdf",
+      "size": 72221,
+      "description": "Helps identify when urges occur, see patterns, and understand how to respond in the future"
+    }
+  }
+}

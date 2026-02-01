@@ -1,0 +1,25 @@
+INSTRUKCJA: Uruchomienie migracji Supabase dla Exoskull
+
+===========================================
+KROK 1: Idź do Supabase SQL Editor
+===========================================
+Link: https://supabase.com/dashboard/project/ocixoxjozzldqldadrip/sql/new
+
+===========================================
+KROK 2: Skopiuj i uruchom PIERWSZĄ migrację
+===========================================
+Lokalizacja: exoskull-app/supabase/migrations/20260131000003_use_public_schema.sql
+
+Tworzy: exo_tenants, exo_agents (główne tabele)
+
+===========================================
+KROK 3: Skopiuj i uruchom DRUGĄ migrację
+===========================================
+Lokalizacja: exoskull-app/supabase/migrations/20260131000004_add_tasks_table.sql
+
+Tworzy: exo_tasks (tabela zadań)
+
+===========================================
+GOTOWE!
+===========================================
+Po uruchomieniu możesz się zarejestrować i zalogować.

@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(supabase link:*)",
+      "Bash(supabase db push:*)",
+      "Bash(supabase db pull:*)",
+      "Bash(npm install:*)",
+      "Bash(echo:*)",
+      "Bash(scoop update:*)",
+      "WebFetch(domain:supabase.com)",
+      "Bash(npm run dev:*)",
+      "Bash(powershell -Command \"Stop-Process -Id 24436,36324,804 -Force\")",
+      "Bash(npm cache clean:*)",
+      "Bash(test:*)",
+      "Bash(npm run build:*)",
+      "Bash(lsof:*)",
+      "Bash(for f in supabase/migrations/*.sql)",
+      "Bash(done)",
+      "Bash(supabase status:*)",
+      "Bash(tasklist:*)",
+      "Read(//c/Program Files/**)",
+      "Bash(\"/c/Users/bogum/scoop/apps/gh/current/bin/gh.exe\" repo create mouse-assistant --public --description \"Mouse Assistant\")"
+    ]
+  }
+}

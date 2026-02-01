@@ -1,0 +1,13 @@
+PyQt5>=5.15.0
+pynput>=1.7.6
+pywin32>=305
+SpeechRecognition>=3.10.0
+sounddevice>=0.4.0
+numpy>=1.20.0
+pyautogui>=0.9.54
+keyboard>=0.13.5
+pyperclip>=1.8.2
+deepgram-sdk>=3.0.0
+pyttsx3>=2.90
+pytesseract>=0.3.10
+Pillow>=9.0.0

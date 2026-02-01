@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "nodeId": "d828fdcb-c071-4720-99d2-9a12dd42d1fc",
+  "displayName": "BGML",
+  "gateway": {
+    "host": "exoskull.xyz",
+    "port": 443,
+    "tls": true
+  }
+}

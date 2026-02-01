@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "socket": {
+    "path": "C:\\Users\\bogum\\.openclaw\\exec-approvals.sock",
+    "token": "BR4DHJSEn-O6LKN6VyYJd4kDtwUyqTTe"
+  },
+  "defaults": {},
+  "agents": {
+    "*": {
+      "allowlist": [
+        {
+          "pattern": "cmd",
+          "lastUsedAt": 1769814023927,
+          "id": "69f4c103-cae9-4b65-9143-190255e65fc1"
+        },
+        {
+          "pattern": "C:\\Windows\\System32\\cmd.exe",
+          "lastUsedAt": 1769814054295,
+          "id": "0cc6cb47-a628-439f-95f1-489e9bd96773"
+        }
+      ]
+    },
+    "main": {
+      "allowlist": []
+    }
+  }
+}
