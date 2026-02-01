@@ -4,6 +4,43 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-02] Emotion Intelligence Architecture
+
+### Added - ARCHITECTURE.md: Layer 11 Emotion Intelligence
+- **Multi-Modal Emotion Detection** (from IORS)
+  - Voice biomarkers: pitch, rate, pauses, energy, jitter, shimmer
+  - Text sentiment: GPT-4o-mini / Gemini Flash
+  - Facial expression: face-api.js (100% local processing)
+  - Fusion engine: weighted average (voice 40%, text 35%, face 25%)
+
+- **Crisis Detection System**
+  - Suicide risk detection with escalation protocol
+  - Panic attack detection with grounding protocol
+  - Trauma response detection with safety protocol
+  - Substance abuse detection with emergency protocol
+  - Full escalation flow with crisis hotline integration
+
+- **Emotion-Adaptive Responses**
+  - Dynamic prompt injection for: sadness, anger, anxiety, low energy
+  - Mixed signals detection (words vs voice/face mismatch)
+
+- **Behavioral Monitoring (Advanced)**
+  - Implicit Association Tests (IAT) for unconscious attitudes
+  - Screen activity monitoring via ActivityWatch
+  - Ambient audio analysis (opt-in, on-device only)
+
+### Changed
+- Layer numbering: 11-20 → 12-21 (emotion layer inserted as L11)
+- Layer 3 extended with emotion_signals input modality
+- Tech Stack updated with emotion detection tools
+- Roadmap Phase 2 includes emotion intelligence tasks
+
+### Architecture
+- Version: 3.0 → 3.1 (OpenClaw + IORS Emotion Intelligence)
+- Total layers: 20 → 21
+
+---
+
 ## [2026-02-02] Voice-First System
 
 ### Added - Global Voice Button
