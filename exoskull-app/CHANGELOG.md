@@ -4,6 +4,114 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-02] Data Lake Silver Layer
+
+### Added - Silver Layer ETL
+- **Parquet Reader** (`lib/storage/parquet-reader.ts`)
+  - Read Parquet files from R2 using hyparquet
+  - Type-safe readers for conversations, messages, voice calls, SMS logs
+  - Deduplication and timestamp parsing utilities
+
+- **Silver ETL** (`lib/datalake/silver-etl.ts`)
+  - Transforms Bronze (R2 Parquet) → Silver (Supabase Postgres)
+  - Deduplicate by ID
+  - Validate schema (channel, role, direction constraints)
+  - Parse JSON strings → JSONB
+  - Normalize timestamps to UTC
+
+- **Cron Endpoint** (`app/api/cron/silver-etl/route.ts`)
+  - Runs hourly at minute 15 (10 min after Bronze ETL)
+  - GET: Status and stats
+  - POST: Trigger ETL (auth required)
+
+- **Supabase Migrations**
+  - `exo_silver_conversations` - Cleaned conversation records
+  - `exo_silver_messages` - Cleaned message records
+  - `exo_silver_voice_calls` - Cleaned voice call records
+  - `exo_silver_sms_logs` - Cleaned SMS log records
+  - `exo_silver_sync_log` - ETL tracking per tenant/data_type
+
+### Tested
+- 30 records successfully transformed (18 conversations, 12 messages)
+- All 4 data types processing correctly
+- Incremental sync working (only new Bronze files processed)
+
+---
+
+## [2026-02-01] Dashboard Expansion
+
+### Added - Chat Panel
+- **ChatPanel Component** (`components/voice/ChatPanel.tsx`)
+  - Real-time transcript display during voice calls
+  - User messages (blue, right), Agent messages (gray, left)
+  - "User is speaking..." / "Agent is speaking..." indicators
+  - Auto-scroll to latest message
+
+- **Voice Page Update** (`app/dashboard/voice/page.tsx`)
+  - Integrated ChatPanel with VAPI events
+  - Handles `speech-start`, `speech-end`, `transcript`, `message` events
+  - Interim transcript support (partial → final)
+
+### Added - CRON Dashboard
+- **Schedule Page** (`app/dashboard/schedule/page.tsx`)
+  - Full UI for managing scheduled jobs
+  - Toggle jobs on/off
+  - View global settings (timezone, quiet hours, rate limits)
+  - Recent execution logs
+  - Manual job trigger for testing
+
+### Added - Dynamic Widgets
+- **TasksWidget** (`components/widgets/TasksWidget.tsx`)
+  - Task completion stats (pending/in_progress/done)
+  - Links to tasks page
+
+- **ConversationsWidget** (`components/widgets/ConversationsWidget.tsx`)
+  - Conversation stats (today/week/avg duration)
+
+- **QuickActionsWidget** (`components/widgets/QuickActionsWidget.tsx`)
+  - Quick links to voice, tasks, schedule, knowledge
+
+- **AreaChartWrapper** (`components/charts/AreaChartWrapper.tsx`)
+  - Recharts wrapper for area charts
+  - Gradient fill, tooltips
+
+- **Dashboard Page** (`app/dashboard/page.tsx`)
+  - New layout with widget grid
+  - Real stats from database (tasks, conversations, agents)
+  - Dynamic greeting based on time
+
+### Added - Knowledge System
+- **Migration** (`supabase/migrations/20260201000008_knowledge_system.sql`)
+  - `exo_user_documents` table (file metadata)
+  - `exo_document_chunks` table (embeddings with pgvector)
+  - `search_user_documents()` function for semantic search
+  - RLS policies for tenant isolation
+
+- **Storage Bucket** (`supabase/migrations/20260201000009_user_documents_bucket.sql`)
+  - `user-documents` bucket (private, 10MB limit)
+  - RLS policies for upload/view/delete
+
+- **Knowledge API** (`app/api/knowledge/route.ts`)
+  - GET: List documents with stats
+  - DELETE: Remove document and storage file
+
+- **Upload API** (`app/api/knowledge/upload/route.ts`)
+  - POST: Upload file to Supabase Storage
+  - Validates type (pdf, txt, md, jpg, png) and size (10MB)
+
+- **Knowledge Page** (`app/dashboard/knowledge/page.tsx`)
+  - Placeholder UI with planned features
+
+### Changed - Navigation
+- **Layout** (`app/dashboard/layout.tsx`)
+  - Added "Harmonogram" (Clock icon)
+  - Added "Wiedza" (FileText icon)
+
+### Dependencies
+- `recharts` - Chart library for React
+
+---
+
 ## [2026-02-01] Data Lake Bronze Layer
 
 ### Added
