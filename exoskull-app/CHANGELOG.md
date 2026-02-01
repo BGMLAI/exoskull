@@ -4,6 +4,36 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-02] Voice-First System
+
+### Added - Global Voice Button
+- **GlobalVoiceButton** (`components/voice/GlobalVoiceButton.tsx`)
+  - Fixed position button in top-left corner of dashboard
+  - One-click to start VAPI voice conversation with ExoAI
+  - Inline chat panel shows real-time transcript
+  - Full VAPI integration with tools (get_tasks, create_task, complete_task)
+  - End call button when connected
+
+- **DashboardShell** (`components/dashboard/DashboardShell.tsx`)
+  - Client component wrapper for GlobalVoiceButton
+  - Added to dashboard layout for all pages
+
+- **Voice Notes API** (`app/api/voice/notes/route.ts`)
+  - POST: Upload voice note
+  - GET: List voice notes with signed URLs
+  - DELETE: Remove voice note and storage file
+
+- **Transcription API** (`app/api/voice/transcribe/route.ts`)
+  - Deepgram integration for Polish transcription
+  - Real-time audio to text conversion
+
+### Philosophy
+- Voice-first: every interaction starts with voice
+- Global button always accessible - never more than one click away
+- All voice interactions go through ExoAI (no separate "notes" vs "conversation")
+
+---
+
 ## [2026-02-02] Data Lake Silver Layer
 
 ### Added - Silver Layer ETL

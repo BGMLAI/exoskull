@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Home, CheckSquare, Brain, Settings, Mic } from 'lucide-react'
+import { Home, CheckSquare, Brain, Settings, Mic, Clock, FileText } from 'lucide-react'
+import { DashboardShell } from '@/components/dashboard/DashboardShell'
 
 export default async function DashboardLayout({
   children,
@@ -56,6 +57,22 @@ export default async function DashboardLayout({
             <Mic className="w-5 h-5" />
             <span>Rozmowa</span>
           </Link>
+
+          <Link
+            href="/dashboard/schedule"
+            className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent transition-colors"
+          >
+            <Clock className="w-5 h-5" />
+            <span>Harmonogram</span>
+          </Link>
+
+          <Link
+            href="/dashboard/knowledge"
+            className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent transition-colors"
+          >
+            <FileText className="w-5 h-5" />
+            <span>Wiedza</span>
+          </Link>
         </nav>
 
         <div className="p-4 border-t">
@@ -80,7 +97,9 @@ export default async function DashboardLayout({
 
       {/* Main content */}
       <main className="flex-1 overflow-auto">
-        {children}
+        <DashboardShell tenantId={user.id}>
+          {children}
+        </DashboardShell>
       </main>
     </div>
   )
