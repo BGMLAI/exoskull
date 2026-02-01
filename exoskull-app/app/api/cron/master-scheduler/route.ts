@@ -255,11 +255,15 @@ async function logJobExecution(
  */
 export async function GET(req: NextRequest) {
   try {
-    // Get job status
+    // Get all jobs with consent info
     const { data: jobs } = await supabase
       .from('exo_scheduled_jobs')
-      .select('job_name, display_name, job_type, time_window_start, default_channel, is_active')
+      .select('job_name, display_name, job_type, time_window_start, default_channel, is_active, is_system, requires_user_consent')
       .order('time_window_start')
+
+    // Separate system and user jobs
+    const systemJobs = jobs?.filter(j => j.is_system || !j.requires_user_consent) || []
+    const userJobs = jobs?.filter(j => !j.is_system && j.requires_user_consent) || []
 
     // Get recent logs
     const { data: recentLogs } = await supabase
@@ -270,9 +274,11 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       status: 'ok',
-      jobs: jobs || [],
+      system_jobs: systemJobs,
+      user_jobs: userJobs,
       recent_executions: recentLogs || [],
-      next_run: 'Hourly at minute 0'
+      next_run: 'Hourly at minute 0',
+      note: 'System jobs run automatically. User jobs require consent via conversation.'
     })
 
   } catch (error) {
