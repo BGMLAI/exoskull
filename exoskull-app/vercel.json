@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/bronze-etl",
       "schedule": "5 * * * *"
+    },
+    {
+      "path": "/api/cron/silver-etl",
+      "schedule": "15 * * * *"
     }
   ]
 }
