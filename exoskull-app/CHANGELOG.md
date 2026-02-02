@@ -4,6 +4,138 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-02] Deep GHL Integration - Communication Hub
+
+### Added - GoHighLevel as Central Communication Hub
+
+**GHL Library** (`lib/ghl/`)
+- `client.ts` - OAuth 2.0 client with automatic token refresh, rate limiting (100/10s)
+- `messaging.ts` - Unified messaging: SMS, Email, WhatsApp, Facebook, Instagram
+- `contacts.ts` - CRM contact management: CRUD, tags, notes, tasks
+- `calendar.ts` - Calendar & booking: appointments, free slots, availability
+- `social.ts` - Social media: Facebook, Instagram, LinkedIn, TikTok, Twitter/X
+- `workflows.ts` - Automation: trigger workflows, event-based routing
+- `opportunities.ts` - Pipeline management: stages, opportunities, CRM
+- `index.ts` - Central export for all GHL functions
+
+**API Routes**
+- `app/api/ghl/oauth/start/route.ts` - Initiate OAuth flow
+- `app/api/ghl/oauth/callback/route.ts` - Handle OAuth callback, store tokens
+- `app/api/webhooks/ghl/route.ts` - Inbound webhooks (messages, contacts, appointments)
+- `app/api/ghl/tools/route.ts` - AI tools endpoint (9 tools for VAPI/agents)
+
+**AI Tools for GHL Control**
+| Tool | Description |
+|------|-------------|
+| `ghl_send_message` | Send SMS/Email/WhatsApp/FB/IG |
+| `ghl_create_contact` | Create CRM contact |
+| `ghl_update_contact` | Update contact info |
+| `ghl_get_contact` | Get contact by ID/email/phone |
+| `ghl_schedule_post` | Schedule social media post |
+| `ghl_create_appointment` | Book appointment |
+| `ghl_trigger_workflow` | Start automation |
+| `ghl_get_conversations` | Get message history |
+| `ghl_move_opportunity` | Move in pipeline |
+
+**Database Migration** (`20260202000003_ghl_integration.sql`)
+- `exo_ghl_oauth_states` - OAuth security
+- `exo_ghl_connections` - Tenant connections with encrypted tokens
+- `exo_ghl_contacts` - Contact mapping
+- `exo_ghl_messages` - Message log for analytics
+- `exo_ghl_webhook_log` - Webhook idempotency
+- `exo_ghl_social_posts` - Social post tracking
+- `exo_ghl_appointments` - Appointment sync
+
+### Changed
+
+**lib/cron/dispatcher.ts**
+- SMS: GHL as primary, Twilio as fallback
+- Added: Email dispatch via GHL
+- Added: WhatsApp dispatch via GHL
+- Channel priority: Voice (VAPI) > WhatsApp > SMS > Email
+
+**ARCHITECTURE.md**
+- Updated channel orchestration to reflect GHL hub
+- Added "GHL Integration Architecture" section
+- Updated tech stack table
+- Added data flow diagrams
+
+### Architecture
+
+```
+Communication Architecture:
+├─ Voice AI: VAPI (real-time AI conversations)
+└─ Everything Else: GHL
+    ├─ SMS, Email, WhatsApp
+    ├─ Facebook Messenger, Instagram DMs
+    ├─ Social Media (FB, IG, LinkedIn, TikTok, Twitter)
+    ├─ CRM (Contacts, Pipelines, Opportunities)
+    ├─ Calendar & Booking
+    └─ Workflow Automation
+```
+
+### Environment Variables Required
+
+```env
+GHL_CLIENT_ID=xxx
+GHL_CLIENT_SECRET=xxx
+GHL_REDIRECT_URI=https://app.exoskull.ai/api/ghl/oauth/callback
+GHL_WEBHOOK_SECRET=xxx (optional)
+```
+
+### Notes for Future Agents
+- GHL OAuth flow is ready - user needs to connect via `/api/ghl/oauth/start?tenant_id=xxx`
+- All GHL functions have rate limiting built-in (100 req/10s)
+- Twilio remains as SMS fallback when GHL not connected
+- VAPI remains for voice AI (GHL doesn't have real-time AI voice)
+
+---
+
+## [2026-02-02] Data Lake Gold Layer
+
+### Added - Gold Layer (Pre-Aggregated Dashboard Views)
+
+**lib/datalake/gold-etl.ts**
+- Materialized view refresh logic
+- Functions: `runGoldETL()`, `refreshSingleView()`, `getGoldStats()`, `getRefreshHistory()`
+- Sequential refresh to avoid resource contention
+- Automatic logging to `exo_gold_sync_log`
+
+**app/api/cron/gold-etl/route.ts**
+- POST: Trigger full refresh (auth required via `x-cron-secret`)
+- POST with `view_name`: Refresh single view
+- GET: Status + stats + recent history
+- Schedule: Daily at 02:00 UTC
+
+**supabase/migrations/20260202000006_gold_schema.sql**
+- `exo_gold_daily_summary` - Daily conversation aggregations
+- `exo_gold_weekly_summary` - Weekly aggregations with active days
+- `exo_gold_monthly_summary` - Monthly aggregations
+- `exo_gold_messages_daily` - Daily message counts by role
+- `exo_gold_sync_log` - Refresh tracking table
+- Unique indexes for CONCURRENTLY refresh (no read locks)
+
+**vercel.json**
+```json
+{ "path": "/api/cron/gold-etl", "schedule": "0 2 * * *" }
+```
+
+### Data Lake Architecture Complete
+
+```
+Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
+   Raw data              Cleaned/deduped        Pre-aggregated
+   :05 hourly            :15 hourly             02:00 daily
+```
+
+### Notes for Future Agents
+- Gold views depend on Silver tables (`exo_silver_*`)
+- Refresh uses CONCURRENTLY (requires unique index, no locks)
+- Query Gold views for dashboard (sub-10ms response)
+- Test endpoint: `curl -X POST /api/cron/gold-etl -H "x-cron-secret: exoskull-cron-2026"`
+
+---
+
 ## [2026-02-02] Emotion Intelligence Architecture
 
 ### Added - ARCHITECTURE.md: Layer 11 Emotion Intelligence
