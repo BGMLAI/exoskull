@@ -3,6 +3,14 @@
 > **IMPORTANT:** This project uses the global self-optimizing agent system.
 > Before starting work, read: `C:\Users\bogum\.claude\CLAUDE.md`
 >
+> **Global System Sections (v002):**
+> - §0-8: Core protocols (Session Start, Plan Mode, Agents, Testing, Logging)
+> - §9: **Deep Research Before Planning** - ZAWSZE czytaj dokumentację przed planowaniem
+> - §10: **Proactive Suggestions** - sugeruj lepsze rozwiązania
+> - §11: **Competitive Intelligence** - znaj konkurencję, buduj unfair advantages
+> - §12: **Framework Selection** - 3-5 frameworków dla każdego zadania (w tym akademickie)
+> - §13: **Session End Protocol** - analiza sesji → propozycje zmian → propozycje agentów
+>
 > **Agent System Files:**
 > - `~/.claude/agents/` - Agent protocols (Master, Executor, Observer, Optimizer)
 > - `~/.claude/LEARNINGS.md` - Success/failure patterns
@@ -498,6 +506,72 @@ python tools/memory/memory_read.py --format markdown
 
 ---
 
+### **10. CONTINUOUS EXECUTION (AUTO-NEXT TASK)**
+
+**Po zakończeniu każdego zadania, AUTOMATYCZNIE przejdź do następnego.**
+
+**Zasada ciągłości:**
+```
+Zadanie zakończone → Aktualizuj dokumentację → Sprawdź plan → Weź następne zadanie → Wykonaj
+```
+
+**Źródła zadań (w kolejności priorytetu):**
+1. **TodoList** - Aktywna lista zadań w sesji
+2. **ARCHITECTURE.md** - Plan rozwoju systemu, niezaimplementowane warstwy
+3. **Plan zatwierdzony** - Plan mode output z approval
+4. **goals/manifest.md** - Kolejne cele do realizacji
+
+**Protokół AUTO-NEXT:**
+
+1. **Po każdym SUCCESS:**
+   - Zaloguj do SESSION_LOG.md
+   - Zaktualizuj CHANGELOG.md
+   - Sprawdź: "Czy są kolejne zadania w planie?"
+   - Jeśli TAK → natychmiast rozpocznij następne
+   - Jeśli NIE → zapytaj: "Plan wykonany. Co dalej?"
+
+2. **Kiedy PRZERWAĆ automatyczne wykonywanie:**
+   - ❌ Użytkownik zleci INNE zadanie (nowe polecenie = nowy priorytet)
+   - ❌ Użytkownik powie "stop", "poczekaj", "nie rób"
+   - ❌ Zadanie wymaga decyzji architektonicznej
+   - ❌ Potrzebna zgoda na wydatki/API
+   - ❌ Deploy do produkcji
+   - ❌ Zmiany w CLAUDE.md
+
+3. **Kiedy ZAWSZE kontynuować:**
+   - ✅ Kolejne kroki w zatwierdzonym planie
+   - ✅ Niezaimplementowane warstwy z ARCHITECTURE.md
+   - ✅ Pending items z TodoList
+   - ✅ Testy po implementacji
+   - ✅ Brak nowych poleceń od użytkownika
+
+**Raportowanie postępu:**
+```
+✅ Task 3/7 complete: [description]
+→ Moving to Task 4/7: [next task]
+```
+
+**Przykład pełnego cyklu:**
+```
+1. User: "Zaimplementuj system X zgodnie z ARCHITECTURE.md"
+2. Agent: Czyta ARCHITECTURE.md, identyfikuje 5 kroków
+3. Agent: Wykonuje krok 1 → SUCCESS → loguje → przechodzi do kroku 2
+4. Agent: Wykonuje krok 2 → SUCCESS → loguje → przechodzi do kroku 3
+5. ... (kontynuuje aż do końca)
+6. Agent: "Plan wykonany (5/5). System X gotowy. Co dalej?"
+```
+
+**Przerwanie przez użytkownika:**
+```
+Agent: Wykonuje krok 3...
+User: "Zrób najpierw X"
+Agent: STOP → przerywa bieżący plan → realizuje nowe polecenie
+```
+
+**NIE CZEKAJ na "kontynuuj" po każdym zadaniu. DZIAŁAJ, chyba że użytkownik przerwie.**
+
+---
+
 # **The Continuous Improvement Loop**
 
 Every failure strengthens the system:
@@ -658,27 +732,38 @@ export()           // Data download
 
 ## **Data Lake Architecture**
 
+**⚠️ IMPLEMENTED FROM DAY 1 - Not phased. Total Recall requires full data history.**
+
+**Decision:** Full Data Lake from start (not API-only). Rationale:
+- API rate limits would block analysis (Oura: 1000/day)
+- No historical data = no pattern detection
+- ML requires training data from day 1
+- Independence from external API availability
+
 **All data flows through Bronze → Silver → Gold layers.**
 
-**Bronze (Raw):**
-- Everything as it arrives, no transformations
+**Bronze (Raw) - Cloudflare R2:**
+- Everything as it arrives, no transformations, NEVER deleted
 - Format: Parquet (columnar, compressed ~80% smaller)
-- Storage: S3-compatible (Supabase Storage / Cloudflare R2)
-- Retention: Forever or user-defined
+- Storage: Cloudflare R2 ($0.015/GB/mo, no egress fees)
+- Path: `r2://exoskull/{tenant_id}/bronze/{data_type}/year={YYYY}/month={MM}/day={DD}/`
+- Data types: conversations, device_data, voice_calls, sms_logs, transactions
 
-**Silver (Cleaned):**
+**Silver (Cleaned) - Supabase Postgres:**
 - Bronze → cleaned, validated, enriched
-- Transformations: dedup, validate schema, fill missing, normalize timestamps
-- Update: Hourly
+- Transformations: dedup, validate schema, fill missing, normalize timestamps (UTC)
+- Update: Hourly via Edge Function
+- Tables: `silver.conversations_clean`, `silver.device_metrics_clean`, etc.
 
-**Gold (Aggregated):**
+**Gold (Aggregated) - Supabase Materialized Views:**
 - Silver → aggregated insights (daily/weekly/monthly summaries)
-- Query speed: Sub-second (pre-aggregated)
-- Update: Daily at 2am UTC
+- Query speed: <100ms (pre-aggregated)
+- Update: Daily at 02:00 UTC
+- Tables: `gold.daily_health_summary`, `gold.weekly_productivity`, `gold.monthly_financial`
 
-**Query Engine:** DuckDB (embedded) - query Parquet on S3 directly, 10x faster than Postgres for analytics.
+**Query Engine:** DuckDB (embedded in Edge Function) - query Parquet on R2 directly, 10x faster than Postgres for analytics.
 
-**Privacy:** Per-tenant isolation (s3://bucket/tenant_id/), encryption at rest + in transit, federated learning.
+**Privacy:** Per-tenant isolation (`r2://exoskull/{tenant_id}/`), encryption at rest (AES-256) + in transit (TLS 1.3), GDPR data export on request.
 
 ---
 
