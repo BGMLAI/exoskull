@@ -6,6 +6,52 @@ All notable changes to ExoSkull are documented here.
 
 ## 2026-02-02
 
+### Fix Task Creation + Custom Schedules Dashboard
+
+**Problem 1: Zadania nie mogły być tworzone**
+- Root cause: Brak rekordu exo_tenants dla użytkownika (FK constraint)
+- Fix: Auto-tworzenie tenant przy pierwszym użyciu dashboard
+
+**Problem 2: Brak możliwości tworzenia własnych harmonogramów**
+- Dashboard tylko włączał/wyłączał predefiniowane joby
+- Brak UI do tworzenia custom cronów
+
+**Rozwiązanie - pełna funkcja custom schedules:**
+
+**Nowa tabela:** `exo_custom_scheduled_jobs`
+- Użytkownik tworzy własne harmonogramy
+- Częstotliwość: codziennie / co tydzień (wybór dni) / co miesiąc (dzień)
+- Kanały: SMS lub połączenie głosowe
+- Message template dla custom wiadomości
+
+**Nowe API:** `/api/schedule/custom`
+- POST: tworzenie harmonogramu
+- GET: lista harmonogramów użytkownika
+- PUT: edycja
+- DELETE: usuwanie
+
+**Nowy UI:** Dashboard /dashboard/schedule
+- Przycisk "Nowy harmonogram"
+- Formularz z polami: nazwa, opis, częstotliwość, godzina, dni, kanał, wiadomość
+- Lista harmonogramów z edit/delete
+- Toggle on/off
+
+**Master scheduler:** Rozszerzony o obsługę custom jobs
+- Pobiera custom jobs z bazy
+- Sprawdza schedule_type, days_of_week, day_of_month
+- Dispatchuje przez GHL/Twilio/VAPI
+
+**Pliki:**
+- `app/dashboard/tasks/page.tsx` - ensureTenantExists()
+- `app/dashboard/schedule/page.tsx` - nowy UI
+- `app/api/schedule/custom/route.ts` - nowe API
+- `app/api/cron/master-scheduler/route.ts` - custom jobs dispatch
+- `migrations/20260202000020_custom_scheduled_jobs.sql`
+
+**Commit:** 1aa42ff
+
+---
+
 ### Voice Pipeline - Twilio + VAPI + Custom
 
 **VAPI Configuration (działa):**
