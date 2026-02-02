@@ -4,6 +4,7 @@ import { queryDatabase } from '@/lib/db-direct'
 import { TasksWidget } from '@/components/widgets/TasksWidget'
 import { ConversationsWidget } from '@/components/widgets/ConversationsWidget'
 import { QuickActionsWidget } from '@/components/widgets/QuickActionsWidget'
+import { IntegrationsWidget } from '@/components/widgets/IntegrationsWidget'
 import { TaskStats, ConversationStats } from '@/lib/dashboard/types'
 import { Zap, Brain, Clock } from 'lucide-react'
 
@@ -77,6 +78,17 @@ export default async function DashboardPage() {
     agentsCount = 5 // Fallback
   }
 
+  // Get rig connections
+  let rigConnections: any[] = []
+  try {
+    const connections = await queryDatabase('exo_rig_connections', {
+      filter: { tenant_id: user?.id }
+    })
+    rigConnections = connections || []
+  } catch (e: any) {
+    console.error('Failed to load rig connections:', e)
+  }
+
   // Get greeting based on time
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Dzien dobry' : hour < 18 ? 'Witaj' : 'Dobry wieczor'
@@ -114,10 +126,14 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Quick actions */}
+      {/* Quick actions & Integrations */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <QuickActionsWidget />
+        <IntegrationsWidget connections={rigConnections} />
+      </div>
 
+      {/* Check-ins */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">

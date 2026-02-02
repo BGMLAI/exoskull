@@ -104,45 +104,95 @@ export async function refreshAccessToken(
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+// Comprehensive Google Scopes (ALL services)
+const GOOGLE_COMPREHENSIVE_SCOPES = [
+  // Profile & Auth
+  'openid',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
+
+  // Google Fit (Health & Fitness)
+  'https://www.googleapis.com/auth/fitness.activity.read',
+  'https://www.googleapis.com/auth/fitness.activity.write',
+  'https://www.googleapis.com/auth/fitness.sleep.read',
+  'https://www.googleapis.com/auth/fitness.sleep.write',
+  'https://www.googleapis.com/auth/fitness.heart_rate.read',
+  'https://www.googleapis.com/auth/fitness.body.read',
+  'https://www.googleapis.com/auth/fitness.body.write',
+  'https://www.googleapis.com/auth/fitness.nutrition.read',
+  'https://www.googleapis.com/auth/fitness.location.read',
+  'https://www.googleapis.com/auth/fitness.blood_glucose.read',
+  'https://www.googleapis.com/auth/fitness.blood_pressure.read',
+  'https://www.googleapis.com/auth/fitness.oxygen_saturation.read',
+  'https://www.googleapis.com/auth/fitness.body_temperature.read',
+  'https://www.googleapis.com/auth/fitness.reproductive_health.read',
+
+  // Gmail
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/gmail.compose',
+  'https://www.googleapis.com/auth/gmail.labels',
+  'https://www.googleapis.com/auth/gmail.modify',
+
+  // Calendar
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/calendar.readonly',
+
+  // Drive
+  'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive.readonly',
+
+  // Docs, Sheets, Slides
+  'https://www.googleapis.com/auth/documents',
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/presentations',
+
+  // Tasks
+  'https://www.googleapis.com/auth/tasks',
+  'https://www.googleapis.com/auth/tasks.readonly',
+
+  // Contacts
+  'https://www.googleapis.com/auth/contacts',
+  'https://www.googleapis.com/auth/contacts.readonly',
+
+  // YouTube
+  'https://www.googleapis.com/auth/youtube.readonly',
+  'https://www.googleapis.com/auth/yt-analytics.readonly',
+
+  // Photos
+  'https://www.googleapis.com/auth/photoslibrary.readonly',
+];
+
 export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
-  // Google Fit / HealthConnect
+  // =====================================================
+  // GOOGLE UNIFIED (ALL SERVICES - RECOMMENDED)
+  // =====================================================
+  'google': () => ({
+    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenUrl: 'https://oauth2.googleapis.com/token',
+    scopes: GOOGLE_COMPREHENSIVE_SCOPES,
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    redirectUri: `${BASE_URL}/api/rigs/google/callback`,
+  }),
+
+  // Google Fit / HealthConnect (legacy - use 'google' instead)
   'google-fit': () => ({
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
-    scopes: [
-      'https://www.googleapis.com/auth/fitness.activity.read',
-      'https://www.googleapis.com/auth/fitness.sleep.read',
-      'https://www.googleapis.com/auth/fitness.heart_rate.read',
-      'https://www.googleapis.com/auth/fitness.body.read',
-      'https://www.googleapis.com/auth/fitness.location.read',
-    ],
+    scopes: GOOGLE_COMPREHENSIVE_SCOPES, // Use comprehensive for cross-rig token sharing
     clientId: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     redirectUri: `${BASE_URL}/api/rigs/google-fit/callback`,
   }),
 
-  // Google Workspace (Gmail, Calendar, Drive, Tasks)
+  // Google Workspace (legacy - use 'google' instead)
   'google-workspace': () => ({
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
-    scopes: [
-      // Gmail
-      'https://www.googleapis.com/auth/gmail.readonly',
-      'https://www.googleapis.com/auth/gmail.send',
-      'https://www.googleapis.com/auth/gmail.labels',
-      // Calendar
-      'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/calendar.events',
-      // Drive
-      'https://www.googleapis.com/auth/drive.readonly',
-      'https://www.googleapis.com/auth/drive.file',
-      // Tasks
-      'https://www.googleapis.com/auth/tasks',
-      'https://www.googleapis.com/auth/tasks.readonly',
-      // Profile
-      'https://www.googleapis.com/auth/userinfo.email',
-      'https://www.googleapis.com/auth/userinfo.profile',
-    ],
+    scopes: GOOGLE_COMPREHENSIVE_SCOPES, // Use comprehensive for cross-rig token sharing
     clientId: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     redirectUri: `${BASE_URL}/api/rigs/google-workspace/callback`,
@@ -152,10 +202,7 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
   'google-calendar': () => ({
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
-    scopes: [
-      'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/calendar.events',
-    ],
+    scopes: GOOGLE_COMPREHENSIVE_SCOPES, // Use comprehensive for cross-rig token sharing
     clientId: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     redirectUri: `${BASE_URL}/api/rigs/google-calendar/callback`,

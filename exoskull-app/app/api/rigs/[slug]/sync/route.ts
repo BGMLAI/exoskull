@@ -12,6 +12,7 @@ import { createTodoistClient } from '@/lib/rigs/todoist/client';
 import { createGoogleWorkspaceClient } from '@/lib/rigs/google-workspace/client';
 import { createMicrosoft365Client } from '@/lib/rigs/microsoft-365/client';
 import { GoogleFitClient } from '@/lib/rigs/google-fit/client';
+import { createGoogleClient } from '@/lib/rigs/google/client';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -144,6 +145,50 @@ export async function POST(
             steps: allData.steps.slice(0, 7),
             heartRate: allData.heartRate.slice(0, 7),
             sleep: allData.sleep.slice(0, 7),
+          },
+        };
+        break;
+      }
+
+      case 'google': {
+        // Unified Google client (Fit + Workspace + YouTube + Photos + Contacts)
+        const client = createGoogleClient(connection as RigConnection);
+        if (!client) throw new Error('Failed to create Google client');
+
+        const dashboard = await client.getDashboardData();
+        syncResult = {
+          success: true,
+          records:
+            dashboard.fit.steps.length +
+            dashboard.fit.heartRate.length +
+            dashboard.workspace.gmail.recentEmails.length +
+            dashboard.workspace.calendar.todaysEvents.length +
+            dashboard.workspace.tasks.activeTasks.length +
+            dashboard.youtube.recentVideos.length +
+            dashboard.contacts.recentContacts.length +
+            dashboard.photos.recentPhotos.length,
+          data: {
+            fit: {
+              todaySteps: dashboard.fit.todaySteps,
+              todayCalories: dashboard.fit.todayCalories,
+              avgHeartRate: dashboard.fit.avgHeartRate,
+            },
+            workspace: {
+              unreadEmails: dashboard.workspace.gmail.unreadCount,
+              todaysEvents: dashboard.workspace.calendar.todaysEvents.length,
+              activeTasks: dashboard.workspace.tasks.activeCount,
+              overdueTasks: dashboard.workspace.tasks.overdueCount,
+            },
+            youtube: {
+              channelName: dashboard.youtube.channel?.title || null,
+              recentVideos: dashboard.youtube.recentVideos.length,
+            },
+            contacts: {
+              total: dashboard.contacts.totalCount,
+            },
+            photos: {
+              recent: dashboard.photos.recentPhotos.length,
+            },
           },
         };
         break;

@@ -6,6 +6,56 @@ export * from './types';
 
 // Rig definitions with OAuth and API config
 export const RIG_DEFINITIONS = {
+  // =====================================================
+  // GOOGLE UNIFIED (Recommended - All Google Services)
+  // =====================================================
+  google: {
+    slug: 'google' as const,
+    name: 'Google',
+    description: 'Fit, Gmail, Calendar, Drive, Tasks, YouTube, Photos, Contacts - pełna integracja',
+    icon: '🌐',
+    category: 'productivity' as const,
+    oauth: {
+      authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+      scopes: [
+        'openid',
+        'https://www.googleapis.com/auth/userinfo.email',
+        'https://www.googleapis.com/auth/userinfo.profile',
+        // Fit
+        'https://www.googleapis.com/auth/fitness.activity.read',
+        'https://www.googleapis.com/auth/fitness.sleep.read',
+        'https://www.googleapis.com/auth/fitness.heart_rate.read',
+        'https://www.googleapis.com/auth/fitness.body.read',
+        // Workspace
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.send',
+        'https://www.googleapis.com/auth/calendar',
+        'https://www.googleapis.com/auth/drive.readonly',
+        'https://www.googleapis.com/auth/tasks',
+        'https://www.googleapis.com/auth/contacts.readonly',
+        // YouTube
+        'https://www.googleapis.com/auth/youtube.readonly',
+        // Photos
+        'https://www.googleapis.com/auth/photoslibrary.readonly',
+      ],
+      clientIdEnv: 'GOOGLE_CLIENT_ID',
+      clientSecretEnv: 'GOOGLE_CLIENT_SECRET',
+    },
+    api: {
+      baseUrl: 'https://www.googleapis.com',
+      rateLimit: { requests: 100, period: 'second' as const },
+    },
+    sync: {
+      frequency: 'hourly' as const,
+      dataTypes: [
+        'steps', 'sleep', 'heart_rate', 'calories',
+        'emails', 'events', 'files', 'tasks',
+        'contacts', 'youtube', 'photos',
+      ],
+    },
+  },
+
   oura: {
     slug: 'oura' as const,
     name: 'Oura Ring',

@@ -5,6 +5,7 @@
 export type RigCategory = 'health' | 'productivity' | 'finance' | 'smart_home';
 
 export type RigSlug =
+  | 'google' // Unified Google (Fit + Workspace + YouTube)
   | 'oura'
   | 'fitbit'
   | 'apple-health'
