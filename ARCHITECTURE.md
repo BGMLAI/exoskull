@@ -1,7 +1,7 @@
 # 🧠 EXOSKULL - Adaptive Life Operating System
 ## Your Second Brain. Built For You. By AI.
 
-**Version:** 3.0 - OpenClaw-Inspired Architecture
+**Version:** 3.0
 **Created:** 2026-02-01
 **Updated:** 2026-02-01
 **Status:** 🔴 Architecture Design Phase
@@ -77,23 +77,67 @@ You don't use ExoSkull. You ARE ExoSkull + You.
 
 ---
 
+## 📖 TERMINOLOGY
+
+ExoSkull uses gaming/sci-fi nomenclature:
+
+| Term | Definition |
+|------|------------|
+| **Mods** | Abilities & extensions (sleep tracker, focus mode, finance monitor) |
+| **Rigs** | Tools & integrations (Oura sync, Calendar, Transcription) |
+| **Quests** | Weekly development programs (transform sleep, digital detox, fitness) |
+| **Exoskulleton** | Marketplace/catalog - browse & install Mods, Rigs, Quests |
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  🏪 EXOSKULLETON (Marketplace)                          │
+│                                                         │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐       │
+│  │    MODS     │ │    RIGS     │ │   QUESTS    │       │
+│  │             │ │             │ │             │       │
+│  │ Sleep Track │ │ Oura API    │ │ 7-Day Sleep │       │
+│  │ Focus Mode  │ │ Google Cal  │ │ Digital     │       │
+│  │ Finance Mon │ │ Whisper STT │ │   Detox     │       │
+│  │ Energy Log  │ │ Notion Sync │ │ Morning     │       │
+│  │ Mood Track  │ │ Stripe      │ │   Routine   │       │
+│  └─────────────┘ └─────────────┘ └─────────────┘       │
+└─────────────────────────────────────────────────────────┘
+```
+
+**CLI Commands:**
+```bash
+exoskull browse              # Open Exoskulleton catalog
+exoskull mod add sleep       # Install Sleep Tracker Mod
+exoskull rig add oura        # Install Oura API Rig
+exoskull quest start detox   # Start Digital Detox Quest
+exoskull inventory           # Show installed Mods/Rigs/active Quests
+```
+
+**Quest Structure:**
+- Duration: 7 days (weekly cycles)
+- Daily check-ins via voice/SMS
+- Progress tracking + rewards
+- Completion unlocks achievements
+
+---
+
 ## 🏗️ SYSTEM ARCHITECTURE OVERVIEW
 
-### 6-Tier Architecture (OpenClaw-Inspired)
+### 6-Tier Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ TIER 1: INTERFACE LAYER                                     │
-│   Layer 1: Gateway & Control Plane (NEW - OpenClaw pattern) │
+│   Layer 1: Gateway & Control Plane  │
 │   Layer 2: Omnichannel Presence                             │
 │   Layer 3: Multimodal Input/Output                          │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ TIER 2: ORCHESTRATION LAYER                                 │
-│   Layer 4: Agent Swarm Orchestration (Kimi K2.5 + LangGraph)│
+│   Layer 4: Agent Swarm Orchestration │
 │   Layer 5: Multi-Model AI Routing                           │
-│   Layer 6: MCP Skills Registry (NEW - 100+ integrations)    │
+│   Layer 6: Mods & Rigs Registry (Exoskulleton)              │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -107,14 +151,14 @@ You don't use ExoSkull. You ARE ExoSkull + You.
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ TIER 4: MEMORY & DATA LAYER                                 │
-│   Layer 12: Total Recall Memory (MemOS-style)               │
+│   Layer 12: Total Recall Memory                │
 │   Layer 13: Data Lake (Bronze/Silver/Gold)                  │
 │   Layer 14: Skill Memory & Cross-Task Reuse                 │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ TIER 5: EXECUTION LAYER                                     │
-│   Layer 15: Custom App Builder (Pi Agent pattern)           │
+│   Layer 15: Custom App Builder            │
 │   Layer 16: Autonomous Actions Framework                    │
 │   Layer 17: Device Integration Mesh                         │
 │   Layer 18: Android-First Integration                       │
@@ -132,14 +176,14 @@ You don't use ExoSkull. You ARE ExoSkull + You.
 
 # TIER 1: INTERFACE LAYER
 
-## Layer 1: Gateway & Control Plane (NEW)
+## Layer 1: Gateway & Control Plane
 
-**Inspired by OpenClaw's hub-and-spoke architecture.**
+**Hub-and-spoke architecture for centralized orchestration.**
 
 ```javascript
 ExoSkull_Gateway = {
 
-  // Central control plane (OpenClaw pattern)
+  // Central control plane 
   control_plane: {
     websocket: "ws://localhost:18789",  // Real-time control
     http: "http://localhost:18793",      // HTTP server
@@ -210,7 +254,7 @@ ExoSkull_Gateway = {
     }
   },
 
-  // Tech stack (OpenClaw-compatible)
+  // Tech stack
   stack: {
     runtime: "Node.js ≥22",
     language: "TypeScript (tsx)",
@@ -814,9 +858,9 @@ Multimodal_System = {
 ```javascript
 Agent_Swarm = {
 
-  // OpenClaw Pi Agent pattern (minimal core)
+  // Core agent (minimal core, maximum extensibility)
   core_agent: {
-    name: "Pi Agent",
+    name: "Core Agent",
     tools: ["Read", "Write", "Edit", "Bash"],
     principle: "Minimal core, maximum extensibility",
     self_extending: "Agent can write its own extensions"
@@ -1062,7 +1106,7 @@ AI_Routing = {
 ```javascript
 MCP_Skills_Registry = {
 
-  concept: "npm for AI capabilities (OpenClaw pattern)",
+  concept: "npm for AI capabilities ",
   protocol: "Model Context Protocol (MCP)",
   benefit: "Plug-and-play integrations, no custom code needed",
 
@@ -1864,21 +1908,21 @@ Emotion_Intelligence = {
 
 | New Layer | Old Layer | Status |
 |-----------|-----------|--------|
-| L1: Gateway & Control Plane | - | NEW (OpenClaw) |
+| L1: Gateway & Control Plane | - | NEW |
 | L2: Omnichannel Presence | L7 | Moved |
 | L3: Multimodal I/O | L6 | Moved + Emotion Signals |
 | L4: Agent Swarm Orchestration | L3 | ENHANCED (Kimi K2.5) |
 | L5: Multi-Model AI Routing | L15 | Moved + Updated |
-| L6: MCP Skills Registry | L13 (partial) | NEW (OpenClaw) |
+| L6: MCP Skills Registry | L13 (partial) | NEW |
 | L7: Discovery & Relationship | L1 | Moved |
 | L8: Gap Detection | L4 | Moved |
 | L9: Success Metrics | L8 | Moved |
 | L10: Self-Optimization | L9 | Moved + MAPE-K |
 | L11: Emotion Intelligence | - | **NEW (from IORS)** |
-| L12: Total Recall Memory | L5 | ENHANCED (MemOS) |
+| L12: Total Recall Memory | L5 | ENHANCED |
 | L13: Data Lake | L14 | Moved |
-| L14: Skill Memory | - | NEW (MemOS) |
-| L15: Custom App Builder | L2 | Moved + Pi Agent |
+| L14: Skill Memory | - | NEW |
+| L15: Custom App Builder | L2 | MOVED |
 | L16: Autonomous Actions | L17 | Moved |
 | L17: Device Integration | L10 | Moved |
 | L18: Android Integration | L11 | Moved |
@@ -1892,7 +1936,7 @@ Emotion_Intelligence = {
 
 # TIER 4: MEMORY & DATA LAYER
 
-## Layer 12: Total Recall Memory (MemOS-style)
+## Layer 12: Total Recall Memory 
 
 **Your biological brain forgets. ExoSkull remembers EVERYTHING.**
 
@@ -1901,7 +1945,7 @@ Memory_System = {
 
   motto: "I am your external hard drive. I never forget.",
 
-  // MemOS-inspired architecture
+  // Hierarchical memory architecture
   memory_types: {
 
     // 1. Episodic Memory (specific events)
@@ -1993,7 +2037,7 @@ Memory_System = {
     }
   },
 
-  // MCP Integration (OpenMemory pattern)
+  // MCP Integration
   mcp_server: {
     endpoint: "mcp://exoskull-memory",
     operations: [
@@ -2236,15 +2280,14 @@ Data_Lake = {
 
 ---
 
-## Layer 14: Skill Memory & Cross-Task Reuse
+## Layer 14: Mod Memory & Cross-Task Reuse
 
-**MemOS-inspired persistent skill memory.**
+**Persistent mod memory - AI learns and improves over time.**
 
 ```javascript
-Skill_Memory = {
+Mod_Memory = {
 
-  concept: "AI learns and improves skills over time",
-  source: "MemOS + OpenMemory patterns",
+  concept: "AI learns and improves mods over time",
 
   memory_types: {
 
@@ -2324,15 +2367,15 @@ Skill_Memory = {
 
 # TIER 5: EXECUTION LAYER
 
-## Layer 15: Custom App Builder (Pi Agent pattern)
+## Layer 15: Custom App Builder 
 
 **ExoSkull doesn't have "features." It WRITES software for you.**
 
 ```javascript
 App_Builder = {
 
-  // OpenClaw Pi Agent pattern
-  core_principle: "Minimal core (4 tools), maximum extensibility",
+  // Minimal core, maximum extensibility
+  core_principle: "4 core tools + self-extension capability",
 
   core_tools: {
     read: "Read files, databases, APIs",
@@ -2751,7 +2794,7 @@ Guardrails = {
 | **AI Tier 4** | Claude Opus 4.5 (meta-coordinator) |
 | **Fallback SMS** | Twilio (when GHL not connected) |
 | **Telegram** | grammY (Bot API) |
-| **MCP Skills** | 100+ integrations (OpenClaw pattern) |
+| **MCP Skills** | 100+ integrations  |
 | **Hosting** | Vercel (frontend), Supabase (backend), Docker |
 
 ---
@@ -2875,41 +2918,20 @@ TWILIO_PHONE_NUMBER=+1xxx
 
 ---
 
-# SOURCES & INSPIRATION
+# TECHNOLOGY STACK
 
-## OpenClaw.ai (ClawdBot/MoltBot)
-- Hub-and-spoke Gateway architecture
-- Pi Agent pattern (4 core tools + self-extension)
-- MCP Skills system (100+ integrations)
-- Session management and workspace isolation
+## AI Models
+- **Kimi K2.5** - 100-agent parallel swarm, 256K context, 4.5x speedup
+- **Claude** - Complex reasoning, code generation
+- **Gemini Flash** - Fast classification, simple tasks
 
-## Kimi K2.5
-- 100-agent parallel swarm (PARL)
-- 256K context window
-- 4.5x speedup vs sequential
-- Visual agentic capabilities
+## Orchestration
+- **LangGraph** - DAG-based workflow orchestration
 
-## LangGraph
-- DAG-based workflow orchestration
-- Prevents infinite loops
-- Enables parallel execution
-
-## MemOS
-- Persistent skill memory
-- Cross-task reuse
-- Skill evolution tracking
-
-## MemoryOS
-- Multi-tier memory (short/mid/long-term)
-- Automated user profile updating
-
-## Swarms Framework
-- Enterprise-grade multi-agent orchestration
-- Hierarchical agent collaboration
-
-## MAPE-K
-- Monitor → Analyze → Plan → Execute → Knowledge
-- Self-adaptive system pattern
+## Architecture Patterns
+- **Hub-and-spoke Gateway** - Centralized orchestration
+- **MAPE-K Loop** - Monitor → Analyze → Plan → Execute → Knowledge
+- **Multi-tier Memory** - Short/mid/long-term with automatic updates
 
 ---
 
@@ -2962,7 +2984,7 @@ TWILIO_PHONE_NUMBER=+1xxx
 
 ---
 
-**Version:** 3.1 (OpenClaw + IORS Emotion Intelligence)
+**Version:** 3.1
 **Status:** Architecture Complete
 **Created:** 2026-02-01
 **Updated:** 2026-02-02

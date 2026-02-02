@@ -118,10 +118,19 @@ export async function boostHighlight(
   supabase: SupabaseClient,
   highlightId: string
 ): Promise<void> {
+  // First get current importance
+  const { data: current } = await supabase
+    .from('user_memory_highlights')
+    .select('importance')
+    .eq('id', highlightId)
+    .single()
+
+  const newImportance = Math.min(10, (current?.importance || 5) + 1)
+
   await supabase
     .from('user_memory_highlights')
     .update({
-      importance: supabase.rpc('least', { a: 10, b: supabase.raw('importance + 1') }),
+      importance: newImportance,
       updated_at: new Date().toISOString()
     })
     .eq('id', highlightId)

@@ -275,6 +275,8 @@ export interface LearningEvent {
     | 'highlight_decayed'
     | 'pattern_detected'
     | 'mit_updated'
+    | 'agent_completed'
+    | 'decay_completed'
   tenantId: string
   data: Record<string, unknown>
   timestamp: string

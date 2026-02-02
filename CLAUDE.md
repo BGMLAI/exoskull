@@ -883,6 +883,17 @@ export()           // Data download
 - Discriminate (bias testing on models)
 - Hide what's being collected (transparency required)
 
+**Intellectual Property:**
+- NEVER mention that architecture/features were "inspired by", "based on", or "copied from" other products
+- NEVER use phrases like "X-Inspired", "X pattern", "X-style" when referring to external brands
+- DO mention tools/models we USE (Kimi, LangGraph, Claude) - that's technology stack, not copying
+- DO describe what our system does - just don't attribute the idea to competitors
+
+**TODO (Legal Research):**
+- [ ] Before public launch: IP review of terminology (Mods, Rigs, Quests, Exoskulleton)
+- [ ] Trademark search for "ExoSkull" and "Exoskulleton"
+- [ ] Review if any architectural patterns require licensing
+
 ---
 
 ## **Key Differences from Standard GOTCHA System**

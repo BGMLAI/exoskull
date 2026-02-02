@@ -9,3 +9,4 @@ node_modules/
 .tmp/link_validation_report.md
 ovh_manager/ovh_credentials.json
 exoskull-app/README.md
+.claude/

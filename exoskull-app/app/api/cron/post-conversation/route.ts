@@ -6,7 +6,7 @@
  * - Extract highlights
  * - Boost referenced highlights
  *
- * Schedule: */15 * * * * (every 15 minutes)
+ * Schedule: every 15 minutes
  */
 
 import { NextRequest, NextResponse } from 'next/server'
