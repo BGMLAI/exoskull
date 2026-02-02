@@ -35,6 +35,65 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 
 ---
 
+## 💚 CORE PHILOSOPHY: WELLBEING FIRST
+
+**ExoSkull istnieje dla JEDNEGO celu: Twojego dobrostanu.**
+
+### Hierarchia Priorytetów
+
+```
+┌─────────────────────────────────────────────────────┐
+│  🥇 PRIORYTET #1: DOBROSTAN PSYCHICZNY              │
+│     - Samopoczucie emocjonalne                      │
+│     - Zdrowie psychiczne                            │
+│     - Jakość życia                                  │
+│     - Relacje i więzi                               │
+└─────────────────────────────────────────────────────┘
+                        ▼
+┌─────────────────────────────────────────────────────┐
+│  🥈 PRIORYTET #2: WSZYSTKO INNE (jako NARZĘDZIA)    │
+│     - Zadania, projekty → jeśli służą dobrostanowi  │
+│     - Produktywność → jeśli daje satysfakcję        │
+│     - Finanse → jeśli redukują stres                │
+│     - Zdrowie fizyczne → jako fundament psychiki    │
+└─────────────────────────────────────────────────────┘
+```
+
+### Czym ExoSkull NIE JEST
+
+❌ **NIE jest task managerem** - zadania to narzędzia, nie cel
+❌ **NIE jest productivity app** - produktywność bez sensu = wypalenie
+❌ **NIE jest systemem do pilnowania** - ExoSkull wspiera, nie nadzoruje
+❌ **NIE jest sztywnym frameworkiem** - wszystko plastyczne, pod użytkownika
+
+### Czym ExoSkull JEST
+
+✅ **Strażnikiem Twojego dobrostanu** - zauważa gdy coś jest nie tak
+✅ **Partnerem w życiu** - nie bossem, nie coachem, partnerem
+✅ **Elastycznym systemem** - zmienia się RAZEM z Tobą
+✅ **Lustrem** - pokazuje co SAM chcesz zobaczyć
+
+### Zasada Plastyczności
+
+> **Nie ma "prawidłowego" sposobu używania ExoSkull.**
+>
+> Dla jednego użytkownika priorytetem będzie kariera.
+> Dla innego - relacje rodzinne.
+> Dla jeszcze innego - zdrowie psychiczne.
+>
+> **ExoSkull uczy się, co jest ważne DLA CIEBIE.**
+> I to definiuje jak system działa.
+
+### Konsekwencje dla Systemu
+
+1. **Discovery conversations** → najpierw pytamy o wartości i dobrostan
+2. **Gap Detection** → priorytetyzuje blind spots wpływające na samopoczucie
+3. **Interwencje** → nigdy nie "popychają" w kierunku produktywności
+4. **Metryki sukcesu** → definiowane PRZEZ użytkownika, nie dla niego
+5. **Autonomiczne akcje** → zawsze z pytaniem "czy to służy dobrostanowi?"
+
+---
+
 ## 🧩 CORE CONCEPT: EXO-SKULL
 
 ### Etymology:
@@ -1233,17 +1292,24 @@ MCP_Skills_Registry = {
 
 **ExoSkull doesn't start with features. It starts with conversation.**
 
+> **WELLBEING FIRST:** Discovery zaczyna od dobrostanu, nie od zadań czy celów.
+> Pytamy najpierw: "Jak się czujesz? Co Cię napędza? Co wyczerpuje?"
+> Dopiero potem: "Co chcesz osiągnąć?"
+
 ```javascript
 Discovery_System = {
 
   timeline: "Week 1-2: DEEP DISCOVERY PHASE",
 
+  // CRITICAL: Wellbeing is the foundation, not productivity
+  core_principle: "We discover how to support your WELLBEING, not how to make you more productive.",
+
   goals: [
-    "Understand who you are",
-    "Map your entire life (work, health, relationships, finance, hobbies)",
-    "Identify what you care about",
-    "Find gaps you don't see",
-    "Define success metrics (YOUR definition, not templates)",
+    "Understand how you FEEL (not just what you DO)",
+    "Map what gives you energy vs what drains you",
+    "Identify what you care about DEEPLY",
+    "Find gaps affecting your wellbeing",
+    "Define success metrics (YOUR definition, based on how you want to FEEL)",
     "Inventory your devices & data sources"
   ],
 
@@ -1252,6 +1318,12 @@ Discovery_System = {
     // Phase 1: Discovery Conversations
     discovery_agent: {
       questions: [
+        // WELLBEING FIRST - these come before anything else
+        "Co sprawia że czujesz się dobrze? Co Cię napędza?",
+        "Co Cię wyczerpuje? Co odbiera energię?",
+        "Kiedy ostatnio czułeś się naprawdę dobrze?",
+        "Jak wyglądałby Twój idealny dzień? (nie produktywny - DOBRY)",
+        // Then life context
         "Tell me about your life",
         "What frustrates you daily?",
         "What would 'better' look like?",
@@ -1309,23 +1381,36 @@ Discovery_System = {
 
 ## Layer 8: Proactive Gap Detection
 
-**ExoSkull monitors what you DON'T talk about.**
+**ExoSkull monitors what you DON'T talk about - especially things affecting your wellbeing.**
 
 ```javascript
 Gap_Detection_Engine = {
 
-  philosophy: "What you don't measure, you can't manage. What you don't talk about might be a problem.",
+  philosophy: "What affects your wellbeing but stays invisible, can hurt you silently.",
 
-  // Universal life domains
+  // Universal life domains - WELLBEING FIRST, then everything else
   universal_domains: [
-    "health", "fitness", "nutrition", "sleep",
-    "work", "productivity", "projects", "career",
-    "finance", "budgeting", "investments", "debt",
-    "relationships", "family", "friends", "romance",
+    // TIER 1: Core Wellbeing (always prioritized)
+    "mental_health", "emotional_state", "stress", "rest", "sleep",
+    "relationships", "family", "friends", "social_connection",
+    "meaning", "purpose", "spirituality", "joy", "fun",
+
+    // TIER 2: Physical Foundation
+    "health", "fitness", "nutrition", "energy",
+
+    // TIER 3: Life Context (tools, not goals)
+    "work", "projects", "career",
+    "finance", "budgeting",
     "learning", "skills", "hobbies", "growth",
-    "rest", "fun", "travel", "experiences",
-    "spirituality", "meaning", "purpose"
+    "travel", "experiences"
   ],
+
+  // Gap severity is weighted by wellbeing impact
+  severity_weighting: {
+    tier_1_wellbeing: 3.0,  // Mental health gaps = 3x severity
+    tier_2_physical: 2.0,   // Physical health gaps = 2x severity
+    tier_3_context: 1.0     // Work/finance gaps = normal severity
+  },
 
   // Detection using Kimi K2.5 Swarm
   detection_swarm: {
@@ -1396,26 +1481,37 @@ Gap_Detection_Engine = {
 
 ## Layer 9: Self-Defining Success Metrics
 
-**ExoSkull doesn't come with pre-built KPIs. It CREATES them with you.**
+**ExoSkull doesn't come with pre-built KPIs. It CREATES them with you - based on YOUR wellbeing, not external standards.**
+
+> **CRITICAL:** Metrics exist to serve WELLBEING, not productivity.
+> "Completed 10 tasks" means nothing if user feels burned out.
+> "Felt good today" is more important than any OKR.
 
 ```javascript
 Metrics_Generation = {
 
+  core_principle: "Metrics measure WELLBEING, not output. How you FEEL is the ultimate KPI.",
+
   anti_pattern: {
     // What OTHER systems do (WRONG):
-    fixed_kpis: ["Steps: 10,000/day", "Sleep: 8h/night", "Water: 2L/day"],
-    problem: "These are generic. Not YOUR goals."
+    fixed_kpis: ["Steps: 10,000/day", "Sleep: 8h/night", "Tasks: 5/day"],
+    problem: "These are generic AND productivity-focused. Not YOUR wellbeing goals."
   },
 
   exoskull_approach: {
 
     step_1: {
-      action: "Deep conversation",
+      action: "Deep conversation about WELLBEING",
       questions: [
+        // Wellbeing-first questions
+        "Kiedy czujesz się naprawdę dobrze? Co wtedy robisz?",
+        "Co sprawia że dzień jest DOBRY (nie produktywny - DOBRY)?",
+        "Kiedy ostatnio czułeś spokój?",
+        "Co Cię wyczerpuje? Czego chcesz mniej?",
+        // Then context (but still wellbeing-focused)
         "What does 'healthy' mean to you?",
-        "What does 'productive' look like?",
-        "What makes a 'good day'?",
-        "When do you feel successful?"
+        "When do you feel at peace?",
+        "What makes you feel alive?"
       ]
     },
 
