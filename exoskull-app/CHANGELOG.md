@@ -4,6 +4,42 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-02] Google Tasks Integration
+
+### Added - Google Tasks API
+
+**Google Workspace Client** - extended with Tasks API:
+- `getTaskLists()` - List all task lists
+- `getDefaultTaskList()` - Get primary task list
+- `getTasks()` - List tasks (with showCompleted option)
+- `getTask()` - Get single task
+- `createTask()` - Create new task with title, notes, due date
+- `updateTask()` - Update task properties
+- `completeTask()` / `uncompleteTask()` - Toggle completion
+- `deleteTask()` - Remove task
+- `getActiveTasks()` - Get non-completed tasks
+- `getDueTodayTasks()` - Tasks due today
+- `getOverdueTasks()` - Overdue tasks
+
+### Changed - OAuth Scopes
+- Added `https://www.googleapis.com/auth/tasks` to google-workspace
+- Added `https://www.googleapis.com/auth/tasks.readonly` to google-workspace
+
+### Changed - Task Manager Mod
+- Google Tasks is now **primary source** (default)
+- Unified view: Google Tasks + Todoist + Notion + ExoSkull
+- `create_task` defaults to Google Tasks
+- `complete_task` supports Google format (`google:listId:taskId`)
+- Added `google_tasklist_id` config option
+
+### Files Changed
+- `lib/rigs/google-workspace/client.ts` - Full Google Tasks API
+- `lib/rigs/oauth.ts` - Added Tasks scopes
+- `lib/mods/executors/task-manager.ts` - Google integration
+- `lib/mods/index.ts` - Updated requires_rigs
+
+---
+
 ## [2026-02-02] Notion + Todoist Integration & Task Manager Mod
 
 ### Added - Rig Clients
