@@ -4,6 +4,175 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-02] Mood Tracker & Habit Tracker Mods
+
+### Added - Mood Tracker Mod
+
+**Executor:** `lib/mods/executors/mood-tracker.ts`
+
+Implements `IModExecutor` interface for daily mood tracking:
+
+**Data:**
+- Mood value (1-10 scale)
+- Energy level (1-10)
+- Emotions (multi-select from 15 predefined emotions)
+- Context (morning/afternoon/evening/night)
+- Notes
+
+**Insights:**
+- Mood trend detection (improving/stable/declining)
+- Missing check-in reminders
+- Weekly consistency tracking
+- Top emotions analysis
+- Low mood pattern alerts (mental health awareness)
+
+**Actions:**
+| Action | Description |
+|--------|-------------|
+| `log_mood` | Record mood entry with emotions and notes |
+| `get_history` | Retrieve mood entries for time period |
+| `delete_entry` | Remove a mood entry |
+
+### Added - Habit Tracker Mod
+
+**Executor:** `lib/mods/executors/habit-tracker.ts`
+
+Full habit tracking with streaks and completion rates:
+
+**Data:**
+- Habit definitions (name, description, frequency)
+- Daily/weekly frequency support
+- Target days for weekly habits
+- Reminder time configuration
+- Icon and color customization
+
+**Insights:**
+- Daily progress (X/Y habits completed)
+- Streak achievements (7+ days)
+- Broken streak warnings
+- Low completion rate detection
+- Consistency celebration
+
+**Actions:**
+| Action | Description |
+|--------|-------------|
+| `create_habit` | Create new habit to track |
+| `complete_habit` | Mark habit done for today |
+| `update_habit` | Modify habit properties |
+| `delete_habit` | Soft-delete (deactivate) habit |
+| `get_habit_history` | Completion history for habit |
+
+### Added - Database Migration
+
+**Migration:** `20260202000014_mood_habit_tables.sql`
+
+**Tables:**
+- `exo_mood_entries` - Mood check-in records
+- `exo_habits` - Habit definitions
+- `exo_habit_completions` - Completion log
+
+**Indexes:**
+- Efficient queries by tenant + date
+- Fast lookup for today's entries
+
+**Analytics Views:**
+- `silver_mood_daily` - Daily mood aggregations
+- `silver_habits_weekly` - Weekly completion rates
+
+### Changed - Executor Registry
+
+**Updated:** `lib/mods/executors/index.ts`
+- Added `MoodTrackerExecutor`
+- Added `HabitTrackerExecutor`
+- Factory functions for both
+
+**Implemented Mods:** 3 total
+- task-manager
+- mood-tracker
+- habit-tracker
+
+### Notes for Future Agents
+- Both Mods are standalone (no Rigs required)
+- Use `x-tenant-id` header for API calls
+- Mood check-in times configurable in mod config
+- Habit soft-delete preserves completion history
+
+---
+
+## [2026-02-02] Multi-Model AI Router
+
+### Added - Intelligent AI Model Routing
+
+**Multi-Model Router** (`lib/ai/`)
+Complete AI cost optimization system with 4-tier model routing:
+
+| Tier | Model | Cost/1M | Use Cases |
+|------|-------|---------|-----------|
+| 1 | Gemini 1.5 Flash | $0.075 | Classification, simple responses |
+| 2 | Claude 3.5 Haiku | $0.80 | Summarization, analysis |
+| 3 | Kimi K2.5 | ~$0.50 | Complex reasoning, long context |
+| 4 | Claude Opus 4.5 | $15.00 | Crisis, meta-coordination |
+
+**Core Components:**
+- `lib/ai/types.ts` - TypeScript interfaces for entire AI system
+- `lib/ai/config.ts` - Model configurations, pricing, tier mappings
+- `lib/ai/task-classifier.ts` - Automatic task complexity classification
+- `lib/ai/circuit-breaker.ts` - Failure handling with cooldown
+- `lib/ai/model-router.ts` - Central routing logic with escalation
+- `lib/ai/index.ts` - Factory functions and convenience API
+
+**Provider Implementations:**
+- `lib/ai/providers/gemini-provider.ts` - Google Gemini integration
+- `lib/ai/providers/anthropic-provider.ts` - Claude Haiku & Opus
+- `lib/ai/providers/kimi-provider.ts` - Moonshot AI (Kimi K2.5)
+
+**Features:**
+- Automatic task classification based on keywords and complexity
+- Tier escalation on failure (1 → 2 → 3 → 4)
+- Circuit breaker with 5-minute cooldown after 3 failures
+- Task history learning (reuses successful models)
+- Cost estimation per request
+- Usage tracking (database migration included)
+
+**API:**
+```typescript
+import { aiChat, aiQuick, aiCritical } from '@/lib/ai'
+
+// Auto-routed based on complexity
+const response = await aiChat(messages)
+
+// Explicit tier hints
+await aiChat(messages, { taskCategory: 'simple_response' }) // Tier 1
+await aiChat(messages, { forceTier: 4 })                    // Tier 4
+await aiQuick(prompt)    // Tier 1 - Gemini Flash
+await aiCritical(prompt) // Tier 4 - Claude Opus
+```
+
+### Added - Database Migration
+- `supabase/migrations/20260202000013_ai_usage_tracking.sql`
+- `exo_ai_usage` table for request tracking
+- `mv_ai_daily_costs` materialized view for cost analysis
+- Helper functions: `log_ai_usage()`, `get_ai_usage_summary()`
+
+### Changed - Greeting Generation
+- `app/api/generate-greeting/route.ts` now uses Multi-Model Router
+- Routes to Tier 1 (Gemini Flash) for cost optimization
+- ~95% cost reduction vs direct GPT-4 calls
+
+### Dependencies
+```bash
+npm install @anthropic-ai/sdk @google/generative-ai
+```
+
+### Environment Variables Required
+```env
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_AI_API_KEY=AIza...
+KIMI_API_KEY=sk-...  # Optional
+```
+
+---
+
 ## [2026-02-02] Google Tasks Integration
 
 ### Added - Google Tasks API
