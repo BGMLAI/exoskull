@@ -1,12 +1,13 @@
 // =====================================================
 // TASK MANAGER MOD EXECUTOR
-// Unified task management across Notion + Todoist
+// Unified task management across Google Tasks + Notion + Todoist
 // =====================================================
 
 import { createClient } from '@supabase/supabase-js';
 import { IModExecutor, ModInsight, ModAction, ModSlug } from '../types';
 import { NotionClient, createNotionClient, NotionPage } from '../../rigs/notion/client';
 import { TodoistClient, createTodoistClient, TodoistTask } from '../../rigs/todoist/client';
+import { GoogleWorkspaceClient, createGoogleWorkspaceClient, GoogleTask } from '../../rigs/google-workspace/client';
 import { RigConnection } from '../../rigs/types';
 
 // =====================================================
@@ -15,7 +16,7 @@ import { RigConnection } from '../../rigs/types';
 
 interface UnifiedTask {
   id: string;
-  source: 'notion' | 'todoist' | 'exoskull';
+  source: 'google' | 'notion' | 'todoist' | 'exoskull';
   title: string;
   description?: string;
   status: 'todo' | 'in_progress' | 'done';
@@ -33,6 +34,7 @@ interface TaskManagerConfig {
   auto_prioritize?: boolean;
   notion_database_id?: string;
   todoist_project_id?: string;
+  google_tasklist_id?: string;
 }
 
 // =====================================================
@@ -72,6 +74,11 @@ export class TaskManagerExecutor implements IModExecutor {
   private async getTodoistClient(tenantId: string): Promise<TodoistClient | null> {
     const connection = await this.getRigConnection(tenantId, 'todoist');
     return connection ? createTodoistClient(connection) : null;
+  }
+
+  private async getGoogleWorkspaceClient(tenantId: string): Promise<GoogleWorkspaceClient | null> {
+    const connection = await this.getRigConnection(tenantId, 'google-workspace');
+    return connection ? createGoogleWorkspaceClient(connection) : null;
   }
 
   private async getConfig(tenantId: string): Promise<TaskManagerConfig> {
@@ -169,12 +176,28 @@ export class TaskManagerExecutor implements IModExecutor {
     };
   }
 
+  private googleTaskToUnified(task: GoogleTask, taskListId: string): UnifiedTask {
+    return {
+      id: `google:${taskListId}:${task.id}`,
+      source: 'google',
+      title: task.title,
+      description: task.notes || undefined,
+      status: task.status === 'completed' ? 'done' : 'todo',
+      priority: 'medium', // Google Tasks doesn't have priority
+      dueDate: task.due?.split('T')[0], // Extract YYYY-MM-DD from RFC 3339
+      url: task.selfLink,
+      createdAt: task.updated, // Google Tasks only provides updated time
+      updatedAt: task.updated,
+    };
+  }
+
   // =====================================================
   // INTERFACE IMPLEMENTATION
   // =====================================================
 
   async getData(tenantId: string): Promise<Record<string, unknown>> {
-    const [notionClient, todoistClient, config] = await Promise.all([
+    const [googleClient, notionClient, todoistClient, config] = await Promise.all([
+      this.getGoogleWorkspaceClient(tenantId),
       this.getNotionClient(tenantId),
       this.getTodoistClient(tenantId),
       this.getConfig(tenantId),
@@ -183,6 +206,19 @@ export class TaskManagerExecutor implements IModExecutor {
     const tasks: UnifiedTask[] = [];
     const sources: string[] = [];
     const errors: string[] = [];
+
+    // Fetch from Google Tasks (primary)
+    if (googleClient) {
+      sources.push('google');
+      try {
+        const taskListId = config.google_tasklist_id || '@default';
+        const googleTasks = await googleClient.getActiveTasks(taskListId);
+        tasks.push(...googleTasks.map((t) => this.googleTaskToUnified(t, taskListId)));
+      } catch (err) {
+        console.error('[TaskManager] Google Tasks fetch failed:', err);
+        errors.push(`Google Tasks: ${(err as Error).message}`);
+      }
+    }
 
     // Fetch from Notion
     if (notionClient) {
@@ -361,10 +397,25 @@ export class TaskManagerExecutor implements IModExecutor {
             description?: string;
             priority?: string;
             due_date?: string;
-            source?: 'todoist' | 'notion' | 'exoskull';
+            source?: 'google' | 'todoist' | 'notion' | 'exoskull';
           };
 
-          const targetSource = source || 'exoskull';
+          const targetSource = source || 'google'; // Default to Google Tasks
+
+          if (targetSource === 'google') {
+            const client = await this.getGoogleWorkspaceClient(tenantId);
+            const config = await this.getConfig(tenantId);
+            if (!client) return { success: false, error: 'Google Workspace not connected' };
+
+            const taskListId = config.google_tasklist_id || '@default';
+            const task = await client.createTask(taskListId, {
+              title,
+              notes: description,
+              due: due_date ? `${due_date}T00:00:00.000Z` : undefined,
+            });
+
+            return { success: true, result: { id: `google:${taskListId}:${task.id}`, task } };
+          }
 
           if (targetSource === 'todoist') {
             const client = await this.getTodoistClient(tenantId);
@@ -418,9 +469,20 @@ export class TaskManagerExecutor implements IModExecutor {
 
         case 'complete_task': {
           const { task_id } = params as { task_id: string };
-          const [source, id] = task_id.split(':');
+          const parts = task_id.split(':');
+          const source = parts[0];
+
+          if (source === 'google') {
+            // Format: google:taskListId:taskId
+            const [, taskListId, taskId] = parts;
+            const client = await this.getGoogleWorkspaceClient(tenantId);
+            if (!client) return { success: false, error: 'Google Workspace not connected' };
+            await client.completeTask(taskListId, taskId);
+            return { success: true };
+          }
 
           if (source === 'todoist') {
+            const [, id] = parts;
             const client = await this.getTodoistClient(tenantId);
             if (!client) return { success: false, error: 'Todoist not connected' };
             await client.completeTask(id);
@@ -428,6 +490,7 @@ export class TaskManagerExecutor implements IModExecutor {
           }
 
           if (source === 'notion') {
+            const [, id] = parts;
             const client = await this.getNotionClient(tenantId);
             if (!client) return { success: false, error: 'Notion not connected' };
             await client.completeTask(id);
@@ -435,6 +498,7 @@ export class TaskManagerExecutor implements IModExecutor {
           }
 
           if (source === 'exoskull') {
+            const [, id] = parts;
             const { error } = await this.supabase
               .from('exo_tasks')
               .update({ status: 'done', completed_at: new Date().toISOString() })
@@ -497,7 +561,7 @@ export class TaskManagerExecutor implements IModExecutor {
       {
         slug: 'create_task',
         name: 'Create Task',
-        description: 'Create a new task in Todoist, Notion, or ExoSkull',
+        description: 'Create a new task in Google Tasks, Todoist, Notion, or ExoSkull',
         params_schema: {
           type: 'object',
           required: ['title'],
@@ -506,7 +570,7 @@ export class TaskManagerExecutor implements IModExecutor {
             description: { type: 'string', description: 'Task description' },
             priority: { type: 'string', enum: ['low', 'medium', 'high', 'urgent'] },
             due_date: { type: 'string', format: 'date', description: 'Due date (YYYY-MM-DD)' },
-            source: { type: 'string', enum: ['todoist', 'notion', 'exoskull'], default: 'exoskull' },
+            source: { type: 'string', enum: ['google', 'todoist', 'notion', 'exoskull'], default: 'google' },
           },
         },
       },
@@ -518,7 +582,7 @@ export class TaskManagerExecutor implements IModExecutor {
           type: 'object',
           required: ['task_id'],
           properties: {
-            task_id: { type: 'string', description: 'Task ID (format: source:id)' },
+            task_id: { type: 'string', description: 'Task ID (format: source:id or source:listId:id for Google)' },
           },
         },
       },

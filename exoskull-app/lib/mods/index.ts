@@ -80,15 +80,16 @@ export const MOD_DEFINITIONS = {
   'task-manager': {
     slug: 'task-manager' as const,
     name: 'Task Manager',
-    description: 'Unified task management synced with your tools',
+    description: 'Unified task management synced with Google Tasks, Todoist, and Notion',
     icon: '📋',
     category: 'productivity' as const,
-    requires_rigs: ['todoist', 'notion'],
+    requires_rigs: ['google-workspace', 'todoist', 'notion'],
     config_schema: {
       type: 'object',
       properties: {
         default_project: { type: 'string' },
         auto_prioritize: { type: 'boolean', default: true },
+        google_tasklist_id: { type: 'string', description: 'Google Task List ID (default: @default)' },
       },
     },
     capabilities: {
