@@ -90,8 +90,49 @@ export default function TasksPage() {
   })
 
   useEffect(() => {
-    loadTasks()
+    initializeAndLoadTasks()
   }, [])
+
+  async function ensureTenantExists() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return false
+
+      // Check if tenant exists
+      const { data: existing } = await supabase
+        .from('exo_tenants')
+        .select('id')
+        .eq('id', user.id)
+        .single()
+
+      if (!existing) {
+        // Create tenant record
+        const { error } = await supabase
+          .from('exo_tenants')
+          .insert({
+            id: user.id,
+            name: user.email?.split('@')[0] || 'User',
+            email: user.email,
+            created_at: new Date().toISOString()
+          })
+
+        if (error) {
+          console.error('[EnsureTenant] Failed to create tenant:', error)
+          return false
+        }
+        console.log('[EnsureTenant] Created tenant for user:', user.id)
+      }
+      return true
+    } catch (error) {
+      console.error('[EnsureTenant] Error:', error)
+      return false
+    }
+  }
+
+  async function initializeAndLoadTasks() {
+    await ensureTenantExists()
+    await loadTasks()
+  }
 
   async function loadTasks() {
     try {
@@ -116,6 +157,12 @@ export default function TasksPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
+      // Ensure tenant exists before creating task
+      const tenantReady = await ensureTenantExists()
+      if (!tenantReady) {
+        throw new Error('Failed to initialize user profile')
+      }
+
       const { error } = await supabase.from('exo_tasks').insert({
         tenant_id: user.id,
         title: formData.title,
@@ -133,8 +180,11 @@ export default function TasksPage() {
       setIsCreateDialogOpen(false)
       resetForm()
     } catch (error) {
-      console.error('Error creating task:', error)
-      alert('Nie udało się utworzyć zadania')
+      console.error('[CreateTask] Error:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        error
+      })
+      alert(`Nie udało się utworzyć zadania: ${error instanceof Error ? error.message : 'Nieznany błąd'}`)
     }
   }
 

@@ -103,6 +103,7 @@ export async function POST(req: NextRequest) {
     const results = {
       timestamp: new Date().toISOString(),
       jobs_checked: jobs?.length || 0,
+      custom_jobs_checked: 0,
       jobs_triggered: 0,
       users_notified: 0,
       errors: [] as string[],
@@ -204,6 +205,9 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Process custom scheduled jobs
+    await processCustomScheduledJobs(results)
+
     const duration = Date.now() - startTime
     console.log(`\n✅ Master Scheduler complete in ${duration}ms`)
     console.log(`   Jobs: ${results.jobs_triggered}/${results.jobs_checked}`)
@@ -247,6 +251,193 @@ async function logJobExecution(
     })
   } catch (error) {
     console.error('Failed to log job execution:', error)
+  }
+}
+
+/**
+ * Process custom user-created scheduled jobs
+ */
+async function processCustomScheduledJobs(results: {
+  custom_jobs_checked: number
+  jobs_triggered: number
+  users_notified: number
+  errors: string[]
+  details: any[]
+}) {
+  try {
+    const currentHour = new Date().getHours()
+    const currentMinute = new Date().getMinutes()
+
+    // Get all enabled custom jobs that should run now
+    // We check if the time_of_day hour matches current hour (within cron window)
+    const { data: customJobs, error: customError } = await supabase
+      .from('exo_custom_scheduled_jobs')
+      .select(`
+        *,
+        tenant:exo_tenants!exo_custom_scheduled_jobs_tenant_id_fkey (
+          id, phone, timezone, language, name, schedule_settings
+        )
+      `)
+      .eq('is_enabled', true)
+
+    if (customError) {
+      console.error('❌ Failed to fetch custom jobs:', customError)
+      results.errors.push(`Custom jobs: ${customError.message}`)
+      return
+    }
+
+    if (!customJobs || customJobs.length === 0) {
+      console.log('📋 No custom jobs to process')
+      return
+    }
+
+    results.custom_jobs_checked = customJobs.length
+    console.log(`\n📋 Processing ${customJobs.length} custom jobs`)
+
+    for (const customJob of customJobs) {
+      try {
+        const tenant = customJob.tenant
+        if (!tenant || !tenant.phone) {
+          console.log(`   ⏭️ ${customJob.display_name}: No tenant or phone`)
+          continue
+        }
+
+        const timezone = tenant.timezone || 'Europe/Warsaw'
+
+        // Check if job should run based on schedule type and current time
+        if (!shouldCustomJobRunNow(customJob, timezone)) {
+          continue
+        }
+
+        console.log(`   👤 Custom job "${customJob.display_name}" for tenant ${tenant.id}`)
+
+        // Check quiet hours
+        const settings = tenant.schedule_settings || {}
+        const quietStart = settings.quiet_hours?.start || '22:00'
+        const quietEnd = settings.quiet_hours?.end || '07:00'
+        if (isInQuietHours(timezone, quietStart, quietEnd)) {
+          console.log(`      ⏭️ Skipped (quiet hours)`)
+          await logCustomJobExecution(customJob, 'skipped', null, 'Quiet hours')
+          continue
+        }
+
+        // Check rate limits
+        const { data: withinLimits } = await supabase.rpc('check_user_rate_limit', {
+          p_tenant_id: tenant.id,
+          p_channel: customJob.channel
+        })
+
+        if (!withinLimits) {
+          console.log(`      ⏭️ Skipped (rate limited)`)
+          await logCustomJobExecution(customJob, 'rate_limited')
+          continue
+        }
+
+        // Create a job-like object for dispatcher
+        const fakeJob: ScheduledJob = {
+          id: customJob.id,
+          job_name: customJob.job_name,
+          display_name: customJob.display_name,
+          job_type: customJob.job_type || 'custom',
+          time_window_start: customJob.time_of_day,
+          time_window_end: customJob.time_of_day,
+          default_channel: customJob.channel as 'voice' | 'sms',
+          handler_endpoint: ''
+        }
+
+        const userConfig: UserJobConfig = {
+          tenant_id: tenant.id,
+          phone: tenant.phone,
+          timezone,
+          language: tenant.language || 'pl',
+          preferred_channel: customJob.channel,
+          custom_time: customJob.time_of_day,
+          tenant_name: tenant.name,
+          schedule_settings: settings
+        }
+
+        // Dispatch the job
+        const dispatchResult = await dispatchJob(fakeJob, userConfig)
+
+        if (dispatchResult.success) {
+          console.log(`      ✅ ${dispatchResult.channel.toUpperCase()} sent`)
+          results.jobs_triggered++
+          results.users_notified++
+          await logCustomJobExecution(customJob, 'completed', dispatchResult)
+
+          // Update last_executed_at
+          await supabase
+            .from('exo_custom_scheduled_jobs')
+            .update({ last_executed_at: new Date().toISOString() })
+            .eq('id', customJob.id)
+        } else {
+          console.log(`      ❌ Failed: ${dispatchResult.error}`)
+          results.errors.push(`Custom ${customJob.display_name}: ${dispatchResult.error}`)
+          await logCustomJobExecution(customJob, 'failed', dispatchResult)
+        }
+
+        // Small delay between jobs
+        await new Promise(resolve => setTimeout(resolve, 200))
+
+      } catch (jobError: any) {
+        console.error(`   ❌ Error processing custom job ${customJob.display_name}:`, jobError)
+        results.errors.push(`Custom ${customJob.display_name}: ${jobError.message}`)
+      }
+    }
+
+  } catch (error: any) {
+    console.error('❌ Failed to process custom jobs:', error)
+    results.errors.push(`Custom jobs processing: ${error.message}`)
+  }
+}
+
+/**
+ * Check if a custom job should run based on schedule type and current time
+ */
+function shouldCustomJobRunNow(job: any, timezone: string): boolean {
+  const dayOfWeek = getDayOfWeek(timezone)
+  const dayOfMonth = getDayOfMonth(timezone)
+
+  // Check schedule type constraints
+  if (job.schedule_type === 'weekly') {
+    if (!job.days_of_week || !job.days_of_week.includes(dayOfWeek)) {
+      return false
+    }
+  }
+
+  if (job.schedule_type === 'monthly') {
+    if (job.day_of_month !== dayOfMonth) {
+      return false
+    }
+  }
+
+  // Check time window (within 10 minutes of target time)
+  const targetTime = job.time_of_day
+  return isTimeToTrigger(timezone, targetTime, 10)
+}
+
+/**
+ * Log custom job execution to database
+ */
+async function logCustomJobExecution(
+  job: any,
+  status: string,
+  result?: any,
+  errorMessage?: string
+) {
+  try {
+    await supabase
+      .from('exo_custom_job_logs')
+      .insert({
+        job_id: job.id,
+        tenant_id: job.tenant_id,
+        status,
+        channel_used: result?.channel || job.channel,
+        result: result ? result : null,
+        error_message: errorMessage || result?.error || null
+      })
+  } catch (error) {
+    console.error('Failed to log custom job execution:', error)
   }
 }
 
