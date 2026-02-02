@@ -4,6 +4,216 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-02] Notion + Todoist Integration & Task Manager Mod
+
+### Added - Rig Clients
+
+**Notion Client** (`lib/rigs/notion/client.ts`)
+- Full Notion API v2022-06-28 integration
+- Search (pages, databases)
+- Pages (CRUD, archive)
+- Databases (query, get all items)
+- Blocks (page content, append, delete)
+- Users (list, me)
+- Task helpers (createTask, completeTask)
+- Dashboard data aggregation
+
+**Todoist Client** (`lib/rigs/todoist/client.ts`)
+- Full Todoist REST API v2 integration
+- Tasks (CRUD, complete, reopen)
+- Projects (CRUD)
+- Sections (CRUD)
+- Labels (CRUD)
+- Comments (CRUD)
+- Filters (today, overdue, 7 days, high priority)
+- Productivity stats (Sync API)
+- Dashboard data aggregation
+
+### Added - Task Manager Mod Executor
+
+**First Mod Implementation** (`lib/mods/executors/task-manager.ts`)
+- Implements `IModExecutor` interface
+- Unified task view across Notion + Todoist + ExoSkull internal tasks
+- Task normalization (source, title, status, priority, dueDate)
+- Priority sorting (urgent → high → medium → low)
+- Insights generation:
+  - Overdue tasks alert
+  - High priority count warning
+  - Due today notification
+  - Completion rate tracking
+
+**Actions:**
+| Action | Description |
+|--------|-------------|
+| `create_task` | Create in Todoist, Notion, or ExoSkull |
+| `complete_task` | Mark task as done in any source |
+| `update_priority` | Change task priority |
+| `sync` | Force refresh from all sources |
+
+### Added - API Routes
+
+**Mod API** (`app/api/mods/[slug]/route.ts`)
+- GET: Get mod data, insights, actions
+- POST: Execute mod action
+
+**Rig Sync API** (`app/api/rigs/[slug]/sync/route.ts`)
+- POST: Trigger manual sync for any Rig
+- GET: Get sync status and history
+- Supports: Notion, Todoist, Google Workspace, Microsoft 365, Google Fit
+
+### Added - Executor Registry
+
+**Executor Index** (`lib/mods/executors/index.ts`)
+- `getModExecutor(slug)` - Get executor for a mod
+- `hasModExecutor(slug)` - Check if mod is implemented
+- `getImplementedMods()` - List implemented mods
+
+### Environment Variables Required
+```
+NOTION_CLIENT_ID=
+NOTION_CLIENT_SECRET=
+TODOIST_CLIENT_ID=
+TODOIST_CLIENT_SECRET=
+```
+
+### Notes for Future Agents
+- Task Manager Mod is first fully working Mod
+- Pattern established for other Mod implementations
+- Notion/Todoist OAuth configs already in `lib/rigs/oauth.ts`
+- Use `x-tenant-id` header for all Mod/Rig API calls
+
+---
+
+## [2026-02-02] Voice Schedule Tools
+
+### Fixed
+- **Cloudflare Tunnel** - VAPI nie mogło wywoływać narzędzi (tunel nieaktywny)
+
+### Added - Voice Schedule Tools
+- `get_schedule` - Lista check-inów użytkownika
+- `create_checkin` - Nowe przypomnienie (name, time, frequency, channel, message)
+- `toggle_checkin` - Włącz/wyłącz check-in
+
+### Added - Database
+- **Migration:** `20260202000012_user_checkins.sql`
+- **Table:** `exo_user_checkins`
+
+### Files Changed
+- `components/voice/GlobalVoiceButton.tsx` - 3 nowe narzędzia VAPI
+- `app/api/voice/tools/route.ts` - Handlery schedule
+- `lib/voice/system-prompt.ts` - Sekcja 3.5 Harmonogram
+
+---
+
+## [2026-02-02] Android & Workspace Rigs
+
+### Added - New Rigs
+**Migration:** `20260202000011_android_workspace_rigs.sql`
+
+- **Google Fit / HealthConnect** - Steps, sleep, heart rate from Android
+- **Google Workspace** - Gmail, Calendar, Drive unified
+- **Microsoft 365** - Outlook, Calendar, OneDrive, Teams
+
+### Added - OAuth Infrastructure
+- `lib/rigs/oauth.ts` - Universal OAuth handler with configs for all providers
+- `app/api/rigs/[slug]/connect/route.ts` - Start OAuth flow
+- `app/api/rigs/[slug]/callback/route.ts` - Handle OAuth callback
+
+### Added - API Clients
+- `lib/rigs/google-fit/client.ts` - Google Fit API (steps, sleep, heart rate, calories)
+- `lib/rigs/google-workspace/client.ts` - Gmail, Calendar, Drive APIs
+- `lib/rigs/microsoft-365/client.ts` - Outlook, Calendar, OneDrive APIs
+
+### Environment Variables Required
+```
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+```
+
+---
+
+## [2026-02-02] Mods & Rigs System (Exoskulleton)
+
+### Added - Database Schema
+**Migration:** `20260202000010_mods_rigs_schema.sql`
+
+New tables:
+- `exo_registry` - Registry of all Mods, Rigs, and Quests
+- `exo_user_installations` - User's installed items
+- `exo_rig_connections` - OAuth tokens for Rig integrations
+- `exo_rig_sync_log` - Sync history
+
+### Added - Seed Data
+Pre-populated registry with:
+- **10 Rigs:** Oura, Fitbit, Apple Health, Google Calendar, Notion, Todoist, Philips Hue, Home Assistant, Plaid, Stripe
+- **9 Mods:** Sleep Tracker, Energy Monitor, HRV Tracker, Focus Mode, Task Manager, Calendar Assistant, Mood Tracker, Habit Tracker, Spending Tracker
+- **5 Quests:** 7-Day Sleep Reset, Digital Detox, Morning Routine, Mindfulness Week, Fitness Kickstart
+
+### Added - API Routes
+- `GET /api/registry` - Browse Exoskulleton marketplace
+- `GET /api/registry/[slug]` - Get item details
+- `GET /api/installations` - User's installed items
+- `POST /api/installations` - Install mod/rig/quest
+- `PATCH /api/installations/[id]` - Update config
+- `DELETE /api/installations/[id]` - Uninstall
+
+### Added - Type Definitions
+- `lib/rigs/types.ts` - Rig interfaces
+- `lib/rigs/index.ts` - Rig definitions with OAuth config
+- `lib/mods/types.ts` - Mod interfaces
+- `lib/mods/index.ts` - Mod definitions with capabilities
+
+---
+
+## [2026-02-02] IP Research & Final Cleanup
+
+### Research - IP/Legal Analysis
+Completed comprehensive research on intellectual property compliance:
+- **OpenClaw** - MIT License allows unrestricted use (SAFE)
+- **Claude Code** - Not used as component, only Anthropic API (SAFE)
+- **Anthropic API** - Commercial use allowed for non-competing products (SAFE)
+
+### Removed - Remaining External References from ARCHITECTURE.md
+- Line 257: `(OpenClaw-compatible)` → removed
+- Line 1911: `NEW (OpenClaw)` → `NEW`
+- Line 1916: `NEW (OpenClaw)` → `NEW`
+- Line 1922: `ENHANCED (MemOS)` → `ENHANCED`
+- Line 1924: `NEW (MemOS)` → `NEW`
+- Line 1925: `Moved + Pi Agent` → `MOVED`
+- Line 2987: `3.1 (OpenClaw + IORS...)` → `3.1`
+
+### Verified - No IP Violations
+ExoSkull does NOT violate any intellectual property rights of:
+- OpenClaw (MIT License - full commercial use allowed)
+- Claude Code (not used as component)
+- Anthropic (API usage per Commercial Terms)
+
+---
+
+## [2026-02-02] Terminology & IP Protection
+
+### Added - Gaming/Sci-Fi Terminology
+**ARCHITECTURE.md** now uses consistent naming:
+- **Mods** = User-facing abilities & extensions (sleep tracker, focus mode)
+- **Rigs** = Tools & integrations (Oura sync, Calendar)
+- **Quests** = Weekly development programs (7-day challenges)
+- **Exoskulleton** = Marketplace/catalog for Mods, Rigs, Quests
+
+### Removed - External Brand References
+Removed all "inspired by", "X-pattern", "X-style" references that could suggest copying:
+- Cleaned ARCHITECTURE.md (OpenClaw, MemOS, Pi Agent references)
+- Changed "SOURCES & INSPIRATION" → "TECHNOLOGY STACK"
+- Kept brand names we USE (Kimi, LangGraph, Claude) - that's tech stack, not copying
+
+### Added - IP Guardrails
+**CLAUDE.md** now includes:
+- Never mention architecture was "inspired by" external products
+- TODO: Legal research before launch (trademarks, IP review)
+
+---
+
 ## [2026-02-02] Application Testing & Bug Fixes
 
 ### Fixed - Tasks RLS Policy
