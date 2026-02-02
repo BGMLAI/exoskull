@@ -9,12 +9,16 @@ export type RigSlug =
   | 'fitbit'
   | 'apple-health'
   | 'google-calendar'
+  | 'google-fit'
+  | 'google-workspace'
+  | 'microsoft-365'
   | 'notion'
   | 'todoist'
   | 'philips-hue'
   | 'home-assistant'
   | 'plaid'
-  | 'stripe';
+  | 'stripe'
+  | 'health-connect';
 
 export interface RigDefinition {
   slug: RigSlug;

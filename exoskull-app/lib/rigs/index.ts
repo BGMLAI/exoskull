@@ -258,6 +258,24 @@ export const RIG_DEFINITIONS = {
       dataTypes: ['emails', 'events', 'files'],
     },
   },
+
+  'health-connect': {
+    slug: 'health-connect' as const,
+    name: 'Health Connect',
+    description: 'Android Health Connect - sen, kroki, puls, HRV',
+    icon: '❤️',
+    category: 'health' as const,
+    // No OAuth - data pushed from Android bridge app
+    oauth: undefined,
+    api: {
+      baseUrl: '', // No external API - data comes from device
+      rateLimit: { requests: 1000, period: 'hour' as const },
+    },
+    sync: {
+      frequency: 'hourly' as const,
+      dataTypes: ['steps', 'sleep', 'heart_rate', 'hrv', 'calories', 'distance'],
+    },
+  },
 } as const;
 
 export type RigSlugKey = keyof typeof RIG_DEFINITIONS;
