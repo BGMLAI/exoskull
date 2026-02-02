@@ -4,6 +4,53 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-02] Application Testing & Bug Fixes
+
+### Fixed - Tasks RLS Policy
+**Problem:** Użytkownicy nie mogli dodawać zadań przez dashboard
+**Root cause:** Polityka RLS miała tylko `USING` bez `WITH CHECK` - INSERT wymaga obu
+**Solution:** Dodano `WITH CHECK (tenant_id = auth.uid())`
+
+**Migrations:**
+- `20260202000008_fix_tasks_rls.sql` - Naprawiona polityka RLS
+- `20260202000009_drop_permissive_policy.sql` - Usunięta zbyt permisywna polityka
+
+### Fixed - Migration Duplicate
+**Problem:** Dwa pliki migracji z tym samym numerem 20260202000004
+**Solution:** Przemianowano `silver_to_public.sql` na `20260202000007`
+
+### Fixed - Silver Layer RLS Idempotency
+**Problem:** Migracja failowała przy ponownym uruchomieniu (polityki już istniały)
+**Solution:** Dodano `DROP POLICY IF EXISTS` przed każdym `CREATE POLICY`
+
+### Added - VAPI Webhook Handler
+**File:** `app/api/vapi/webhook/route.ts`
+
+Obsługuje:
+- `assistant-request` → zwraca `variableValues` (zadania, imię, historia)
+- `end-of-call-report` → zapisuje rozmowę do bazy
+- `function-call` → `get_tasks`, `create_task`, `complete_task`
+
+Wzorzec z IORS - zmienne wstrzykiwane przez webhook zamiast tool calls.
+
+### Changed - Voice System Prompt
+**File:** `lib/voice/system-prompt.ts`
+
+Usunięto instrukcje o narzędziach do zadań. Asystent teraz kieruje użytkowników do dashboardu dla zarządzania zadaniami. Rozmowa głosowa = dyskusja, wsparcie. Dashboard = zarządzanie listami.
+
+### Test Results
+| Test | Status |
+|------|--------|
+| Build (30 routes) | ✅ PASS |
+| TypeScript | ✅ PASS |
+| Bronze ETL | ✅ 200 OK, 345ms |
+| Silver ETL | ✅ 200 OK, 1559ms |
+| Gold ETL | ✅ 200 OK, 1202ms |
+| GHL Webhook | ✅ 200 OK |
+| Voice Tools | ✅ 200 OK |
+
+---
+
 ## [2026-02-02] GHL Private Integration Token Migration
 
 ### Changed - Simplified Authentication

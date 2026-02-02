@@ -8,7 +8,6 @@ import Vapi from '@vapi-ai/web'
 import { buildFullSystemPrompt } from '@/lib/voice/system-prompt'
 
 const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 export default function VoicePage() {
   const [isConnected, setIsConnected] = useState(false)
@@ -203,77 +202,12 @@ export default function VoicePage() {
         dayOfWeek: now.getDay(),
       })
 
-      // Start the call with inline assistant configuration + tools
+      // Start the call with inline assistant configuration (no tools - simpler, more reliable)
       await vapiInstance.start({
         model: {
           provider: 'openai',
           model: 'gpt-4o-mini',
-          systemPrompt,
-          tools: [
-            {
-              type: 'function',
-              function: {
-                name: 'get_tasks',
-                description: 'Pobierz liste zadan uzytkownika. Wywolaj na poczatku rozmowy i gdy user pyta o zadania.',
-                parameters: {
-                  type: 'object',
-                  properties: {},
-                  required: []
-                }
-              },
-              server: {
-                url: `${APP_URL}/api/voice/tools?tenant_id=${tenant_id}&conversation_id=${conversation.id}`
-              }
-            },
-            {
-              type: 'function',
-              function: {
-                name: 'create_task',
-                description: 'Dodaj nowe zadanie. Uzyj gdy user chce cos dodac do listy zadan.',
-                parameters: {
-                  type: 'object',
-                  properties: {
-                    title: {
-                      type: 'string',
-                      description: 'Tytul zadania - krotki i konkretny'
-                    },
-                    priority: {
-                      type: 'number',
-                      description: 'Priorytet: 1=pilne, 2=wazne, 3=normalne, 4=niski'
-                    },
-                    due_date: {
-                      type: 'string',
-                      description: 'Termin w formacie YYYY-MM-DD (opcjonalne)'
-                    }
-                  },
-                  required: ['title']
-                }
-              },
-              server: {
-                url: `${APP_URL}/api/voice/tools?tenant_id=${tenant_id}&conversation_id=${conversation.id}`
-              }
-            },
-            {
-              type: 'function',
-              function: {
-                name: 'complete_task',
-                description: 'Oznacz zadanie jako wykonane. Uzyj gdy user mowi ze cos zrobil.',
-                parameters: {
-                  type: 'object',
-                  properties: {
-                    task_id: {
-                      type: 'string',
-                      description: 'ID zadania do oznaczenia jako wykonane'
-                    }
-                  },
-                  required: ['task_id']
-                }
-              },
-              server: {
-                url: `${APP_URL}/api/voice/tools?tenant_id=${tenant_id}&conversation_id=${conversation.id}`
-              }
-            }
-          ]
+          systemPrompt
         } as any,
         voice: {
           provider: '11labs',
