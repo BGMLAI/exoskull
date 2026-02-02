@@ -1,0 +1,422 @@
+/**
+ * Self-Updating Mechanism
+ *
+ * Core engine for ExoSkull's self-learning system:
+ * - Extract highlights from conversations
+ * - Boost referenced highlights
+ * - Decay unused highlights
+ * - Log learning events
+ */
+
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import {
+  extractPotentialHighlights,
+  addHighlight,
+  boostHighlight,
+  getUserHighlights,
+  UserHighlight,
+} from '../memory/highlights'
+import {
+  SelfUpdateResult,
+  LearningEvent,
+  HighlightCandidate,
+} from '../agents/types'
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+const CONFIG = {
+  // Minimum confidence for AI-validated highlights
+  MIN_CONFIDENCE: 0.6,
+
+  // Maximum highlights per conversation
+  MAX_HIGHLIGHTS_PER_CONV: 5,
+
+  // Decay threshold (days since last boost)
+  DECAY_AFTER_DAYS: 30,
+
+  // Minimum importance after decay
+  MIN_IMPORTANCE: 1,
+
+  // Decay amount per cycle
+  DECAY_AMOUNT: 1,
+
+  // Hours to look back for unprocessed conversations
+  LOOKBACK_HOURS: 24,
+
+  // Max conversations per batch
+  BATCH_SIZE: 50,
+}
+
+// ============================================================================
+// SELF-UPDATER CLASS
+// ============================================================================
+
+export class SelfUpdater {
+  private supabase: SupabaseClient
+
+  constructor(supabaseClient?: SupabaseClient) {
+    this.supabase =
+      supabaseClient ||
+      createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+  }
+
+  // ============================================================================
+  // MAIN ENTRY POINT
+  // ============================================================================
+
+  /**
+   * Run the full self-update cycle
+   */
+  async runUpdateCycle(): Promise<SelfUpdateResult> {
+    const startTime = Date.now()
+    let highlightsAdded = 0
+    let highlightsBoosted = 0
+    let conversationsProcessed = 0
+    const patternsDetected: string[] = []
+
+    console.log('[SelfUpdater] Starting update cycle...')
+
+    try {
+      // 1. Get unprocessed conversations
+      const conversations = await this.getUnprocessedConversations()
+      console.log(
+        `[SelfUpdater] Found ${conversations.length} unprocessed conversations`
+      )
+
+      // 2. Process each conversation
+      for (const conv of conversations) {
+        const result = await this.processConversation(conv)
+        highlightsAdded += result.added
+        highlightsBoosted += result.boosted
+        conversationsProcessed++
+      }
+
+      // 3. Log summary event
+      await this.logLearningEvent({
+        type: 'agent_completed',
+        tenantId: 'system',
+        data: {
+          cycle: 'self_update',
+          conversationsProcessed,
+          highlightsAdded,
+          highlightsBoosted,
+          durationMs: Date.now() - startTime,
+        },
+        timestamp: new Date().toISOString(),
+      })
+
+      console.log(
+        `[SelfUpdater] Cycle complete: ${conversationsProcessed} convs, ` +
+          `${highlightsAdded} added, ${highlightsBoosted} boosted`
+      )
+    } catch (error) {
+      console.error('[SelfUpdater] Cycle failed:', error)
+    }
+
+    return {
+      highlightsAdded,
+      highlightsBoosted,
+      highlightsDecayed: 0, // Decay runs separately
+      patternsDetected,
+      mitsUpdated: false, // MIT detection runs separately
+      processingTimeMs: Date.now() - startTime,
+      conversationsProcessed,
+    }
+  }
+
+  // ============================================================================
+  // CONVERSATION PROCESSING
+  // ============================================================================
+
+  /**
+   * Process a single conversation for highlights
+   */
+  private async processConversation(conv: {
+    id: string
+    tenant_id: string
+    context: Record<string, unknown>
+  }): Promise<{ added: number; boosted: number }> {
+    let added = 0
+    let boosted = 0
+
+    try {
+      // 1. Get transcript from context
+      const transcript = this.extractTranscript(conv.context)
+      if (!transcript || transcript.length < 50) {
+        // Too short to be meaningful
+        await this.markProcessed(conv.id, 0)
+        return { added: 0, boosted: 0 }
+      }
+
+      // 2. Get existing highlights for this user
+      const existing = await getUserHighlights(this.supabase, conv.tenant_id)
+      const existingContents = existing.map((h) => h.content)
+
+      // 3. Extract potential highlights using regex patterns
+      const candidates = extractPotentialHighlights(transcript, existingContents)
+
+      // 4. Add high-confidence candidates
+      for (const candidate of candidates.slice(0, CONFIG.MAX_HIGHLIGHTS_PER_CONV)) {
+        if (candidate.importance >= 5) {
+          // Basic threshold
+          const result = await addHighlight(this.supabase, conv.tenant_id, {
+            category: candidate.category,
+            content: candidate.content,
+            importance: candidate.importance,
+            source: 'conversation',
+          })
+
+          if (result) {
+            added++
+            await this.logLearningEvent({
+              type: 'highlight_added',
+              tenantId: conv.tenant_id,
+              data: {
+                content: candidate.content,
+                category: candidate.category,
+                importance: candidate.importance,
+                conversationId: conv.id,
+              },
+              timestamp: new Date().toISOString(),
+            })
+          }
+        }
+      }
+
+      // 5. Boost existing highlights if referenced
+      for (const existingHighlight of existing) {
+        if (this.isReferenced(transcript, existingHighlight.content)) {
+          await boostHighlight(this.supabase, existingHighlight.id)
+          boosted++
+          await this.logLearningEvent({
+            type: 'highlight_boosted',
+            tenantId: conv.tenant_id,
+            data: {
+              highlightId: existingHighlight.id,
+              content: existingHighlight.content,
+              conversationId: conv.id,
+            },
+            timestamp: new Date().toISOString(),
+          })
+        }
+      }
+
+      // 6. Mark conversation as processed
+      await this.markProcessed(conv.id, added)
+    } catch (error) {
+      console.error(
+        `[SelfUpdater] Error processing conversation ${conv.id}:`,
+        error
+      )
+      // Still mark as processed to avoid infinite retries
+      await this.markProcessed(conv.id, 0)
+    }
+
+    return { added, boosted }
+  }
+
+  // ============================================================================
+  // HIGHLIGHT DECAY
+  // ============================================================================
+
+  /**
+   * Run decay cycle for unused highlights
+   */
+  async runDecayCycle(): Promise<{ decayed: number }> {
+    let decayed = 0
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - CONFIG.DECAY_AFTER_DAYS)
+
+    console.log(
+      `[SelfUpdater] Running decay cycle (cutoff: ${cutoffDate.toISOString()})`
+    )
+
+    try {
+      // Find highlights that haven't been boosted recently
+      const { data: staleHighlights, error } = await this.supabase
+        .from('user_memory_highlights')
+        .select('id, user_id, content, importance')
+        .lt('updated_at', cutoffDate.toISOString())
+        .gt('importance', CONFIG.MIN_IMPORTANCE)
+
+      if (error) {
+        console.error('[SelfUpdater] Error fetching stale highlights:', error)
+        return { decayed: 0 }
+      }
+
+      // Decay each highlight
+      for (const highlight of staleHighlights || []) {
+        const newImportance = Math.max(
+          CONFIG.MIN_IMPORTANCE,
+          highlight.importance - CONFIG.DECAY_AMOUNT
+        )
+
+        await this.supabase
+          .from('user_memory_highlights')
+          .update({ importance: newImportance })
+          .eq('id', highlight.id)
+
+        decayed++
+        await this.logLearningEvent({
+          type: 'highlight_decayed',
+          tenantId: highlight.user_id,
+          data: {
+            highlightId: highlight.id,
+            content: highlight.content,
+            oldImportance: highlight.importance,
+            newImportance,
+          },
+          timestamp: new Date().toISOString(),
+        })
+      }
+
+      console.log(`[SelfUpdater] Decayed ${decayed} highlights`)
+    } catch (error) {
+      console.error('[SelfUpdater] Decay cycle failed:', error)
+    }
+
+    return { decayed }
+  }
+
+  // ============================================================================
+  // AI-ENHANCED EXTRACTION (Optional, uses more tokens)
+  // ============================================================================
+
+  /**
+   * Use AI to validate and enhance highlight candidates
+   * Only call this for high-value conversations
+   */
+  async validateWithAI(
+    transcript: string,
+    candidates: HighlightCandidate[],
+    tenantId: string
+  ): Promise<HighlightCandidate[]> {
+    // TODO: Integrate with ModelRouter for AI validation
+    // For now, return candidates as-is
+    return candidates
+  }
+
+  // ============================================================================
+  // HELPERS
+  // ============================================================================
+
+  private async getUnprocessedConversations(): Promise<
+    Array<{ id: string; tenant_id: string; context: Record<string, unknown> }>
+  > {
+    const { data, error } = await this.supabase.rpc('get_unprocessed_conversations', {
+      p_limit: CONFIG.BATCH_SIZE,
+      p_hours_back: CONFIG.LOOKBACK_HOURS,
+    })
+
+    if (error) {
+      console.error('[SelfUpdater] Error fetching conversations:', error)
+      return []
+    }
+
+    return data || []
+  }
+
+  private extractTranscript(context: Record<string, unknown>): string {
+    // Try different paths where transcript might be stored
+    if (typeof context.transcript === 'string') {
+      return context.transcript
+    }
+    if (typeof context.summary === 'string') {
+      return context.summary
+    }
+    if (Array.isArray(context.messages)) {
+      return context.messages
+        .map((m: { role?: string; content?: string }) =>
+          `${m.role || 'unknown'}: ${m.content || ''}`
+        )
+        .join('\n')
+    }
+    return ''
+  }
+
+  private isReferenced(transcript: string, content: string): boolean {
+    // Simple substring check (case-insensitive)
+    const lowerTranscript = transcript.toLowerCase()
+    const lowerContent = content.toLowerCase()
+
+    // Check for significant overlap (at least 3 words match)
+    const contentWords = lowerContent.split(/\s+/).filter((w) => w.length > 3)
+    const matchingWords = contentWords.filter((word) =>
+      lowerTranscript.includes(word)
+    )
+
+    return matchingWords.length >= Math.min(3, contentWords.length)
+  }
+
+  private async markProcessed(conversationId: string, highlightsCount: number): Promise<void> {
+    await this.supabase.rpc('mark_conversation_processed', {
+      p_conversation_id: conversationId,
+      p_highlights_count: highlightsCount,
+    })
+  }
+
+  private async logLearningEvent(event: LearningEvent): Promise<void> {
+    try {
+      await this.supabase.rpc('log_learning_event', {
+        p_tenant_id: event.tenantId,
+        p_event_type: event.type,
+        p_data: event.data,
+        p_agent_id: event.agentId || null,
+      })
+    } catch (error) {
+      console.error('[SelfUpdater] Failed to log event:', error)
+    }
+  }
+}
+
+// ============================================================================
+// CONVENIENCE FUNCTIONS
+// ============================================================================
+
+let updaterInstance: SelfUpdater | null = null
+
+export function getSelfUpdater(): SelfUpdater {
+  if (!updaterInstance) {
+    updaterInstance = new SelfUpdater()
+  }
+  return updaterInstance
+}
+
+/**
+ * Run the update cycle (called by CRON)
+ */
+export async function runSelfUpdate(): Promise<SelfUpdateResult> {
+  const updater = getSelfUpdater()
+  return updater.runUpdateCycle()
+}
+
+/**
+ * Run the decay cycle (called by CRON, daily)
+ */
+export async function runDecay(): Promise<{ decayed: number }> {
+  const updater = getSelfUpdater()
+  return updater.runDecayCycle()
+}
+
+/**
+ * Process a specific conversation immediately
+ * (can be called post-call instead of waiting for CRON)
+ */
+export async function processConversationNow(
+  conversationId: string,
+  tenantId: string,
+  context: Record<string, unknown>
+): Promise<{ added: number; boosted: number }> {
+  const updater = getSelfUpdater()
+  // @ts-ignore - accessing private method for immediate processing
+  return updater.processConversation({
+    id: conversationId,
+    tenant_id: tenantId,
+    context,
+  })
+}

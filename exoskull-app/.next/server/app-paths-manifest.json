@@ -1,5 +1,0 @@
-{
-  "/api/voice/tools/route": "app/api/voice/tools/route.js",
-  "/api/conversations/route": "app/api/conversations/route.js",
-  "/api/generate-greeting/route": "app/api/generate-greeting/route.js",
-  "/api/conversations/[id]/messages/route": "app/api/conve

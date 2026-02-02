@@ -1,0 +1,273 @@
+// =====================================================
+// RIGS - External API Integrations
+// =====================================================
+
+export * from './types';
+
+// Rig definitions with OAuth and API config
+export const RIG_DEFINITIONS = {
+  oura: {
+    slug: 'oura' as const,
+    name: 'Oura Ring',
+    description: 'Sleep, HRV, readiness, and activity data',
+    icon: '💍',
+    category: 'health' as const,
+    oauth: {
+      authUrl: 'https://cloud.ouraring.com/oauth/authorize',
+      tokenUrl: 'https://api.ouraring.com/oauth/token',
+      scopes: ['daily', 'heartrate', 'workout', 'tag', 'session'],
+      clientIdEnv: 'OURA_CLIENT_ID',
+      clientSecretEnv: 'OURA_CLIENT_SECRET',
+    },
+    api: {
+      baseUrl: 'https://api.ouraring.com/v2',
+      rateLimit: { requests: 1000, period: 'day' as const },
+    },
+    sync: {
+      frequency: 'hourly' as const,
+      dataTypes: ['sleep', 'activity', 'readiness', 'heart_rate'],
+    },
+  },
+
+  fitbit: {
+    slug: 'fitbit' as const,
+    name: 'Fitbit',
+    description: 'Steps, sleep, heart rate from Fitbit devices',
+    icon: '⌚',
+    category: 'health' as const,
+    oauth: {
+      authUrl: 'https://www.fitbit.com/oauth2/authorize',
+      tokenUrl: 'https://api.fitbit.com/oauth2/token',
+      scopes: ['activity', 'heartrate', 'sleep', 'profile'],
+      clientIdEnv: 'FITBIT_CLIENT_ID',
+      clientSecretEnv: 'FITBIT_CLIENT_SECRET',
+    },
+    api: {
+      baseUrl: 'https://api.fitbit.com/1/user/-',
+      rateLimit: { requests: 150, period: 'hour' as const },
+    },
+    sync: {
+      frequency: 'daily' as const,
+      dataTypes: ['sleep', 'activity', 'heart_rate'],
+    },
+  },
+
+  'google-calendar': {
+    slug: 'google-calendar' as const,
+    name: 'Google Calendar',
+    description: 'Events, free/busy, and reminders',
+    icon: '📅',
+    category: 'productivity' as const,
+    oauth: {
+      authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+      scopes: [
+        'https://www.googleapis.com/auth/calendar.readonly',
+        'https://www.googleapis.com/auth/calendar.events',
+      ],
+      clientIdEnv: 'GOOGLE_CLIENT_ID',
+      clientSecretEnv: 'GOOGLE_CLIENT_SECRET',
+    },
+    api: {
+      baseUrl: 'https://www.googleapis.com/calendar/v3',
+      rateLimit: { requests: 100, period: 'second' as const },
+    },
+    sync: {
+      frequency: 'realtime' as const,
+      dataTypes: ['events', 'free_busy'],
+    },
+  },
+
+  notion: {
+    slug: 'notion' as const,
+    name: 'Notion',
+    description: 'Databases, pages, and notes',
+    icon: '📓',
+    category: 'productivity' as const,
+    oauth: {
+      authUrl: 'https://api.notion.com/v1/oauth/authorize',
+      tokenUrl: 'https://api.notion.com/v1/oauth/token',
+      scopes: [],
+      clientIdEnv: 'NOTION_CLIENT_ID',
+      clientSecretEnv: 'NOTION_CLIENT_SECRET',
+    },
+    api: {
+      baseUrl: 'https://api.notion.com/v1',
+      rateLimit: { requests: 3, period: 'second' as const },
+    },
+    sync: {
+      frequency: 'hourly' as const,
+      dataTypes: ['databases', 'pages'],
+    },
+  },
+
+  todoist: {
+    slug: 'todoist' as const,
+    name: 'Todoist',
+    description: 'Tasks and projects',
+    icon: '✅',
+    category: 'productivity' as const,
+    oauth: {
+      authUrl: 'https://todoist.com/oauth/authorize',
+      tokenUrl: 'https://todoist.com/oauth/access_token',
+      scopes: ['data:read_write'],
+      clientIdEnv: 'TODOIST_CLIENT_ID',
+      clientSecretEnv: 'TODOIST_CLIENT_SECRET',
+    },
+    api: {
+      baseUrl: 'https://api.todoist.com/rest/v2',
+      rateLimit: { requests: 450, period: 'minute' as const },
+    },
+    sync: {
+      frequency: 'realtime' as const,
+      dataTypes: ['tasks', 'projects'],
+    },
+  },
+
+  'philips-hue': {
+    slug: 'philips-hue' as const,
+    name: 'Philips Hue',
+    description: 'Control lights and scenes',
+    icon: '💡',
+    category: 'smart_home' as const,
+    oauth: {
+      authUrl: 'https://api.meethue.com/v2/oauth2/authorize',
+      tokenUrl: 'https://api.meethue.com/v2/oauth2/token',
+      scopes: [],
+      clientIdEnv: 'HUE_CLIENT_ID',
+      clientSecretEnv: 'HUE_CLIENT_SECRET',
+    },
+    api: {
+      baseUrl: 'https://api.meethue.com/route',
+      rateLimit: { requests: 10, period: 'second' as const },
+    },
+    sync: {
+      frequency: 'realtime' as const,
+      dataTypes: ['lights', 'scenes', 'rooms'],
+    },
+  },
+
+  plaid: {
+    slug: 'plaid' as const,
+    name: 'Plaid',
+    description: 'Bank transactions and balances (read-only)',
+    icon: '🏦',
+    category: 'finance' as const,
+    oauth: {
+      authUrl: '', // Plaid uses Link, not standard OAuth
+      tokenUrl: 'https://production.plaid.com/item/public_token/exchange',
+      scopes: ['transactions'],
+      clientIdEnv: 'PLAID_CLIENT_ID',
+      clientSecretEnv: 'PLAID_SECRET',
+    },
+    api: {
+      baseUrl: 'https://production.plaid.com',
+      rateLimit: { requests: 100, period: 'minute' as const },
+    },
+    sync: {
+      frequency: 'daily' as const,
+      dataTypes: ['transactions', 'balances'],
+    },
+  },
+
+  'google-fit': {
+    slug: 'google-fit' as const,
+    name: 'Google Fit / HealthConnect',
+    description: 'Steps, sleep, heart rate, workouts from Android',
+    icon: '🏃',
+    category: 'health' as const,
+    oauth: {
+      authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+      scopes: [
+        'https://www.googleapis.com/auth/fitness.activity.read',
+        'https://www.googleapis.com/auth/fitness.sleep.read',
+        'https://www.googleapis.com/auth/fitness.heart_rate.read',
+        'https://www.googleapis.com/auth/fitness.body.read',
+      ],
+      clientIdEnv: 'GOOGLE_CLIENT_ID',
+      clientSecretEnv: 'GOOGLE_CLIENT_SECRET',
+    },
+    api: {
+      baseUrl: 'https://www.googleapis.com/fitness/v1/users/me',
+      rateLimit: { requests: 100, period: 'minute' as const },
+    },
+    sync: {
+      frequency: 'hourly' as const,
+      dataTypes: ['steps', 'sleep', 'heart_rate', 'calories', 'distance'],
+    },
+  },
+
+  'google-workspace': {
+    slug: 'google-workspace' as const,
+    name: 'Google Workspace',
+    description: 'Gmail, Calendar, Drive - full Google integration',
+    icon: '🔷',
+    category: 'productivity' as const,
+    oauth: {
+      authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+      scopes: [
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.send',
+        'https://www.googleapis.com/auth/calendar.readonly',
+        'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/drive.readonly',
+        'https://www.googleapis.com/auth/userinfo.email',
+      ],
+      clientIdEnv: 'GOOGLE_CLIENT_ID',
+      clientSecretEnv: 'GOOGLE_CLIENT_SECRET',
+    },
+    api: {
+      baseUrl: 'https://www.googleapis.com',
+      rateLimit: { requests: 100, period: 'second' as const },
+    },
+    sync: {
+      frequency: 'realtime' as const,
+      dataTypes: ['emails', 'events', 'files'],
+    },
+  },
+
+  'microsoft-365': {
+    slug: 'microsoft-365' as const,
+    name: 'Microsoft 365',
+    description: 'Outlook, Calendar, OneDrive, Teams',
+    icon: '🟦',
+    category: 'productivity' as const,
+    oauth: {
+      authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+      tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+      scopes: [
+        'Mail.Read',
+        'Mail.Send',
+        'Calendars.Read',
+        'Calendars.ReadWrite',
+        'Files.Read',
+        'User.Read',
+        'offline_access',
+      ],
+      clientIdEnv: 'MICROSOFT_CLIENT_ID',
+      clientSecretEnv: 'MICROSOFT_CLIENT_SECRET',
+    },
+    api: {
+      baseUrl: 'https://graph.microsoft.com/v1.0',
+      rateLimit: { requests: 10000, period: 'minute' as const },
+    },
+    sync: {
+      frequency: 'realtime' as const,
+      dataTypes: ['emails', 'events', 'files'],
+    },
+  },
+} as const;
+
+export type RigSlugKey = keyof typeof RIG_DEFINITIONS;
+
+// Get rig definition by slug
+export function getRigDefinition(slug: string) {
+  return RIG_DEFINITIONS[slug as RigSlugKey];
+}
+
+// Get all rig slugs
+export function getAllRigSlugs(): string[] {
+  return Object.keys(RIG_DEFINITIONS);
+}

@@ -1,8 +1,17 @@
 /**
  * Job Dispatcher for ExoSkull CRON
  *
- * Handles dispatching scheduled jobs to VAPI (voice) and Twilio (SMS)
+ * Handles dispatching scheduled jobs to:
+ * - VAPI (voice AI conversations)
+ * - GHL (SMS, Email, WhatsApp, Messenger, etc.)
+ * - Twilio (SMS fallback)
  */
+
+import { createClient } from '@supabase/supabase-js'
+import { GHLClient, sendSms as ghlSendSms, sendEmail as ghlSendEmail, sendWhatsApp as ghlSendWhatsApp } from '@/lib/ghl'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export interface ScheduledJob {
   id: string
@@ -11,20 +20,22 @@ export interface ScheduledJob {
   handler_endpoint: string
   time_window_start: string
   time_window_end: string
-  default_channel: 'voice' | 'sms' | 'both'
+  default_channel: 'voice' | 'sms' | 'email' | 'whatsapp' | 'both'
   display_name: string
 }
 
 export interface UserJobConfig {
   tenant_id: string
   phone: string
+  email?: string
   timezone: string
   language: string
   preferred_channel: string
   custom_time: string | null
   tenant_name: string
+  ghl_contact_id?: string  // GHL contact ID for messaging
   schedule_settings: {
-    notification_channels?: { voice?: boolean; sms?: boolean }
+    notification_channels?: { voice?: boolean; sms?: boolean; email?: boolean; whatsapp?: boolean }
     rate_limits?: { max_calls_per_day?: number; max_sms_per_day?: number }
     quiet_hours?: { start?: string; end?: string }
     skip_weekends?: boolean
@@ -33,20 +44,48 @@ export interface UserJobConfig {
 
 export interface DispatchResult {
   success: boolean
-  channel: 'voice' | 'sms'
+  channel: 'voice' | 'sms' | 'email' | 'whatsapp'
   call_id?: string
   message_sid?: string
+  ghl_message_id?: string
   error?: string
+  provider?: 'vapi' | 'ghl' | 'twilio'
 }
 
 // VAPI Configuration
 const VAPI_PRIVATE_KEY = process.env.VAPI_PRIVATE_KEY
 const VAPI_PHONE_NUMBER_ID = process.env.VAPI_PHONE_NUMBER_ID || 'b8f5e796-ddbe-4488-a764-60bcc1d8279f'
 
-// Twilio Configuration
+// Twilio Configuration (fallback)
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
 const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '+14155238886'
+
+/**
+ * Get GHL client
+ *
+ * With Private Integration Token, we use a single token for the entire system.
+ * No per-tenant OAuth tokens needed - just env vars.
+ */
+function getGHLClient(): GHLClient | null {
+  const client = new GHLClient()
+  return client.isConfigured() ? client : null
+}
+
+/**
+ * Get GHL contact ID for user
+ */
+async function getGHLContactId(tenantId: string): Promise<string | null> {
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+  const { data } = await supabase
+    .from('exo_ghl_contacts')
+    .select('ghl_contact_id')
+    .eq('tenant_id', tenantId)
+    .single()
+
+  return data?.ghl_contact_id || null
+}
 
 /**
  * Get the system prompt for a specific job type
@@ -174,7 +213,7 @@ export async function dispatchVoiceCall(
 
     if (response.ok && data.id) {
       console.log(`✅ VAPI call initiated for ${user.tenant_id}: ${data.id}`)
-      return { success: true, channel: 'voice', call_id: data.id }
+      return { success: true, channel: 'voice', call_id: data.id, provider: 'vapi' }
     } else {
       console.error(`❌ VAPI call failed for ${user.tenant_id}:`, data)
       return { success: false, channel: 'voice', error: data.message || JSON.stringify(data) }
@@ -203,8 +242,8 @@ function getSmsMessage(job: ScheduledJob, user: UserJobConfig): string {
       en: `Hey${name ? ` ${name}` : ''}! No meal logged yet. What did you eat today? Reply with one sentence.`
     },
     bedtime_reminder: {
-      pl: `${name ? `${name}, ` : ''}czas się wyciszyć. Twój cel snu jest za 30 minut. Dobranoc! 🌙`,
-      en: `${name ? `${name}, ` : ''}time to wind down. Your sleep goal is in 30 minutes. Good night! 🌙`
+      pl: `${name ? `${name}, ` : ''}czas się wyciszyć. Twój cel snu jest za 30 minut. Dobranoc!`,
+      en: `${name ? `${name}, ` : ''}time to wind down. Your sleep goal is in 30 minutes. Good night!`
     },
     task_overdue: {
       pl: `${name ? `${name}, ` : ''}masz przeterminowane zadania. Odpowiedz "zadzwoń" żeby przejrzeć listę.`,
@@ -225,23 +264,44 @@ function getSmsMessage(job: ScheduledJob, user: UserJobConfig): string {
 }
 
 /**
- * Dispatch an SMS via Twilio
+ * Dispatch SMS via GHL (primary) or Twilio (fallback)
  */
 export async function dispatchSms(
   job: ScheduledJob,
   user: UserJobConfig
 ): Promise<DispatchResult> {
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
-    return { success: false, channel: 'sms', error: 'Twilio credentials not configured' }
-  }
-
   if (!user.phone) {
     return { success: false, channel: 'sms', error: 'User has no phone number' }
   }
 
-  try {
-    const message = getSmsMessage(job, user)
+  const message = getSmsMessage(job, user)
 
+  // Try GHL first
+  const ghlClient = await getGHLClient()
+  const ghlContactId = user.ghl_contact_id || await getGHLContactId(user.tenant_id)
+
+  if (ghlClient && ghlContactId) {
+    try {
+      const result = await ghlSendSms(ghlClient, ghlContactId, message)
+      console.log(`✅ GHL SMS sent to ${user.tenant_id}: ${result.messageId}`)
+      return {
+        success: true,
+        channel: 'sms',
+        ghl_message_id: result.messageId,
+        provider: 'ghl'
+      }
+    } catch (error) {
+      console.error(`⚠️ GHL SMS failed, falling back to Twilio:`, error)
+      // Fall through to Twilio
+    }
+  }
+
+  // Fallback to Twilio
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+    return { success: false, channel: 'sms', error: 'No SMS provider configured (GHL not connected, Twilio not configured)' }
+  }
+
+  try {
     const response = await fetch(
       `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
       {
@@ -261,10 +321,10 @@ export async function dispatchSms(
     const data = await response.json()
 
     if (response.ok && data.sid) {
-      console.log(`✅ SMS sent to ${user.tenant_id}: ${data.sid}`)
-      return { success: true, channel: 'sms', message_sid: data.sid }
+      console.log(`✅ Twilio SMS sent to ${user.tenant_id}: ${data.sid}`)
+      return { success: true, channel: 'sms', message_sid: data.sid, provider: 'twilio' }
     } else {
-      console.error(`❌ SMS failed for ${user.tenant_id}:`, data)
+      console.error(`❌ Twilio SMS failed for ${user.tenant_id}:`, data)
       return { success: false, channel: 'sms', error: data.message || JSON.stringify(data) }
     }
   } catch (error) {
@@ -275,29 +335,130 @@ export async function dispatchSms(
 }
 
 /**
+ * Dispatch Email via GHL
+ */
+export async function dispatchEmail(
+  job: ScheduledJob,
+  user: UserJobConfig
+): Promise<DispatchResult> {
+  if (!user.email) {
+    return { success: false, channel: 'email', error: 'User has no email address' }
+  }
+
+  const ghlClient = await getGHLClient()
+  const ghlContactId = user.ghl_contact_id || await getGHLContactId(user.tenant_id)
+
+  if (!ghlClient || !ghlContactId) {
+    return { success: false, channel: 'email', error: 'GHL not connected for this tenant' }
+  }
+
+  const name = user.tenant_name || ''
+  const language = user.language || 'pl'
+
+  // Email content based on job type
+  const subjects: Record<string, Record<string, string>> = {
+    day_summary: {
+      pl: 'Twoje podsumowanie dnia od ExoSkull',
+      en: 'Your daily summary from ExoSkull'
+    },
+    weekly_summary: {
+      pl: 'Podsumowanie tygodnia od ExoSkull',
+      en: 'Your weekly summary from ExoSkull'
+    }
+  }
+
+  const subject = subjects[job.job_name]?.[language] || subjects.day_summary[language]
+  const body = getSmsMessage(job, user) // Reuse SMS messages for email body
+
+  try {
+    const result = await ghlSendEmail(ghlClient, ghlContactId, subject, body)
+    console.log(`✅ GHL Email sent to ${user.tenant_id}: ${result.messageId}`)
+    return {
+      success: true,
+      channel: 'email',
+      ghl_message_id: result.messageId,
+      provider: 'ghl'
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error(`❌ Email dispatch error for ${user.tenant_id}:`, errorMessage)
+    return { success: false, channel: 'email', error: errorMessage }
+  }
+}
+
+/**
+ * Dispatch WhatsApp message via GHL
+ */
+export async function dispatchWhatsApp(
+  job: ScheduledJob,
+  user: UserJobConfig
+): Promise<DispatchResult> {
+  if (!user.phone) {
+    return { success: false, channel: 'whatsapp', error: 'User has no phone number' }
+  }
+
+  const ghlClient = await getGHLClient()
+  const ghlContactId = user.ghl_contact_id || await getGHLContactId(user.tenant_id)
+
+  if (!ghlClient || !ghlContactId) {
+    return { success: false, channel: 'whatsapp', error: 'GHL not connected for this tenant' }
+  }
+
+  const message = getSmsMessage(job, user)
+
+  try {
+    const result = await ghlSendWhatsApp(ghlClient, ghlContactId, message)
+    console.log(`✅ GHL WhatsApp sent to ${user.tenant_id}: ${result.messageId}`)
+    return {
+      success: true,
+      channel: 'whatsapp',
+      ghl_message_id: result.messageId,
+      provider: 'ghl'
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error(`❌ WhatsApp dispatch error for ${user.tenant_id}:`, errorMessage)
+    return { success: false, channel: 'whatsapp', error: errorMessage }
+  }
+}
+
+/**
  * Dispatch job to appropriate channel
  */
 export async function dispatchJob(
   job: ScheduledJob,
   user: UserJobConfig
 ): Promise<DispatchResult> {
-  const channel = (user.preferred_channel || job.default_channel) as 'voice' | 'sms' | 'both'
+  const channel = (user.preferred_channel || job.default_channel) as 'voice' | 'sms' | 'email' | 'whatsapp' | 'both'
 
   // Check if channel is enabled in user settings
-  const channels = user.schedule_settings?.notification_channels || { voice: true, sms: true }
+  const channels = user.schedule_settings?.notification_channels || { voice: true, sms: true, email: true, whatsapp: true }
 
+  // Channel priority: Voice > WhatsApp > SMS > Email
   if (channel === 'voice' && channels.voice !== false) {
     return await dispatchVoiceCall(job, user)
+  } else if (channel === 'whatsapp' && channels.whatsapp !== false) {
+    return await dispatchWhatsApp(job, user)
   } else if (channel === 'sms' && channels.sms !== false) {
     return await dispatchSms(job, user)
+  } else if (channel === 'email' && channels.email !== false) {
+    return await dispatchEmail(job, user)
   } else if (channel === 'both') {
-    // For "both", try voice first, fallback to SMS
+    // For "both", try in priority order with fallback
     if (channels.voice !== false) {
       const voiceResult = await dispatchVoiceCall(job, user)
       if (voiceResult.success) return voiceResult
     }
+    if (channels.whatsapp !== false) {
+      const whatsappResult = await dispatchWhatsApp(job, user)
+      if (whatsappResult.success) return whatsappResult
+    }
     if (channels.sms !== false) {
-      return await dispatchSms(job, user)
+      const smsResult = await dispatchSms(job, user)
+      if (smsResult.success) return smsResult
+    }
+    if (channels.email !== false) {
+      return await dispatchEmail(job, user)
     }
   }
 

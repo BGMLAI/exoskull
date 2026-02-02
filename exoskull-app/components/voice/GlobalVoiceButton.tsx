@@ -230,6 +230,50 @@ export function GlobalVoiceButton({ tenantId }: GlobalVoiceButtonProps) {
                 }
               },
               server: { url: `${APP_URL}/api/voice/tools?tenant_id=${tenant_id}&conversation_id=${conversation.id}` }
+            },
+            {
+              type: 'function',
+              function: {
+                name: 'get_schedule',
+                description: 'Pobierz harmonogram check-inow i przypomnien uzytkownika.',
+                parameters: { type: 'object', properties: {}, required: [] }
+              },
+              server: { url: `${APP_URL}/api/voice/tools?tenant_id=${tenant_id}&conversation_id=${conversation.id}` }
+            },
+            {
+              type: 'function',
+              function: {
+                name: 'create_checkin',
+                description: 'Dodaj nowe przypomnienie lub check-in. Uzyj gdy uzytkownik chce byc przypominany o czyms regularnie.',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string', description: 'Nazwa przypomnienia, np. "Poranny check-in"' },
+                    time: { type: 'string', description: 'Godzina w formacie HH:MM, np. "08:00"' },
+                    frequency: { type: 'string', description: 'Czestotliwosc: daily, weekdays, weekends, weekly' },
+                    channel: { type: 'string', description: 'Kanal: voice, sms. Domyslnie voice.' },
+                    message: { type: 'string', description: 'Tresc przypomnienia lub pytanie do zadania' }
+                  },
+                  required: ['name', 'time']
+                }
+              },
+              server: { url: `${APP_URL}/api/voice/tools?tenant_id=${tenant_id}&conversation_id=${conversation.id}` }
+            },
+            {
+              type: 'function',
+              function: {
+                name: 'toggle_checkin',
+                description: 'Wlacz lub wylacz istniejacy check-in/przypomnienie.',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    checkin_name: { type: 'string', description: 'Nazwa check-inu do przelaczenia' },
+                    enabled: { type: 'boolean', description: 'true = wlacz, false = wylacz' }
+                  },
+                  required: ['checkin_name', 'enabled']
+                }
+              },
+              server: { url: `${APP_URL}/api/voice/tools?tenant_id=${tenant_id}&conversation_id=${conversation.id}` }
             }
           ]
         } as any,

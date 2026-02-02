@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!
-})
+import { aiChat } from '@/lib/ai'
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,10 +53,9 @@ export async function POST(req: NextRequest) {
 
     const context = contextParts.join('. ')
 
-    // Generuj greeting przez OpenAI
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
+    // Generuj greeting przez Multi-Model Router (routes to Tier 1 - Gemini Flash)
+    const response = await aiChat(
+      [
         {
           role: 'system',
           content: `Jesteś ExoSkull - drugi mózg użytkownika. Generujesz naturalne powitanie na początku rozmowy głosowej.
@@ -90,11 +85,15 @@ ${conversationHistory ? `\nOstatnie wiadomości:\n${conversationHistory}\n` : ''
 Wygeneruj naturalne powitanie:`
         }
       ],
-      temperature: 0.8,
-      max_tokens: 50
-    })
+      {
+        temperature: 0.8,
+        maxTokens: 50,
+        taskCategory: 'simple_response', // Routes to Tier 1 (Gemini Flash - cheapest)
+        tenantId: user?.id
+      }
+    )
 
-    const greeting = completion.choices[0]?.message?.content?.trim() || 'Hej. Co tam?'
+    const greeting = response.content.trim() || 'Hej. Co tam?'
 
     return NextResponse.json({
       greeting,

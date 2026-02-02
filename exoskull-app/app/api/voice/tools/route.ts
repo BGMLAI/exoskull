@@ -86,6 +86,146 @@ async function completeTask(tenantId: string, taskId: string) {
   }
 }
 
+// Schedule/Check-in handlers
+async function getSchedule(tenantId: string) {
+  // Get user's custom check-ins
+  const { data: customCheckins, error: customError } = await supabase
+    .from('exo_user_checkins')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+    .order('time')
+
+  // Get system jobs with user preferences
+  const { data: systemJobs, error: systemError } = await supabase
+    .from('exo_scheduled_jobs')
+    .select('id, job_name, display_name, description, time_window_start, default_channel, is_system')
+    .eq('is_active', true)
+
+  const { data: preferences } = await supabase
+    .from('exo_user_job_preferences')
+    .select('job_id, is_enabled, custom_time, preferred_channel')
+    .eq('tenant_id', tenantId)
+
+  const prefsMap = new Map(preferences?.map(p => [p.job_id, p]) || [])
+
+  const systemWithPrefs = systemJobs?.map(job => ({
+    name: job.display_name || job.job_name,
+    time: prefsMap.get(job.id)?.custom_time || job.time_window_start,
+    channel: prefsMap.get(job.id)?.preferred_channel || job.default_channel,
+    enabled: prefsMap.get(job.id)?.is_enabled ?? true,
+    is_system: true
+  })) || []
+
+  const custom = customCheckins?.map(c => ({
+    name: c.name,
+    time: c.time,
+    frequency: c.frequency,
+    channel: c.channel,
+    message: c.message,
+    enabled: c.is_active,
+    is_system: false
+  })) || []
+
+  const allCheckins = [...systemWithPrefs.filter(j => j.enabled), ...custom]
+
+  if (allCheckins.length === 0) {
+    return { checkins: [], message: 'Nie masz zadnych aktywnych check-inow.' }
+  }
+
+  return {
+    checkins: allCheckins,
+    count: allCheckins.length,
+    message: `Masz ${allCheckins.length} aktywnych check-inow.`
+  }
+}
+
+async function createCheckin(tenantId: string, params: {
+  name: string
+  time: string
+  frequency?: string
+  channel?: string
+  message?: string
+}) {
+  // Validate time format
+  const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/
+  if (!timeRegex.test(params.time)) {
+    return { success: false, error: 'Nieprawidlowy format czasu. Uzyj HH:MM.' }
+  }
+
+  const { data, error } = await supabase
+    .from('exo_user_checkins')
+    .insert({
+      tenant_id: tenantId,
+      name: params.name,
+      time: params.time,
+      frequency: params.frequency || 'daily',
+      channel: params.channel || 'voice',
+      message: params.message || null,
+      is_active: true
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating checkin:', error)
+    return { success: false, error: error.message }
+  }
+
+  return {
+    success: true,
+    checkin: data,
+    message: `Przypomnienie "${params.name}" o ${params.time} dodane.`
+  }
+}
+
+async function toggleCheckin(tenantId: string, checkinName: string, enabled: boolean) {
+  // First try custom checkins
+  const { data: customCheckin, error: customError } = await supabase
+    .from('exo_user_checkins')
+    .update({ is_active: enabled, updated_at: new Date().toISOString() })
+    .eq('tenant_id', tenantId)
+    .ilike('name', `%${checkinName}%`)
+    .select()
+    .single()
+
+  if (customCheckin) {
+    return {
+      success: true,
+      message: enabled ? `Check-in "${customCheckin.name}" wlaczony.` : `Check-in "${customCheckin.name}" wylaczony.`
+    }
+  }
+
+  // Try system jobs
+  const { data: systemJob } = await supabase
+    .from('exo_scheduled_jobs')
+    .select('id, display_name, job_name')
+    .or(`display_name.ilike.%${checkinName}%,job_name.ilike.%${checkinName}%`)
+    .single()
+
+  if (systemJob) {
+    const { error } = await supabase
+      .from('exo_user_job_preferences')
+      .upsert({
+        tenant_id: tenantId,
+        job_id: systemJob.id,
+        is_enabled: enabled,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'tenant_id,job_id' })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return {
+      success: true,
+      message: enabled ? `Check-in "${systemJob.display_name || systemJob.job_name}" wlaczony.` : `Check-in "${systemJob.display_name || systemJob.job_name}" wylaczony.`
+    }
+  }
+
+  return { success: false, error: `Nie znaleziono check-inu o nazwie "${checkinName}"` }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -152,6 +292,15 @@ export async function POST(request: Request) {
           case 'complete_task':
             resultData = await completeTask(tenantId, parameters.task_id)
             break
+          case 'get_schedule':
+            resultData = await getSchedule(tenantId)
+            break
+          case 'create_checkin':
+            resultData = await createCheckin(tenantId, parameters)
+            break
+          case 'toggle_checkin':
+            resultData = await toggleCheckin(tenantId, parameters.checkin_name, parameters.enabled)
+            break
           default:
             resultData = { error: `Unknown function: ${functionName}` }
         }
@@ -188,6 +337,15 @@ export async function POST(request: Request) {
             break
           case 'complete_task':
             resultData = await completeTask(tenantId, parameters.task_id)
+            break
+          case 'get_schedule':
+            resultData = await getSchedule(tenantId)
+            break
+          case 'create_checkin':
+            resultData = await createCheckin(tenantId, parameters)
+            break
+          case 'toggle_checkin':
+            resultData = await toggleCheckin(tenantId, parameters.checkin_name, parameters.enabled)
             break
           default:
             resultData = { error: `Unknown function: ${functionName}` }
