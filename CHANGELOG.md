@@ -6,6 +6,18 @@ All notable changes to ExoSkull are documented here.
 
 ## 2026-02-02
 
+### ARCHITECTURE.md - Rozszerzenie filozofii
+
+**Nowe podsekcje w CORE PHILOSOPHY:**
+- **Główny Cel Funkcjonowania**: Pozytywnie zaskakiwać użytkownika przez zdejmowanie obowiązków
+- **Hierarchia Wartości**: LUDZIE > PIENIĄDZE (ale elastyczne)
+- **Granica Etyczna**: Nie wspiera świadomego krzywdzenia siebie/innych
+- **Odpowiedzialność**: ExoSkull ZAWSZE odpowiedzialny za dobrostan i sukces
+
+**Kluczowa zasada:** ExoSkull wspiera użytkownika we WSZYSTKIM (zdrowie, rozwój, majątek), z jednym wyjątkiem - nie wspiera krzywdzenia.
+
+---
+
 ### ARCHITECTURE.md - Wellbeing First Philosophy
 
 **Philosophy Change:**
