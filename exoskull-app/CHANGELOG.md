@@ -4,6 +4,136 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-03] MODUL 3: Voice Pipeline (Twilio + ElevenLabs + Claude)
+
+### Added - Custom Voice Pipeline (WITHOUT VAPI)
+
+Built a complete voice pipeline for phone calls using HTTP turn-by-turn pattern.
+
+**Stack:** Twilio (telephony) + ElevenLabs (TTS/STT) + Claude (LLM)
+
+**New files created:**
+
+| File | Purpose |
+|------|---------|
+| `lib/voice/twilio-client.ts` | TwiML generation, outbound calls |
+| `lib/voice/elevenlabs-tts.ts` | Text-to-Speech with caching |
+| `lib/voice/elevenlabs-stt.ts` | Speech-to-Text with Deepgram fallback |
+| `lib/voice/conversation-handler.ts` | Claude conversation + tools |
+| `lib/voice/index.ts` | Module exports |
+| `app/api/twilio/voice/route.ts` | Main webhook (start/process/end) |
+| `app/api/twilio/status/route.ts` | Call status callbacks |
+| `app/api/twilio/outbound/route.ts` | Initiate outbound calls |
+| `app/api/voice/sessions/route.ts` | Voice session history API |
+
+**Migration:** `20260202000027_voice_sessions.sql`
+- `exo_voice_sessions` table for conversation state
+- `voice-audio` storage bucket for TTS audio
+
+### Enhanced - Dashboard Voice Page
+
+- Added "Test Phone Call" button (calls user's phone via Twilio)
+- Added voice sessions history display
+- Web voice still uses VAPI SDK (hybrid approach)
+
+### Voice Flow
+
+```
+User calls → Twilio webhook → Claude + Tools → ElevenLabs TTS → Twilio <Play>
+```
+
+### Dependencies
+
+```
+twilio@^5.0.0
+```
+
+---
+
+## [2026-02-02] Data Pipeline Verification & Analytics Module
+
+### ATLAS L - Link (VERIFIED)
+
+**Data Pipeline Status:** All layers operational
+
+| Layer | Status | Files |
+|-------|--------|-------|
+| Bronze ETL | WORKING | `lib/datalake/bronze-etl.ts`, `app/api/cron/bronze-etl/route.ts` |
+| Silver ETL | WORKING | `lib/datalake/silver-etl.ts`, `app/api/cron/silver-etl/route.ts` |
+| Gold ETL | WORKING | `lib/datalake/gold-etl.ts`, `app/api/cron/gold-etl/route.ts` |
+| R2 Storage | CONFIGURED | Credentials in `.env.local` |
+| Cron Jobs | CONFIGURED | `vercel.json` (01:00, 02:00, 03:00 UTC) |
+
+### Added - Analytics Module
+
+**New files created:**
+
+| File | Purpose |
+|------|---------|
+| `lib/analytics/duckdb-client.ts` | DuckDB query generation for Bronze layer, R2 file discovery |
+| `lib/analytics/queries.ts` | Pre-built queries for Gold/Silver layer dashboards |
+| `lib/analytics/index.ts` | Unified exports for analytics module |
+
+**Analytics queries available:**
+- `getDailySummary()` - Gold layer, <100ms
+- `getWeeklySummary()` - Gold layer, <100ms
+- `getMonthlySummary()` - Gold layer, <100ms
+- `getMessagesDailySummary()` - Gold layer, <100ms
+- `getRealTimeStats()` - Silver layer, real-time
+- `getRecentConversations()` - Silver layer, real-time
+- `getConversationInsights()` - Derived insights
+- `getPeriodComparison()` - Week-over-week comparison
+
+**DuckDB utilities:**
+- `generateDuckDBSQL()` - Generate SQL for ad-hoc Bronze queries
+- `getDuckDBConfig()` - R2 connection config for DuckDB
+- `ANALYTICS_QUERIES` - Pre-built query templates
+
+### Added - Gold Layer Refresh RPC
+
+**Migration:** `20260202000026_gold_refresh_function.sql`
+
+**RPC Functions:**
+- `refresh_gold_view(view_name)` - Refresh single materialized view with CONCURRENTLY
+- `refresh_all_gold_views()` - Refresh all 4 Gold views, returns status
+
+### Added - Testing Documentation
+
+**File:** `docs/data-pipeline-testing.md`
+
+Comprehensive stress-test guide covering:
+- Bronze ETL testing (R2 connection, single/all tenants)
+- Silver ETL testing (data quality checks)
+- Gold ETL testing (RPC functions, benchmarks)
+- End-to-end pipeline test procedure
+- Troubleshooting guide
+- Performance benchmarks
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `lib/analytics/duckdb-client.ts` | NEW - DuckDB client for Bronze layer |
+| `lib/analytics/queries.ts` | NEW - Dashboard query functions |
+| `lib/analytics/index.ts` | NEW - Module exports |
+| `supabase/migrations/20260202000026_gold_refresh_function.sql` | NEW - RPC functions |
+| `docs/data-pipeline-testing.md` | NEW - Testing documentation |
+
+### How to Verify
+
+```bash
+# Check Bronze ETL status
+curl -X GET "https://exoskull.xyz/api/cron/bronze-etl"
+
+# Check Silver ETL status
+curl -X GET "https://exoskull.xyz/api/cron/silver-etl"
+
+# Check Gold ETL status
+curl -X GET "https://exoskull.xyz/api/cron/gold-etl"
+```
+
+---
+
 ## [2026-02-02] Voice Pipeline Fix & Cron System Repair
 
 ### Fixed - Voice Function (exoskull-voice)

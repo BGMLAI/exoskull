@@ -1,13 +1,29 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ChatPanel, ChatMessage } from '@/components/voice/ChatPanel'
 import Vapi from '@vapi-ai/web'
 import { buildFullSystemPrompt } from '@/lib/voice/system-prompt'
+import { Phone, PhoneOff, Loader2, Clock, MessageSquare } from 'lucide-react'
 
 const VAPI_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY!
+
+// Types for voice sessions
+interface VoiceSession {
+  id: string
+  call_sid: string
+  status: 'active' | 'ended'
+  messages: Array<{ role: string; content: string }>
+  started_at: string
+  ended_at?: string
+  metadata?: {
+    duration?: number
+    direction?: string
+    final_status?: string
+  }
+}
 
 export default function VoicePage() {
   const [isConnected, setIsConnected] = useState(false)
@@ -19,6 +35,70 @@ export default function VoicePage() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isUserSpeaking, setIsUserSpeaking] = useState(false)
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false)
+
+  // Phone call state
+  const [isPhoneCalling, setIsPhoneCalling] = useState(false)
+  const [phoneCallSid, setPhoneCallSid] = useState<string | null>(null)
+  const [phoneError, setPhoneError] = useState<string | null>(null)
+
+  // Voice sessions history
+  const [voiceSessions, setVoiceSessions] = useState<VoiceSession[]>([])
+  const [loadingSessions, setLoadingSessions] = useState(true)
+
+  // Load voice sessions on mount
+  useEffect(() => {
+    async function loadSessions() {
+      try {
+        const response = await fetch('/api/voice/sessions')
+        if (response.ok) {
+          const { sessions } = await response.json()
+          setVoiceSessions(sessions || [])
+        }
+      } catch (err) {
+        console.error('Failed to load voice sessions:', err)
+      } finally {
+        setLoadingSessions(false)
+      }
+    }
+    loadSessions()
+  }, [])
+
+  // Start phone call via Twilio
+  const startPhoneCall = async () => {
+    try {
+      setPhoneError(null)
+      setIsPhoneCalling(true)
+
+      const response = await fetch('/api/twilio/outbound', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ purpose: 'test' })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to initiate call')
+      }
+
+      setPhoneCallSid(data.callSid)
+      console.log('Phone call initiated:', data.callSid)
+
+      // Refresh sessions after a delay
+      setTimeout(async () => {
+        const sessResponse = await fetch('/api/voice/sessions')
+        if (sessResponse.ok) {
+          const { sessions } = await sessResponse.json()
+          setVoiceSessions(sessions || [])
+        }
+      }, 2000)
+    } catch (err) {
+      console.error('Failed to start phone call:', err)
+      setPhoneError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setIsPhoneCalling(false)
+    }
+  }
 
   const addMessage = useCallback((role: 'user' | 'assistant' | 'system', content: string, isInterim = false) => {
     const newMessage: ChatMessage = {
@@ -311,6 +391,111 @@ export default function VoicePage() {
               <p>3. Czekaj az asystent sie przywita</p>
               <p>4. Rozmawiaj naturalnie - asystent rozumie polski</p>
               <p>5. Kliknij &quot;Zakoncz rozmowe&quot; gdy skonczysz</p>
+            </CardContent>
+          </Card>
+
+          {/* Phone Call Test */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Phone className="h-5 w-5" />
+                Test przez telefon
+              </CardTitle>
+              <CardDescription>
+                Zadzwon na swoj telefon aby przetestowac pipeline Twilio
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {phoneError && (
+                <div className="p-3 bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 rounded-lg text-sm">
+                  {phoneError}
+                </div>
+              )}
+
+              {phoneCallSid && (
+                <div className="p-3 bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-400 rounded-lg text-sm">
+                  Polaczenie zainicjowane! Call SID: {phoneCallSid.slice(0, 20)}...
+                </div>
+              )}
+
+              <Button
+                onClick={startPhoneCall}
+                disabled={isPhoneCalling}
+                variant="outline"
+                className="w-full"
+              >
+                {isPhoneCalling ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Dzwonie...
+                  </>
+                ) : (
+                  <>
+                    <Phone className="mr-2 h-4 w-4" />
+                    Zadzwon do mnie
+                  </>
+                )}
+              </Button>
+
+              <p className="text-xs text-muted-foreground">
+                Zadzwoni na numer z Twojego profilu. Uzywa Twilio + ElevenLabs + Claude.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Voice Sessions History */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Historia polaczen
+              </CardTitle>
+              <CardDescription>
+                Ostatnie rozmowy telefoniczne
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingSessions ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : voiceSessions.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Brak polaczen telefonicznych
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {voiceSessions.slice(0, 10).map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${
+                          session.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+                        }`} />
+                        <div>
+                          <p className="text-sm font-medium">
+                            {session.metadata?.direction === 'outbound' ? 'Wychodzace' : 'Przychodzace'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(session.started_at).toLocaleString('pl-PL')}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {session.metadata?.duration && (
+                          <p className="text-sm">{session.metadata.duration}s</p>
+                        )}
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <MessageSquare className="h-3 w-3" />
+                          {session.messages?.length || 0} wiadomosci
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
