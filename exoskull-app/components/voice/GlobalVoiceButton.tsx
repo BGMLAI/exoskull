@@ -279,7 +279,7 @@ export function GlobalVoiceButton({ tenantId }: GlobalVoiceButtonProps) {
         } as any,
         voice: {
           provider: '11labs',
-          voiceId: 'vhGAGQee0VjHonqyxGxd',
+          voiceId: 'Qs4qmNrqlneCgYPLSNQ7',
           stability: 0.5,
           similarityBoost: 0.75,
           model: 'eleven_turbo_v2_5'

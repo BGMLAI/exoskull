@@ -211,7 +211,7 @@ export default function VoicePage() {
         } as any,
         voice: {
           provider: '11labs',
-          voiceId: 'vhGAGQee0VjHonqyxGxd',  // User's custom cloned voice
+          voiceId: 'Qs4qmNrqlneCgYPLSNQ7',  // User's custom cloned voice
           stability: 0.5,
           similarityBoost: 0.75,
           model: 'eleven_turbo_v2_5'  // Latest turbo model

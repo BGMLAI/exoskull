@@ -7,7 +7,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY
 
 // ElevenLabs voice settings
-const VOICE_ID = 'vhGAGQee0VjHonqyxGxd' // User's custom cloned voice
+const VOICE_ID = 'Qs4qmNrqlneCgYPLSNQ7' // User's custom cloned voice
 const MODEL_ID = 'eleven_turbo_v2_5'
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey)

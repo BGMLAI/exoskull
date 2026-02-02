@@ -4,6 +4,58 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-02] Voice Pipeline Fix & Cron System Repair
+
+### Fixed - Voice Function (exoskull-voice)
+
+**Critical bugs fixed:**
+- Changed table reference from `tasks` → `exo_tasks`
+- Changed column reference from `user_id` → `tenant_id`
+- Changed user lookup from `users` table → `exo_tenants` table
+- Changed phone column from `phone_number` → `phone`
+
+**Added - Claude Tool Use:**
+- `add_task` - Create new tasks via voice
+- `complete_task` - Mark tasks as done (fuzzy title match)
+- `list_tasks` - List pending/done/all tasks
+
+### Fixed - Scheduled Jobs System
+
+**SQL Function Fix:**
+- Created migration `20260202000025_fix_scheduled_job_function.sql`
+- Fixed `get_users_for_scheduled_job` function with explicit type casts
+- Resolved "structure of query does not match function result type" error
+
+### Configuration
+
+**Tenant Setup:**
+- Added phone number `+48607090956` to tenant
+- Added consent for all 10 user-facing scheduled jobs
+
+**Twilio Webhook:**
+- Updated +48732144112 webhook from old Supabase project to correct one
+- URL: `https://uvupnwvkzreikurymncs.supabase.co/functions/v1/exoskull-voice?action=start`
+
+**Supabase Secrets:**
+- Added `ANTHROPIC_API_KEY`
+- Added `ELEVENLABS_API_KEY`
+
+### Changed - ElevenLabs Voice ID
+
+Updated voice ID in 5 files from `vhGAGQee0VjHonqyxGxd` to `Qs4qmNrqlneCgYPLSNQ7`:
+- `components/voice/GlobalVoiceButton.tsx`
+- `app/dashboard/voice/page.tsx`
+- `lib/cron/dispatcher.ts`
+- `app/api/audio/generate-cache/route.ts`
+- `IORS_Master_Project/supabase/functions/exoskull-voice/index.ts`
+
+### Deployed
+
+- Vercel: https://exoskull.xyz (all knowledge API routes)
+- Supabase Edge Function: `exoskull-voice` with tool use
+
+---
+
 ## [2026-02-02] Mood Tracker & Habit Tracker Mods
 
 ### Added - Mood Tracker Mod
