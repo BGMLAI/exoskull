@@ -4,12 +4,42 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-02] GHL Private Integration Token Migration
+
+### Changed - Simplified Authentication
+
+**OAuth → Private Integration Token**
+- Removed OAuth flow complexity in favor of simpler Private Integration Token
+- Token stored in env vars (`GHL_PRIVATE_TOKEN`, `GHL_LOCATION_ID`)
+- No more per-tenant token management, token refresh callbacks
+
+**Updated Files:**
+- `lib/ghl/client.ts` - Simplified to Bearer auth only
+- `lib/cron/dispatcher.ts` - Updated `getGHLClient()` to use env vars
+- `app/api/ghl/tools/route.ts` - Updated `getGHLClient()` to use env vars
+
+**Removed:**
+- `app/api/ghl/oauth/start/route.ts` - OAuth initiation (not needed)
+- `app/api/ghl/oauth/callback/route.ts` - OAuth callback (not needed)
+
+**Database Migration** (`20260202000004_simplify_ghl_schema.sql`)
+- Dropped `exo_ghl_oauth_states` table (not needed)
+- Removed token columns from `exo_ghl_connections` table
+- Dropped unused helper functions (`get_ghl_connection`, `update_ghl_tokens`)
+
+### Setup Instructions
+1. GHL → Agency Settings → Private Integrations → Create
+2. Copy token to env: `GHL_PRIVATE_TOKEN=xxx`
+3. Set location ID: `GHL_LOCATION_ID=xxx`
+
+---
+
 ## [2026-02-02] Deep GHL Integration - Communication Hub
 
 ### Added - GoHighLevel as Central Communication Hub
 
 **GHL Library** (`lib/ghl/`)
-- `client.ts` - OAuth 2.0 client with automatic token refresh, rate limiting (100/10s)
+- `client.ts` - Private Integration Token auth with rate limiting (100/10s)
 - `messaging.ts` - Unified messaging: SMS, Email, WhatsApp, Facebook, Instagram
 - `contacts.ts` - CRM contact management: CRUD, tags, notes, tasks
 - `calendar.ts` - Calendar & booking: appointments, free slots, availability
@@ -19,8 +49,6 @@ All notable changes to this project.
 - `index.ts` - Central export for all GHL functions
 
 **API Routes**
-- `app/api/ghl/oauth/start/route.ts` - Initiate OAuth flow
-- `app/api/ghl/oauth/callback/route.ts` - Handle OAuth callback, store tokens
 - `app/api/webhooks/ghl/route.ts` - Inbound webhooks (messages, contacts, appointments)
 - `app/api/ghl/tools/route.ts` - AI tools endpoint (9 tools for VAPI/agents)
 
@@ -38,8 +66,7 @@ All notable changes to this project.
 | `ghl_move_opportunity` | Move in pipeline |
 
 **Database Migration** (`20260202000003_ghl_integration.sql`)
-- `exo_ghl_oauth_states` - OAuth security
-- `exo_ghl_connections` - Tenant connections with encrypted tokens
+- `exo_ghl_connections` - Tenant-location mapping
 - `exo_ghl_contacts` - Contact mapping
 - `exo_ghl_messages` - Message log for analytics
 - `exo_ghl_webhook_log` - Webhook idempotency
