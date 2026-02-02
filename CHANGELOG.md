@@ -6,6 +6,48 @@ All notable changes to ExoSkull are documented here.
 
 ## 2026-02-02
 
+### Unified Google Integration
+
+**Cel:** Jeden OAuth login → dostęp do wszystkich usług Google
+
+**Nowy unified 'google' rig:**
+- Google Fit (steps, sleep, heart rate, calories)
+- Gmail (emails, unread count, send)
+- Calendar (events, free/busy)
+- Drive (files)
+- Tasks
+- Contacts
+- YouTube (channel, videos)
+- Photos
+
+**Comprehensive OAuth scopes** w `lib/rigs/oauth.ts`:
+- Fitness API (activity, sleep, heart_rate, body, nutrition, location)
+- Gmail API (readonly, send, compose, labels)
+- Calendar API (full access)
+- Drive API (readonly)
+- Tasks API
+- People API (contacts)
+- YouTube Data API
+- Photos Library API
+
+**Nowe pliki:**
+- `lib/rigs/google/client.ts` - unified GoogleClient
+- `components/widgets/IntegrationsWidget.tsx` - UI do łączenia
+
+**Zmodyfikowane:**
+- `lib/rigs/oauth.ts` - GOOGLE_COMPREHENSIVE_SCOPES
+- `lib/rigs/types.ts` - dodany 'google' slug
+- `lib/rigs/index.ts` - google rig definition
+- `app/api/rigs/[slug]/sync/route.ts` - google case
+- `app/dashboard/page.tsx` - IntegrationsWidget
+
+**Jak użyć:**
+1. Dashboard → "Połącz" przy Google
+2. Autoryzacja Google (jeden consent dla wszystkich usług)
+3. Dane dostępne przez `/api/rigs/google/sync`
+
+---
+
 ### Fix Task Creation + Custom Schedules Dashboard
 
 **Problem 1: Zadania nie mogły być tworzone**
