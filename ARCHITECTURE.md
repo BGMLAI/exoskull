@@ -157,22 +157,32 @@ ExoSkull_Gateway = {
       multi_user: "Per-tenant isolation (security)"
     },
 
-    // 2. Channel Orchestration
+    // 2. Channel Orchestration (GHL as Communication Hub)
     channels: {
       supported: [
-        "SMS (Twilio)",
-        "WhatsApp (Baileys protocol)",
-        "Telegram (grammY)",
-        "Discord",
-        "iMessage",
-        "Slack",
-        "Signal",
+        "Voice AI (VAPI) - AI conversations",
+        "SMS (GHL)",
         "Email (GHL)",
-        "Web Chat",
-        "Voice (VAPI)"
+        "WhatsApp (GHL)",
+        "Facebook Messenger (GHL)",
+        "Instagram DMs (GHL)",
+        "LinkedIn (GHL Social)",
+        "TikTok (GHL Social)",
+        "Twitter/X (GHL Social)",
+        "Google Business (GHL)",
+        "Web Chat (GHL)",
+        "Telegram (grammY) - backup",
+        "Twilio - SMS fallback"
       ],
-      routing: "Unified message format → route to agent",
-      priority: "Voice > SMS > WhatsApp > Email"
+      routing: "Unified message format → route via GHL or VAPI",
+      priority: "Voice (VAPI) > WhatsApp > SMS > Messenger > Instagram > Email",
+      ghl_integration: {
+        purpose: "Central hub for ALL non-voice communication",
+        crm: "Contacts, pipelines, opportunities",
+        social: "Content scheduling, engagement tracking",
+        automation: "Workflows, triggers, campaigns",
+        calendar: "Booking, appointments, reminders"
+      }
     },
 
     // 3. Workspace Isolation
@@ -496,27 +506,46 @@ ExoSkull_Gateway = {
 ```
 Communication Channels:
 
-📞 Voice Calls (VAPI)
+📞 Voice AI (VAPI) - Real-time AI conversations
    ├─ Scheduled check-ins (morning, evening)
    ├─ On-demand calls (user initiates)
    ├─ Proactive calls (crisis, important alerts)
-   └─ Outbound to strangers (with permission)
+   ├─ Outbound to strangers (with permission)
+   └─ ElevenLabs cloned voice
 
-💬 Text Messaging
-   ├─ SMS (Twilio)
-   ├─ WhatsApp (Baileys / GHL)
+📱 GHL Hub - All text-based communication
+   ├─ SMS
+   ├─ Email
+   ├─ WhatsApp
+   ├─ Facebook Messenger
+   ├─ Instagram DM
+   ├─ Google Business Messages
+   └─ Live Chat widget
+
+📣 Social Media (GHL Social Planner)
+   ├─ Facebook pages & groups
+   ├─ Instagram posts & stories
+   ├─ LinkedIn posts & articles
+   ├─ TikTok
+   ├─ Twitter/X
+   └─ Google Business Profile
+
+🤖 CRM & Automation (GHL)
+   ├─ Contact management
+   ├─ Pipeline tracking
+   ├─ Workflow automation
+   ├─ Campaign sequences
+   └─ Form submissions
+
+📅 Calendar & Booking (GHL)
+   ├─ Appointment scheduling
+   ├─ Availability management
+   └─ Automated reminders
+
+📧 Fallback Channels
    ├─ Telegram (Bot API / grammY)
-   ├─ Facebook Messenger (GHL)
-   ├─ Instagram DM (GHL)
-   ├─ Discord (discord.js)
-   ├─ Signal
-   ├─ Slack
-   └─ iMessage (macOS only)
-
-📧 Email (GHL)
-   ├─ Daily summaries
-   ├─ Weekly reports
-   └─ Important alerts
+   ├─ Twilio (SMS fallback)
+   └─ Discord (discord.js)
 
 🌐 Web Dashboard (Next.js 14)
    ├─ Full data visualization
@@ -2711,14 +2740,132 @@ Guardrails = {
 | **Auth** | Supabase Auth (RLS) |
 | **Backend** | Supabase Edge Functions (Deno) |
 | **Voice** | VAPI (STT: Deepgram, LLM: Claude, TTS: ElevenLabs) |
+| **Communication Hub** | GoHighLevel (SMS, Email, WhatsApp, Messenger, Instagram, Social) |
+| **CRM** | GoHighLevel (Contacts, Pipelines, Opportunities, Workflows) |
+| **Social Media** | GoHighLevel Social Planner (FB, IG, LinkedIn, TikTok, Twitter) |
+| **Calendar** | GoHighLevel Calendars (Booking, Appointments) |
 | **Emotion Detection** | Deepgram prosody (voice), face-api.js (face), sentiment.js (text) |
 | **AI Tier 1** | Gemini 1.5 Flash (routing) |
 | **AI Tier 2** | Claude 3.5 Haiku (domain agents) |
 | **AI Tier 3** | Kimi K2.5 (100-agent swarm, 256K context) |
 | **AI Tier 4** | Claude Opus 4.5 (meta-coordinator) |
-| **Omnichannel** | Twilio, Baileys (WhatsApp), grammY (Telegram), GHL |
+| **Fallback SMS** | Twilio (when GHL not connected) |
+| **Telegram** | grammY (Bot API) |
 | **MCP Skills** | 100+ integrations (OpenClaw pattern) |
 | **Hosting** | Vercel (frontend), Supabase (backend), Docker |
+
+---
+
+# GHL INTEGRATION ARCHITECTURE
+
+## Why GHL + VAPI Hybrid
+
+**GoHighLevel is the central communication hub for ALL text-based communication and CRM.**
+
+| Capability | Provider | Reason |
+|------------|----------|--------|
+| **Voice AI Conversations** | VAPI | Real-time AI conversations, function calling, ElevenLabs voice clone |
+| **SMS** | GHL (Twilio fallback) | CRM integration, workflow triggers, conversation threading |
+| **Email** | GHL | Templates, tracking, automation, CRM sync |
+| **WhatsApp** | GHL | Official API, CRM integration, message templates |
+| **Facebook Messenger** | GHL | Page integration, CRM sync, automation |
+| **Instagram DMs** | GHL | Business account integration, CRM sync |
+| **Social Media Posting** | GHL Social Planner | Multi-platform scheduling, analytics, engagement |
+| **CRM** | GHL | Contacts, pipelines, opportunities, tags |
+| **Calendar** | GHL | Booking, appointments, availability |
+| **Workflows** | GHL | Automation, triggers, campaigns |
+
+## Data Flow
+
+```
+OUTBOUND (ExoSkull → User):
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  ExoSkull   │────▶│  GHL API    │────▶│    User     │
+│  Decision   │     │  (unified)  │     │  (any ch.)  │
+└─────────────┘     └─────────────┘     └─────────────┘
+                           │
+                    ┌──────┴──────┐
+                    ▼             ▼
+              ┌─────────┐   ┌─────────┐
+              │  Voice  │   │ Fallback│
+              │  (VAPI) │   │ (Twilio)│
+              └─────────┘   └─────────┘
+
+INBOUND (User → ExoSkull):
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│    User     │────▶│ GHL Webhook │────▶│  ExoSkull   │
+│  (any ch.)  │     │  /webhooks  │     │     AI      │
+└─────────────┘     └─────────────┘     └─────────────┘
+                           │
+                    ┌──────┴──────┐
+                    ▼             ▼
+              ┌─────────┐   ┌─────────┐
+              │ Process │   │   Log   │
+              │  & Reply│   │   DB    │
+              └─────────┘   └─────────┘
+```
+
+## AI Tools for GHL Control
+
+The AI (VAPI voice agent or any other agent) can control GHL via `/api/ghl/tools`:
+
+| Tool | Description |
+|------|-------------|
+| `ghl_send_message` | Send SMS, Email, WhatsApp, Messenger, Instagram |
+| `ghl_create_contact` | Create new CRM contact |
+| `ghl_update_contact` | Update contact info, tags |
+| `ghl_schedule_post` | Schedule social media post |
+| `ghl_create_appointment` | Book appointment on calendar |
+| `ghl_trigger_workflow` | Start automation workflow |
+| `ghl_move_opportunity` | Move contact in pipeline |
+| `ghl_get_conversations` | Get message history |
+
+## Database Tables
+
+```sql
+-- GHL OAuth connections
+exo_ghl_connections (tenant_id, location_id, tokens, scopes)
+
+-- Contact mapping
+exo_ghl_contacts (tenant_id, ghl_contact_id, ghl_location_id)
+
+-- Message log (analytics)
+exo_ghl_messages (tenant_id, direction, channel, content, ai_generated)
+
+-- Webhook log (idempotency)
+exo_ghl_webhook_log (webhook_id, event_type, payload, processed)
+
+-- Social posts tracking
+exo_ghl_social_posts (tenant_id, platform, content, status, stats)
+
+-- Appointments sync
+exo_ghl_appointments (tenant_id, ghl_appointment_id, start_time, status)
+```
+
+## Environment Variables
+
+```env
+# GHL OAuth (required)
+GHL_CLIENT_ID=xxx
+GHL_CLIENT_SECRET=xxx
+GHL_REDIRECT_URI=https://app.exoskull.ai/api/ghl/oauth/callback
+
+# GHL Webhook security (recommended)
+GHL_WEBHOOK_SECRET=xxx
+
+# Fallback (optional, if GHL not connected)
+TWILIO_ACCOUNT_SID=xxx
+TWILIO_AUTH_TOKEN=xxx
+TWILIO_PHONE_NUMBER=+1xxx
+```
+
+## Rate Limits
+
+| Limit | Value | Strategy |
+|-------|-------|----------|
+| **Burst** | 100 requests / 10 seconds | Client-side throttling |
+| **Daily** | 200,000 requests / day | Queue management |
+| **Retry** | Exponential backoff | 500ms → 1000ms → 2000ms |
 
 ---
 
