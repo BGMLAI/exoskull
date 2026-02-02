@@ -10,7 +10,18 @@ export default async function LoginPage({
   const { data: { user } } = await supabase.auth.getUser()
 
   if (user) {
-    redirect('/dashboard')
+    // Check if user needs onboarding
+    const { data: tenant } = await supabase
+      .from('exo_tenants')
+      .select('onboarding_status')
+      .eq('id', user.id)
+      .single()
+
+    const needsOnboarding = !tenant?.onboarding_status ||
+      tenant.onboarding_status === 'pending' ||
+      tenant.onboarding_status === 'in_progress'
+
+    redirect(needsOnboarding ? '/onboarding' : '/dashboard')
   }
 
   async function signIn(formData: FormData) {

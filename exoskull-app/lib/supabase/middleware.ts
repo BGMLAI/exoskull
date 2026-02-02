@@ -54,7 +54,49 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // Onboarding redirect logic
+  const pathname = request.nextUrl.pathname
+
+  // Skip onboarding check for public routes and API
+  const isPublicRoute = pathname === '/login' ||
+    pathname === '/auth/callback' ||
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/_next/')
+
+  if (user && !isPublicRoute) {
+    // Check if user needs onboarding
+    const isDashboardRoute = pathname.startsWith('/dashboard')
+    const isOnboardingRoute = pathname.startsWith('/onboarding')
+
+    if (isDashboardRoute || isOnboardingRoute) {
+      try {
+        const { data: tenant } = await supabase
+          .from('exo_tenants')
+          .select('onboarding_status')
+          .eq('id', user.id)
+          .single()
+
+        const needsOnboarding = !tenant?.onboarding_status ||
+          tenant.onboarding_status === 'pending' ||
+          tenant.onboarding_status === 'in_progress'
+
+        // Redirect to onboarding if needed (and not already there)
+        if (needsOnboarding && isDashboardRoute) {
+          return NextResponse.redirect(new URL('/onboarding', request.url))
+        }
+
+        // Redirect to dashboard if onboarding completed (and on onboarding page)
+        if (!needsOnboarding && isOnboardingRoute) {
+          return NextResponse.redirect(new URL('/dashboard', request.url))
+        }
+      } catch (error) {
+        // If tenant doesn't exist yet, allow access
+        console.error('[Middleware] Error checking onboarding status:', error)
+      }
+    }
+  }
 
   return response
 }

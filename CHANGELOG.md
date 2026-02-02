@@ -6,6 +6,82 @@ All notable changes to ExoSkull are documented here.
 
 ## 2026-02-02
 
+### Voice Pipeline - Twilio + VAPI + Custom
+
+**VAPI Configuration (działa):**
+- Numer: +48 732 143 210 (backup)
+- Assistant: `72577c85-81d4-47b4-99b5-0ca8b6ed7a63` (XOSKULL)
+- LLM: Claude Opus 4.5 (`claude-opus-4-5-20251101`)
+- Voice: ElevenLabs `eleven_turbo_v2_5`
+- Transcriber: Deepgram nova-2 (język: pl)
+- firstMessage: "Cześć, tu Zygfryd. W czym mogę pomóc?"
+
+**Custom Pipeline (bez VAPI) - deployed:**
+- Numer: +48 732 144 112
+- Endpoint: `/functions/v1/exoskull-voice`
+- Flow: Twilio <Gather> → Claude Opus 4.5 → <Say> TTS
+- Plik: `IORS_Master_Project/supabase/functions/exoskull-voice/index.ts`
+
+**Naprawione problemy:**
+1. Brak assistant na numerze → przypisano
+2. Custom LLM (Moltbot/n8n) offline → zmiana na OpenAI → Anthropic
+3. Transcriber multi-language → błędny język → wymuszono polski (Deepgram)
+4. Voice Cartesia → zmiana na ElevenLabs
+
+**Numery Twilio w VAPI:**
+- +48732143210 - VAPI (główny, assistant przypisany)
+- +48732144112 - Custom pipeline (deployed)
+- +48732071977, +48732070809, +48732071757 - zapasowe
+
+---
+
+### Conversation-First Onboarding System
+
+**Philosophy:** Onboarding przez naturalną rozmowę głosową, NIE formularze.
+
+**New Files:**
+- `app/onboarding/page.tsx` - Main onboarding page (voice or chat)
+- `app/onboarding/layout.tsx` - Clean layout without sidebar
+- `components/onboarding/DiscoveryVoice.tsx` - VAPI voice discovery
+- `components/onboarding/DiscoveryChat.tsx` - Text chat fallback
+- `lib/onboarding/discovery-prompt.ts` - Discovery system prompt (~60 topics)
+- `lib/onboarding/types.ts` - TypeScript interfaces
+
+**API Routes:**
+- `/api/onboarding` - GET status
+- `/api/onboarding/chat` - POST chat message, GET AI response
+- `/api/onboarding/extract` - POST extract profile from conversation (Gemini Flash)
+- `/api/onboarding/complete` - POST mark onboarding as completed
+- `/api/onboarding/save-profile` - POST save profile (VAPI tool callback)
+
+**Database Migration (20260202000021):**
+- Added to `exo_tenants`:
+  - `onboarding_status` (pending/in_progress/completed)
+  - `onboarding_step`, `onboarding_completed_at`
+  - `preferred_name`, `primary_goal`, `secondary_goals`, `conditions`
+  - `communication_style`, `preferred_channel`
+  - `morning_checkin_time`, `evening_checkin_time`, `checkin_enabled`
+  - `voice_pin_hash`, `discovery_data`
+- New tables: `exo_onboarding_sessions`, `exo_discovery_extractions`
+
+**Middleware Update:**
+- Redirect to `/onboarding` if `onboarding_status != 'completed'` when accessing `/dashboard`
+
+**Discovery Prompt Features:**
+- ~60 topics to naturally discover about user
+- Projective techniques ("Imagine your ideal day...")
+- Natural conversation style, NOT interrogation
+- Auto-extraction of profile data after conversation
+
+**User Journey:**
+1. Signup → `/onboarding`
+2. Choose: "Porozmawiajmy głosowo" or "Wolę pisać"
+3. 10-15 minute natural conversation
+4. AI extracts profile data (Gemini Flash)
+5. Redirect to `/dashboard`
+
+---
+
 ### ARCHITECTURE.md - Rozszerzenie filozofii
 
 **Nowe podsekcje w CORE PHILOSOPHY:**
