@@ -6,6 +6,53 @@ All notable changes to ExoSkull are documented here.
 
 ## 2026-02-02
 
+### GOTCHA Framework Implementation
+
+**Cel:** Stworzenie struktury GOTCHA dla ExoSkull zgodnie z architektura.
+
+**Nowe katalogi i pliki:**
+
+**Goals Layer (`goals/`):**
+- `manifest.md` - Index wszystkich workflow
+- `daily-checkin.md` - Proaktywne check-iny z uzytkownikiem
+- `voice-conversation.md` - Glosowa interakcja (glowny interfejs)
+- `task-management.md` - Zarzadzanie zadaniami
+- `knowledge-capture.md` - Automatyczne wychwytywanie wiedzy
+
+**Tools Layer (`tools/`):**
+- `manifest.md` - Master list wszystkich narzedziw z lib/ (~50 modulow)
+
+**Args Layer (`args/`):**
+- `models.yaml` - Multi-model AI routing config (Tier 1-4)
+- `rigs.yaml` - External API integrations (health, productivity, finance, smart_home)
+- `mods.yaml` - User-facing abilities (sleep-tracker, task-manager, mood-tracker, etc.)
+
+**Hardprompts Layer (`hardprompts/`):**
+- `discovery-interview.md` - Discovery conversation template
+- `gap-detection.md` - Blind spots detection template
+- `intervention-design.md` - Intervention design template
+
+**Context Layer (`context/`):**
+- `tone.md` - Jak ExoSkull mowi (PSYCODE, style matrix, voice rules)
+- `user-archetypes.md` - 7 archetypow uzytkownikow dla gap detection
+
+**Kluczowe elementy:**
+- Model tiers: Gemini Flash (T1) → Claude Haiku (T2) → Kimi K2.5 (T3) → Claude Opus (T4)
+- Mods: sleep-tracker, energy-monitor, task-manager, mood-tracker, habit-tracker + Quests
+- Rigs: Google (unified), Oura, Fitbit, Microsoft 365, Notion, Todoist, Plaid
+- User archetypes: Achiever, Overwhelmed, Searcher, Optimizer, Caregiver, Avoider, Perfectionist
+
+**Jak uzywac GOTCHA:**
+1. Check `goals/manifest.md` przed rozpoczeciem workflow
+2. Check `tools/manifest.md` przed pisaniem nowego kodu
+3. Read `args/` dla konfiguracji (models, rigs, mods)
+4. Use `hardprompts/` dla szablonow promptow
+5. Reference `context/` dla domain knowledge
+
+---
+
+### Earlier 2026-02-02
+
 ### Unified Google Integration
 
 **Cel:** Jeden OAuth login → dostęp do wszystkich usług Google

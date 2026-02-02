@@ -1,0 +1,582 @@
+# =============================================================================
+# Mods Configuration - ExoSkull GOTCHA Framework
+# =============================================================================
+# User-facing abilities and extensions.
+# Mods are what the user "installs" to extend ExoSkull capabilities.
+# =============================================================================
+
+# Default mod behavior
+defaults:
+  enabled_on_install: true
+  auto_insights: true
+  notification_channel: voice # voice, sms, push
+
+# =============================================================================
+# HEALTH MODS
+# =============================================================================
+
+health:
+  # ---------------------------------------------------------------------------
+  # Sleep Tracker
+  # ---------------------------------------------------------------------------
+  sleep-tracker:
+    name: "Sleep Tracker"
+    slug: sleep-tracker
+    description: "Track sleep quality, duration, and patterns"
+    icon: "moon"
+    category: health
+    status: active
+
+    requires_rigs:
+      - google-fit
+      - oura
+      - fitbit
+      - health-connect
+    requires_one_of: true # At least one rig required
+
+    capabilities:
+      insights: true
+      notifications: true
+      actions: true
+      voice: true
+
+    metrics:
+      - sleep_duration
+      - sleep_score
+      - sleep_stages
+      - sleep_debt
+      - bedtime_consistency
+
+    insights:
+      - type: warning
+        condition: "sleep_debt > 4"
+        message: "Masz dług snu {sleep_debt}h. Rozważ wcześniejsze pójście spać."
+      - type: info
+        condition: "bedtime_variance > 60"
+        message: "Twoja pora snu jest niespójna. Stała godzina poprawia jakość."
+      - type: success
+        condition: "sleep_score > 85 for 7 days"
+        message: "Świetny tydzień snu! Utrzymuj ten rytm."
+
+    actions:
+      - name: set_bedtime_reminder
+        description: "Ustaw przypomnienie o porze snu"
+        params:
+          - time: "HH:MM"
+      - name: get_sleep_report
+        description: "Wygeneruj raport snu"
+        params:
+          - period: "week|month"
+
+    config_schema:
+      target_hours:
+        type: number
+        default: 8
+        min: 5
+        max: 12
+      bedtime_reminder:
+        type: boolean
+        default: true
+      reminder_time:
+        type: string
+        default: "22:00"
+
+  # ---------------------------------------------------------------------------
+  # Energy Monitor
+  # ---------------------------------------------------------------------------
+  energy-monitor:
+    name: "Energy Monitor"
+    slug: energy-monitor
+    description: "Track and optimize daily energy levels"
+    icon: "zap"
+    category: health
+    status: active
+
+    requires_rigs: [] # Can work without rigs (manual logging)
+
+    capabilities:
+      insights: true
+      notifications: true
+      actions: true
+      voice: true
+
+    metrics:
+      - energy_level # 1-10
+      - energy_trend
+      - peak_hours
+      - low_hours
+      - correlation_sleep
+
+    insights:
+      - type: info
+        condition: "peak_hours identified"
+        message: "Twoja energia jest najwyższa między {peak_start} a {peak_end}. Planuj ważne zadania wtedy."
+      - type: warning
+        condition: "avg_energy < 5 for 3 days"
+        message: "Twoja energia jest niska od 3 dni. Sprawdźmy sen i stres."
+
+    actions:
+      - name: log_energy
+        description: "Zaloguj aktualny poziom energii"
+        params:
+          - level: "1-10"
+          - notes: "optional"
+      - name: get_energy_report
+        description: "Raport energii"
+
+    config_schema:
+      check_in_times:
+        type: array
+        default: ["09:00", "14:00", "19:00"]
+      auto_prompt:
+        type: boolean
+        default: true
+
+  # ---------------------------------------------------------------------------
+  # HRV Tracker (Heart Rate Variability)
+  # ---------------------------------------------------------------------------
+  hrv-tracker:
+    name: "HRV Tracker"
+    slug: hrv-tracker
+    description: "Monitor stress and recovery through HRV"
+    icon: "heart-pulse"
+    category: health
+    status: planned
+
+    requires_rigs:
+      - oura
+      - google-fit
+    requires_one_of: true
+
+    capabilities:
+      insights: true
+      notifications: true
+      actions: false
+      voice: true
+
+    metrics:
+      - hrv_avg
+      - hrv_trend
+      - stress_index
+      - recovery_score
+
+# =============================================================================
+# PRODUCTIVITY MODS
+# =============================================================================
+
+productivity:
+  # ---------------------------------------------------------------------------
+  # Task Manager
+  # ---------------------------------------------------------------------------
+  task-manager:
+    name: "Task Manager"
+    slug: task-manager
+    description: "Create, track, and complete tasks"
+    icon: "check-square"
+    category: productivity
+    status: active
+
+    requires_rigs: [] # Works standalone
+
+    capabilities:
+      insights: true
+      notifications: true
+      actions: true
+      voice: true
+
+    metrics:
+      - tasks_completed
+      - tasks_overdue
+      - completion_rate
+      - avg_completion_time
+
+    insights:
+      - type: warning
+        condition: "overdue_count > 3"
+        message: "Masz {overdue_count} zaległych zadań. Może przejrzeć priorytety?"
+      - type: success
+        condition: "completion_rate > 80%"
+        message: "Świetny tydzień! Ukończyłeś {completion_rate}% zadań."
+
+    actions:
+      - name: create_task
+        description: "Utwórz nowe zadanie"
+        params:
+          - title: "required"
+          - priority: "1-4"
+          - due_date: "optional"
+      - name: complete_task
+        description: "Oznacz zadanie jako ukończone"
+        params:
+          - task_id: "required"
+      - name: get_tasks
+        description: "Pobierz listę zadań"
+        params:
+          - filter: "all|today|overdue"
+
+    config_schema:
+      default_priority:
+        type: number
+        default: 2
+      overdue_reminder:
+        type: boolean
+        default: true
+      reminder_frequency:
+        type: string
+        default: "daily"
+
+  # ---------------------------------------------------------------------------
+  # Focus Mode
+  # ---------------------------------------------------------------------------
+  focus-mode:
+    name: "Focus Mode"
+    slug: focus-mode
+    description: "Deep work sessions with distraction blocking"
+    icon: "target"
+    category: productivity
+    status: planned
+
+    requires_rigs: [] # Works standalone
+
+    capabilities:
+      insights: true
+      notifications: true
+      actions: true
+      voice: true
+
+    metrics:
+      - focus_minutes_today
+      - focus_sessions_week
+      - avg_session_length
+      - interruption_rate
+
+    actions:
+      - name: start_focus
+        description: "Rozpocznij sesję focus"
+        params:
+          - duration_minutes: "default 25"
+      - name: end_focus
+        description: "Zakończ sesję focus"
+      - name: get_focus_stats
+        description: "Statystyki focus"
+
+    config_schema:
+      default_duration:
+        type: number
+        default: 25
+      break_duration:
+        type: number
+        default: 5
+      block_notifications:
+        type: boolean
+        default: true
+
+  # ---------------------------------------------------------------------------
+  # Calendar Assistant
+  # ---------------------------------------------------------------------------
+  calendar-assistant:
+    name: "Calendar Assistant"
+    slug: calendar-assistant
+    description: "Smart calendar management and scheduling"
+    icon: "calendar"
+    category: productivity
+    status: planned
+
+    requires_rigs:
+      - google-workspace
+      - microsoft-365
+    requires_one_of: true
+
+    capabilities:
+      insights: true
+      notifications: true
+      actions: true
+      voice: true
+
+    metrics:
+      - meetings_today
+      - meetings_week
+      - free_time_blocks
+      - meeting_load
+
+    actions:
+      - name: get_today
+        description: "Co mam dzisiaj?"
+      - name: find_free_time
+        description: "Znajdź wolny czas"
+        params:
+          - duration_minutes: "required"
+          - within_days: "default 7"
+      - name: create_event
+        description: "Utwórz wydarzenie"
+
+# =============================================================================
+# WELLBEING MODS
+# =============================================================================
+
+wellbeing:
+  # ---------------------------------------------------------------------------
+  # Mood Tracker
+  # ---------------------------------------------------------------------------
+  mood-tracker:
+    name: "Mood Tracker"
+    slug: mood-tracker
+    description: "Track emotional states and patterns"
+    icon: "smile"
+    category: wellbeing
+    status: active
+
+    requires_rigs: [] # Manual logging
+
+    capabilities:
+      insights: true
+      notifications: true
+      actions: true
+      voice: true
+
+    metrics:
+      - mood_avg
+      - mood_trend
+      - triggers_positive
+      - triggers_negative
+
+    insights:
+      - type: info
+        condition: "pattern_detected"
+        message: "Zauważyłem, że {pattern}. Chcesz o tym porozmawiać?"
+      - type: warning
+        condition: "mood_avg < 4 for 5 days"
+        message: "Twój nastrój był niski przez 5 dni. Jak mogę pomóc?"
+
+    actions:
+      - name: log_mood
+        description: "Zaloguj nastrój"
+        params:
+          - level: "1-10"
+          - notes: "optional"
+          - triggers: "optional array"
+      - name: get_mood_report
+        description: "Raport nastroju"
+
+    config_schema:
+      check_in_frequency:
+        type: string
+        default: "twice_daily"
+      evening_reflection:
+        type: boolean
+        default: true
+
+  # ---------------------------------------------------------------------------
+  # Habit Tracker
+  # ---------------------------------------------------------------------------
+  habit-tracker:
+    name: "Habit Tracker"
+    slug: habit-tracker
+    description: "Build and maintain positive habits"
+    icon: "repeat"
+    category: wellbeing
+    status: active
+
+    requires_rigs: [] # Manual logging
+
+    capabilities:
+      insights: true
+      notifications: true
+      actions: true
+      voice: true
+
+    metrics:
+      - habits_active
+      - streak_current
+      - streak_longest
+      - completion_rate
+
+    insights:
+      - type: success
+        condition: "streak > 7"
+        message: "Świetna passa! {streak} dni z rzędu dla {habit_name}."
+      - type: warning
+        condition: "streak_broken"
+        message: "Przerwałeś passę dla {habit_name}. Wróć na tor!"
+
+    actions:
+      - name: log_habit
+        description: "Zaloguj nawyk"
+        params:
+          - habit_id: "required"
+          - completed: "boolean"
+      - name: create_habit
+        description: "Utwórz nowy nawyk"
+        params:
+          - name: "required"
+          - frequency: "daily|weekdays|weekly"
+      - name: get_habits
+        description: "Lista nawyków"
+
+    config_schema:
+      reminder_time:
+        type: string
+        default: "20:00"
+      streak_notifications:
+        type: boolean
+        default: true
+
+# =============================================================================
+# FINANCE MODS
+# =============================================================================
+
+finance:
+  # ---------------------------------------------------------------------------
+  # Spending Tracker
+  # ---------------------------------------------------------------------------
+  spending-tracker:
+    name: "Spending Tracker"
+    slug: spending-tracker
+    description: "Track and categorize expenses"
+    icon: "wallet"
+    category: finance
+    status: planned
+
+    requires_rigs:
+      - plaid
+    requires_one_of: false # Can work manually
+
+    capabilities:
+      insights: true
+      notifications: true
+      actions: true
+      voice: true
+
+    metrics:
+      - spending_today
+      - spending_week
+      - spending_month
+      - category_breakdown
+      - vs_budget
+
+    insights:
+      - type: warning
+        condition: "spending > budget * 0.8"
+        message: "Wydałeś 80% budżetu. Zostało {remaining} PLN."
+      - type: info
+        condition: "unusual_spending"
+        message: "Nietypowy wydatek w kategorii {category}: {amount} PLN."
+
+    actions:
+      - name: log_expense
+        description: "Zaloguj wydatek"
+        params:
+          - amount: "required"
+          - category: "optional"
+          - notes: "optional"
+      - name: get_spending_report
+        description: "Raport wydatków"
+
+    config_schema:
+      monthly_budget:
+        type: number
+        default: 5000
+      categories:
+        type: array
+        default:
+          - food
+          - transport
+          - entertainment
+          - bills
+          - shopping
+          - health
+          - other
+
+# =============================================================================
+# QUESTS (Extended Mods - Time-Limited Programs)
+# =============================================================================
+
+quests:
+  7-day-sleep:
+    name: "7-Day Sleep Transform"
+    slug: 7-day-sleep
+    description: "Tydzień na poprawę jakości snu"
+    icon: "moon"
+    category: quest
+    status: active
+    duration_days: 7
+    requires_mods:
+      - sleep-tracker
+
+    daily_tasks:
+      day_1:
+        - "Ustal stałą porę wstawania"
+        - "Zainstaluj f.lux lub Night Shift"
+      day_2:
+        - "Bez kofeiny po 14:00"
+        - "30 min przed snem bez ekranów"
+      day_3:
+        - "Ciemność w sypialni (zasłony/maska)"
+        - "Temperatura 18-20°C"
+      day_4:
+        - "Wieczorna rutyna (10 min)"
+        - "Zapisz 3 rzeczy za które jesteś wdzięczny"
+      day_5:
+        - "Bez alkoholu przed snem"
+        - "Lekka kolacja 3h przed snem"
+      day_6:
+        - "Medytacja/oddychanie przed snem (5 min)"
+        - "Przegląd tygodnia"
+      day_7:
+        - "Podsumowanie i plan na przyszłość"
+        - "Celebracja postępów"
+
+  digital-detox:
+    name: "Digital Detox Week"
+    slug: digital-detox
+    description: "Tydzień odbudowy relacji z technologią"
+    icon: "smartphone-off"
+    category: quest
+    status: planned
+    duration_days: 7
+
+  morning-routine:
+    name: "Morning Routine Builder"
+    slug: morning-routine
+    description: "Zbuduj poranną rutynę w 14 dni"
+    icon: "sunrise"
+    category: quest
+    status: planned
+    duration_days: 14
+
+  mindfulness-week:
+    name: "Mindfulness Week"
+    slug: mindfulness-week
+    description: "Tydzień uważności"
+    icon: "brain"
+    category: quest
+    status: planned
+    duration_days: 7
+
+  fitness-kickstart:
+    name: "Fitness Kickstart"
+    slug: fitness-kickstart
+    description: "21 dni na nawyk ruchu"
+    icon: "dumbbell"
+    category: quest
+    status: planned
+    duration_days: 21
+
+# =============================================================================
+# MOD MARKETPLACE SETTINGS
+# =============================================================================
+
+marketplace:
+  enabled: false # TBD
+  community_mods: false # TBD
+  verification_required: true
+  auto_update: true
+
+# =============================================================================
+# INSTALLATION LIMITS
+# =============================================================================
+
+limits:
+  max_active_mods: 10
+  max_active_quests: 2
+  free_tier_mods: 5

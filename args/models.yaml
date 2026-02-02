@@ -1,0 +1,258 @@
+# =============================================================================
+# AI Models Configuration - ExoSkull GOTCHA Framework
+# =============================================================================
+# Multi-model routing configuration for cost optimization.
+# Tier 1 = cheapest, Tier 4 = most capable.
+# =============================================================================
+
+# Default routing behavior
+defaults:
+  temperature: 0.7
+  max_tokens: 1024
+  enable_streaming: true
+  enable_usage_tracking: true
+  log_level: info # debug in development
+
+# =============================================================================
+# MODEL TIERS
+# =============================================================================
+
+tiers:
+  # ---------------------------------------------------------------------------
+  # TIER 1: Ultra-cheap, ultra-fast
+  # Use for: Simple routing, classification, greetings, data extraction
+  # ---------------------------------------------------------------------------
+  tier_1:
+    name: "Flash Tier"
+    description: "Ultra-cheap for trivial tasks"
+    models:
+      - id: gemini-1.5-flash
+        provider: gemini
+        display_name: "Gemini 1.5 Flash"
+        pricing:
+          input_per_1m: 0.075
+          output_per_1m: 0.30
+        limits:
+          max_tokens: 8192
+          context_window: 1000000
+        features:
+          tools: true
+          streaming: true
+          vision: true
+
+    # Tasks that ALWAYS go to Tier 1
+    task_categories:
+      - classification
+      - extraction
+      - simple_response
+      - routing
+      - greetings
+
+    # Keywords that trigger Tier 1
+    keywords:
+      - "wybierz"
+      - "classify"
+      - "categorize"
+      - "route"
+      - "yes/no"
+      - "tak/nie"
+      - "extract"
+      - "parse"
+      - "greeting"
+      - "hello"
+      - "cześć"
+      - "hej"
+
+  # ---------------------------------------------------------------------------
+  # TIER 2: Pattern detection, summarization, analysis
+  # Use for: Moderate complexity, pattern detection, domain analysis
+  # ---------------------------------------------------------------------------
+  tier_2:
+    name: "Haiku Tier"
+    description: "Balanced cost/capability for moderate tasks"
+    models:
+      - id: claude-3-5-haiku
+        provider: anthropic
+        display_name: "Claude 3.5 Haiku"
+        pricing:
+          input_per_1m: 0.80
+          output_per_1m: 4.00
+        limits:
+          max_tokens: 8192
+          context_window: 200000
+        features:
+          tools: true
+          streaming: true
+          vision: true
+
+    task_categories:
+      - summarization
+      - analysis
+      - pattern_detection
+      - conversation
+      - content_generation
+
+    escalate_from_tier_1:
+      - "response too complex"
+      - "requires reasoning"
+      - "pattern detection needed"
+
+  # ---------------------------------------------------------------------------
+  # TIER 3: Complex reasoning, long context, multi-agent
+  # Use for: Deep reasoning, 1M+ context, Swarm coordination
+  # ---------------------------------------------------------------------------
+  tier_3:
+    name: "Kimi Tier"
+    description: "Complex reasoning and long context"
+    models:
+      - id: kimi-k2.5
+        provider: kimi
+        display_name: "Kimi K2.5"
+        pricing:
+          input_per_1m: 0.50 # Placeholder
+          output_per_1m: 2.00
+        limits:
+          max_tokens: 128000
+          context_window: 1000000 # 1M tokens
+        features:
+          tools: true
+          streaming: true
+          vision: true
+          swarm: true # Multi-agent coordination
+
+    task_categories:
+      - reasoning
+      - swarm
+      - long_context
+      - code_generation
+      - visual_analysis
+
+    # Special capabilities
+    capabilities:
+      swarm_mode: true # Multi-agent coordination
+      visual_agentic: true # Image analysis for actions
+
+  # ---------------------------------------------------------------------------
+  # TIER 4: Meta-coordination, crisis, strategic decisions
+  # Use for: Crisis intervention, strategic planning, meta-decisions
+  # ---------------------------------------------------------------------------
+  tier_4:
+    name: "Opus Tier"
+    description: "Top-tier brain for critical decisions"
+    models:
+      - id: claude-opus-4-5
+        provider: anthropic
+        display_name: "Claude Opus 4.5"
+        pricing:
+          input_per_1m: 15.00
+          output_per_1m: 75.00
+        limits:
+          max_tokens: 32000
+          context_window: 200000
+        features:
+          tools: true
+          streaming: true
+          vision: true
+
+    task_categories:
+      - meta_coordination
+      - crisis
+      - strategic_planning
+      - intervention_design
+      - architecture_decisions
+
+    # Crisis detection keywords (ALWAYS escalate to Tier 4)
+    crisis_keywords:
+      - "samobójcz"
+      - "suicide"
+      - "kryzys"
+      - "crisis"
+      - "przemoc"
+      - "violence"
+      - "panic"
+      - "panika"
+      - "emergency"
+      - "nagły"
+      - "help me"
+      - "pomóż"
+      - "chcę umrzeć"
+      - "nie chcę żyć"
+
+    # Meta-coordination keywords
+    meta_keywords:
+      - "strategia"
+      - "strategy"
+      - "plan długoterminowy"
+      - "long-term"
+      - "architecture"
+      - "architektura"
+      - "system design"
+
+# =============================================================================
+# CIRCUIT BREAKER
+# =============================================================================
+
+circuit_breaker:
+  failure_threshold: 3 # Open after 3 consecutive failures
+  cooldown_ms: 300000 # 5 minutes cooldown
+  half_open_max_attempts: 1 # Test requests in half-open state
+
+# =============================================================================
+# ROUTER BEHAVIOR
+# =============================================================================
+
+router:
+  max_escalations: 3 # Max tier escalations before giving up
+  retry_delays_ms: [1000, 2000, 5000] # Backoff delays
+  fallback_tier: 2 # Default fallback if Tier 1 unavailable
+
+# =============================================================================
+# PROMPT CACHING
+# =============================================================================
+
+caching:
+  enabled: true
+  static_context_min_tokens: 1024 # Cache if static context > 1024 tokens
+  cache_ttl_seconds: 3600 # 1 hour cache
+
+  # What to cache (static)
+  static_content:
+    - system_prompt
+    - user_profile
+    - app_configs
+    - pattern_history
+
+  # What NOT to cache (dynamic)
+  dynamic_content:
+    - current_request
+    - recent_conversations
+    - real_time_data
+
+# =============================================================================
+# USAGE TRACKING
+# =============================================================================
+
+usage_tracking:
+  enabled: true
+  log_to_supabase: true
+  table: exo_ai_usage
+  fields:
+    - tenant_id
+    - model
+    - tier
+    - task_category
+    - input_tokens
+    - output_tokens
+    - estimated_cost
+    - latency_ms
+    - success
+    - error_message
+    - timestamp
+
+# =============================================================================
+# ENVIRONMENT VARIABLES REQUIRED
+# =============================================================================
+# GOOGLE_GEMINI_API_KEY - Gemini API key
+# ANTHROPIC_API_KEY - Anthropic API key
+# KIMI_API_KEY - Kimi API key (when available)
+# =============================================================================
