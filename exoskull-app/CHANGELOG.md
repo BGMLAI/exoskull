@@ -4,6 +4,115 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-03] MODUL 2: Knowledge Layer (Tyrolka Framework)
+
+### Verified/Enhanced
+Complete Knowledge Layer implementation verified and enhanced.
+
+**API Endpoints** (all working):
+- `/api/knowledge/loops` - CRUD for life domains
+- `/api/knowledge/campaigns` - CRUD for major initiatives
+- `/api/knowledge/quests` - CRUD for projects
+- `/api/knowledge/ops` - CRUD for tasks
+- `/api/knowledge/notes` - CRUD for universal notes
+- `/api/knowledge/tyrolka` - GET synthesized context
+- `/api/knowledge/upload` - POST file upload (supports PDF, DOCX, images, video up to 1GB)
+
+**Components Enhanced**:
+- `OpCard.tsx` - Added onToggleStatus prop, checkbox UI, recurring indicator
+- `NoteCard.tsx` - NEW - Display notes with type icon, AI summary, tags
+
+**Components Created**:
+- `LoopFormDialog.tsx` - Create/edit loops with icon/color pickers
+- `CampaignFormDialog.tsx` - Create/edit campaigns
+- `QuestFormDialog.tsx` - Create/edit quests with tags
+- `OpFormDialog.tsx` - Create/edit ops with recurring support
+
+**View Components** (verified existing):
+- `KnowledgeHeader.tsx` - Header with tabs (Hierarchia/Notatki/Dokumenty) + search + add menu
+- `HierarchyView.tsx` - 4-column responsive layout (Loops→Campaigns→Quests→Ops)
+- `NotesView.tsx` - Notes grid with type filter, search, pagination
+- `FileUploadZone.tsx` - Drag & drop upload with progress
+- `DocumentsList.tsx` - Document list with status badges, delete with confirmation
+
+**Lib Created**:
+- `lib/hooks/useKnowledge.ts` - Data fetching hooks (useLoops, useCampaigns, useQuests, useOps, useNotes, useDocuments)
+- `lib/api/knowledge.ts` - CRUD helper functions with error handling
+
+### Files Changed
+- `components/knowledge/OpCard.tsx`
+- `components/knowledge/NoteCard.tsx` (NEW)
+- `components/knowledge/LoopFormDialog.tsx` (NEW)
+- `components/knowledge/CampaignFormDialog.tsx` (NEW)
+- `components/knowledge/QuestFormDialog.tsx` (NEW)
+- `components/knowledge/OpFormDialog.tsx` (NEW)
+- `lib/hooks/useKnowledge.ts` (NEW)
+- `lib/api/knowledge.ts` (NEW)
+
+---
+
+## [2026-02-03] MODUL 6: Tools & Mods
+
+### Added - Claude Tools Framework
+
+Built AI tools for Claude tool use and expanded health tracking mods.
+
+**lib/tools/** (NEW - 6 files):
+- `types.ts` - Tool type definitions (ExoTool, ToolHandler, ToolResult)
+- `index.ts` - Tool registry with TOOL_REGISTRY, getAllToolDefinitions(), executeTool()
+- `task-tool.ts` - Task CRUD wrapper around TaskManagerExecutor
+- `calendar-tool.ts` - Calendar CRUD via Google Workspace rig
+- `email-tool.ts` - Email read/send via Google Workspace rig
+- `search-tool.ts` - Web search via Tavily API
+
+**app/api/tools/** (NEW - 2 files):
+- `route.ts` - Main tool dispatcher (POST execute, GET list)
+- `search/route.ts` - Dedicated web search endpoint
+
+### Added - Health Mod Executors
+
+**lib/mods/executors/** (2 new files):
+- `sleep-tracker.ts` - Sleep tracking with Oura integration + manual fallback
+- `activity-tracker.ts` - Activity/workout tracking with Oura/manual entries
+
+### Added - Database Migration
+
+**supabase/migrations/20260203000001_sleep_activity_tables.sql**:
+- `exo_sleep_entries` - Sleep session tracking (Oura, manual, health-connect)
+- `exo_activity_entries` - Activity/workout tracking
+- `exo_health_goals` - Health goal tracking
+
+### Modified
+- `lib/mods/executors/index.ts` - Registered SleepTrackerExecutor, ActivityTrackerExecutor
+
+### Environment Variables
+- `TAVILY_API_KEY` - Required for web search tool
+
+---
+
+## [2026-02-03] MODUL 5: Integrations (Rigs)
+
+### Added
+- Oura OAuth routes and dedicated sync endpoint that writes to `exo_health_metrics`
+- `lib/rigs/oura/types.ts` and type exports from the Oura client
+- Health dashboard charts: Sleep, Activity, HRV
+
+### Changed
+- Google Workspace client: Gmail drafts, Calendar event update/delete/list, tasks sync helper
+- Rig sync now upserts health metrics for `google` and `google-fit`
+- Health page copy now references Oura/Google Fit + Health Connect
+
+### Files
+- `lib/rigs/oura/types.ts`
+- `lib/rigs/oura/client.ts`
+- `app/api/rigs/oura/connect/route.ts`
+- `app/api/rigs/oura/callback/route.ts`
+- `app/api/rigs/oura/sync/route.ts`
+- `lib/rigs/google-workspace/client.ts`
+- `lib/rigs/google/client.ts`
+- `app/api/rigs/[slug]/sync/route.ts`
+- `app/dashboard/health/page.tsx`
+
 ## [2026-02-03] MODUL 3: Voice Pipeline (Twilio + ElevenLabs + Claude)
 
 ### Added - Custom Voice Pipeline (WITHOUT VAPI)
