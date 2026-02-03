@@ -18,7 +18,7 @@ import { makeOutboundCall } from '@/lib/voice/twilio-client'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://exoskull.vercel.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://exoskull.xyz'
 
 function getSupabase() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
