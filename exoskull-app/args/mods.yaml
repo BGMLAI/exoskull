@@ -1,0 +1,258 @@
+# Mods Configuration - Extension Settings
+#
+# Mods to rozszerzenia dostepne dla uzytkownikow.
+# Kazdy mod definiuje: capabilities, required rigs, default config.
+
+# =====================================================
+# MOD DEFINITIONS
+# =====================================================
+
+mods:
+  sleep-tracker:
+    name: "Sleep Tracker"
+    description: "Track and analyze your sleep patterns with insights"
+    icon: "sleep"
+    category: "health"
+    requires_rigs:
+      any_of: ["oura", "fitbit", "health-connect"]
+    capabilities:
+      insights: true
+      notifications: true
+      actions: true
+      voice: true
+    config:
+      goal_hours:
+        type: number
+        default: 8
+        min: 4
+        max: 12
+      bedtime_reminder:
+        type: boolean
+        default: true
+      bedtime_target:
+        type: string
+        default: "22:30"
+        format: "HH:mm"
+      wake_target:
+        type: string
+        default: "06:30"
+        format: "HH:mm"
+    insights:
+      - "sleep_score_trend"
+      - "sleep_debt_alert"
+      - "optimal_bedtime"
+    executor: "lib/mods/executors/sleep-tracker.ts"
+
+  energy-monitor:
+    name: "Energy Monitor"
+    description: "Track your energy levels throughout the day"
+    icon: "zap"
+    category: "health"
+    requires_rigs:
+      any_of: ["oura", "fitbit"]
+    capabilities:
+      insights: true
+      notifications: true
+      actions: false
+      voice: true
+    config:
+      check_in_times:
+        type: array
+        items: string
+        default: ["09:00", "14:00", "19:00"]
+    insights:
+      - "energy_patterns"
+      - "low_energy_alerts"
+      - "optimal_focus_time"
+    executor: "lib/mods/executors/energy-monitor.ts"
+
+  focus-mode:
+    name: "Focus Mode"
+    description: "Block distractions and optimize environment for deep work"
+    icon: "target"
+    category: "productivity"
+    requires_rigs:
+      optional: ["google-calendar", "philips-hue"]
+    capabilities:
+      insights: false
+      notifications: true
+      actions: true
+      voice: true
+    config:
+      duration_minutes:
+        type: number
+        default: 90
+        min: 15
+        max: 240
+      block_calendar:
+        type: boolean
+        default: true
+      dim_lights:
+        type: boolean
+        default: true
+      dnd_enabled:
+        type: boolean
+        default: true
+    executor: "lib/mods/executors/focus-mode.ts"
+
+  task-manager:
+    name: "Task Manager"
+    description: "Unified task management synced with external services"
+    icon: "list"
+    category: "productivity"
+    requires_rigs:
+      optional: ["google-workspace", "todoist", "notion"]
+    capabilities:
+      insights: true
+      notifications: true
+      actions: true
+      voice: true
+    config:
+      default_project:
+        type: string
+        default: null
+      auto_prioritize:
+        type: boolean
+        default: true
+      google_tasklist_id:
+        type: string
+        default: "@default"
+      sync_interval_minutes:
+        type: number
+        default: 15
+    insights:
+      - "overdue_tasks"
+      - "completion_rate"
+      - "productivity_trends"
+    executor: "lib/mods/executors/task-manager.ts"
+
+  mood-tracker:
+    name: "Mood Tracker"
+    description: "Daily mood check-ins and pattern analysis"
+    icon: "smile"
+    category: "wellbeing"
+    requires_rigs: []
+    capabilities:
+      insights: true
+      notifications: true
+      actions: false
+      voice: true
+    config:
+      check_in_times:
+        type: array
+        items: string
+        default: ["08:00", "20:00"]
+      scale:
+        type: string
+        enum: ["1-5", "1-10", "emoji"]
+        default: "1-10"
+    insights:
+      - "mood_trends"
+      - "mood_correlations"
+      - "trigger_detection"
+    executor: "lib/mods/executors/mood-tracker.ts"
+
+  habit-tracker:
+    name: "Habit Tracker"
+    description: "Build and maintain positive habits with streak tracking"
+    icon: "flame"
+    category: "wellbeing"
+    requires_rigs: []
+    capabilities:
+      insights: true
+      notifications: true
+      actions: true
+      voice: true
+    config:
+      habits:
+        type: array
+        items:
+          type: object
+          properties:
+            name: string
+            frequency: ["daily", "weekly"]
+            reminder_time: string
+        default: []
+      streak_notifications:
+        type: boolean
+        default: true
+    insights:
+      - "streak_status"
+      - "habit_completion_rate"
+      - "best_performing_habits"
+    executor: "lib/mods/executors/habit-tracker.ts"
+
+  spending-tracker:
+    name: "Spending Tracker"
+    description: "Track and categorize expenses automatically"
+    icon: "dollar"
+    category: "finance"
+    requires_rigs:
+      required: ["plaid"]
+    capabilities:
+      insights: true
+      notifications: true
+      actions: false
+      voice: true
+    config:
+      budget_alerts:
+        type: boolean
+        default: true
+      monthly_budget:
+        type: number
+        default: null
+      categories:
+        type: array
+        items: string
+        default: ["food", "transport", "entertainment", "utilities"]
+      alert_threshold_percent:
+        type: number
+        default: 80
+    insights:
+      - "spending_by_category"
+      - "budget_progress"
+      - "unusual_transactions"
+    executor: "lib/mods/executors/spending-tracker.ts"
+
+# =====================================================
+# MOD CATEGORIES
+# =====================================================
+
+categories:
+  health:
+    name: "Health"
+    description: "Sleep, energy, activity tracking"
+    mods: ["sleep-tracker", "energy-monitor"]
+
+  productivity:
+    name: "Productivity"
+    description: "Tasks, focus, time management"
+    mods: ["task-manager", "focus-mode"]
+
+  wellbeing:
+    name: "Wellbeing"
+    description: "Mood, habits, mental health"
+    mods: ["mood-tracker", "habit-tracker"]
+
+  finance:
+    name: "Finance"
+    description: "Spending, budgets, transactions"
+    mods: ["spending-tracker"]
+
+# =====================================================
+# MOD LIFECYCLE
+# =====================================================
+
+lifecycle:
+  auto_archive_unused_days: 30
+  archive_notification: true
+  max_active_mods: 10
+
+# =====================================================
+# INSIGHTS ENGINE
+# =====================================================
+
+insights:
+  generation_schedule: "0 6 * * *"  # Daily at 6am
+  min_data_points: 7  # Need 7 days of data
+  confidence_threshold: 0.7

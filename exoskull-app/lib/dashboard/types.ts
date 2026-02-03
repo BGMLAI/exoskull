@@ -42,3 +42,34 @@ export interface ConversationStats {
   totalWeek: number
   avgDuration: number
 }
+
+export interface CalendarItem {
+  id: string
+  title: string
+  date: string
+  type: 'task' | 'checkin' | 'custom'
+  link: string
+  meta?: string
+}
+
+export interface HealthSummary {
+  steps: number | null
+  sleepMinutes: number | null
+  hrv: number | null
+  sleepSeries: DataPoint[]
+}
+
+export interface KnowledgeSummary {
+  loopsTotal: number
+  activeCampaigns: number
+  topLoop?: {
+    name: string
+    icon?: string | null
+    attentionScore?: number | null
+  }
+}
+
+export interface MiniSeriesData {
+  label: string
+  data: DataPoint[]
+}

@@ -4,6 +4,98 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-03] MODUL 1: GOTCHA Framework - Formalizacja
+
+### Added - Pełna struktura GOTCHA Framework
+
+Sformalizowano architekturę 6-warstwową według GOTCHA:
+
+**goals/** (5 workflow definitions):
+| File | Purpose |
+|------|---------|
+| `manifest.md` | Index wszystkich workflow |
+| `daily-checkin.md` | Morning/evening check-in flow |
+| `voice-conversation.md` | Voice pipeline (Twilio+ElevenLabs+Claude) |
+| `task-management.md` | Task CRUD via voice/dashboard/integrations |
+| `knowledge-capture.md` | Tyrolka framework: Loops>Campaigns>Quests>Ops>Notes |
+| `autonomy-execution.md` | MAPE-K loop, gap detection, permissions |
+
+**tools/** (1 file):
+| File | Purpose |
+|------|---------|
+| `manifest.md` | Index of AI tools (task, calendar, email, web_search) |
+
+**args/** (4 config files):
+| File | Purpose |
+|------|---------|
+| `models.yaml` | Multi-model AI routing (4 tiers: Gemini→Haiku→Kimi→Opus) |
+| `rigs.yaml` | Integration settings (12 rigs: Google, Oura, Todoist...) |
+| `mods.yaml` | Mod definitions (7 mods: sleep, mood, habit, task...) |
+| `voice.yaml` | Voice pipeline config (Twilio, ElevenLabs, Claude) |
+
+**hardprompts/** (3 templates):
+| File | Purpose |
+|------|---------|
+| `discovery-interview.md` | Onboarding conversation (~60 topics) |
+| `gap-detection.md` | Blind spot detection prompts |
+| `daily-summary.md` | Morning/evening summary templates |
+
+**context/** (2 knowledge files):
+| File | Purpose |
+|------|---------|
+| `tone.md` | ExoSkull personality & communication style |
+| `domains.md` | Life domains (Health, Work, Finance...) + gap thresholds |
+
+### GOTCHA Architecture
+
+```
+GOT (Engine):
+├── Goals (goals/) - What to achieve
+├── Orchestration - AI manager (Claude)
+└── Tools (lib/tools/) - Deterministic execution
+
+CHA (Context):
+├── Context (context/) - Domain knowledge
+├── Hard Prompts (hardprompts/) - Instruction templates
+└── Args (args/) - Behavior configuration
+```
+
+### Files Created (16 total)
+```
+exoskull-app/
+├── goals/
+│   ├── manifest.md
+│   ├── daily-checkin.md
+│   ├── voice-conversation.md
+│   ├── task-management.md
+│   ├── knowledge-capture.md
+│   └── autonomy-execution.md
+├── tools/
+│   └── manifest.md
+├── args/
+│   ├── models.yaml
+│   ├── rigs.yaml
+│   ├── mods.yaml
+│   └── voice.yaml
+├── hardprompts/
+│   ├── discovery-interview.md
+│   ├── gap-detection.md
+│   └── daily-summary.md
+└── context/
+    ├── tone.md
+    └── domains.md
+```
+
+### Notes for Future Agents
+- Goals define WHAT to achieve, not HOW system behaves
+- Args control runtime behavior (model tiers, sync intervals)
+- Hardprompts are reusable templates for LLM sub-tasks
+- Context is static reference material (personality, domains)
+- Tools are in lib/tools/ (code), manifests here (documentation)
+- MODUL 1 is now 100% complete
+
+---
+
 ## [2026-02-03] MODUL 2: Knowledge Layer (Tyrolka Framework)
 
 ### Verified/Enhanced

@@ -156,17 +156,38 @@ export class GoogleClient {
       getUnreadCount: () => this.workspaceClient.getUnreadCount(),
       sendEmail: (to: string, subject: string, body: string) =>
         this.workspaceClient.sendEmail(to, subject, body),
+      listDrafts: (max?: number) => this.workspaceClient.listDrafts(max),
+      getDraft: (draftId: string) => this.workspaceClient.getDraft(draftId),
+      createDraft: (to: string, subject: string, body: string) =>
+        this.workspaceClient.createDraft(to, subject, body),
+      sendDraft: (draftId: string) => this.workspaceClient.sendDraft(draftId),
+      deleteDraft: (draftId: string) => this.workspaceClient.deleteDraft(draftId),
     };
   }
 
   get calendar() {
     return {
+      listEvents: (params: {
+        calendarId?: string;
+        timeMin?: string;
+        timeMax?: string;
+        maxResults?: number;
+        q?: string;
+        singleEvents?: boolean;
+        orderBy?: string;
+      }) => this.workspaceClient.listEvents(params),
+      getEvent: (calendarId: string, eventId: string) =>
+        this.workspaceClient.getEvent(calendarId, eventId),
       getUpcomingEvents: (calendarId?: string, max?: number) =>
         this.workspaceClient.getUpcomingEvents(calendarId, max),
       getTodaysEvents: (calendarId?: string) =>
         this.workspaceClient.getTodaysEvents(calendarId),
       createEvent: (calendarId: string, event: Partial<CalendarEvent>) =>
         this.workspaceClient.createEvent(calendarId, event),
+      updateEvent: (calendarId: string, eventId: string, updates: Partial<CalendarEvent>) =>
+        this.workspaceClient.updateEvent(calendarId, eventId, updates),
+      deleteEvent: (calendarId: string, eventId: string) =>
+        this.workspaceClient.deleteEvent(calendarId, eventId),
       getFreeBusy: (timeMin: string, timeMax: string, calendars?: string[]) =>
         this.workspaceClient.getFreeBusy(timeMin, timeMax, calendars),
     };
@@ -191,6 +212,8 @@ export class GoogleClient {
         this.workspaceClient.completeTask(listId, taskId),
       getActiveTasks: (listId?: string) => this.workspaceClient.getActiveTasks(listId),
       getOverdueTasks: (listId?: string) => this.workspaceClient.getOverdueTasks(listId),
+      getAllTasks: (options?: { showCompleted?: boolean }) =>
+        this.workspaceClient.getAllTasks(options),
     };
   }
 

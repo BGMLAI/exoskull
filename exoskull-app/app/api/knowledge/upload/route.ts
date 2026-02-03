@@ -12,8 +12,30 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-const ALLOWED_TYPES = ['application/pdf', 'text/plain', 'text/markdown', 'image/jpeg', 'image/png']
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const ALLOWED_TYPES = [
+  // Documents
+  'application/pdf',
+  'text/plain',
+  'text/markdown',
+  'application/json',
+  'text/csv',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation', // pptx
+  // Legacy office formats
+  'application/msword', // doc
+  'application/vnd.ms-excel', // xls
+  'application/vnd.ms-powerpoint', // ppt
+  // Images
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  // Video
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+]
+const MAX_FILE_SIZE = 1024 * 1024 * 1024 // 1GB
 
 export async function POST(req: NextRequest) {
   try {

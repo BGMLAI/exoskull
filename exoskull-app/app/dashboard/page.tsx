@@ -1,12 +1,21 @@
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { queryDatabase } from '@/lib/db-direct'
-import { TasksWidget } from '@/components/widgets/TasksWidget'
-import { ConversationsWidget } from '@/components/widgets/ConversationsWidget'
 import { QuickActionsWidget } from '@/components/widgets/QuickActionsWidget'
 import { IntegrationsWidget } from '@/components/widgets/IntegrationsWidget'
-import { TaskStats, ConversationStats } from '@/lib/dashboard/types'
-import { Zap, Brain, Clock } from 'lucide-react'
+import { CalendarWidget } from '@/components/widgets/CalendarWidget'
+import { HealthWidget } from '@/components/widgets/HealthWidget'
+import { KnowledgeWidget } from '@/components/widgets/KnowledgeWidget'
+import { DashboardRealtime } from '@/components/dashboard/DashboardRealtime'
+import {
+  CalendarItem,
+  ConversationStats,
+  DataPoint,
+  HealthSummary,
+  KnowledgeSummary,
+  TaskStats,
+} from '@/lib/dashboard/types'
+import { Zap } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,11 +25,22 @@ export default async function DashboardPage() {
   // Get user data
   const { data: { user } } = await supabase.auth.getUser()
 
+  if (!user) {
+    return (
+      <div className="p-8">
+        <h1 className="text-2xl font-bold">Zaloguj sie, aby zobaczyc dashboard</h1>
+      </div>
+    )
+  }
+
   // Get task stats
   let taskStats: TaskStats = { total: 0, pending: 0, in_progress: 0, done: 0, blocked: 0 }
+  let taskSeries: DataPoint[] = []
+  let tasks: any[] = []
+
   try {
-    const tasks = await queryDatabase('exo_tasks', {
-      filter: { tenant_id: user?.id }
+    tasks = await queryDatabase('exo_tasks', {
+      filter: { tenant_id: user.id }
     })
 
     if (tasks) {
@@ -29,8 +49,14 @@ export default async function DashboardPage() {
         pending: tasks.filter((t: any) => t.status === 'pending').length,
         in_progress: tasks.filter((t: any) => t.status === 'in_progress').length,
         done: tasks.filter((t: any) => t.status === 'done').length,
-        blocked: tasks.filter((t: any) => t.status === 'blocked').length
+        blocked: tasks.filter((t: any) => t.status === 'blocked').length,
       }
+
+      const completedDates = tasks
+        .filter((t: any) => t.completed_at)
+        .map((t: any) => t.completed_at)
+
+      taskSeries = buildDailySeries(completedDates, 7)
     }
   } catch (e: any) {
     console.error('Failed to load tasks:', e)
@@ -38,18 +64,21 @@ export default async function DashboardPage() {
 
   // Get conversation stats
   let conversationStats: ConversationStats = { totalToday: 0, totalWeek: 0, avgDuration: 0 }
+  let conversationSeries: DataPoint[] = []
+
   try {
     const now = new Date()
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
-    const startOfWeek = new Date(now.setDate(now.getDate() - 7)).toISOString()
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const startOfWeek = new Date(now)
+    startOfWeek.setDate(startOfWeek.getDate() - 7)
 
     const conversations = await queryDatabase('exo_conversations', {
-      filter: { tenant_id: user?.id }
+      filter: { tenant_id: user.id }
     })
 
     if (conversations) {
-      const todayConvs = conversations.filter((c: any) => c.started_at >= startOfDay)
-      const weekConvs = conversations.filter((c: any) => c.started_at >= startOfWeek)
+      const todayConvs = conversations.filter((c: any) => new Date(c.started_at) >= startOfDay)
+      const weekConvs = conversations.filter((c: any) => new Date(c.started_at) >= startOfWeek)
       const durations = conversations
         .filter((c: any) => c.duration_seconds)
         .map((c: any) => c.duration_seconds)
@@ -61,28 +90,128 @@ export default async function DashboardPage() {
           ? Math.round(durations.reduce((a: number, b: number) => a + b, 0) / durations.length)
           : 0
       }
+
+      const startedDates = conversations.map((c: any) => c.started_at)
+      conversationSeries = buildDailySeries(startedDates, 7)
     }
   } catch (e: any) {
     console.error('Failed to load conversations:', e)
   }
 
-  // Get agents count
-  let agentsCount = 0
+  // Health summary (last 7 days)
+  let healthSummary: HealthSummary = {
+    steps: null,
+    sleepMinutes: null,
+    hrv: null,
+    sleepSeries: [],
+  }
+
   try {
-    const agents = await queryDatabase('exo_agents', {
-      filter: { is_global: true }
-    })
-    agentsCount = agents?.length || 0
+    const weekAgo = new Date()
+    weekAgo.setDate(weekAgo.getDate() - 7)
+
+    const { data: healthMetrics } = await supabase
+      .from('exo_health_metrics')
+      .select('metric_type, value, recorded_at')
+      .eq('tenant_id', user.id)
+      .gte('recorded_at', weekAgo.toISOString())
+      .order('recorded_at', { ascending: true })
+
+    if (healthMetrics && healthMetrics.length > 0) {
+      const latestByType: Record<string, { value: number; ts: number }> = {}
+      const sleepByDate = new Map<string, number>()
+
+      for (const metric of healthMetrics) {
+        const timestamp = new Date(metric.recorded_at).getTime()
+
+        if (!latestByType[metric.metric_type] || latestByType[metric.metric_type].ts < timestamp) {
+          latestByType[metric.metric_type] = { value: metric.value, ts: timestamp }
+        }
+
+        if (metric.metric_type === 'sleep') {
+          const key = new Date(metric.recorded_at).toISOString().split('T')[0]
+          sleepByDate.set(key, (sleepByDate.get(key) || 0) + metric.value)
+        }
+      }
+
+      healthSummary = {
+        steps: latestByType.steps?.value ?? null,
+        sleepMinutes: latestByType.sleep?.value ?? null,
+        hrv: latestByType.hrv?.value ?? null,
+        sleepSeries: buildDailyValueSeries(sleepByDate, 7, (value) => Math.round((value / 60) * 10) / 10),
+      }
+    }
   } catch (e: any) {
-    console.error('Failed to load agents:', e)
-    agentsCount = 5 // Fallback
+    console.error('Failed to load health metrics:', e)
+  }
+
+  // Knowledge summary (loops/campaigns)
+  let knowledgeSummary: KnowledgeSummary = {
+    loopsTotal: 0,
+    activeCampaigns: 0,
+  }
+
+  try {
+    const { data: loops } = await supabase
+      .from('user_loops')
+      .select('name, icon, attention_score, is_active')
+      .eq('tenant_id', user.id)
+
+    const { data: campaigns } = await supabase
+      .from('user_campaigns')
+      .select('status')
+      .eq('tenant_id', user.id)
+
+    const topLoop = loops
+      ? [...loops].sort((a, b) => (b.attention_score || 0) - (a.attention_score || 0))[0]
+      : null
+
+    knowledgeSummary = {
+      loopsTotal: loops?.length || 0,
+      activeCampaigns: campaigns?.filter((c) => c.status === 'active').length || 0,
+      topLoop: topLoop
+        ? {
+          name: topLoop.name,
+          icon: topLoop.icon,
+          attentionScore: topLoop.attention_score,
+        }
+        : undefined,
+    }
+  } catch (e: any) {
+    console.error('Failed to load knowledge summary:', e)
+  }
+
+  // Calendar items
+  let calendarItems: CalendarItem[] = []
+
+  try {
+    const scheduledJobs = await queryDatabase('exo_scheduled_jobs', {
+      filter: { is_active: true }
+    })
+
+    const jobPreferences = await queryDatabase('exo_user_job_preferences', {
+      filter: { tenant_id: user.id }
+    })
+
+    const customJobs = await queryDatabase('exo_custom_scheduled_jobs', {
+      filter: { tenant_id: user.id }
+    })
+
+    calendarItems = buildCalendarItems({
+      tasks,
+      scheduledJobs: scheduledJobs || [],
+      jobPreferences: jobPreferences || [],
+      customJobs: customJobs || [],
+    })
+  } catch (e: any) {
+    console.error('Failed to load calendar items:', e)
   }
 
   // Get rig connections
   let rigConnections: any[] = []
   try {
     const connections = await queryDatabase('exo_rig_connections', {
-      filter: { tenant_id: user?.id }
+      filter: { tenant_id: user.id }
     })
     rigConnections = connections || []
   } catch (e: any) {
@@ -94,80 +223,30 @@ export default async function DashboardPage() {
   const greeting = hour < 12 ? 'Dzien dobry' : hour < 18 ? 'Witaj' : 'Dobry wieczor'
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <div>
         <h1 className="text-3xl font-bold">{greeting}!</h1>
         <p className="text-muted-foreground">Oto Twoj dzisiejszy przeglad</p>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <TasksWidget stats={taskStats} />
-        <ConversationsWidget stats={conversationStats} />
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Brain className="h-5 w-5" />
-              Agenci
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold mb-2">
-              {agentsCount}
-              <span className="text-sm font-normal text-muted-foreground ml-2">
-                aktywnych
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Asystenci pracujacy w tle
-            </p>
-          </CardContent>
-        </Card>
+      {/* Widgets */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <DashboardRealtime
+          tenantId={user.id}
+          initialTaskStats={taskStats}
+          initialConversationStats={conversationStats}
+          initialTaskSeries={taskSeries}
+          initialConversationSeries={conversationSeries}
+        />
+        <CalendarWidget items={calendarItems} />
+        <HealthWidget summary={healthSummary} />
+        <KnowledgeWidget summary={knowledgeSummary} />
       </div>
 
       {/* Quick actions & Integrations */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <QuickActionsWidget />
         <IntegrationsWidget connections={rigConnections} />
-      </div>
-
-      {/* Check-ins */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Nastepne check-iny
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-              <div>
-                <p className="font-medium text-sm">Poranny check-in</p>
-                <p className="text-xs text-muted-foreground">Jak sie dzis czujesz?</p>
-              </div>
-              <a
-                href="/dashboard/voice"
-                className="text-sm text-primary hover:underline"
-              >
-                Rozpocznij
-              </a>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-              <div>
-                <p className="font-medium text-sm">Wieczorna refleksja</p>
-                <p className="text-xs text-muted-foreground">Jak minal dzien?</p>
-              </div>
-              <a
-                href="/dashboard/schedule"
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                Skonfiguruj
-              </a>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Info about dynamic widgets */}
@@ -194,4 +273,150 @@ export default async function DashboardPage() {
       </Card>
     </div>
   )
+}
+
+function buildDailySeries(dateStrings: string[], days: number): DataPoint[] {
+  const counts = new Map<string, number>()
+  const today = new Date()
+  const start = new Date(today)
+  start.setDate(start.getDate() - (days - 1))
+  start.setHours(0, 0, 0, 0)
+
+  dateStrings.forEach((dateStr) => {
+    const date = new Date(dateStr)
+    if (date < start) return
+    const key = date.toISOString().split('T')[0]
+    counts.set(key, (counts.get(key) || 0) + 1)
+  })
+
+  const series: DataPoint[] = []
+  for (let i = 0; i < days; i += 1) {
+    const date = new Date(start)
+    date.setDate(start.getDate() + i)
+    const key = date.toISOString().split('T')[0]
+    series.push({
+      date: key,
+      value: counts.get(key) || 0,
+      label: formatShortDate(date),
+    })
+  }
+
+  return series
+}
+
+function buildDailyValueSeries(
+  valuesByDate: Map<string, number>,
+  days: number,
+  transform?: (value: number) => number
+): DataPoint[] {
+  const today = new Date()
+  const start = new Date(today)
+  start.setDate(start.getDate() - (days - 1))
+  start.setHours(0, 0, 0, 0)
+
+  const series: DataPoint[] = []
+  for (let i = 0; i < days; i += 1) {
+    const date = new Date(start)
+    date.setDate(start.getDate() + i)
+    const key = date.toISOString().split('T')[0]
+    const rawValue = valuesByDate.get(key) || 0
+    const value = transform ? transform(rawValue) : rawValue
+
+    series.push({
+      date: key,
+      value,
+      label: formatShortDate(date),
+    })
+  }
+
+  return series
+}
+
+function formatShortDate(date: Date): string {
+  return date.toLocaleDateString('pl-PL', {
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
+function buildCalendarItems({
+  tasks,
+  scheduledJobs,
+  jobPreferences,
+  customJobs,
+}: {
+  tasks: any[]
+  scheduledJobs: any[]
+  jobPreferences: any[]
+  customJobs: any[]
+}): CalendarItem[] {
+  const now = new Date()
+  const prefsMap = new Map(jobPreferences.map((pref: any) => [pref.job_id, pref]))
+
+  const taskItems = tasks
+    .filter((task) => task.due_date && task.status !== 'done')
+    .map((task) => ({
+      id: `task-${task.id}`,
+      title: task.title,
+      date: task.due_date,
+      type: 'task' as const,
+      link: '/dashboard/tasks',
+      meta: 'Zadanie',
+    }))
+    .filter((item) => new Date(item.date) >= now)
+
+  const checkinItems = scheduledJobs
+    .filter((job) => !job.is_system)
+    .map((job) => {
+      const pref = prefsMap.get(job.id)
+      const isEnabled = pref?.is_enabled ?? true
+      if (!isEnabled) return null
+
+      const time = pref?.custom_time || job.time_window_start
+      const nextDate = getNextOccurrenceFromTime(time)
+      if (!nextDate) return null
+
+      return {
+        id: `job-${job.id}`,
+        title: job.display_name,
+        date: nextDate,
+        type: 'checkin' as const,
+        link: '/dashboard/schedule',
+        meta: pref?.preferred_channel || job.default_channel || 'check-in',
+      }
+    })
+    .filter(Boolean) as CalendarItem[]
+
+  const customItems = customJobs
+    .filter((job) => job.is_enabled)
+    .map((job) => ({
+      id: `custom-${job.id}`,
+      title: job.display_name,
+      date: job.next_execution_at || getNextOccurrenceFromTime(job.time_of_day),
+      type: 'custom' as const,
+      link: '/dashboard/schedule',
+      meta: job.job_type || 'custom',
+    }))
+    .filter((item) => item.date) as CalendarItem[]
+
+  return [...taskItems, ...checkinItems, ...customItems]
+    .filter((item) => new Date(item.date) >= now)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(0, 5)
+}
+
+function getNextOccurrenceFromTime(timeStr: string | null): string | null {
+  if (!timeStr) return null
+  const [hour, minute] = timeStr.split(':').map((value) => parseInt(value, 10))
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null
+
+  const now = new Date()
+  const next = new Date(now)
+  next.setHours(hour, minute, 0, 0)
+
+  if (next < now) {
+    next.setDate(next.getDate() + 1)
+  }
+
+  return next.toISOString()
 }

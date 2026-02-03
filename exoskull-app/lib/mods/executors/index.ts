@@ -6,6 +6,8 @@ import { IModExecutor, ModSlug } from '../types';
 import { TaskManagerExecutor, createTaskManagerExecutor } from './task-manager';
 import { MoodTrackerExecutor } from './mood-tracker';
 import { HabitTrackerExecutor } from './habit-tracker';
+import { SleepTrackerExecutor } from './sleep-tracker';
+import { ActivityTrackerExecutor } from './activity-tracker';
 
 // Factory functions for executors
 export function createMoodTrackerExecutor(): IModExecutor {
@@ -16,15 +18,21 @@ export function createHabitTrackerExecutor(): IModExecutor {
   return new HabitTrackerExecutor();
 }
 
+export function createSleepTrackerExecutor(): IModExecutor {
+  return new SleepTrackerExecutor();
+}
+
+export function createActivityTrackerExecutor(): IModExecutor {
+  return new ActivityTrackerExecutor();
+}
+
 // Registry of all mod executors
 const EXECUTORS: Partial<Record<ModSlug, () => IModExecutor>> = {
   'task-manager': createTaskManagerExecutor,
   'mood-tracker': createMoodTrackerExecutor,
   'habit-tracker': createHabitTrackerExecutor,
-  // Add more executors as they are implemented:
-  // 'sleep-tracker': createSleepTrackerExecutor,
-  // 'energy-monitor': createEnergyMonitorExecutor,
-  // etc.
+  'sleep-tracker': createSleepTrackerExecutor,
+  'energy-monitor': createActivityTrackerExecutor, // Activity tracker uses energy-monitor slug
 };
 
 /**
@@ -54,3 +62,5 @@ export function getImplementedMods(): ModSlug[] {
 export { TaskManagerExecutor, createTaskManagerExecutor };
 export { MoodTrackerExecutor };
 export { HabitTrackerExecutor };
+export { SleepTrackerExecutor };
+export { ActivityTrackerExecutor };

@@ -1,0 +1,211 @@
+# Rigs Configuration - Integration Settings
+#
+# Rigs to integracje z zewnetrznymi serwisami.
+# Kazdy rig definiuje: OAuth scopes, sync intervals, data mapping.
+
+# =====================================================
+# RIG DEFINITIONS
+# =====================================================
+
+rigs:
+  google:
+    name: "Google"
+    description: "Fit, Gmail, Calendar, Drive, Tasks, YouTube, Photos, Contacts"
+    category: "unified"
+    oauth:
+      provider: "google"
+      scopes:
+        # Fitness
+        - "https://www.googleapis.com/auth/fitness.activity.read"
+        - "https://www.googleapis.com/auth/fitness.body.read"
+        - "https://www.googleapis.com/auth/fitness.heart_rate.read"
+        - "https://www.googleapis.com/auth/fitness.sleep.read"
+        # Email
+        - "https://www.googleapis.com/auth/gmail.readonly"
+        - "https://www.googleapis.com/auth/gmail.send"
+        - "https://www.googleapis.com/auth/gmail.compose"
+        # Calendar
+        - "https://www.googleapis.com/auth/calendar"
+        - "https://www.googleapis.com/auth/calendar.events"
+        # Drive
+        - "https://www.googleapis.com/auth/drive.readonly"
+        - "https://www.googleapis.com/auth/drive.file"
+        # Tasks
+        - "https://www.googleapis.com/auth/tasks"
+        # Contacts
+        - "https://www.googleapis.com/auth/contacts.readonly"
+    sync:
+      interval_minutes: 60
+      batch_size: 100
+    client_file: "lib/rigs/google/client.ts"
+
+  google-workspace:
+    name: "Google Workspace"
+    description: "Gmail, Calendar, Drive for productivity"
+    category: "productivity"
+    oauth:
+      provider: "google"
+      scopes:
+        - "https://www.googleapis.com/auth/gmail.readonly"
+        - "https://www.googleapis.com/auth/gmail.send"
+        - "https://www.googleapis.com/auth/calendar"
+        - "https://www.googleapis.com/auth/drive.readonly"
+        - "https://www.googleapis.com/auth/tasks"
+    sync:
+      interval_minutes: 15
+    client_file: "lib/rigs/google-workspace/client.ts"
+
+  oura:
+    name: "Oura Ring"
+    description: "Sleep, HRV, readiness, activity tracking"
+    category: "health"
+    oauth:
+      provider: "oura"
+      scopes:
+        - "daily"
+        - "personal"
+        - "heartrate"
+        - "workout"
+        - "sleep"
+    sync:
+      interval_minutes: 60
+      rate_limit_per_day: 1000
+    data_mapping:
+      sleep_score: "user_health.sleep_score"
+      hrv: "user_health.hrv"
+      readiness: "user_health.readiness_score"
+    client_file: "lib/rigs/oura/client.ts"
+
+  fitbit:
+    name: "Fitbit"
+    description: "Steps, sleep, heart rate tracking"
+    category: "health"
+    oauth:
+      provider: "fitbit"
+      scopes:
+        - "activity"
+        - "heartrate"
+        - "sleep"
+        - "weight"
+    sync:
+      interval_minutes: 60
+    client_file: "lib/rigs/fitbit/client.ts"
+
+  todoist:
+    name: "Todoist"
+    description: "Task management"
+    category: "productivity"
+    oauth:
+      provider: "todoist"
+      scopes:
+        - "data:read"
+        - "data:read_write"
+    sync:
+      interval_minutes: 15
+    client_file: "lib/rigs/todoist/client.ts"
+
+  notion:
+    name: "Notion"
+    description: "Databases, pages, knowledge management"
+    category: "productivity"
+    oauth:
+      provider: "notion"
+      scopes: []  # Notion uses internal integration
+    sync:
+      interval_minutes: 30
+    client_file: "lib/rigs/notion/client.ts"
+
+  plaid:
+    name: "Plaid"
+    description: "Bank transactions, financial data"
+    category: "finance"
+    oauth:
+      provider: "plaid"
+      products:
+        - "transactions"
+        - "auth"
+    sync:
+      interval_minutes: 360  # 6 hours
+    client_file: "lib/rigs/plaid/client.ts"
+
+  philips-hue:
+    name: "Philips Hue"
+    description: "Smart lights control"
+    category: "smart_home"
+    auth:
+      type: "bridge"
+    sync:
+      interval_minutes: 0  # Real-time only
+    client_file: "lib/rigs/philips-hue/client.ts"
+
+  telegram:
+    name: "Telegram"
+    description: "Messaging integration"
+    category: "communication"
+    auth:
+      type: "bot_token"
+      env_key: "TELEGRAM_BOT_TOKEN"
+    client_file: "lib/rigs/telegram/client.ts"
+
+  health-connect:
+    name: "Health Connect"
+    description: "Android unified health data"
+    category: "health"
+    auth:
+      type: "android_permission"
+    sync:
+      interval_minutes: 60
+    data_types:
+      - "Steps"
+      - "HeartRate"
+      - "Sleep"
+      - "Weight"
+      - "ActiveCaloriesBurned"
+    client_file: "lib/rigs/health-connect/client.ts"
+
+# =====================================================
+# RIG CATEGORIES
+# =====================================================
+
+categories:
+  health:
+    description: "Dane zdrowotne (sen, aktywnosc, HRV)"
+    rigs: ["oura", "fitbit", "health-connect", "google"]
+
+  productivity:
+    description: "Zarzadzanie zadaniami i kalendarzem"
+    rigs: ["google-workspace", "todoist", "notion"]
+
+  finance:
+    description: "Transakcje i budzet"
+    rigs: ["plaid"]
+
+  communication:
+    description: "Wiadomosci i kontakty"
+    rigs: ["telegram"]
+
+  smart_home:
+    description: "Automatyka domowa"
+    rigs: ["philips-hue"]
+
+# =====================================================
+# SYNC SETTINGS
+# =====================================================
+
+sync:
+  default_batch_size: 100
+  retry_on_failure: 3
+  backoff_seconds: [60, 300, 900]  # 1min, 5min, 15min
+
+  # Rate limiting
+  global_requests_per_minute: 100
+  per_rig_cooldown_seconds: 5
+
+# =====================================================
+# DATA RETENTION
+# =====================================================
+
+retention:
+  raw_data_days: 365  # Bronze layer
+  processed_data_days: 730  # Silver layer
+  aggregated_forever: true  # Gold layer

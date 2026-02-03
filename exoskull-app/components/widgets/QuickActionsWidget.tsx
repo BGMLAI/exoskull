@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Zap, Mic, Plus, Calendar } from 'lucide-react'
+import { Zap, Mic, Plus, Calendar, FileText, Heart, Settings } from 'lucide-react'
 import Link from 'next/link'
 
 export function QuickActionsWidget() {
@@ -15,7 +15,7 @@ export function QuickActionsWidget() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
           <Link href="/dashboard/voice">
             <Button variant="outline" className="w-full justify-start gap-2">
               <Mic className="h-4 w-4" />
@@ -36,8 +36,20 @@ export function QuickActionsWidget() {
           </Link>
           <Link href="/dashboard/knowledge">
             <Button variant="outline" className="w-full justify-start gap-2">
-              <Plus className="h-4 w-4" />
-              Wgraj plik
+              <FileText className="h-4 w-4" />
+              Wiedza
+            </Button>
+          </Link>
+          <Link href="/dashboard/health">
+            <Button variant="outline" className="w-full justify-start gap-2">
+              <Heart className="h-4 w-4" />
+              Zdrowie
+            </Button>
+          </Link>
+          <Link href="/dashboard/settings">
+            <Button variant="outline" className="w-full justify-start gap-2">
+              <Settings className="h-4 w-4" />
+              Ustawienia
             </Button>
           </Link>
         </div>

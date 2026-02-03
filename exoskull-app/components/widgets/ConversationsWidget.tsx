@@ -2,15 +2,18 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { MessageSquare, Clock, TrendingUp } from 'lucide-react'
-import { ConversationStats } from '@/lib/dashboard/types'
+import { ConversationStats, DataPoint } from '@/lib/dashboard/types'
 import Link from 'next/link'
+import { AreaChartWrapper } from '@/components/charts/AreaChartWrapper'
 
 interface ConversationsWidgetProps {
   stats: ConversationStats
+  series?: DataPoint[]
+  lastUpdated?: string | null
   loading?: boolean
 }
 
-export function ConversationsWidget({ stats, loading }: ConversationsWidgetProps) {
+export function ConversationsWidget({ stats, series = [], lastUpdated, loading }: ConversationsWidgetProps) {
   if (loading) {
     return (
       <Card>
@@ -31,25 +34,33 @@ export function ConversationsWidget({ stats, loading }: ConversationsWidgetProps
   }
 
   const avgMinutes = Math.round(stats.avgDuration / 60)
+  const hasSeries = series.some((point) => point.value > 0)
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex items-center justify-between">
-          <span className="flex items-center gap-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />
             Rozmowy
-          </span>
-          <Link
-            href="/dashboard/voice"
-            className="text-sm font-normal text-muted-foreground hover:text-foreground"
-          >
-            Rozpocznij rozmowe
-          </Link>
-        </CardTitle>
+          </CardTitle>
+          <div className="flex items-center gap-3">
+            {lastUpdated && (
+              <span className="text-xs text-muted-foreground">
+                Aktualizacja: {formatTime(lastUpdated)}
+              </span>
+            )}
+            <Link
+              href="/dashboard/voice"
+              className="text-sm font-normal text-muted-foreground hover:text-foreground"
+            >
+              Rozpocznij rozmowe
+            </Link>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold mb-4">
+      <CardContent className="space-y-4">
+        <div className="text-3xl font-bold">
           {stats.totalWeek}
           <span className="text-sm font-normal text-muted-foreground ml-2">
             w tym tygodniu
@@ -66,7 +77,21 @@ export function ConversationsWidget({ stats, loading }: ConversationsWidgetProps
             <span>~{avgMinutes} min/rozmowa</span>
           </div>
         </div>
+
+        {hasSeries && (
+          <AreaChartWrapper
+            data={series}
+            color="#3b82f6"
+            height={80}
+            showXAxis
+          />
+        )}
       </CardContent>
     </Card>
   )
+}
+
+function formatTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  return date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
 }

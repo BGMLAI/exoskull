@@ -24,6 +24,20 @@ export interface GmailMessage {
   labelIds: string[];
 }
 
+export interface GmailDraftMessage {
+  id: string;
+  threadId?: string;
+  labelIds?: string[];
+  snippet?: string;
+  internalDate?: string;
+  payload?: { headers: { name: string; value: string }[] };
+}
+
+export interface GmailDraft {
+  id: string;
+  message: GmailDraftMessage;
+}
+
 export interface CalendarEvent {
   id: string;
   summary: string;
@@ -67,6 +81,11 @@ export interface GoogleTask {
   links?: { type: string; description: string; link: string }[];
 }
 
+export interface GoogleTaskWithList extends GoogleTask {
+  taskListId: string;
+  taskListTitle?: string;
+}
+
 export class GoogleWorkspaceClient {
   private accessToken: string;
 
@@ -90,6 +109,35 @@ export class GoogleWorkspaceClient {
     }
 
     return response.json();
+  }
+
+  private buildRawEmail(params: {
+    to: string;
+    subject: string;
+    body: string;
+    cc?: string;
+    bcc?: string;
+    replyTo?: string;
+    headers?: Record<string, string>;
+  }): string {
+    const lines: string[] = [
+      `To: ${params.to}`,
+      params.cc ? `Cc: ${params.cc}` : '',
+      params.bcc ? `Bcc: ${params.bcc}` : '',
+      params.replyTo ? `Reply-To: ${params.replyTo}` : '',
+      `Subject: ${params.subject}`,
+      'Content-Type: text/html; charset=utf-8',
+    ];
+
+    if (params.headers) {
+      for (const [key, value] of Object.entries(params.headers)) {
+        lines.push(`${key}: ${value}`);
+      }
+    }
+
+    lines.push('', params.body);
+
+    return Buffer.from(lines.filter(Boolean).join('\r\n')).toString('base64url');
   }
 
   // =====================================================
@@ -132,19 +180,50 @@ export class GoogleWorkspaceClient {
   }
 
   async sendEmail(to: string, subject: string, body: string): Promise<{ id: string }> {
-    const email = [
-      `To: ${to}`,
-      `Subject: ${subject}`,
-      'Content-Type: text/html; charset=utf-8',
-      '',
-      body,
-    ].join('\r\n');
-
-    const encodedEmail = Buffer.from(email).toString('base64url');
+    const encodedEmail = this.buildRawEmail({ to, subject, body });
 
     return this.fetch(`${GMAIL_API}/messages/send`, {
       method: 'POST',
       body: JSON.stringify({ raw: encodedEmail }),
+    });
+  }
+
+  // =====================================================
+  // GMAIL DRAFTS
+  // =====================================================
+
+  async listDrafts(maxResults: number = 20): Promise<GmailDraft[]> {
+    const response = await this.fetch<{ drafts: GmailDraft[] }>(
+      `${GMAIL_API}/drafts?maxResults=${maxResults}`
+    );
+    return response.drafts || [];
+  }
+
+  async getDraft(draftId: string): Promise<GmailDraft> {
+    return this.fetch(`${GMAIL_API}/drafts/${draftId}`);
+  }
+
+  async createDraft(to: string, subject: string, body: string): Promise<GmailDraft> {
+    const encodedEmail = this.buildRawEmail({ to, subject, body });
+
+    return this.fetch(`${GMAIL_API}/drafts`, {
+      method: 'POST',
+      body: JSON.stringify({
+        message: { raw: encodedEmail },
+      }),
+    });
+  }
+
+  async sendDraft(draftId: string): Promise<{ id: string; threadId?: string }> {
+    return this.fetch(`${GMAIL_API}/drafts/send`, {
+      method: 'POST',
+      body: JSON.stringify({ id: draftId }),
+    });
+  }
+
+  async deleteDraft(draftId: string): Promise<void> {
+    await this.fetch(`${GMAIL_API}/drafts/${draftId}`, {
+      method: 'DELETE',
     });
   }
 
@@ -158,6 +237,42 @@ export class GoogleWorkspaceClient {
   // =====================================================
   // CALENDAR
   // =====================================================
+
+  async listEvents(params: {
+    calendarId?: string;
+    timeMin?: string;
+    timeMax?: string;
+    maxResults?: number;
+    q?: string;
+    singleEvents?: boolean;
+    orderBy?: string;
+  }): Promise<CalendarEvent[]> {
+    const calendarId = params.calendarId || 'primary';
+    const query = new URLSearchParams();
+    if (params.timeMin) query.append('timeMin', params.timeMin);
+    if (params.timeMax) query.append('timeMax', params.timeMax);
+    if (params.maxResults) query.append('maxResults', params.maxResults.toString());
+    if (params.q) query.append('q', params.q);
+    if (params.singleEvents !== undefined) {
+      query.append('singleEvents', params.singleEvents.toString());
+    } else {
+      query.append('singleEvents', 'true');
+    }
+    if (params.orderBy) {
+      query.append('orderBy', params.orderBy);
+    } else if (params.timeMin) {
+      query.append('orderBy', 'startTime');
+    }
+
+    const response = await this.fetch<{ items: CalendarEvent[] }>(
+      `${CALENDAR_API}/calendars/${calendarId}/events?${query.toString()}`
+    );
+    return response.items || [];
+  }
+
+  async getEvent(calendarId: string, eventId: string): Promise<CalendarEvent> {
+    return this.fetch(`${CALENDAR_API}/calendars/${calendarId}/events/${eventId}`);
+  }
 
   async getUpcomingEvents(
     calendarId: string = 'primary',
@@ -188,6 +303,23 @@ export class GoogleWorkspaceClient {
     return this.fetch(`${CALENDAR_API}/calendars/${calendarId}/events`, {
       method: 'POST',
       body: JSON.stringify(event),
+    });
+  }
+
+  async updateEvent(
+    calendarId: string,
+    eventId: string,
+    updates: Partial<CalendarEvent>
+  ): Promise<CalendarEvent> {
+    return this.fetch(`${CALENDAR_API}/calendars/${calendarId}/events/${eventId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteEvent(calendarId: string, eventId: string): Promise<void> {
+    await this.fetch(`${CALENDAR_API}/calendars/${calendarId}/events/${eventId}`, {
+      method: 'DELETE',
     });
   }
 
@@ -309,6 +441,26 @@ export class GoogleWorkspaceClient {
     const tasks = await this.getActiveTasks(taskListId);
     const today = new Date().toISOString().split('T')[0];
     return tasks.filter((t) => t.due && t.due < today);
+  }
+
+  async getAllTasks(options?: { showCompleted?: boolean }): Promise<{
+    taskLists: GoogleTaskList[];
+    tasks: GoogleTaskWithList[];
+  }> {
+    const taskLists = await this.getTaskLists();
+    const tasksByList = await Promise.all(
+      taskLists.map((list) => this.getTasks(list.id, options?.showCompleted || false))
+    );
+
+    const tasks: GoogleTaskWithList[] = taskLists.flatMap((list, index) =>
+      tasksByList[index].map((task) => ({
+        ...task,
+        taskListId: list.id,
+        taskListTitle: list.title,
+      }))
+    );
+
+    return { taskLists, tasks };
   }
 
   // =====================================================

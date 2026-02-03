@@ -1,0 +1,192 @@
+# Voice Configuration - Speech & Conversation Settings
+#
+# Konfiguracja pipeline'u glosowego.
+
+# =====================================================
+# PROVIDERS
+# =====================================================
+
+providers:
+  telephony:
+    name: "Twilio"
+    env_keys:
+      account_sid: "TWILIO_ACCOUNT_SID"
+      auth_token: "TWILIO_AUTH_TOKEN"
+    phone_numbers:
+      primary: "+48732144112"
+      backup: "+48732143210"
+
+  stt:
+    name: "ElevenLabs"
+    model: "eleven_turbo_v2_5"
+    env_key: "ELEVENLABS_API_KEY"
+    fallback:
+      name: "Deepgram"
+      model: "nova-2"
+      env_key: "DEEPGRAM_API_KEY"
+
+  tts:
+    name: "ElevenLabs"
+    model: "eleven_turbo_v2_5"
+    env_key: "ELEVENLABS_API_KEY"
+    voice_id: "Qs4qmNrqlneCgYPLSNQ7"  # User's cloned voice
+    stability: 0.5
+    similarity_boost: 0.8
+    style: 0.2
+
+  llm:
+    name: "Claude"
+    model: "claude-opus-4-5-20251101"
+    env_key: "ANTHROPIC_API_KEY"
+    max_tokens: 1024
+    temperature: 0.7
+
+# =====================================================
+# LANGUAGE & LOCALE
+# =====================================================
+
+language:
+  primary: "pl"
+  fallback: "en"
+  detect_language: false  # Assume Polish
+
+locale:
+  timezone: "Europe/Warsaw"
+  date_format: "DD.MM.YYYY"
+  time_format: "HH:mm"
+
+# =====================================================
+# CONVERSATION SETTINGS
+# =====================================================
+
+conversation:
+  max_turns: 50
+  silence_timeout_ms: 30000  # 30 seconds
+  max_duration_minutes: 30
+
+  greeting:
+    morning: "Czesc {name}. Jak sie czujesz?"
+    afternoon: "Czesc {name}. Co slychac?"
+    evening: "Czesc {name}. Jak minal dzien?"
+    night: "Czesc {name}. Powinnas juz spac!"
+
+  goodbye:
+    - "Do uslyszenia!"
+    - "Na razie!"
+    - "Trzymaj sie!"
+
+# =====================================================
+# PERFORMANCE TARGETS
+# =====================================================
+
+performance:
+  stt_latency_target_ms: 500
+  llm_response_target_ms: 2000
+  tts_generation_target_ms: 1000
+  total_turnaround_target_ms: 3500
+
+# =====================================================
+# AUDIO CACHING
+# =====================================================
+
+audio_cache:
+  enabled: true
+  storage: "supabase"  # or "r2"
+  bucket: "audio-cache"
+  ttl_days: 30
+
+  cached_phrases:
+    - "Tak, rozumiem."
+    - "Moment, sprawdzam."
+    - "Zrobione."
+    - "Nie zrozumiałem. Powtórz?"
+    - "Coś jeszcze?"
+    - "Do usłyszenia!"
+    - "Czekaj chwilę."
+    - "Przepraszam, wystąpił błąd."
+    - "Dodałem zadanie."
+    - "Sprawdzam kalendarz."
+    - "Wysyłam wiadomość."
+    - "Notatka zapisana."
+    - "Nie mam uprawnień."
+    - "Potrzebuję więcej informacji."
+    - "Który termin preferujesz?"
+    - "Na kiedy ustawić deadline?"
+    - "Jaki priorytet?"
+    - "Potwierdzam."
+
+# =====================================================
+# PROMPT CONFIGURATION
+# =====================================================
+
+prompts:
+  system_prompt_file: "lib/voice/system-prompt.ts"
+  personality_file: "lib/voice/PSYCODE.md"
+
+  context_injection:
+    user_profile: true
+    recent_conversations: 5
+    active_tasks: true
+    calendar_today: true
+    health_data: true
+    tyrolka_context: true
+
+# =====================================================
+# CALL HANDLING
+# =====================================================
+
+calls:
+  inbound:
+    auto_answer: true
+    greeting_delay_ms: 500
+    unknown_number_handling: "ask_name"
+
+  outbound:
+    retry_on_no_answer: 1
+    retry_delay_minutes: 30
+    fallback_to_sms: true
+
+  recording:
+    enabled: false  # Privacy - user opt-in only
+    retention_days: 90
+
+# =====================================================
+# ERROR HANDLING
+# =====================================================
+
+errors:
+  max_consecutive_failures: 3
+  on_stt_fail: "Przepraszam, nie zrozumiałem. Powtórz?"
+  on_llm_fail: "Przepraszam, coś poszło nie tak. Spróbujmy jeszcze raz."
+  on_tts_fail: "fallback_to_native"  # Twilio native TTS
+
+  circuit_breaker:
+    threshold: 5
+    cooldown_seconds: 300
+
+# =====================================================
+# SCHEDULED CALLS
+# =====================================================
+
+scheduled:
+  morning_checkin:
+    default_time: "07:00"
+    channel: "voice"
+    prompt_file: "hardprompts/daily-summary.md"
+
+  evening_reflection:
+    default_time: "21:00"
+    channel: "sms"  # Default to SMS for evening
+    prompt_file: "hardprompts/daily-summary.md"
+
+# =====================================================
+# QUIET HOURS
+# =====================================================
+
+quiet_hours:
+  enabled: true
+  start: "22:00"
+  end: "07:00"
+  exceptions:
+    - "emergency"
+    - "crisis_detection"

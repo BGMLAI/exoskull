@@ -1,0 +1,160 @@
+# Models Configuration - AI Model Routing
+#
+# ExoSkull uses multi-model routing for cost optimization.
+# Cheapest model that can handle the task.
+
+# =====================================================
+# TIER SYSTEM
+# =====================================================
+
+tiers:
+  tier1_simple:
+    name: "Gemini Flash"
+    provider: "google"
+    model_id: "gemini-1.5-flash-latest"
+    pricing:
+      input_per_1m: 0.075
+      output_per_1m: 0.30
+    use_for:
+      - simple_classification
+      - data_extraction
+      - routing_decisions
+      - sms_responses
+    max_tokens: 8192
+
+  tier2_moderate:
+    name: "Claude Haiku"
+    provider: "anthropic"
+    model_id: "claude-3-5-haiku-20241022"
+    pricing:
+      input_per_1m: 0.80
+      output_per_1m: 4.00
+    use_for:
+      - pattern_detection
+      - summarization
+      - prioritization
+      - moderate_analysis
+    max_tokens: 8192
+
+  tier3_complex:
+    name: "Kimi K2.5"
+    provider: "moonshot"
+    model_id: "kimi-2.5-latest"
+    pricing:
+      input_per_1m: 0.50
+      output_per_1m: 2.00
+    use_for:
+      - deep_reasoning
+      - long_context_analysis
+      - multi_agent_coordination
+      - visual_analysis
+    max_tokens: 32000
+    context_window: 1000000
+
+  tier4_meta:
+    name: "Claude Opus"
+    provider: "anthropic"
+    model_id: "claude-opus-4-5-20251101"
+    pricing:
+      input_per_1m: 15.00
+      output_per_1m: 75.00
+    use_for:
+      - meta_coordinator_decisions
+      - gap_detection
+      - intervention_design
+      - crisis_situations
+      - complex_planning
+    max_tokens: 16384
+
+# =====================================================
+# USE CASE MAPPING
+# =====================================================
+
+use_cases:
+  voice_conversation:
+    default_tier: tier4_meta  # Opus for natural conversation
+    fallback_tier: tier2_moderate
+
+  sms_response:
+    default_tier: tier1_simple
+    fallback_tier: tier2_moderate
+
+  task_classification:
+    default_tier: tier1_simple
+    fallback_tier: tier2_moderate
+
+  daily_summary:
+    default_tier: tier2_moderate
+    fallback_tier: tier3_complex
+
+  gap_detection:
+    default_tier: tier4_meta
+    fallback_tier: tier3_complex
+
+  pattern_learning:
+    default_tier: tier3_complex
+    fallback_tier: tier2_moderate
+
+  crisis_detection:
+    default_tier: tier4_meta  # Always use best model
+    fallback_tier: tier4_meta
+
+  onboarding_conversation:
+    default_tier: tier4_meta
+    fallback_tier: tier2_moderate
+
+# =====================================================
+# CIRCUIT BREAKER
+# =====================================================
+
+circuit_breaker:
+  max_failures: 3
+  cooldown_seconds: 300  # 5 minutes
+  escalation_on_failure: true  # Try next tier on fail
+
+# =====================================================
+# PROMPT CACHING
+# =====================================================
+
+prompt_caching:
+  enabled: true
+  static_context_ttl_seconds: 3600  # 1 hour
+  cacheable_sections:
+    - system_prompt
+    - user_profile
+    - app_configs
+    - patterns
+  dynamic_sections:  # Always fresh
+    - recent_conversations
+    - current_request
+    - real_time_data
+
+# =====================================================
+# RATE LIMITS
+# =====================================================
+
+rate_limits:
+  per_user:
+    requests_per_minute: 20
+    tokens_per_day: 100000
+  global:
+    requests_per_minute: 1000
+    daily_budget_usd: 100
+
+# =====================================================
+# PROVIDER CREDENTIALS
+# =====================================================
+# Note: Actual keys in .env, not here
+
+providers:
+  anthropic:
+    env_key: "ANTHROPIC_API_KEY"
+    base_url: "https://api.anthropic.com"
+
+  google:
+    env_key: "GOOGLE_AI_API_KEY"
+    base_url: "https://generativelanguage.googleapis.com"
+
+  moonshot:
+    env_key: "KIMI_API_KEY"
+    base_url: "https://api.moonshot.cn"

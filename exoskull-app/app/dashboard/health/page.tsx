@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { SleepChart } from '@/components/health/SleepChart'
+import { ActivityChart } from '@/components/health/ActivityChart'
+import { HRVChart } from '@/components/health/HRVChart'
 import {
   Heart,
   Footprints,
@@ -115,7 +118,7 @@ export default async function HealthDashboardPage() {
             Zdrowie
           </h1>
           <p className="text-muted-foreground">
-            Dane z Health Connect na Twoim Androidzie
+            Dane z Oura, Google Fit i Health Connect
           </p>
         </div>
         <Badge variant={isConnected ? 'default' : 'secondary'} className="flex items-center gap-1">
@@ -162,6 +165,9 @@ export default async function HealthDashboardPage() {
                   POST /api/rigs/health-connect/sync
                 </code>
               </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Jesli nie masz Androida, podlacz Oura lub Google Fit w Exoskulletonie.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -202,6 +208,13 @@ export default async function HealthDashboardPage() {
           color="text-green-500"
           hasData={!!metricsByType.hrv}
         />
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <SleepChart />
+        <ActivityChart />
+        <HRVChart />
       </div>
 
       {/* Weekly summary */}
