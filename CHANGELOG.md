@@ -4,6 +4,57 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## 2026-02-03
+
+### MVP Complete - GOTCHA + ATLAS (6 Phases)
+
+**FAZA 1: Voice Pipeline + IORS Rebranding**
+- Replaced all "Zygfryd" references with dynamic IORS naming from DB
+- Removed all VAPI code (6 files deleted, package deps removed, CSP cleaned)
+- Created new VoiceInterface using Web Speech API (STT) + ElevenLabs (TTS)
+- Created web-speech.ts wrapper for browser-native STT
+- Created /api/voice/chat route (Claude + IORS_TOOLS + ElevenLabs)
+- Added assistant_name column to exo_tenants (default 'IORS')
+- Updated voice.yaml config
+
+**FAZA 2: Unified Chat + Voice**
+- Created /dashboard/chat with text + voice toggle
+- Created /api/chat/send using same IORS_TOOLS pipeline
+- Updated NAV_ITEMS (added Chat, Zdrowie; removed Agenci, Voice)
+
+**FAZA 3: Onboarding Form (15 questions)**
+- Created OnboardingForm.tsx - 15 step form with progress bar
+- Questions: name, goals, communication style, check-in times, devices, autonomy, language, timezone
+- Created /api/onboarding/save-profile route
+- Data maps to exo_tenants + discovery_data JSONB
+
+**FAZA 4: IORS App Builder**
+- Created Mod system: exo_mod_registry, exo_tenant_mods, exo_mod_data tables
+- Inserted 12 template Mods (sleep-tracker, mood-tracker, habit-tracker, etc.)
+- Created proactive-engine.ts: auto-installs Mods based on onboarding goals
+- Added 3 IORS_TOOLS: log_mod_data, get_mod_data, install_mod
+- Created DynamicModWidget - generic renderer based on Mod config
+- Created /api/mods/* routes (list, install, CRUD data)
+
+**FAZA 5: Emotion Recognition + Adaptive UI**
+- Created text-analyzer.ts (HuggingFace free API + Polish keyword fallback)
+- Created 5 mood-based CSS palettes (positive, calm, stressed, low, focused)
+- Created AdaptiveThemeProvider React context
+- Created exo_emotion_log table with RLS
+
+**FAZA 6: Landing Page + UX Polish + Cleanup**
+- Created landing page (Hero, Features, How it works, CTA) - dark theme
+- Redesigned login page to dark theme matching landing
+- Dashboard: personalized greeting with user name, installed Mods section
+- Added mobile bottom tab navigation (5 tabs)
+- Deleted /dashboard/agents and /dashboard/marketplace (not ready)
+- Fixed branding: Exoskull -> ExoSkull throughout
+
+**Files changed:** 40+ files created/modified
+**Build status:** Clean (only pre-existing gap-detector.ts TS7015 warning)
+
+---
+
 ## 2026-02-02
 
 ### GOTCHA Framework Implementation

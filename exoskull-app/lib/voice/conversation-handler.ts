@@ -44,7 +44,7 @@ export interface ConversationResult {
 // TOOL DEFINITIONS (Claude Format)
 // ============================================================================
 
-const VOICE_TOOLS: Anthropic.Tool[] = [
+const IORS_TOOLS: Anthropic.Tool[] = [
   {
     name: 'add_task',
     description: 'Dodaj nowe zadanie do listy użytkownika',
@@ -87,6 +87,57 @@ const VOICE_TOOLS: Anthropic.Tool[] = [
           default: 'pending'
         }
       }
+    }
+  },
+  {
+    name: 'log_mod_data',
+    description: 'Zapisz dane do zainstalowanego Moda (np. sen, nastrój, trening, wydatek). Użyj gdy user mówi o czymś co pasuje do jego Modów.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        mod_slug: {
+          type: 'string',
+          description: 'Slug Moda: sleep-tracker, mood-tracker, exercise-logger, habit-tracker, food-logger, water-tracker, reading-log, finance-monitor, social-tracker, journal, goal-setter, weekly-review'
+        },
+        data: {
+          type: 'object',
+          description: 'Dane do zapisania (zależne od Moda). Np. sleep-tracker: {hours: 7, quality: 8}, mood-tracker: {mood: 7, energy: 6}'
+        }
+      },
+      required: ['mod_slug', 'data']
+    }
+  },
+  {
+    name: 'get_mod_data',
+    description: 'Pobierz ostatnie dane z Moda. Użyj gdy user pyta o swoje dane (np. "ile spałem", "jaki był mój nastrój").',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        mod_slug: {
+          type: 'string',
+          description: 'Slug Moda z którego pobrać dane'
+        },
+        limit: {
+          type: 'number',
+          description: 'Ile ostatnich wpisów pobrać (domyślnie 5)',
+          default: 5
+        }
+      },
+      required: ['mod_slug']
+    }
+  },
+  {
+    name: 'install_mod',
+    description: 'Zainstaluj nowy Mod. Użyj gdy user chce śledzić coś nowego (np. "chcę śledzić czytanie" → install reading-log).',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        mod_slug: {
+          type: 'string',
+          description: 'Slug Moda do zainstalowania'
+        }
+      },
+      required: ['mod_slug']
     }
   }
 ]
@@ -304,6 +355,77 @@ async function executeTool(
       return `Masz ${tasks.length} zadań: ${taskList}`
     }
 
+    if (toolName === 'log_mod_data') {
+      const { error } = await supabase
+        .from('exo_mod_data')
+        .insert({
+          tenant_id: tenantId,
+          mod_slug: toolInput.mod_slug,
+          data: toolInput.data
+        })
+
+      if (error) {
+        console.error('[ConversationHandler] log_mod_data error:', error)
+        return `Błąd: nie udało się zapisać danych`
+      }
+
+      return `Zapisano dane do ${toolInput.mod_slug}`
+    }
+
+    if (toolName === 'get_mod_data') {
+      const limit = toolInput.limit || 5
+      const { data: entries, error } = await supabase
+        .from('exo_mod_data')
+        .select('data, created_at')
+        .eq('tenant_id', tenantId)
+        .eq('mod_slug', toolInput.mod_slug)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+      if (error || !entries || entries.length === 0) {
+        return `Brak danych w ${toolInput.mod_slug}`
+      }
+
+      const summary = entries.map((e) => {
+        const values = Object.entries(e.data)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(', ')
+        return values
+      }).join(' | ')
+
+      return `Ostatnie ${entries.length} wpisów (${toolInput.mod_slug}): ${summary}`
+    }
+
+    if (toolName === 'install_mod') {
+      // Check if already installed
+      const { data: existing } = await supabase
+        .from('exo_mod_registry')
+        .select('id')
+        .eq('slug', toolInput.mod_slug)
+        .single()
+
+      if (!existing) {
+        return `Mod "${toolInput.mod_slug}" nie istnieje`
+      }
+
+      const { error } = await supabase
+        .from('exo_tenant_mods')
+        .upsert({
+          tenant_id: tenantId,
+          mod_id: existing.id,
+          active: true
+        }, {
+          onConflict: 'tenant_id,mod_id'
+        })
+
+      if (error) {
+        console.error('[ConversationHandler] install_mod error:', error)
+        return `Błąd: nie udało się zainstalować Moda`
+      }
+
+      return `Zainstalowano Mod: ${toolInput.mod_slug}`
+    }
+
     return 'Nieznane narzędzie'
   } catch (error) {
     console.error('[ConversationHandler] Tool execution error:', error)
@@ -422,7 +544,7 @@ export async function processUserMessage(
       max_tokens: 500,
       system: fullSystemPrompt,
       messages,
-      tools: VOICE_TOOLS
+      tools: IORS_TOOLS
     })
 
     // Check for tool use
@@ -506,17 +628,18 @@ export async function generateGreeting(tenantId: string): Promise<string> {
   // Get user profile
   const { data: tenant } = await supabase
     .from('exo_tenants')
-    .select('name, preferred_name')
+    .select('name, preferred_name, assistant_name')
     .eq('id', tenantId)
     .single()
 
   const userName = tenant?.preferred_name || tenant?.name
+  const assistantName = tenant?.assistant_name || 'IORS'
 
   if (userName) {
-    return `Cześć ${userName}! Tu Zygfryd. W czym mogę pomóc?`
+    return `Cześć ${userName}! Tu ${assistantName}. W czym mogę pomóc?`
   }
 
-  return `Cześć! Tu Zygfryd, twój asystent ExoSkull. W czym mogę pomóc?`
+  return `Cześć! Tu ${assistantName}, twój osobisty asystent. W czym mogę pomóc?`
 }
 
 /**

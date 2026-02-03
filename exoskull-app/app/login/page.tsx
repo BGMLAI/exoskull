@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 
 export default async function LoginPage({
   searchParams,
@@ -85,17 +86,19 @@ export default async function LoginPage({
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-xl shadow-lg">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="max-w-md w-full space-y-8 p-8 bg-slate-800/50 border border-slate-700 rounded-xl">
         <div>
-          <h1 className="text-4xl font-bold text-center">Exoskull</h1>
-          <p className="text-center text-muted-foreground mt-2">
+          <Link href="/" className="block text-center">
+            <h1 className="text-4xl font-bold text-white">ExoSkull</h1>
+          </Link>
+          <p className="text-center text-slate-400 mt-2">
             Adaptive Life Operating System
           </p>
         </div>
 
         {searchParams.message && (
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+          <div className="p-4 bg-blue-900/30 border border-blue-700/50 rounded-lg text-sm text-blue-300">
             {searchParams.message}
           </div>
         )}
@@ -103,7 +106,7 @@ export default async function LoginPage({
         <div className="space-y-6">
           <form action={signIn} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-2">
+              <label htmlFor="email" className="block text-sm font-medium mb-2 text-slate-300">
                 Email
               </label>
               <input
@@ -111,59 +114,59 @@ export default async function LoginPage({
                 name="email"
                 type="email"
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="twoj@email.pl"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-2">
-                Hasło
+              <label htmlFor="password" className="block text-sm font-medium mb-2 text-slate-300">
+                Haslo
               </label>
               <input
                 id="password"
                 name="password"
                 type="password"
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="••••••••"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
             >
-              Zaloguj się
+              Zaloguj sie
             </button>
           </form>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300"></div>
+              <div className="w-full border-t border-slate-700"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">Lub</span>
+              <span className="px-2 bg-slate-800/50 text-slate-500">Lub</span>
             </div>
           </div>
 
           <form action={signUp} className="space-y-4">
             <div>
-              <label htmlFor="signup-name" className="block text-sm font-medium mb-2">
-                Imię
+              <label htmlFor="signup-name" className="block text-sm font-medium mb-2 text-slate-300">
+                Imie
               </label>
               <input
                 id="signup-name"
                 name="name"
                 type="text"
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Jan Kowalski"
               />
             </div>
 
             <div>
-              <label htmlFor="signup-email" className="block text-sm font-medium mb-2">
+              <label htmlFor="signup-email" className="block text-sm font-medium mb-2 text-slate-300">
                 Email
               </label>
               <input
@@ -171,14 +174,14 @@ export default async function LoginPage({
                 name="email"
                 type="email"
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="twoj@email.pl"
               />
             </div>
 
             <div>
-              <label htmlFor="signup-password" className="block text-sm font-medium mb-2">
-                Hasło
+              <label htmlFor="signup-password" className="block text-sm font-medium mb-2 text-slate-300">
+                Haslo
               </label>
               <input
                 id="signup-password"
@@ -186,22 +189,22 @@ export default async function LoginPage({
                 type="password"
                 required
                 minLength={6}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="••••••••"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-gray-800 hover:bg-gray-900 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              className="w-full bg-slate-600 hover:bg-slate-500 text-white font-medium py-3 px-4 rounded-lg transition-colors"
             >
-              Utwórz konto
+              Utworz konto
             </button>
           </form>
         </div>
 
-        <p className="text-xs text-center text-gray-500 mt-4">
-          Rejestrując się akceptujesz nasze warunki użytkowania
+        <p className="text-xs text-center text-slate-600 mt-4">
+          Rejestrujac sie akceptujesz nasze warunki uzytkowania
         </p>
       </div>
     </div>

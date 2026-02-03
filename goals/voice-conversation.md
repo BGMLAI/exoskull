@@ -15,7 +15,7 @@ Voice jest PRIMARY interface - SMS/chat to fallback.
 
 | Trigger | Source | Context |
 |---------|--------|---------|
-| Inbound call | VAPI webhook | User calls ExoSkull |
+| Inbound call | Twilio webhook | User calls ExoSkull |
 | Outbound call | CRON dispatcher | Scheduled check-in |
 | User SMS "zadzwon" | GHL webhook | User requests call |
 | Intervention trigger | Pattern detection | System initiates |
@@ -23,6 +23,18 @@ Voice jest PRIMARY interface - SMS/chat to fallback.
 ---
 
 ## Narzedzia
+
+### Voice Pipeline (Twilio + Deepgram + ElevenLabs)
+
+| Tool | Path | Usage |
+|------|------|-------|
+| Twilio Webhook | `app/api/twilio/voice/route.ts` | Incoming call handler |
+| Twilio Media Stream | `app/api/twilio/stream/route.ts` | WebSocket audio stream |
+| Deepgram STT | `lib/voice/deepgram-stt.ts` | Real-time speech-to-text |
+| ElevenLabs TTS | `lib/voice/elevenlabs-tts.ts` | Text-to-speech synthesis |
+| Conversation Handler | `lib/voice/conversation-handler.ts` | Claude + context + tools |
+
+### Core Tools
 
 | Tool | Path | Usage |
 |------|------|-------|
@@ -53,26 +65,28 @@ Voice jest PRIMARY interface - SMS/chat to fallback.
 3. Build system prompt:
    - Static (PSYCODE + core prompt) → cached
    - Dynamic (context) → fresh each call
-4. Initialize VAPI call with tools
+4. Initialize Twilio Media Streams WebSocket
 ```
 
-### 2. During Call
+### 2. During Call (Twilio + Deepgram + Claude + ElevenLabs)
 
 ```
-1. Receive user speech (VAPI STT)
-2. Route to appropriate AI tier:
+1. Twilio Media Stream → raw audio
+2. Deepgram STT (WebSocket) → real-time transcription
+3. Route to appropriate AI tier:
    - Simple response → Tier 1 (Gemini Flash)
    - Pattern/analysis → Tier 2 (Haiku)
    - Complex reasoning → Tier 3 (Kimi)
    - Crisis/meta → Tier 4 (Opus)
-3. Execute tools if needed:
+4. Execute tools if needed:
    - get_tasks, create_task, complete_task
    - ghl_send_message
    - log_mood, log_habit
    - get_schedule, create_checkin
-4. Generate response
-5. Speak response (VAPI TTS)
-6. Log exchange to buffer
+5. Generate response (Claude)
+6. ElevenLabs TTS → audio stream
+7. Twilio Media Stream ← send audio to user
+8. Log exchange to buffer
 ```
 
 ### 3. Post-Call

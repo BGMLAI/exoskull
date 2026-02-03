@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Home, CheckSquare, Brain, Settings, Mic, Clock, FileText, Menu } from 'lucide-react'
+import { Home, CheckSquare, MessageSquare, Settings, Clock, FileText, Menu, Heart } from 'lucide-react'
 import { DashboardShell } from '@/components/dashboard/DashboardShell'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { Button } from '@/components/ui/button'
@@ -16,11 +16,20 @@ import {
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
+  { href: '/dashboard/chat', label: 'Chat', icon: MessageSquare },
   { href: '/dashboard/tasks', label: 'Zadania', icon: CheckSquare },
-  { href: '/dashboard/agents', label: 'Agenci', icon: Brain },
-  { href: '/dashboard/voice', label: 'Rozmowa', icon: Mic },
   { href: '/dashboard/schedule', label: 'Harmonogram', icon: Clock },
   { href: '/dashboard/knowledge', label: 'Wiedza', icon: FileText },
+  { href: '/dashboard/health', label: 'Zdrowie', icon: Heart },
+]
+
+// Subset for mobile bottom tab bar (5 max for usability)
+const MOBILE_TAB_ITEMS = [
+  { href: '/dashboard', label: 'Home', icon: Home },
+  { href: '/dashboard/chat', label: 'Chat', icon: MessageSquare },
+  { href: '/dashboard/tasks', label: 'Zadania', icon: CheckSquare },
+  { href: '/dashboard/health', label: 'Zdrowie', icon: Heart },
+  { href: '/dashboard/settings', label: 'Wiecej', icon: Settings },
 ]
 
 export default async function DashboardLayout({
@@ -41,7 +50,7 @@ export default async function DashboardLayout({
       <aside className="hidden md:flex w-64 bg-card border-r flex-col">
         <div className="p-6 border-b flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Exoskull</h1>
+            <h1 className="text-2xl font-bold">ExoSkull</h1>
             <p className="text-sm text-muted-foreground">Life OS</p>
           </div>
           <ThemeToggle />
@@ -84,7 +93,7 @@ export default async function DashboardLayout({
         {/* Mobile top bar */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b bg-card">
           <div>
-            <p className="text-base font-semibold">Exoskull</p>
+            <p className="text-base font-semibold">ExoSkull</p>
             <p className="text-xs text-muted-foreground">Life OS</p>
           </div>
           <div className="flex items-center gap-2">
@@ -127,11 +136,25 @@ export default async function DashboardLayout({
         </header>
 
         {/* Main content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto pb-16 md:pb-0">
           <DashboardShell tenantId={user.id}>
             {children}
           </DashboardShell>
         </main>
+
+        {/* Mobile bottom tab bar */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t flex items-center justify-around py-2 z-40">
+          {MOBILE_TAB_ITEMS.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex flex-col items-center gap-0.5 px-3 py-1 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <item.icon className="h-5 w-5" />
+              <span className="text-[10px]">{item.label}</span>
+            </Link>
+          ))}
+        </nav>
       </div>
     </div>
   )

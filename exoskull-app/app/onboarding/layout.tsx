@@ -30,7 +30,7 @@ export default async function OnboardingLayout({
         {/* Logo */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white">ExoSkull</h1>
-          <p className="text-slate-400 mt-2">Twój drugi mózg</p>
+          <p className="text-slate-400 mt-2">Adaptive Life Operating System</p>
         </div>
 
         {/* Content */}

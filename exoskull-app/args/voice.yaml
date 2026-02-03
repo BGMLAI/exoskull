@@ -1,6 +1,8 @@
-# Voice Configuration - Speech & Conversation Settings
+# Voice Configuration - IORS Speech & Conversation Settings
 #
 # Konfiguracja pipeline'u glosowego.
+# Stack: Web Speech API (STT) + Claude (LLM) + ElevenLabs (TTS)
+# Telefon: Twilio (STT via Gather) + Claude (LLM) + ElevenLabs (TTS)
 
 # =====================================================
 # PROVIDERS
@@ -13,33 +15,43 @@ providers:
       account_sid: "TWILIO_ACCOUNT_SID"
       auth_token: "TWILIO_AUTH_TOKEN"
     phone_numbers:
-      primary: "+48732144112"
-      backup: "+48732143210"
+      primary: "+48732143210"
 
   stt:
-    name: "ElevenLabs"
-    model: "eleven_turbo_v2_5"
-    env_key: "ELEVENLABS_API_KEY"
-    fallback:
-      name: "Deepgram"
-      model: "nova-2"
-      env_key: "DEEPGRAM_API_KEY"
+    web:
+      name: "Web Speech API"
+      language: "pl-PL"
+      notes: "Browser-native, free, no API key needed"
+    phone:
+      name: "Twilio Gather"
+      language: "pl-PL"
+      notes: "Twilio built-in STT via <Gather>"
 
   tts:
     name: "ElevenLabs"
     model: "eleven_turbo_v2_5"
     env_key: "ELEVENLABS_API_KEY"
-    voice_id: "Qs4qmNrqlneCgYPLSNQ7"  # User's cloned voice
+    voice_id: "Qs4qmNrqlneCgYPLSNQ7"
     stability: 0.5
-    similarity_boost: 0.8
-    style: 0.2
+    similarity_boost: 0.75
+    style: 0
 
   llm:
     name: "Claude"
-    model: "claude-opus-4-5-20251101"
+    model: "claude-sonnet-4-20250514"
     env_key: "ANTHROPIC_API_KEY"
-    max_tokens: 1024
-    temperature: 0.7
+    max_tokens: 500
+    notes: "Fast + capable for voice conversations"
+
+# =====================================================
+# IORS IDENTITY
+# =====================================================
+
+identity:
+  default_name: "IORS"
+  full_name: "Intelligent Observant Reinforcement System"
+  db_column: "assistant_name"
+  notes: "User can customize via settings. Reads from exo_tenants.assistant_name"
 
 # =====================================================
 # LANGUAGE & LOCALE
@@ -48,7 +60,7 @@ providers:
 language:
   primary: "pl"
   fallback: "en"
-  detect_language: false  # Assume Polish
+  detect_language: false
 
 locale:
   timezone: "Europe/Warsaw"
@@ -61,7 +73,7 @@ locale:
 
 conversation:
   max_turns: 50
-  silence_timeout_ms: 30000  # 30 seconds
+  silence_timeout_ms: 30000
   max_duration_minutes: 30
 
   greeting:
@@ -91,11 +103,12 @@ performance:
 
 audio_cache:
   enabled: true
-  storage: "supabase"  # or "r2"
-  bucket: "audio-cache"
+  storage: "supabase"
+  bucket: "voice-audio"
   ttl_days: 30
 
   cached_phrases:
+    - "Cześć! Tu IORS. W czym mogę pomóc?"
     - "Tak, rozumiem."
     - "Moment, sprawdzam."
     - "Zrobione."
@@ -108,12 +121,9 @@ audio_cache:
     - "Sprawdzam kalendarz."
     - "Wysyłam wiadomość."
     - "Notatka zapisana."
-    - "Nie mam uprawnień."
     - "Potrzebuję więcej informacji."
-    - "Który termin preferujesz?"
-    - "Na kiedy ustawić deadline?"
-    - "Jaki priorytet?"
     - "Potwierdzam."
+    - "Miłego dnia!"
 
 # =====================================================
 # PROMPT CONFIGURATION
@@ -129,7 +139,6 @@ prompts:
     active_tasks: true
     calendar_today: true
     health_data: true
-    tyrolka_context: true
 
 # =====================================================
 # CALL HANDLING
@@ -147,7 +156,7 @@ calls:
     fallback_to_sms: true
 
   recording:
-    enabled: false  # Privacy - user opt-in only
+    enabled: false
     retention_days: 90
 
 # =====================================================
@@ -158,7 +167,7 @@ errors:
   max_consecutive_failures: 3
   on_stt_fail: "Przepraszam, nie zrozumiałem. Powtórz?"
   on_llm_fail: "Przepraszam, coś poszło nie tak. Spróbujmy jeszcze raz."
-  on_tts_fail: "fallback_to_native"  # Twilio native TTS
+  on_tts_fail: "fallback_to_native"
 
   circuit_breaker:
     threshold: 5
@@ -176,7 +185,7 @@ scheduled:
 
   evening_reflection:
     default_time: "21:00"
-    channel: "sms"  # Default to SMS for evening
+    channel: "sms"
     prompt_file: "hardprompts/daily-summary.md"
 
 # =====================================================

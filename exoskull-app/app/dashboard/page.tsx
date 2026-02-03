@@ -7,6 +7,7 @@ import { CalendarWidget } from '@/components/widgets/CalendarWidget'
 import { HealthWidget } from '@/components/widgets/HealthWidget'
 import { KnowledgeWidget } from '@/components/widgets/KnowledgeWidget'
 import { DashboardRealtime } from '@/components/dashboard/DashboardRealtime'
+import { DynamicModWidget } from '@/components/widgets/DynamicModWidget'
 import {
   CalendarItem,
   ConversationStats,
@@ -15,7 +16,8 @@ import {
   KnowledgeSummary,
   TaskStats,
 } from '@/lib/dashboard/types'
-import { Zap } from 'lucide-react'
+import { Zap, MessageSquare } from 'lucide-react'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +33,38 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold">Zaloguj sie, aby zobaczyc dashboard</h1>
       </div>
     )
+  }
+
+  // Get tenant profile
+  let tenantName = ''
+  let assistantName = 'IORS'
+  try {
+    const { data: tenant } = await supabase
+      .from('exo_tenants')
+      .select('preferred_name, name, assistant_name')
+      .eq('id', user.id)
+      .single()
+    tenantName = tenant?.preferred_name || tenant?.name || ''
+    assistantName = tenant?.assistant_name || 'IORS'
+  } catch (e: any) {
+    console.error('[Dashboard] Failed to load tenant:', e)
+  }
+
+  // Get installed Mods
+  let installedMods: any[] = []
+  try {
+    const { data: mods } = await supabase
+      .from('exo_tenant_mods')
+      .select('id, mod_id, config_overrides, active, exo_mod_registry(slug, name, description, icon, category, config)')
+      .eq('tenant_id', user.id)
+      .eq('active', true)
+
+    installedMods = (mods || []).map((m: any) => ({
+      id: m.id,
+      ...(m.exo_mod_registry || {}),
+    }))
+  } catch (e: any) {
+    console.error('[Dashboard] Failed to load mods:', e)
   }
 
   // Get task stats
@@ -224,10 +258,37 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-4 md:p-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">{greeting}!</h1>
-        <p className="text-muted-foreground">Oto Twoj dzisiejszy przeglad</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">{greeting}{tenantName ? `, ${tenantName}` : ''}!</h1>
+          <p className="text-muted-foreground">Oto Twoj dzisiejszy przeglad</p>
+        </div>
+        <Link
+          href="/dashboard/chat"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+        >
+          <MessageSquare className="h-4 w-4" />
+          Porozmawiaj z {assistantName}
+        </Link>
       </div>
+
+      {/* Installed Mods */}
+      {installedMods.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold mb-3">Twoje Mody</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {installedMods.map((mod: any) => (
+              <DynamicModWidget
+                key={mod.id}
+                slug={mod.slug}
+                name={mod.name}
+                icon={mod.icon || ''}
+                config={mod.config || { fields: [], widget: 'log' }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Widgets */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -249,28 +310,30 @@ export default async function DashboardPage() {
         <IntegrationsWidget connections={rigConnections} />
       </div>
 
-      {/* Info about dynamic widgets */}
-      <Card className="border-dashed border-2 border-muted">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Zap className="h-5 w-5 text-amber-500" />
-            Twoj dashboard rosnie z Toba
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Dashboard bedzie automatycznie wyswietlac widgety oparte na tym, co sledzisz.
-            Porozmawiaj z asystentem glosowym o swoich celach - system dostosuje sie do Ciebie.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="px-2 py-1 bg-muted rounded text-xs">Energia</span>
-            <span className="px-2 py-1 bg-muted rounded text-xs">Sen</span>
-            <span className="px-2 py-1 bg-muted rounded text-xs">Nastroj</span>
-            <span className="px-2 py-1 bg-muted rounded text-xs">Stres</span>
-            <span className="px-2 py-1 bg-muted rounded text-xs">Produktywnosc</span>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Info about dynamic widgets - only show if no mods installed */}
+      {installedMods.length === 0 && (
+        <Card className="border-dashed border-2 border-muted">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Zap className="h-5 w-5 text-amber-500" />
+              Twoj dashboard rosnie z Toba
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              {assistantName} automatycznie zainstaluje narzedzia dopasowane do Twoich celow.
+              Porozmawiaj z {assistantName} o swoich potrzebach - system dostosuje sie do Ciebie.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="px-2 py-1 bg-muted rounded text-xs">Sen</span>
+              <span className="px-2 py-1 bg-muted rounded text-xs">Nastroj</span>
+              <span className="px-2 py-1 bg-muted rounded text-xs">Nawyki</span>
+              <span className="px-2 py-1 bg-muted rounded text-xs">Cwiczenia</span>
+              <span className="px-2 py-1 bg-muted rounded text-xs">Finanse</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

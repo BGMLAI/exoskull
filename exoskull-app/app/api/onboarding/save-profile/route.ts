@@ -2,93 +2,68 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
- * POST /api/onboarding/save-profile - Save profile data (VAPI tool callback or direct)
+ * POST /api/onboarding/save-profile - Save onboarding form data
  */
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
-    // Get tenant_id from query params (VAPI tool) or from auth
-    const url = new URL(request.url)
-    let tenantId = url.searchParams.get('tenant_id')
-    const conversationId = url.searchParams.get('conversation_id')
-
-    // If no tenant_id in URL, get from auth
-    if (!tenantId) {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-      tenantId = user.id
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
 
-    // Handle VAPI tool call format
-    const profileData = body.message?.toolCalls?.[0]?.function?.arguments || body
+    console.log('[SaveProfile] Received data for tenant:', user.id)
 
-    console.log('[SaveProfile API] Received data:', {
-      tenantId,
-      conversationId,
-      profileData
-    })
-
-    // Build update object
+    // Build update object from form data
     const updateData: Record<string, any> = {
       onboarding_status: 'in_progress'
     }
 
-    if (profileData.preferred_name) updateData.preferred_name = profileData.preferred_name
-    if (profileData.primary_goal) updateData.primary_goal = profileData.primary_goal
-    if (profileData.secondary_goals) updateData.secondary_goals = profileData.secondary_goals
-    if (profileData.conditions) updateData.conditions = profileData.conditions
-    if (profileData.communication_style) updateData.communication_style = profileData.communication_style
-    if (profileData.morning_checkin_time) updateData.morning_checkin_time = profileData.morning_checkin_time
-    if (profileData.insights) {
-      updateData.discovery_data = {
-        insights: profileData.insights,
-        extracted_at: new Date().toISOString()
-      }
+    // Direct field mappings
+    if (body.preferred_name) updateData.preferred_name = body.preferred_name
+    if (body.primary_goal) updateData.primary_goal = body.primary_goal
+    if (body.secondary_goals) updateData.secondary_goals = body.secondary_goals
+    if (body.communication_style) updateData.communication_style = body.communication_style
+    if (body.preferred_channel) updateData.preferred_channel = body.preferred_channel
+    if (body.morning_checkin_time) updateData.morning_checkin_time = body.morning_checkin_time
+    if (body.evening_checkin_time) updateData.evening_checkin_time = body.evening_checkin_time
+    if (body.language) updateData.language = body.language
+    if (body.timezone) updateData.timezone = body.timezone
+
+    // Discovery data (JSON fields)
+    updateData.discovery_data = {
+      challenge: body.challenge || null,
+      quiet_hours: {
+        start: body.quiet_hours_start || '22:00',
+        end: body.quiet_hours_end || '07:00'
+      },
+      devices: body.devices || [],
+      autonomy: body.autonomy_level || 'minor',
+      weekend_checkins: body.weekend_checkins ?? false,
+      notes: body.notes || null,
+      source: 'onboarding_form',
+      completed_at: new Date().toISOString()
     }
 
     // Update tenant
     const { error: updateError } = await supabase
       .from('exo_tenants')
       .update(updateData)
-      .eq('id', tenantId)
+      .eq('id', user.id)
 
     if (updateError) {
-      console.error('[SaveProfile API] Error updating tenant:', updateError)
+      console.error('[SaveProfile] Error updating tenant:', updateError)
       return NextResponse.json({ error: 'Failed to save profile' }, { status: 500 })
     }
 
-    // Save individual insights as extractions
-    if (profileData.insights && Array.isArray(profileData.insights)) {
-      for (const insight of profileData.insights) {
-        await supabase.from('exo_discovery_extractions').insert({
-          tenant_id: tenantId,
-          conversation_id: conversationId || null,
-          extraction_type: 'insight',
-          value: insight,
-          confidence: 0.9
-        })
-      }
-    }
+    console.log('[SaveProfile] Profile saved for tenant:', user.id)
 
-    console.log('[SaveProfile API] Profile saved successfully for tenant:', tenantId)
-
-    // Return VAPI-compatible response
-    return NextResponse.json({
-      results: [{
-        toolCallId: body.message?.toolCalls?.[0]?.id || 'direct',
-        result: {
-          success: true,
-          message: 'Profil zapisany pomyślnie'
-        }
-      }]
-    })
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('[SaveProfile API] Unexpected error:', error)
+    console.error('[SaveProfile] Unexpected error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

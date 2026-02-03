@@ -2,9 +2,8 @@
  * Job Dispatcher for ExoSkull CRON
  *
  * Handles dispatching scheduled jobs to:
- * - VAPI (voice AI conversations)
+ * - Twilio (voice calls + SMS)
  * - GHL (SMS, Email, WhatsApp, Messenger, etc.)
- * - Twilio (SMS fallback)
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -49,17 +48,13 @@ export interface DispatchResult {
   message_sid?: string
   ghl_message_id?: string
   error?: string
-  provider?: 'vapi' | 'ghl' | 'twilio'
+  provider?: 'twilio' | 'ghl'
 }
 
-// VAPI Configuration
-const VAPI_PRIVATE_KEY = process.env.VAPI_PRIVATE_KEY
-const VAPI_PHONE_NUMBER_ID = process.env.VAPI_PHONE_NUMBER_ID || 'b8f5e796-ddbe-4488-a764-60bcc1d8279f'
-
-// Twilio Configuration (fallback)
+// Twilio Configuration
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '+14155238886'
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '+48732143210'
 
 /**
  * Get GHL client
@@ -152,14 +147,15 @@ Brief and to the point.`
 }
 
 /**
- * Dispatch a voice call via VAPI
+ * Dispatch a voice call via Twilio
+ * Uses Twilio <Gather> for STT + Claude for LLM + ElevenLabs for TTS
  */
 export async function dispatchVoiceCall(
   job: ScheduledJob,
   user: UserJobConfig
 ): Promise<DispatchResult> {
-  if (!VAPI_PRIVATE_KEY) {
-    return { success: false, channel: 'voice', error: 'VAPI_PRIVATE_KEY not configured' }
+  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+    return { success: false, channel: 'voice', error: 'Twilio credentials not configured' }
   }
 
   if (!user.phone) {
@@ -167,60 +163,38 @@ export async function dispatchVoiceCall(
   }
 
   try {
-    const systemPrompt = getJobSystemPrompt(job, user)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'https://exoskull.app'
+    const webhookUrl = `${baseUrl}/api/voice/twilio/outbound?tenant_id=${user.tenant_id}&job_type=${job.job_type}`
 
-    const response = await fetch('https://api.vapi.ai/call/phone', {
+    const authHeader = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64')
+
+    const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${VAPI_PRIVATE_KEY}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Basic ${authHeader}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: JSON.stringify({
-        phoneNumberId: VAPI_PHONE_NUMBER_ID,
-        customer: {
-          number: user.phone
-        },
-        assistant: {
-          model: {
-            provider: 'openai',
-            model: 'gpt-4o-mini',
-            systemPrompt
-          },
-          voice: {
-            provider: '11labs',
-            voiceId: 'Qs4qmNrqlneCgYPLSNQ7',  // User's cloned voice
-            stability: 0.5,
-            similarityBoost: 0.75,
-            model: 'eleven_turbo_v2_5'
-          },
-          transcriber: {
-            provider: 'deepgram',
-            language: user.language || 'pl'
-          },
-          silenceTimeoutSeconds: 30,
-          maxDurationSeconds: 300
-        },
-        metadata: {
-          tenant_id: user.tenant_id,
-          job_type: job.job_type,
-          job_name: job.job_name,
-          scheduled_at: new Date().toISOString()
-        }
-      })
+      body: new URLSearchParams({
+        To: user.phone,
+        From: TWILIO_PHONE_NUMBER,
+        Url: webhookUrl,
+        StatusCallback: `${baseUrl}/api/voice/twilio/status`,
+        Timeout: '30',
+      }).toString()
     })
 
     const data = await response.json()
 
-    if (response.ok && data.id) {
-      console.log(`✅ VAPI call initiated for ${user.tenant_id}: ${data.id}`)
-      return { success: true, channel: 'voice', call_id: data.id, provider: 'vapi' }
+    if (response.ok && data.sid) {
+      console.log(`[Dispatcher] Twilio call initiated for ${user.tenant_id}: ${data.sid}`)
+      return { success: true, channel: 'voice', call_id: data.sid, provider: 'twilio' }
     } else {
-      console.error(`❌ VAPI call failed for ${user.tenant_id}:`, data)
+      console.error(`[Dispatcher] Twilio call failed for ${user.tenant_id}:`, data)
       return { success: false, channel: 'voice', error: data.message || JSON.stringify(data) }
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    console.error(`❌ VAPI dispatch error for ${user.tenant_id}:`, errorMessage)
+    console.error(`[Dispatcher] Twilio dispatch error for ${user.tenant_id}:`, errorMessage)
     return { success: false, channel: 'voice', error: errorMessage }
   }
 }

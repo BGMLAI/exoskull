@@ -17,8 +17,8 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.daily.co https://*.vapi.ai blob:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.vapi.ai https://*.daily.co wss://*.daily.co https://api.openai.com https://api.deepgram.com",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.elevenlabs.io https://api.anthropic.com",
               "media-src 'self' blob: https://*.daily.co",
               "worker-src 'self' blob:",
               "frame-src 'self' https://*.daily.co",

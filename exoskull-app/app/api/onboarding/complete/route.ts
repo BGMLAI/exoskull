@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { autoInstallMods } from '@/lib/builder/proactive-engine'
 
 /**
  * POST /api/onboarding/complete - Mark onboarding as completed
@@ -13,7 +14,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { conversationId } = await request.json()
+    const body = await request.json().catch(() => ({}))
+    const method = body.method || 'form'
 
     // Update tenant status
     const { error: updateError } = await supabase
@@ -30,16 +32,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Log onboarding session
-    if (conversationId) {
-      await supabase.from('exo_onboarding_sessions').insert({
-        tenant_id: user.id,
-        step: 1,
-        step_name: 'discovery',
-        completed_at: new Date().toISOString(),
-        conversation_id: conversationId,
-        data: { method: 'conversation' }
-      })
-    }
+    await supabase.from('exo_onboarding_sessions').insert({
+      tenant_id: user.id,
+      step: 1,
+      step_name: 'onboarding',
+      completed_at: new Date().toISOString(),
+      conversation_id: body.conversationId || null,
+      data: { method }
+    })
 
     // Schedule first check-in if morning time was set
     const { data: tenant } = await supabase
@@ -68,6 +68,11 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[Complete API] Onboarding completed for user:', user.id)
+
+    // Auto-install Mods based on user goals (fire-and-forget)
+    autoInstallMods(user.id).catch(err =>
+      console.error('[Complete API] Auto-install mods error:', err)
+    )
 
     return NextResponse.json({
       success: true,

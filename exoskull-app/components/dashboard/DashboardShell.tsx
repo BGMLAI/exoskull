@@ -1,6 +1,6 @@
 'use client'
 
-import { GlobalVoiceButton } from '@/components/voice/GlobalVoiceButton'
+import { VoiceInterface } from '@/components/voice/VoiceInterface'
 
 interface DashboardShellProps {
   children: React.ReactNode
@@ -10,11 +10,8 @@ interface DashboardShellProps {
 export function DashboardShell({ children, tenantId }: DashboardShellProps) {
   return (
     <>
-      {/* Global Voice Recording Button - always visible */}
-      <GlobalVoiceButton tenantId={tenantId} />
-
-      {/* Page content */}
       {children}
+      <VoiceInterface tenantId={tenantId} position="fixed" />
     </>
   )
 }

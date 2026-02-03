@@ -229,7 +229,7 @@ export async function generateAndUploadTTS(
 // ============================================================================
 
 const COMMON_PHRASES = [
-  'Cześć! Tu Zygfryd. W czym mogę pomóc?',
+  'Cześć! Tu IORS. W czym mogę pomóc?',
   'Do usłyszenia!',
   'Jasne.',
   'Ok, zrobione.',
