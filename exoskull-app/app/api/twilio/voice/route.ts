@@ -182,14 +182,50 @@ export async function POST(req: NextRequest) {
           console.error('[Twilio Voice] End session error:', e)
         )
 
-        return new NextResponse(
-          generateEndCallTwiML({ farewellText: result.text }),
-          { headers: { 'Content-Type': 'application/xml' } }
-        )
+        // Try ElevenLabs TTS for farewell
+        try {
+          const audioBuffer = await textToSpeech(result.text)
+          const audioUrl = await uploadTTSAudio(
+            audioBuffer,
+            session.id,
+            session.messages.length + 1
+          )
+          return new NextResponse(
+            generateEndCallTwiML({ audioUrl }),
+            { headers: { 'Content-Type': 'application/xml' } }
+          )
+        } catch {
+          return new NextResponse(
+            generateEndCallTwiML({ farewellText: result.text }),
+            { headers: { 'Content-Type': 'application/xml' } }
+          )
+        }
       }
 
-      // Use Twilio <Say> for responses (fast, fits within 10s Vercel timeout)
-      // ElevenLabs TTS is only used for greeting (action=start)
+      // Generate ElevenLabs TTS for response (Pro plan = 60s timeout)
+      let audioUrl: string | undefined
+      try {
+        const audioBuffer = await textToSpeech(result.text)
+        audioUrl = await uploadTTSAudio(
+          audioBuffer,
+          session.id,
+          session.messages.length + 1
+        )
+      } catch (ttsError) {
+        console.error('[Twilio Voice] TTS Error:', ttsError)
+      }
+
+      if (audioUrl) {
+        const twiml = generateGatherTwiML({
+          audioUrl,
+          actionUrl: getActionUrl('process')
+        })
+        return new NextResponse(twiml, {
+          headers: { 'Content-Type': 'application/xml' }
+        })
+      }
+
+      // Fallback to Twilio <Say> if TTS fails
       const twiml = generateSayAndGatherTwiML({
         text: result.text,
         actionUrl: getActionUrl('process')

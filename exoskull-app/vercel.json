@@ -1,5 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "app/api/twilio/**/*.ts": {
+      "maxDuration": 60
+    },
+    "app/api/chat/**/*.ts": {
+      "maxDuration": 60
+    },
+    "app/api/voice/**/*.ts": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/master-scheduler",
