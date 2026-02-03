@@ -272,7 +272,7 @@ export class GapDetectorAgent extends BaseAgent {
 
       return {
         count: count || 0,
-        latest: latest?.[mapping.dateCol] || null,
+        latest: (latest as any)?.[mapping.dateCol] || null,
       }
     } catch {
       // Table might not exist
