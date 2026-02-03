@@ -164,7 +164,7 @@ export async function dispatchVoiceCall(
 
   try {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'https://exoskull.app'
-    const webhookUrl = `${baseUrl}/api/voice/twilio/outbound?tenant_id=${user.tenant_id}&job_type=${job.job_type}`
+    const webhookUrl = `${baseUrl}/api/twilio/voice?action=start&tenant_id=${user.tenant_id}&job_type=${job.job_type}`
 
     const authHeader = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64')
 
@@ -178,7 +178,7 @@ export async function dispatchVoiceCall(
         To: user.phone,
         From: TWILIO_PHONE_NUMBER,
         Url: webhookUrl,
-        StatusCallback: `${baseUrl}/api/voice/twilio/status`,
+        StatusCallback: `${baseUrl}/api/twilio/status`,
         Timeout: '30',
       }).toString()
     })

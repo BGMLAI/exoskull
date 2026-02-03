@@ -84,11 +84,20 @@ export async function POST(req: NextRequest) {
     // ACTION: START - New incoming call
     // ========================================================================
     if (action === 'start') {
-      console.log('[Twilio Voice] New call from:', from)
+      // For outbound CRON calls, tenant_id comes as query param
+      const queryTenantId = url.searchParams.get('tenant_id')
+      const jobType = url.searchParams.get('job_type')
 
-      // Find tenant by phone
-      const tenant = await findTenantByPhone(from)
-      const tenantId = tenant?.id || 'anonymous'
+      console.log('[Twilio Voice] New call:', { from, queryTenantId, jobType })
+
+      // Resolve tenant: use query param (outbound) or lookup by phone (inbound)
+      let tenantId: string
+      if (queryTenantId) {
+        tenantId = queryTenantId
+      } else {
+        const tenant = await findTenantByPhone(from)
+        tenantId = tenant?.id || 'anonymous'
+      }
 
       // Create session
       const session = await getOrCreateSession(callSid, tenantId)
