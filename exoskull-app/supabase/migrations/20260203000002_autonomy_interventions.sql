@@ -141,8 +141,7 @@ CREATE TABLE IF NOT EXISTS exo_intervention_queue (
 );
 
 -- Indexes for queue processing
-CREATE INDEX IF NOT EXISTS idx_queue_scheduled ON exo_intervention_queue(scheduled_at)
-  WHERE locked_until IS NULL OR locked_until < NOW();
+CREATE INDEX IF NOT EXISTS idx_queue_scheduled ON exo_intervention_queue(scheduled_at, locked_until);
 CREATE INDEX IF NOT EXISTS idx_queue_tenant ON exo_intervention_queue(tenant_id);
 
 -- RLS for queue

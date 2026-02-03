@@ -156,25 +156,25 @@ ALTER TABLE exo_sleep_entries ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own sleep entries"
   ON exo_sleep_entries FOR SELECT
   USING (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
+    SELECT id FROM exo_tenants WHERE id = auth.uid()
   ));
 
 CREATE POLICY "Users can insert own sleep entries"
   ON exo_sleep_entries FOR INSERT
   WITH CHECK (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
+    SELECT id FROM exo_tenants WHERE id = auth.uid()
   ));
 
 CREATE POLICY "Users can update own sleep entries"
   ON exo_sleep_entries FOR UPDATE
   USING (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
+    SELECT id FROM exo_tenants WHERE id = auth.uid()
   ));
 
 CREATE POLICY "Users can delete own sleep entries"
   ON exo_sleep_entries FOR DELETE
   USING (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
+    SELECT id FROM exo_tenants WHERE id = auth.uid()
   ));
 
 -- Activity entries
@@ -183,25 +183,25 @@ ALTER TABLE exo_activity_entries ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own activity entries"
   ON exo_activity_entries FOR SELECT
   USING (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
+    SELECT id FROM exo_tenants WHERE id = auth.uid()
   ));
 
 CREATE POLICY "Users can insert own activity entries"
   ON exo_activity_entries FOR INSERT
   WITH CHECK (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
+    SELECT id FROM exo_tenants WHERE id = auth.uid()
   ));
 
 CREATE POLICY "Users can update own activity entries"
   ON exo_activity_entries FOR UPDATE
   USING (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
+    SELECT id FROM exo_tenants WHERE id = auth.uid()
   ));
 
 CREATE POLICY "Users can delete own activity entries"
   ON exo_activity_entries FOR DELETE
   USING (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
+    SELECT id FROM exo_tenants WHERE id = auth.uid()
   ));
 
 -- Health goals
@@ -210,19 +210,19 @@ ALTER TABLE exo_health_goals ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own health goals"
   ON exo_health_goals FOR SELECT
   USING (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
+    SELECT id FROM exo_tenants WHERE id = auth.uid()
   ));
 
 CREATE POLICY "Users can insert own health goals"
   ON exo_health_goals FOR INSERT
   WITH CHECK (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
+    SELECT id FROM exo_tenants WHERE id = auth.uid()
   ));
 
 CREATE POLICY "Users can update own health goals"
   ON exo_health_goals FOR UPDATE
   USING (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
+    SELECT id FROM exo_tenants WHERE id = auth.uid()
   ));
 
 -- =====================================================
