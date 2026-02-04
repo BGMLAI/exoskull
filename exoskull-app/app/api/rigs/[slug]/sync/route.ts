@@ -2,22 +2,26 @@
 // RIG SYNC API - Manual sync trigger
 // =====================================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { RigConnection } from '@/lib/rigs/types';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { RigConnection } from "@/lib/rigs/types";
 
 // Import rig clients
-import { createNotionClient } from '@/lib/rigs/notion/client';
-import { createTodoistClient } from '@/lib/rigs/todoist/client';
-import { createGoogleWorkspaceClient } from '@/lib/rigs/google-workspace/client';
-import { createMicrosoft365Client } from '@/lib/rigs/microsoft-365/client';
-import { GoogleFitClient } from '@/lib/rigs/google-fit/client';
-import { createGoogleClient } from '@/lib/rigs/google/client';
+import { createNotionClient } from "@/lib/rigs/notion/client";
+import { createTodoistClient } from "@/lib/rigs/todoist/client";
+import { createGoogleWorkspaceClient } from "@/lib/rigs/google-workspace/client";
+import { createMicrosoft365Client } from "@/lib/rigs/microsoft-365/client";
+import { GoogleFitClient } from "@/lib/rigs/google-fit/client";
+import { createGoogleClient } from "@/lib/rigs/google/client";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+export const dynamic = "force-dynamic";
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 interface HealthMetricInsert {
   tenant_id: string;
@@ -35,37 +39,38 @@ interface HealthMetricInsert {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ slug: string }> },
 ) {
+  const supabase = getSupabase();
   const startTime = Date.now();
   const { slug } = await params;
-  const tenantId = request.headers.get('x-tenant-id');
+  const tenantId = request.headers.get("x-tenant-id");
 
   if (!tenantId) {
-    return NextResponse.json({ error: 'Missing tenant ID' }, { status: 401 });
+    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
   }
 
   try {
     // Get connection
     const { data: connection, error: connError } = await supabase
-      .from('exo_rig_connections')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('rig_slug', slug)
+      .from("exo_rig_connections")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .eq("rig_slug", slug)
       .single();
 
     if (connError || !connection) {
       return NextResponse.json(
-        { error: 'Rig not connected', slug },
-        { status: 404 }
+        { error: "Rig not connected", slug },
+        { status: 404 },
       );
     }
 
     // Update status to syncing
     await supabase
-      .from('exo_rig_connections')
-      .update({ sync_status: 'syncing', sync_error: null })
-      .eq('id', connection.id);
+      .from("exo_rig_connections")
+      .update({ sync_status: "syncing", sync_error: null })
+      .eq("id", connection.id);
 
     // Perform sync based on rig type
     let syncResult: {
@@ -76,22 +81,25 @@ export async function POST(
     };
 
     switch (slug) {
-      case 'notion': {
+      case "notion": {
         const client = createNotionClient(connection as RigConnection);
-        if (!client) throw new Error('Failed to create Notion client');
+        if (!client) throw new Error("Failed to create Notion client");
 
         const dashboard = await client.getDashboardData();
         syncResult = {
           success: true,
           records: dashboard.recentPages.length,
-          data: { user: dashboard.user?.name, totalPages: dashboard.totalPages },
+          data: {
+            user: dashboard.user?.name,
+            totalPages: dashboard.totalPages,
+          },
         };
         break;
       }
 
-      case 'todoist': {
+      case "todoist": {
         const client = createTodoistClient(connection as RigConnection);
-        if (!client) throw new Error('Failed to create Todoist client');
+        if (!client) throw new Error("Failed to create Todoist client");
 
         const dashboard = await client.getDashboardData();
         syncResult = {
@@ -102,9 +110,10 @@ export async function POST(
         break;
       }
 
-      case 'google-workspace': {
+      case "google-workspace": {
         const client = createGoogleWorkspaceClient(connection as RigConnection);
-        if (!client) throw new Error('Failed to create Google Workspace client');
+        if (!client)
+          throw new Error("Failed to create Google Workspace client");
 
         const dashboard = await client.getDashboardData();
         syncResult = {
@@ -122,9 +131,9 @@ export async function POST(
         break;
       }
 
-      case 'microsoft-365': {
+      case "microsoft-365": {
         const client = createMicrosoft365Client(connection as RigConnection);
-        if (!client) throw new Error('Failed to create Microsoft 365 client');
+        if (!client) throw new Error("Failed to create Microsoft 365 client");
 
         const dashboard = await client.getDashboardData();
         syncResult = {
@@ -142,21 +151,28 @@ export async function POST(
         break;
       }
 
-      case 'google-fit': {
+      case "google-fit": {
         const client = new GoogleFitClient(connection.access_token!);
         const endDate = new Date();
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 7); // Last 7 days
         const allData = await client.getAllData(startDate, endDate);
 
-        const healthMetrics = buildGoogleFitMetrics(tenantId, allData, 'google-fit');
+        const healthMetrics = buildGoogleFitMetrics(
+          tenantId,
+          allData,
+          "google-fit",
+        );
         if (healthMetrics.length > 0) {
           await upsertHealthMetrics(healthMetrics);
         }
 
         syncResult = {
           success: true,
-          records: allData.steps.length + allData.heartRate.length + allData.calories.length,
+          records:
+            allData.steps.length +
+            allData.heartRate.length +
+            allData.calories.length,
           data: {
             steps: allData.steps.slice(0, 7),
             heartRate: allData.heartRate.slice(0, 7),
@@ -167,17 +183,17 @@ export async function POST(
         break;
       }
 
-      case 'google': {
+      case "google": {
         // Unified Google client (Fit + Workspace + YouTube + Photos + Contacts)
         const client = createGoogleClient(connection as RigConnection);
-        if (!client) throw new Error('Failed to create Google client');
+        if (!client) throw new Error("Failed to create Google client");
 
         const dashboard = await client.getDashboardData();
 
         const healthMetrics = buildGoogleDashboardMetrics(
           tenantId,
           dashboard.fit,
-          'google'
+          "google",
         );
         if (healthMetrics.length > 0) {
           await upsertHealthMetrics(healthMetrics);
@@ -234,16 +250,16 @@ export async function POST(
 
     // Update connection status
     await supabase
-      .from('exo_rig_connections')
+      .from("exo_rig_connections")
       .update({
-        sync_status: syncResult.success ? 'success' : 'error',
+        sync_status: syncResult.success ? "success" : "error",
         sync_error: syncResult.error || null,
         last_sync_at: new Date().toISOString(),
       })
-      .eq('id', connection.id);
+      .eq("id", connection.id);
 
     // Log sync result
-    await supabase.from('exo_rig_sync_log').insert({
+    await supabase.from("exo_rig_sync_log").insert({
       connection_id: connection.id,
       tenant_id: tenantId,
       rig_slug: slug,
@@ -270,13 +286,13 @@ export async function POST(
 
     // Update connection status
     await supabase
-      .from('exo_rig_connections')
+      .from("exo_rig_connections")
       .update({
-        sync_status: 'error',
+        sync_status: "error",
         sync_error: errorMessage,
       })
-      .eq('tenant_id', tenantId)
-      .eq('rig_slug', slug);
+      .eq("tenant_id", tenantId)
+      .eq("rig_slug", slug);
 
     return NextResponse.json(
       {
@@ -285,7 +301,7 @@ export async function POST(
         error: errorMessage,
         duration_ms: duration,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -296,21 +312,22 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ slug: string }> },
 ) {
+  const supabase = getSupabase();
   const { slug } = await params;
-  const tenantId = request.headers.get('x-tenant-id');
+  const tenantId = request.headers.get("x-tenant-id");
 
   if (!tenantId) {
-    return NextResponse.json({ error: 'Missing tenant ID' }, { status: 401 });
+    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
   }
 
   // Get connection status
   const { data: connection, error: connError } = await supabase
-    .from('exo_rig_connections')
-    .select('id, sync_status, sync_error, last_sync_at, metadata')
-    .eq('tenant_id', tenantId)
-    .eq('rig_slug', slug)
+    .from("exo_rig_connections")
+    .select("id, sync_status, sync_error, last_sync_at, metadata")
+    .eq("tenant_id", tenantId)
+    .eq("rig_slug", slug)
     .single();
 
   if (connError || !connection) {
@@ -319,10 +336,10 @@ export async function GET(
 
   // Get recent sync logs
   const { data: logs } = await supabase
-    .from('exo_rig_sync_log')
-    .select('success, records_synced, error, duration_ms, created_at')
-    .eq('connection_id', connection.id)
-    .order('created_at', { ascending: false })
+    .from("exo_rig_sync_log")
+    .select("success, records_synced, error, duration_ms, created_at")
+    .eq("connection_id", connection.id)
+    .order("created_at", { ascending: false })
     .limit(10);
 
   return NextResponse.json({
@@ -347,17 +364,19 @@ function toRecordedAt(day: string): string {
 async function upsertHealthMetrics(metrics: HealthMetricInsert[]) {
   if (metrics.length === 0) return;
 
-  const { error } = await supabase.from('exo_health_metrics').upsert(metrics, {
-    onConflict: 'tenant_id,metric_type,recorded_at,source',
-    ignoreDuplicates: true,
-  });
+  const { error } = await getSupabase()
+    .from("exo_health_metrics")
+    .upsert(metrics, {
+      onConflict: "tenant_id,metric_type,recorded_at,source",
+      ignoreDuplicates: true,
+    });
 
   if (error) {
-    console.error('[Rig Sync] Failed to upsert health metrics:', {
+    console.error("[Rig Sync] Failed to upsert health metrics:", {
       error: error.message,
       count: metrics.length,
     });
-    throw new Error('Failed to save health metrics');
+    throw new Error("Failed to save health metrics");
   }
 }
 
@@ -370,7 +389,7 @@ function buildGoogleFitMetrics(
     sleep: { date: string; durationMinutes: number }[];
     distance: { date: string; meters: number }[];
   },
-  source: string
+  source: string,
 ): HealthMetricInsert[] {
   const metrics: HealthMetricInsert[] = [];
 
@@ -378,9 +397,9 @@ function buildGoogleFitMetrics(
     if (item.steps > 0) {
       metrics.push({
         tenant_id: tenantId,
-        metric_type: 'steps',
+        metric_type: "steps",
         value: item.steps,
-        unit: 'count',
+        unit: "count",
         recorded_at: toRecordedAt(item.date),
         source,
       });
@@ -391,9 +410,9 @@ function buildGoogleFitMetrics(
     if (item.bpm > 0) {
       metrics.push({
         tenant_id: tenantId,
-        metric_type: 'heart_rate',
+        metric_type: "heart_rate",
         value: item.bpm,
-        unit: 'bpm',
+        unit: "bpm",
         recorded_at: toRecordedAt(item.date),
         source,
       });
@@ -404,9 +423,9 @@ function buildGoogleFitMetrics(
     if (item.calories > 0) {
       metrics.push({
         tenant_id: tenantId,
-        metric_type: 'calories',
+        metric_type: "calories",
         value: item.calories,
-        unit: 'kcal',
+        unit: "kcal",
         recorded_at: toRecordedAt(item.date),
         source,
       });
@@ -417,9 +436,9 @@ function buildGoogleFitMetrics(
     if (item.durationMinutes > 0) {
       metrics.push({
         tenant_id: tenantId,
-        metric_type: 'sleep',
+        metric_type: "sleep",
         value: item.durationMinutes,
-        unit: 'minutes',
+        unit: "minutes",
         recorded_at: toRecordedAt(item.date),
         source,
       });
@@ -430,9 +449,9 @@ function buildGoogleFitMetrics(
     if (item.meters > 0) {
       metrics.push({
         tenant_id: tenantId,
-        metric_type: 'distance',
+        metric_type: "distance",
         value: item.meters,
-        unit: 'meters',
+        unit: "meters",
         recorded_at: toRecordedAt(item.date),
         source,
       });
@@ -450,7 +469,7 @@ function buildGoogleDashboardMetrics(
     calories: { date: string; calories: number }[];
     sleep: { date: string; durationMinutes: number }[];
   },
-  source: string
+  source: string,
 ): HealthMetricInsert[] {
   return buildGoogleFitMetrics(
     tenantId,
@@ -461,6 +480,6 @@ function buildGoogleDashboardMetrics(
       sleep: fit.sleep,
       distance: [],
     },
-    source
+    source,
   );
 }

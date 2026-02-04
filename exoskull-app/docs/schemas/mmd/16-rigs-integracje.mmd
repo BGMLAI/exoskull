@@ -1,0 +1,34 @@
+graph TB
+    subgraph RIGS["🔌 RIGS - Integracje zewnętrzne"]
+        subgraph HEALTH_R["❤️ Zdrowie"]
+            OURA["⌚ Oura Ring<br/>Sen, HRV, tętno"]
+            HC["📱 HealthConnect<br/>Android dane zdrowotne"]
+        end
+
+        subgraph PROD_R["📈 Produktywność"]
+            GCAL["📅 Google Calendar"]
+            TODOIST["✅ Todoist"]
+            NOTION["📓 Notion"]
+        end
+
+        subgraph COMM_R["💬 Komunikacja"]
+            TELEGRAM["💬 Telegram"]
+            MS365["📧 Microsoft 365"]
+        end
+    end
+
+    subgraph FLOW["🔄 Jak działa połączenie"]
+        OAUTH["1️⃣ OAuth<br/>Kliknij Połącz<br/>Zaloguj się w serwisie"]
+        TOKEN["2️⃣ Token<br/>ExoSkull dostaje<br/>klucz dostępu"]
+        SYNC["3️⃣ Sync<br/>Dane automatycznie<br/>pobierane"]
+        STORE["4️⃣ Store<br/>Zapisane w bazie<br/>Bronze → Silver → Gold"]
+    end
+
+    OURA & HC & GCAL & TODOIST & NOTION & TELEGRAM & MS365 --> OAUTH
+    OAUTH --> TOKEN --> SYNC --> STORE
+
+    style RIGS fill:#1e1e2e,stroke:#6366f1,color:#fff
+    style HEALTH_R fill:#f43f5e,stroke:#e11d48,color:#fff
+    style PROD_R fill:#3b82f6,stroke:#2563eb,color:#fff
+    style COMM_R fill:#22c55e,stroke:#16a34a,color:#fff
+    style FLOW fill:#f59e0b,stroke:#d97706,color:#000

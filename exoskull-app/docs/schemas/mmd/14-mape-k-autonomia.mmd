@@ -1,0 +1,26 @@
+graph TB
+    subgraph CYCLE["🔄 Cykl MAPE-K - Autonomia ExoSkull"]
+        M["📡 MONITOR<br/>Zbieraj dane<br/>Co się dzieje?<br/>(rozmowy, sensory, zachowanie)"]
+        A["🔍 ANALYZE<br/>Szukaj wzorców<br/>Co to znaczy?<br/>(korelacje, anomalie, trendy)"]
+        P["📋 PLAN<br/>Zaplanuj akcję<br/>Co zrobić?<br/>(interwencja, alert, raport)"]
+        E["⚡ EXECUTE<br/>Wykonaj<br/>(za zgodą lub auto)<br/>(SMS, email, zadanie)"]
+        K["🧠 KNOWLEDGE<br/>Ucz się<br/>Czy zadziałało?<br/>(feedback, optymalizacja)"]
+    end
+
+    M -->|"dane"| A
+    A -->|"insighty"| P
+    P -->|"plan"| E
+    E -->|"wynik"| K
+    K -->|"lepsze modele"| M
+
+    subgraph EXAMPLE["💡 Przykład"]
+        EX["Monitor: Sen 4h przez 3 noce<br/>Analyze: Dług senny krytyczny<br/>Plan: Zaproponuj odwołanie porannego spotkania<br/>Execute: Wysyła SMS z propozycją<br/>Knowledge: User odwołał - zapamiętaj wzorzec"]
+    end
+
+    style CYCLE fill:#1e1e2e,stroke:#6366f1,color:#fff
+    style M fill:#22d3ee,stroke:#06b6d4,color:#000
+    style A fill:#3b82f6,stroke:#2563eb,color:#fff
+    style P fill:#f59e0b,stroke:#d97706,color:#000
+    style E fill:#22c55e,stroke:#16a34a,color:#fff
+    style K fill:#a855f7,stroke:#9333ea,color:#fff
+    style EXAMPLE fill:#374151,stroke:#6b7280,color:#fff

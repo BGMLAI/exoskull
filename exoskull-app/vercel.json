@@ -20,11 +20,23 @@
   "crons": [
     {
       "path": "/api/cron/master-scheduler",
-      "schedule": "0 6 * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/intervention-executor",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/post-conversation",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/pulse",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/highlight-decay",
+      "schedule": "0 3 * * *"
     },
     {
       "path": "/api/cron/bronze-etl",
@@ -36,7 +48,7 @@
     },
     {
       "path": "/api/cron/gold-etl",
-      "schedule": "0 3 * * *"
+      "schedule": "0 4 * * *"
     }
   ]
 }

@@ -1,0 +1,71 @@
+erDiagram
+    exo_tenants {
+        uuid id PK
+        text name
+        text timezone
+        text language
+        text communication_style
+    }
+
+    exo_tasks {
+        uuid id PK
+        uuid tenant_id FK
+        text title
+        text status
+        timestamp due_date
+    }
+
+    exo_health_metrics {
+        uuid id PK
+        uuid tenant_id FK
+        text metric_type
+        jsonb data
+        date date
+    }
+
+    exo_voice_sessions {
+        uuid id PK
+        uuid tenant_id FK
+        jsonb messages
+        timestamp started_at
+    }
+
+    exo_unified_thread {
+        uuid id PK
+        uuid tenant_id FK
+        text channel
+        text content
+        text direction
+    }
+
+    exo_interventions {
+        uuid id PK
+        uuid tenant_id FK
+        text action_type
+        text status
+        text priority
+    }
+
+    exo_user_documents {
+        uuid id PK
+        uuid tenant_id FK
+        text title
+        text category
+        text storage_path
+    }
+
+    exo_mod_data {
+        uuid id PK
+        uuid tenant_id FK
+        text mod_slug
+        jsonb data
+        timestamp logged_at
+    }
+
+    exo_tenants ||--o{ exo_tasks : "ma"
+    exo_tenants ||--o{ exo_health_metrics : "ma"
+    exo_tenants ||--o{ exo_voice_sessions : "ma"
+    exo_tenants ||--o{ exo_unified_thread : "ma"
+    exo_tenants ||--o{ exo_interventions : "ma"
+    exo_tenants ||--o{ exo_user_documents : "ma"
+    exo_tenants ||--o{ exo_mod_data : "ma"

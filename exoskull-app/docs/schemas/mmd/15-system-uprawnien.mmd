@@ -1,0 +1,41 @@
+graph TB
+    subgraph WANT["🤖 ExoSkull chce coś zrobić"]
+        ACTION["np. Wysłać SMS<br/>z przypomnieniem"]
+    end
+
+    subgraph CHECK["🔐 Sprawdzanie uprawnień"]
+        PERM{"Czy użytkownik<br/>dał zgodę na<br/>ten typ akcji?"}
+    end
+
+    subgraph YES_PATH["✅ TAK - ma zgodę"]
+        EXEC["Wykonaj akcję"]
+        LOG["Zaloguj wynik"]
+        LEARN["Ucz się z feedbacku"]
+    end
+
+    subgraph NO_PATH["❌ NIE - brak zgody"]
+        PROPOSE["Zaproponuj akcję"]
+        WAIT["Czekaj na decyzję"]
+        APPROVE{"Użytkownik<br/>akceptuje?"}
+    end
+
+    subgraph EXAMPLES["📋 Typy uprawnień"]
+        EX1["send_sms:reminder ✅<br/>Może wysyłać przypomnienia"]
+        EX2["create_task:* ✅<br/>Może tworzyć dowolne zadania"]
+        EX3["transfer_money ❌<br/>Zawsze pyta o zgodę"]
+        EX4["cancel_event:* ✅<br/>Może odwoływać wydarzenia"]
+    end
+
+    ACTION --> PERM
+    PERM -->|"TAK"| EXEC
+    EXEC --> LOG --> LEARN
+    PERM -->|"NIE"| PROPOSE
+    PROPOSE --> WAIT --> APPROVE
+    APPROVE -->|"TAK"| EXEC
+    APPROVE -->|"NIE"| DROP["Anuluj"]
+
+    style WANT fill:#6366f1,stroke:#4f46e5,color:#fff
+    style CHECK fill:#f59e0b,stroke:#d97706,color:#000
+    style YES_PATH fill:#22c55e,stroke:#16a34a,color:#fff
+    style NO_PATH fill:#ef4444,stroke:#dc2626,color:#fff
+    style EXAMPLES fill:#374151,stroke:#6b7280,color:#fff

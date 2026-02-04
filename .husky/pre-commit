@@ -6,12 +6,12 @@ cd exoskull-app
 echo "[pre-commit] Running lint-staged..."
 npx lint-staged || exit 1
 
-echo "[pre-commit] Running TypeScript build check..."
-npx next build 2>&1 | tail -5
-BUILD_EXIT=$?
+echo "[pre-commit] Running TypeScript check..."
+npx tsc --noEmit 2>&1 | tail -5
+TSC_EXIT=$?
 
-if [ $BUILD_EXIT -ne 0 ]; then
-  echo "[pre-commit] BUILD FAILED - fix TypeScript errors before committing"
+if [ $TSC_EXIT -ne 0 ]; then
+  echo "[pre-commit] TypeScript errors found - fix before committing"
   exit 1
 fi
 

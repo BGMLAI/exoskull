@@ -8,20 +8,25 @@
  * - Intervention calls
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { makeOutboundCall } from '@/lib/voice/twilio-client'
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { makeOutboundCall } from "@/lib/voice/twilio-client";
+
+export const dynamic = "force-dynamic";
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://exoskull.xyz'
-
 function getSupabase() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
+
+function getAppUrl() {
+  return process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
 }
 
 // ============================================================================
@@ -29,10 +34,10 @@ function getSupabase() {
 // ============================================================================
 
 interface OutboundCallRequest {
-  phone?: string // Phone number to call (optional if tenantId provided)
-  tenantId?: string // Lookup phone from tenant
-  purpose?: 'test' | 'checkin' | 'intervention' | 'custom'
-  message?: string // Custom message for the call
+  phone?: string; // Phone number to call (optional if tenantId provided)
+  tenantId?: string; // Lookup phone from tenant
+  purpose?: "test" | "checkin" | "intervention" | "custom";
+  message?: string; // Custom message for the call
 }
 
 // ============================================================================
@@ -41,101 +46,101 @@ interface OutboundCallRequest {
 
 export async function POST(req: NextRequest) {
   try {
-    const body: OutboundCallRequest = await req.json()
-    const { phone, tenantId, purpose = 'test' } = body
+    const body: OutboundCallRequest = await req.json();
+    const { phone, tenantId, purpose = "test" } = body;
 
-    console.log('[Twilio Outbound] Request:', { phone, tenantId, purpose })
+    console.log("[Twilio Outbound] Request:", { phone, tenantId, purpose });
 
     // Resolve phone number
-    let targetPhone = phone
+    let targetPhone = phone;
 
     if (!targetPhone && tenantId) {
-      const supabase = getSupabase()
+      const supabase = getSupabase();
       const { data: tenant } = await supabase
-        .from('exo_tenants')
-        .select('phone')
-        .eq('id', tenantId)
-        .single()
+        .from("exo_tenants")
+        .select("phone")
+        .eq("id", tenantId)
+        .single();
 
       if (!tenant?.phone) {
         return NextResponse.json(
-          { error: 'Tenant phone number not found' },
-          { status: 400 }
-        )
+          { error: "Tenant phone number not found" },
+          { status: 400 },
+        );
       }
 
-      targetPhone = tenant.phone
+      targetPhone = tenant.phone;
     }
 
     if (!targetPhone) {
       return NextResponse.json(
-        { error: 'Phone number required (provide phone or tenantId)' },
-        { status: 400 }
-      )
+        { error: "Phone number required (provide phone or tenantId)" },
+        { status: 400 },
+      );
     }
 
     // Initiate outbound call
     // Pass tenant_id in webhook URL so voice handler knows the user
-    const webhookParams = tenantId ? `&tenant_id=${tenantId}` : ''
+    const webhookParams = tenantId ? `&tenant_id=${tenantId}` : "";
     const result = await makeOutboundCall({
       to: targetPhone,
-      webhookUrl: `${APP_URL}/api/twilio/voice?action=start${webhookParams}`,
-      statusCallbackUrl: `${APP_URL}/api/twilio/status`,
-      timeout: 30
-    })
+      webhookUrl: `${getAppUrl()}/api/twilio/voice?action=start${webhookParams}`,
+      statusCallbackUrl: `${getAppUrl()}/api/twilio/status`,
+      timeout: 30,
+    });
 
-    console.log('[Twilio Outbound] Call initiated:', {
+    console.log("[Twilio Outbound] Call initiated:", {
       callSid: result.callSid,
       to: targetPhone,
-      purpose
-    })
+      purpose,
+    });
 
     // Pre-create session in database
     if (tenantId) {
-      const supabase = getSupabase()
-      await supabase.from('exo_voice_sessions').insert({
+      const supabase = getSupabase();
+      await supabase.from("exo_voice_sessions").insert({
         call_sid: result.callSid,
         tenant_id: tenantId,
-        status: 'active',
+        status: "active",
         messages: [],
         started_at: new Date().toISOString(),
         metadata: {
-          direction: 'outbound',
-          purpose
-        }
-      })
+          direction: "outbound",
+          purpose,
+        },
+      });
     }
 
     return NextResponse.json({
       success: true,
       callSid: result.callSid,
       status: result.status,
-      to: targetPhone
-    })
+      to: targetPhone,
+    });
   } catch (error) {
-    console.error('[Twilio Outbound] Error:', error)
+    console.error("[Twilio Outbound] Error:", error);
 
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = error instanceof Error ? error.message : "Unknown error";
 
     return NextResponse.json(
       { error: `Failed to initiate call: ${message}` },
-      { status: 500 }
-    )
+      { status: 500 },
+    );
   }
 }
 
 // Test endpoint
 export async function GET() {
   return NextResponse.json({
-    status: 'ok',
-    endpoint: 'Twilio Outbound Call API',
+    status: "ok",
+    endpoint: "Twilio Outbound Call API",
     usage: {
-      method: 'POST',
+      method: "POST",
       body: {
-        phone: '+48123456789 (optional if tenantId provided)',
-        tenantId: 'uuid (optional)',
-        purpose: 'test | checkin | intervention | custom'
-      }
-    }
-  })
+        phone: "+48123456789 (optional if tenantId provided)",
+        tenantId: "uuid (optional)",
+        purpose: "test | checkin | intervention | custom",
+      },
+    },
+  });
 }

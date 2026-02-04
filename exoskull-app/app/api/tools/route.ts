@@ -4,13 +4,15 @@
 // GET /api/tools - List available tools
 // =====================================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 import {
   executeTool,
   getAllToolDefinitions,
   getToolManifest,
   ToolExecutionRequest,
-} from '@/lib/tools';
+} from "@/lib/tools";
+
+export const dynamic = "force-dynamic";
 
 // =====================================================
 // GET - List available tools
@@ -28,10 +30,10 @@ export async function GET() {
       count: tools.length,
     });
   } catch (error) {
-    console.error('[API/tools] GET error:', error);
+    console.error("[API/tools] GET error:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to get tools' },
-      { status: 500 }
+      { success: false, error: "Failed to get tools" },
+      { status: 500 },
     );
   }
 }
@@ -50,15 +52,15 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!tool) {
       return NextResponse.json(
-        { success: false, error: 'Missing required field: tool' },
-        { status: 400 }
+        { success: false, error: "Missing required field: tool" },
+        { status: 400 },
       );
     }
 
     if (!tenant_id) {
       return NextResponse.json(
-        { success: false, error: 'Missing required field: tenant_id' },
-        { status: 400 }
+        { success: false, error: "Missing required field: tenant_id" },
+        { status: 400 },
       );
     }
 
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
     const result = await executeTool(
       tool,
       { tenant_id, conversation_id },
-      params || {}
+      params || {},
     );
 
     const executionTime = Date.now() - startTime;
@@ -77,7 +79,7 @@ export async function POST(request: NextRequest) {
       execution_time_ms: executionTime,
     });
   } catch (error) {
-    console.error('[API/tools] POST error:', {
+    console.error("[API/tools] POST error:", {
       error: error instanceof Error ? error.message : error,
       duration_ms: Date.now() - startTime,
     });
@@ -85,9 +87,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Tool execution failed',
+        error: error instanceof Error ? error.message : "Tool execution failed",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

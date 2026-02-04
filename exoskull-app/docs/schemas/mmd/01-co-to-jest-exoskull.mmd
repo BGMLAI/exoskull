@@ -1,0 +1,48 @@
+graph TB
+    subgraph CENTER["🧠 ExoSkull - Twój Drugi Mózg"]
+        EXO["<b>ExoSkull</b><br/>Adaptacyjny System<br/>Zarządzania Życiem"]
+    end
+
+    subgraph VOICE["🎤 Głos"]
+        V1["Rozmowy głosowe"]
+        V2["SMS / Email"]
+        V3["Chat webowy"]
+    end
+
+    subgraph HEALTH["❤️ Zdrowie"]
+        H1["Oura Ring<br/>(sen, HRV)"]
+        H2["Telefon<br/>(aktywność)"]
+        H3["HealthConnect<br/>(Android)"]
+    end
+
+    subgraph TASKS["✅ Zadania"]
+        T1["Tworzenie zadań"]
+        T2["Przypomnienia"]
+        T3["Automatyczne<br/>planowanie"]
+    end
+
+    subgraph AUTO["🤖 Automatyzacja"]
+        A1["Proaktywne<br/>interwencje"]
+        A2["Autonomiczne<br/>działania"]
+        A3["Wykrywanie<br/>problemów"]
+    end
+
+    subgraph MEMORY["💾 Pamięć"]
+        M1["Zapamiętuje<br/>WSZYSTKO"]
+        M2["Wzorce<br/>zachowań"]
+        M3["Profil<br/>użytkownika"]
+    end
+
+    VOICE --> EXO
+    HEALTH --> EXO
+    EXO --> TASKS
+    EXO --> AUTO
+    EXO --> MEMORY
+
+    style CENTER fill:#6366f1,stroke:#4f46e5,color:#fff
+    style EXO fill:#6366f1,stroke:#4f46e5,color:#fff
+    style VOICE fill:#22d3ee,stroke:#06b6d4,color:#000
+    style HEALTH fill:#f43f5e,stroke:#e11d48,color:#fff
+    style TASKS fill:#22c55e,stroke:#16a34a,color:#fff
+    style AUTO fill:#f59e0b,stroke:#d97706,color:#000
+    style MEMORY fill:#a855f7,stroke:#9333ea,color:#fff

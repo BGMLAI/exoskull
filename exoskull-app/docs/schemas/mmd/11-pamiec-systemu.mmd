@@ -1,0 +1,33 @@
+graph TB
+    subgraph SHORT["⚡ Pamięć krótka<br/>(ostatnie 3 rozmowy)"]
+        S1["Co właśnie powiedziałeś"]
+        S2["Aktualny kontekst"]
+        S3["Bieżąca sesja"]
+    end
+
+    subgraph MID["📅 Pamięć średnia<br/>(ostatnie 30 dni)"]
+        M1["Wzorce zachowań"]
+        M2["Trendy zdrowotne"]
+        M3["Powtarzające się tematy"]
+    end
+
+    subgraph LONG["🏛️ Pamięć długa<br/>(na zawsze)"]
+        L1["Kim jesteś<br/>(profil, preferencje)"]
+        L2["Cele życiowe"]
+        L3["Wzorce historyczne<br/>(korelacje, insighty)"]
+    end
+
+    subgraph USE["🧠 Jak ExoSkull używa pamięci"]
+        U1["Personalizuje<br/>odpowiedzi"]
+        U2["Proaktywnie<br/>ostrzega"]
+        U3["Uczy się<br/>co działa"]
+    end
+
+    SHORT -->|"po 24h"| MID
+    MID -->|"po 30 dniach"| LONG
+    SHORT & MID & LONG --> USE
+
+    style SHORT fill:#22d3ee,stroke:#06b6d4,color:#000
+    style MID fill:#3b82f6,stroke:#2563eb,color:#fff
+    style LONG fill:#6366f1,stroke:#4f46e5,color:#fff
+    style USE fill:#22c55e,stroke:#16a34a,color:#fff

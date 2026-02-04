@@ -1,0 +1,44 @@
+graph TB
+    subgraph META["🧠 Meta-Koordynator<br/>(Claude Opus)"]
+        MC["Strategiczne decyzje<br/>Co jest priorytetem?<br/>Kogo wysłać?"]
+    end
+
+    subgraph SWARM["🐝 Rój Agentów<br/>(Kimi K2.5 - równolegle)"]
+        subgraph HEALTH["❤️ Domena: Zdrowie"]
+            HA1["Analityk snu"]
+            HA2["Predyktor energii"]
+            HA3["Tracker nawodnienia"]
+        end
+
+        subgraph PROD["📈 Domena: Produktywność"]
+            PA1["Detector stresu kalendarza"]
+            PA2["Forecaster produktywności"]
+            PA3["Monitor deep work"]
+        end
+
+        subgraph FIN["💰 Domena: Finanse"]
+            FA1["Analityk wydatków"]
+            FA2["Detector anomalii"]
+        end
+
+        subgraph SOC["👥 Domena: Relacje"]
+            SA1["Checker częstotliwości"]
+            SA2["Detector izolacji"]
+        end
+    end
+
+    subgraph SYNTH["📊 Syntezator"]
+        SY["Łączy wyniki<br/>wszystkich agentów<br/>w jedną odpowiedź"]
+    end
+
+    MC -->|"wysyła<br/>zadania"| SWARM
+    HEALTH & PROD & FIN & SOC -->|"wyniki"| SYNTH
+    SYNTH -->|"raport"| MC
+
+    style META fill:#ef4444,stroke:#dc2626,color:#fff
+    style SWARM fill:#1e1e2e,stroke:#6366f1,color:#fff
+    style HEALTH fill:#f43f5e,stroke:#e11d48,color:#fff
+    style PROD fill:#3b82f6,stroke:#2563eb,color:#fff
+    style FIN fill:#22c55e,stroke:#16a34a,color:#fff
+    style SOC fill:#f59e0b,stroke:#d97706,color:#000
+    style SYNTH fill:#8b5cf6,stroke:#7c3aed,color:#fff

@@ -1,0 +1,41 @@
+graph LR
+    subgraph EXOSKULL["🧠 ExoSkull - 6 Głównych Modułów"]
+        direction TB
+
+        subgraph VOI["🎤 VOICE<br/>System głosowy"]
+            V["Rozmawiasz z ExoSkull<br/>jak z asystentem.<br/>Głos, SMS, Chat."]
+        end
+
+        subgraph KNO["📚 KNOWLEDGE<br/>Baza wiedzy"]
+            K["Notatki, dokumenty,<br/>cele, kampanie,<br/>questy życiowe."]
+        end
+
+        subgraph AUT["🤖 AUTONOMY<br/>Autonomia"]
+            A["ExoSkull sam<br/>podejmuje działania<br/>(za Twoją zgodą)."]
+        end
+
+        subgraph RIG["🔌 RIGS<br/>Integracje"]
+            R["Oura Ring, Google,<br/>Todoist, Notion,<br/>Telegram, i więcej."]
+        end
+
+        subgraph MOD["🧩 MODS<br/>Mini-aplikacje"]
+            M["Sleep Tracker,<br/>Mood Logger,<br/>Habit Tracker..."]
+        end
+
+        subgraph CRO["⏰ CRON<br/>Harmonogram"]
+            C["Poranne check-in,<br/>podsumowania dnia,<br/>ETL danych."]
+        end
+    end
+
+    VOI --- KNO
+    KNO --- AUT
+    AUT --- RIG
+    RIG --- MOD
+    MOD --- CRO
+
+    style VOI fill:#3b82f6,stroke:#2563eb,color:#fff
+    style KNO fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style AUT fill:#f59e0b,stroke:#d97706,color:#000
+    style RIG fill:#10b981,stroke:#059669,color:#fff
+    style MOD fill:#ec4899,stroke:#db2777,color:#fff
+    style CRO fill:#6366f1,stroke:#4f46e5,color:#fff

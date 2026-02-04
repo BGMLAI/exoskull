@@ -1,0 +1,48 @@
+graph TB
+    subgraph LOOPS["🔄 LOOPS - Domeny życia<br/>(najwyższy poziom)"]
+        HEALTH_L["❤️ Zdrowie"]
+        WORK_L["💼 Praca"]
+        FIN_L["💰 Finanse"]
+        SOC_L["👥 Relacje"]
+        DEV_L["📚 Rozwój"]
+    end
+
+    subgraph CAMPAIGNS["🎯 CAMPAIGNS - Duże inicjatywy<br/>(średnioterminowe cele)"]
+        C1["Optymalizacja snu"]
+        C2["Nowa praca do Q3"]
+        C3["Oszczędności 10k"]
+    end
+
+    subgraph QUESTS["⚔️ QUESTS - 7-dniowe programy<br/>(konkretne wyzwania)"]
+        Q1["7-dniowe wyzwanie snu"]
+        Q2["CV + LinkedIn update"]
+        Q3["Tydzień bez zbędnych wydatków"]
+    end
+
+    subgraph ACTIONS["✅ CODZIENNE DZIAŁANIA"]
+        A1["Śpij przed 23:00"]
+        A2["Zaktualizuj CV"]
+        A3["Zapisz wydatki"]
+    end
+
+    HEALTH_L --> C1
+    WORK_L --> C2
+    FIN_L --> C3
+    C1 --> Q1
+    C2 --> Q2
+    C3 --> Q3
+    Q1 --> A1
+    Q2 --> A2
+    Q3 --> A3
+
+    subgraph ALSO["📝 Też w Knowledge"]
+        NOTES["Notatki<br/>(wolna forma)"]
+        DOCS["Dokumenty<br/>(PDF, pliki)"]
+        OPS["Ops<br/>(wiedza operacyjna)"]
+    end
+
+    style LOOPS fill:#6366f1,stroke:#4f46e5,color:#fff
+    style CAMPAIGNS fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style QUESTS fill:#a855f7,stroke:#9333ea,color:#fff
+    style ACTIONS fill:#22c55e,stroke:#16a34a,color:#fff
+    style ALSO fill:#374151,stroke:#6b7280,color:#fff

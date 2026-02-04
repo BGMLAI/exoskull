@@ -1,43 +1,53 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+export const dynamic = "force-dynamic";
 
-// Use service role for server-side operations
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+function getSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return createClient(supabaseUrl, supabaseServiceKey);
+}
 
-// VAPI Tool Handlers
+// Tool Handlers (legacy VAPI format - kept for backward compatibility)
+// TODO: Migrate callers to use lib/tools/ registry instead
 async function getTasks(tenantId: string) {
+  const supabase = getSupabase();
   const { data, error } = await supabase
-    .from('exo_tasks')
-    .select('id, title, status, priority, due_date, description, energy_required')
-    .eq('tenant_id', tenantId)
-    .neq('status', 'cancelled')
-    .order('priority', { ascending: true })
-    .order('due_date', { ascending: true, nullsFirst: false })
-    .limit(20)
+    .from("exo_tasks")
+    .select(
+      "id, title, status, priority, due_date, description, energy_required",
+    )
+    .eq("tenant_id", tenantId)
+    .neq("status", "cancelled")
+    .order("priority", { ascending: true })
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .limit(20);
 
   if (error) {
-    console.error('Error fetching tasks:', error)
-    return { tasks: [], error: error.message }
+    console.error("Error fetching tasks:", error);
+    return { tasks: [], error: error.message };
   }
 
   return {
     tasks: data || [],
-    count: data?.length || 0
-  }
+    count: data?.length || 0,
+  };
 }
 
-async function createTask(tenantId: string, params: {
-  title: string
-  priority?: number
-  due_date?: string
-  description?: string
-  energy_required?: number
-}) {
+async function createTask(
+  tenantId: string,
+  params: {
+    title: string;
+    priority?: number;
+    due_date?: string;
+    description?: string;
+    energy_required?: number;
+  },
+) {
+  const supabase = getSupabase();
   const { data, error } = await supabase
-    .from('exo_tasks')
+    .from("exo_tasks")
     .insert({
       tenant_id: tenantId,
       title: params.title,
@@ -45,339 +55,414 @@ async function createTask(tenantId: string, params: {
       due_date: params.due_date || null,
       description: params.description || null,
       energy_required: params.energy_required || null,
-      status: 'pending'
+      status: "pending",
     })
     .select()
-    .single()
+    .single();
 
   if (error) {
-    console.error('Error creating task:', error)
-    return { success: false, error: error.message }
+    console.error("Error creating task:", error);
+    return { success: false, error: error.message };
   }
 
   return {
     success: true,
     task: data,
-    message: `Zadanie "${params.title}" zostało dodane`
-  }
+    message: `Zadanie "${params.title}" zostało dodane`,
+  };
 }
 
 async function completeTask(tenantId: string, taskId: string) {
+  const supabase = getSupabase();
   const { data, error } = await supabase
-    .from('exo_tasks')
+    .from("exo_tasks")
     .update({
-      status: 'done',
-      completed_at: new Date().toISOString()
+      status: "done",
+      completed_at: new Date().toISOString(),
     })
-    .eq('id', taskId)
-    .eq('tenant_id', tenantId)
+    .eq("id", taskId)
+    .eq("tenant_id", tenantId)
     .select()
-    .single()
+    .single();
 
   if (error) {
-    console.error('Error completing task:', error)
-    return { success: false, error: error.message }
+    console.error("Error completing task:", error);
+    return { success: false, error: error.message };
   }
 
   return {
     success: true,
     task: data,
-    message: `Zadanie oznaczone jako wykonane`
-  }
+    message: `Zadanie oznaczone jako wykonane`,
+  };
 }
 
 // Schedule/Check-in handlers
 async function getSchedule(tenantId: string) {
+  const supabase = getSupabase();
   // Get user's custom check-ins
-  const { data: customCheckins, error: customError } = await supabase
-    .from('exo_user_checkins')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .eq('is_active', true)
-    .order('time')
+  const { data: customCheckins } = await supabase
+    .from("exo_user_checkins")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("is_active", true)
+    .order("time");
 
   // Get system jobs with user preferences
-  const { data: systemJobs, error: systemError } = await supabase
-    .from('exo_scheduled_jobs')
-    .select('id, job_name, display_name, description, time_window_start, default_channel, is_system')
-    .eq('is_active', true)
+  const { data: systemJobs } = await supabase
+    .from("exo_scheduled_jobs")
+    .select(
+      "id, job_name, display_name, description, time_window_start, default_channel, is_system",
+    )
+    .eq("is_active", true);
 
   const { data: preferences } = await supabase
-    .from('exo_user_job_preferences')
-    .select('job_id, is_enabled, custom_time, preferred_channel')
-    .eq('tenant_id', tenantId)
+    .from("exo_user_job_preferences")
+    .select("job_id, is_enabled, custom_time, preferred_channel")
+    .eq("tenant_id", tenantId);
 
-  const prefsMap = new Map(preferences?.map(p => [p.job_id, p]) || [])
+  const prefsMap = new Map(preferences?.map((p) => [p.job_id, p]) || []);
 
-  const systemWithPrefs = systemJobs?.map(job => ({
-    name: job.display_name || job.job_name,
-    time: prefsMap.get(job.id)?.custom_time || job.time_window_start,
-    channel: prefsMap.get(job.id)?.preferred_channel || job.default_channel,
-    enabled: prefsMap.get(job.id)?.is_enabled ?? true,
-    is_system: true
-  })) || []
+  const systemWithPrefs =
+    systemJobs?.map((job) => ({
+      name: job.display_name || job.job_name,
+      time: prefsMap.get(job.id)?.custom_time || job.time_window_start,
+      channel: prefsMap.get(job.id)?.preferred_channel || job.default_channel,
+      enabled: prefsMap.get(job.id)?.is_enabled ?? true,
+      is_system: true,
+    })) || [];
 
-  const custom = customCheckins?.map(c => ({
-    name: c.name,
-    time: c.time,
-    frequency: c.frequency,
-    channel: c.channel,
-    message: c.message,
-    enabled: c.is_active,
-    is_system: false
-  })) || []
+  const custom =
+    customCheckins?.map((c) => ({
+      name: c.name,
+      time: c.time,
+      frequency: c.frequency,
+      channel: c.channel,
+      message: c.message,
+      enabled: c.is_active,
+      is_system: false,
+    })) || [];
 
-  const allCheckins = [...systemWithPrefs.filter(j => j.enabled), ...custom]
+  const allCheckins = [...systemWithPrefs.filter((j) => j.enabled), ...custom];
 
   if (allCheckins.length === 0) {
-    return { checkins: [], message: 'Nie masz zadnych aktywnych check-inow.' }
+    return { checkins: [], message: "Nie masz zadnych aktywnych check-inow." };
   }
 
   return {
     checkins: allCheckins,
     count: allCheckins.length,
-    message: `Masz ${allCheckins.length} aktywnych check-inow.`
-  }
+    message: `Masz ${allCheckins.length} aktywnych check-inow.`,
+  };
 }
 
-async function createCheckin(tenantId: string, params: {
-  name: string
-  time: string
-  frequency?: string
-  channel?: string
-  message?: string
-}) {
+async function createCheckin(
+  tenantId: string,
+  params: {
+    name: string;
+    time: string;
+    frequency?: string;
+    channel?: string;
+    message?: string;
+  },
+) {
+  const supabase = getSupabase();
   // Validate time format
-  const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/
+  const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
   if (!timeRegex.test(params.time)) {
-    return { success: false, error: 'Nieprawidlowy format czasu. Uzyj HH:MM.' }
+    return { success: false, error: "Nieprawidlowy format czasu. Uzyj HH:MM." };
   }
 
   const { data, error } = await supabase
-    .from('exo_user_checkins')
+    .from("exo_user_checkins")
     .insert({
       tenant_id: tenantId,
       name: params.name,
       time: params.time,
-      frequency: params.frequency || 'daily',
-      channel: params.channel || 'voice',
+      frequency: params.frequency || "daily",
+      channel: params.channel || "voice",
       message: params.message || null,
-      is_active: true
+      is_active: true,
     })
     .select()
-    .single()
+    .single();
 
   if (error) {
-    console.error('Error creating checkin:', error)
-    return { success: false, error: error.message }
+    console.error("Error creating checkin:", error);
+    return { success: false, error: error.message };
   }
 
   return {
     success: true,
     checkin: data,
-    message: `Przypomnienie "${params.name}" o ${params.time} dodane.`
-  }
+    message: `Przypomnienie "${params.name}" o ${params.time} dodane.`,
+  };
 }
 
-async function toggleCheckin(tenantId: string, checkinName: string, enabled: boolean) {
+async function toggleCheckin(
+  tenantId: string,
+  checkinName: string,
+  enabled: boolean,
+) {
+  const supabase = getSupabase();
   // First try custom checkins
-  const { data: customCheckin, error: customError } = await supabase
-    .from('exo_user_checkins')
+  const { data: customCheckin } = await supabase
+    .from("exo_user_checkins")
     .update({ is_active: enabled, updated_at: new Date().toISOString() })
-    .eq('tenant_id', tenantId)
-    .ilike('name', `%${checkinName}%`)
+    .eq("tenant_id", tenantId)
+    .ilike("name", `%${checkinName}%`)
     .select()
-    .single()
+    .single();
 
   if (customCheckin) {
     return {
       success: true,
-      message: enabled ? `Check-in "${customCheckin.name}" wlaczony.` : `Check-in "${customCheckin.name}" wylaczony.`
-    }
+      message: enabled
+        ? `Check-in "${customCheckin.name}" wlaczony.`
+        : `Check-in "${customCheckin.name}" wylaczony.`,
+    };
   }
 
   // Try system jobs
   const { data: systemJob } = await supabase
-    .from('exo_scheduled_jobs')
-    .select('id, display_name, job_name')
+    .from("exo_scheduled_jobs")
+    .select("id, display_name, job_name")
     .or(`display_name.ilike.%${checkinName}%,job_name.ilike.%${checkinName}%`)
-    .single()
+    .single();
 
   if (systemJob) {
-    const { error } = await supabase
-      .from('exo_user_job_preferences')
-      .upsert({
+    const { error } = await supabase.from("exo_user_job_preferences").upsert(
+      {
         tenant_id: tenantId,
         job_id: systemJob.id,
         is_enabled: enabled,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'tenant_id,job_id' })
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "tenant_id,job_id" },
+    );
 
     if (error) {
-      return { success: false, error: error.message }
+      return { success: false, error: error.message };
     }
 
     return {
       success: true,
-      message: enabled ? `Check-in "${systemJob.display_name || systemJob.job_name}" wlaczony.` : `Check-in "${systemJob.display_name || systemJob.job_name}" wylaczony.`
-    }
+      message: enabled
+        ? `Check-in "${systemJob.display_name || systemJob.job_name}" wlaczony.`
+        : `Check-in "${systemJob.display_name || systemJob.job_name}" wylaczony.`,
+    };
   }
 
-  return { success: false, error: `Nie znaleziono check-inu o nazwie "${checkinName}"` }
+  return {
+    success: false,
+    error: `Nie znaleziono check-inu o nazwie "${checkinName}"`,
+  };
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    const body = await request.json();
 
-    console.log('🔧 VAPI Tool Call received:', JSON.stringify(body, null, 2))
+    console.log(
+      "[VoiceTools] Tool call received:",
+      JSON.stringify(body, null, 2),
+    );
 
-    // VAPI sends function calls in message.functionCall
-    const { message, call } = body
+    // Parse function calls from payload
+    const { message, call } = body;
 
     // PRIMARY: Get tenant_id from URL query params (most reliable)
-    const url = new URL(request.url)
-    const urlTenantId = url.searchParams.get('tenant_id')
-    const conversationId = url.searchParams.get('conversation_id')
+    const url = new URL(request.url);
+    const urlTenantId = url.searchParams.get("tenant_id");
+    const conversationId = url.searchParams.get("conversation_id");
 
-    console.log('🔗 URL params:', { tenant_id: urlTenantId, conversation_id: conversationId })
+    console.log("[VoiceTools] URL params:", {
+      tenant_id: urlTenantId,
+      conversation_id: conversationId,
+    });
 
-    // FALLBACK: Get from VAPI payload (backup)
-    const payloadTenantId = call?.metadata?.tenant_id
-      || call?.assistantOverrides?.variableValues?.tenant_id
-      || call?.assistant?.metadata?.tenant_id
-      || message?.call?.metadata?.tenant_id
+    // FALLBACK: Get from call payload metadata
+    const payloadTenantId =
+      call?.metadata?.tenant_id ||
+      call?.assistantOverrides?.variableValues?.tenant_id ||
+      call?.assistant?.metadata?.tenant_id ||
+      message?.call?.metadata?.tenant_id;
 
     // Use URL param first, fallback to payload
-    const tenantId = urlTenantId || payloadTenantId
+    const tenantId = urlTenantId || payloadTenantId;
 
     if (!tenantId) {
-      console.error('❌ No tenant_id found in URL or payload')
-      console.error('URL:', request.url)
-      console.error('Call:', JSON.stringify(call, null, 2))
+      console.error("[VoiceTools] No tenant_id found in URL or payload");
+      console.error("URL:", request.url);
+      console.error("Call:", JSON.stringify(call, null, 2));
       return NextResponse.json({
         result: {
-          error: 'Nie można zidentyfikować użytkownika. Spróbuj zalogować się ponownie.',
-          tasks: []
-        }
-      })
+          error:
+            "Nie można zidentyfikować użytkownika. Spróbuj zalogować się ponownie.",
+          tasks: [],
+        },
+      });
     }
 
-    console.log('👤 Found tenant_id:', tenantId, urlTenantId ? '(from URL)' : '(from payload)')
+    console.log(
+      "[VoiceTools] Found tenant_id:",
+      tenantId,
+      urlTenantId ? "(from URL)" : "(from payload)",
+    );
 
     // Handle function call - check for tool-calls (new format) or function-call (old format)
-    if (message?.type === 'tool-calls' || message?.type === 'function-call' || message?.functionCall) {
-      // VAPI new format: toolCallList array
-      const toolCalls = message?.toolCallList || message?.toolWithToolCallList ||
-        (message?.functionCall ? [{ id: message.functionCall.id || 'unknown', name: message.functionCall.name, parameters: message.functionCall.parameters }] : [])
+    if (
+      message?.type === "tool-calls" ||
+      message?.type === "function-call" ||
+      message?.functionCall
+    ) {
+      // New format: toolCallList array
+      const toolCalls =
+        message?.toolCallList ||
+        message?.toolWithToolCallList ||
+        (message?.functionCall
+          ? [
+              {
+                id: message.functionCall.id || "unknown",
+                name: message.functionCall.name,
+                parameters: message.functionCall.parameters,
+              },
+            ]
+          : []);
 
       // If using old format
       if (toolCalls.length === 0 && message?.functionCall) {
-        const functionCall = message.functionCall
-        const functionName = functionCall.name
-        const parameters = functionCall.parameters || {}
-        const toolCallId = functionCall.id || body?.toolCallId || 'unknown'
+        const functionCall = message.functionCall;
+        const functionName = functionCall.name;
+        const parameters = functionCall.parameters || {};
+        const toolCallId = functionCall.id || body?.toolCallId || "unknown";
 
-        console.log(`📞 Function: ${functionName}, Params:`, parameters, `ToolCallId:`, toolCallId)
+        console.log(
+          `[VoiceTools] Function: ${functionName}, Params:`,
+          parameters,
+          `ToolCallId:`,
+          toolCallId,
+        );
 
-        let resultData: any
+        let resultData: any;
 
         switch (functionName) {
-          case 'get_tasks':
-            resultData = await getTasks(tenantId)
-            break
-          case 'create_task':
-            resultData = await createTask(tenantId, parameters)
-            break
-          case 'complete_task':
-            resultData = await completeTask(tenantId, parameters.task_id)
-            break
-          case 'get_schedule':
-            resultData = await getSchedule(tenantId)
-            break
-          case 'create_checkin':
-            resultData = await createCheckin(tenantId, parameters)
-            break
-          case 'toggle_checkin':
-            resultData = await toggleCheckin(tenantId, parameters.checkin_name, parameters.enabled)
-            break
+          case "get_tasks":
+            resultData = await getTasks(tenantId);
+            break;
+          case "create_task":
+            resultData = await createTask(tenantId, parameters);
+            break;
+          case "complete_task":
+            resultData = await completeTask(tenantId, parameters.task_id);
+            break;
+          case "get_schedule":
+            resultData = await getSchedule(tenantId);
+            break;
+          case "create_checkin":
+            resultData = await createCheckin(tenantId, parameters);
+            break;
+          case "toggle_checkin":
+            resultData = await toggleCheckin(
+              tenantId,
+              parameters.checkin_name,
+              parameters.enabled,
+            );
+            break;
           default:
-            resultData = { error: `Unknown function: ${functionName}` }
+            resultData = { error: `Unknown function: ${functionName}` };
         }
 
-        console.log(`✅ Result:`, resultData)
+        console.log(`[VoiceTools] Result:`, resultData);
 
-        // VAPI expects results array with toolCallId and result as STRING
-        const resultString = typeof resultData === 'string' ? resultData : JSON.stringify(resultData)
+        // Return results array with toolCallId and result as STRING
+        const resultString =
+          typeof resultData === "string"
+            ? resultData
+            : JSON.stringify(resultData);
         return NextResponse.json({
-          results: [{
-            toolCallId: toolCallId,
-            result: resultString
-          }]
-        })
+          results: [
+            {
+              toolCallId: toolCallId,
+              result: resultString,
+            },
+          ],
+        });
       }
 
       // Handle new tool-calls format with toolCallList
-      const results = []
+      const results = [];
       for (const toolCall of toolCalls) {
-        const functionName = toolCall.name || toolCall.function?.name
-        const parameters = toolCall.parameters || toolCall.function?.arguments || {}
-        const toolCallId = toolCall.id || toolCall.toolCall?.id || 'unknown'
+        const functionName = toolCall.name || toolCall.function?.name;
+        const parameters =
+          toolCall.parameters || toolCall.function?.arguments || {};
+        const toolCallId = toolCall.id || toolCall.toolCall?.id || "unknown";
 
-        console.log(`📞 Function: ${functionName}, Params:`, parameters, `ToolCallId:`, toolCallId)
+        console.log(
+          `[VoiceTools] Function: ${functionName}, Params:`,
+          parameters,
+          `ToolCallId:`,
+          toolCallId,
+        );
 
-        let resultData: any
+        let resultData: any;
 
         switch (functionName) {
-          case 'get_tasks':
-            resultData = await getTasks(tenantId)
-            break
-          case 'create_task':
-            resultData = await createTask(tenantId, parameters)
-            break
-          case 'complete_task':
-            resultData = await completeTask(tenantId, parameters.task_id)
-            break
-          case 'get_schedule':
-            resultData = await getSchedule(tenantId)
-            break
-          case 'create_checkin':
-            resultData = await createCheckin(tenantId, parameters)
-            break
-          case 'toggle_checkin':
-            resultData = await toggleCheckin(tenantId, parameters.checkin_name, parameters.enabled)
-            break
+          case "get_tasks":
+            resultData = await getTasks(tenantId);
+            break;
+          case "create_task":
+            resultData = await createTask(tenantId, parameters);
+            break;
+          case "complete_task":
+            resultData = await completeTask(tenantId, parameters.task_id);
+            break;
+          case "get_schedule":
+            resultData = await getSchedule(tenantId);
+            break;
+          case "create_checkin":
+            resultData = await createCheckin(tenantId, parameters);
+            break;
+          case "toggle_checkin":
+            resultData = await toggleCheckin(
+              tenantId,
+              parameters.checkin_name,
+              parameters.enabled,
+            );
+            break;
           default:
-            resultData = { error: `Unknown function: ${functionName}` }
+            resultData = { error: `Unknown function: ${functionName}` };
         }
 
-        console.log(`✅ Result for ${functionName}:`, resultData)
+        console.log(`[VoiceTools] Result for ${functionName}:`, resultData);
 
-        // Convert result to string (VAPI requirement)
-        const resultString = typeof resultData === 'string' ? resultData : JSON.stringify(resultData)
+        // Convert result to string
+        const resultString =
+          typeof resultData === "string"
+            ? resultData
+            : JSON.stringify(resultData);
         results.push({
           toolCallId: toolCallId,
-          result: resultString
-        })
+          result: resultString,
+        });
       }
 
-      return NextResponse.json({ results })
+      return NextResponse.json({ results });
     }
 
     // Handle other message types (transcript, end-of-call, etc.)
-    if (message?.type === 'end-of-call-report') {
-      console.log('📊 Call ended:', message)
-      return NextResponse.json({ received: true })
+    if (message?.type === "end-of-call-report") {
+      console.log("[VoiceTools] Call ended:", message);
+      return NextResponse.json({ received: true });
     }
 
-    return NextResponse.json({ received: true })
-
+    return NextResponse.json({ received: true });
   } catch (error: any) {
-    console.error('❌ Tool handler error:', error)
+    console.error("[VoiceTools] Handler error:", error);
     return NextResponse.json(
-      { result: { error: error.message || 'Internal error' } },
-      { status: 500 }
-    )
+      { result: { error: error.message || "Internal error" } },
+      { status: 500 },
+    );
   }
 }
 
@@ -386,9 +471,9 @@ export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
     },
-  })
+  });
 }

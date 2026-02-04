@@ -10,48 +10,52 @@
  * 3. ?action=end - Call ended, save transcript
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from "next/server";
 import {
   generateGatherTwiML,
   generateSayAndGatherTwiML,
   generateEndCallTwiML,
-  generateErrorTwiML
-} from '@/lib/voice/twilio-client'
-import { textToSpeech, uploadTTSAudio } from '@/lib/voice/elevenlabs-tts'
+  generateErrorTwiML,
+} from "@/lib/voice/twilio-client";
+import { textToSpeech, uploadTTSAudio } from "@/lib/voice/elevenlabs-tts";
 import {
   getOrCreateSession,
   updateSession,
   endSession,
   processUserMessage,
   generateGreeting,
-  findTenantByPhone
-} from '@/lib/voice/conversation-handler'
+  findTenantByPhone,
+} from "@/lib/voice/conversation-handler";
+
+export const dynamic = "force-dynamic";
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://exoskull.xyz'
+function getAppUrl() {
+  return process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
+}
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
 function getActionUrl(action: string): string {
-  return `${APP_URL}/api/twilio/voice?action=${action}`
+  return `${getAppUrl()}/api/twilio/voice?action=${action}`;
 }
 
 async function parseFormData(
-  req: NextRequest
+  req: NextRequest,
 ): Promise<Record<string, string>> {
-  const formData = await req.formData()
-  const data: Record<string, string> = {}
+  const formData = await req.formData();
+  const data: Record<string, string> = {};
 
   formData.forEach((value, key) => {
-    data[key] = value.toString()
-  })
+    data[key] = value.toString();
+  });
 
-  return data
+  return data;
 }
 
 // ============================================================================
@@ -59,61 +63,61 @@ async function parseFormData(
 // ============================================================================
 
 export async function POST(req: NextRequest) {
-  const startTime = Date.now()
+  const startTime = Date.now();
 
   try {
-    const url = new URL(req.url)
-    const action = url.searchParams.get('action') || 'start'
+    const url = new URL(req.url);
+    const action = url.searchParams.get("action") || "start";
 
     // Parse Twilio form data
-    const formData = await parseFormData(req)
-    const callSid = formData.CallSid
-    const from = formData.From
-    const speechResult = formData.SpeechResult
-    const recordingUrl = formData.RecordingUrl
+    const formData = await parseFormData(req);
+    const callSid = formData.CallSid;
+    const from = formData.From;
+    const speechResult = formData.SpeechResult;
+    const recordingUrl = formData.RecordingUrl;
 
-    console.log('[Twilio Voice] Request:', {
+    console.log("[Twilio Voice] Request:", {
       action,
       callSid,
       from,
       hasSpeech: !!speechResult,
-      hasRecording: !!recordingUrl
-    })
+      hasRecording: !!recordingUrl,
+    });
 
     // ========================================================================
     // ACTION: START - New incoming call
     // ========================================================================
-    if (action === 'start') {
+    if (action === "start") {
       // For outbound CRON calls, tenant_id comes as query param
-      const queryTenantId = url.searchParams.get('tenant_id')
-      const jobType = url.searchParams.get('job_type')
+      const queryTenantId = url.searchParams.get("tenant_id");
+      const jobType = url.searchParams.get("job_type");
 
-      console.log('[Twilio Voice] New call:', { from, queryTenantId, jobType })
+      console.log("[Twilio Voice] New call:", { from, queryTenantId, jobType });
 
       // Resolve tenant: use query param (outbound) or lookup by phone (inbound)
-      let tenantId: string
+      let tenantId: string;
       if (queryTenantId) {
-        tenantId = queryTenantId
+        tenantId = queryTenantId;
       } else {
-        const tenant = await findTenantByPhone(from)
-        tenantId = tenant?.id || 'anonymous'
+        const tenant = await findTenantByPhone(from);
+        tenantId = tenant?.id || "anonymous";
       }
 
       // Create session
-      const session = await getOrCreateSession(callSid, tenantId)
+      const session = await getOrCreateSession(callSid, tenantId);
 
       // Generate personalized greeting
-      const greeting = await generateGreeting(tenantId)
+      const greeting = await generateGreeting(tenantId);
 
       // Generate TTS audio
-      let audioUrl: string | undefined
+      let audioUrl: string | undefined;
 
       try {
-        const audioBuffer = await textToSpeech(greeting)
-        audioUrl = await uploadTTSAudio(audioBuffer, session.id, 0)
-        console.log('[Twilio Voice] TTS greeting uploaded:', audioUrl)
+        const audioBuffer = await textToSpeech(greeting);
+        audioUrl = await uploadTTSAudio(audioBuffer, session.id, 0);
+        console.log("[Twilio Voice] TTS greeting uploaded:", audioUrl);
       } catch (ttsError) {
-        console.error('[Twilio Voice] TTS Error:', ttsError)
+        console.error("[Twilio Voice] TTS Error:", ttsError);
         // Will fall back to Twilio Say
       }
 
@@ -121,163 +125,164 @@ export async function POST(req: NextRequest) {
       if (audioUrl) {
         const twiml = generateGatherTwiML({
           audioUrl,
-          actionUrl: getActionUrl('process')
-        })
+          actionUrl: getActionUrl("process"),
+        });
         return new NextResponse(twiml, {
-          headers: { 'Content-Type': 'application/xml' }
-        })
+          headers: { "Content-Type": "application/xml" },
+        });
       }
 
       // Fallback to Twilio Say
       const twiml = generateGatherTwiML({
         fallbackText: greeting,
-        actionUrl: getActionUrl('process')
-      })
+        actionUrl: getActionUrl("process"),
+      });
 
       return new NextResponse(twiml, {
-        headers: { 'Content-Type': 'application/xml' }
-      })
+        headers: { "Content-Type": "application/xml" },
+      });
     }
 
     // ========================================================================
     // ACTION: PROCESS - Handle speech input
     // ========================================================================
-    if (action === 'process') {
+    if (action === "process") {
       // Get session - for outbound calls, From is our Twilio number so
       // we try To first, then From, then fall back to session's tenant_id
-      const to = formData.To
-      const tenant = await findTenantByPhone(to) || await findTenantByPhone(from)
-      const tenantId = tenant?.id || 'anonymous'
-      const session = await getOrCreateSession(callSid, tenantId)
+      const to = formData.To;
+      const tenant =
+        (await findTenantByPhone(to)) || (await findTenantByPhone(from));
+      const tenantId = tenant?.id || "anonymous";
+      const session = await getOrCreateSession(callSid, tenantId);
 
       // Get user speech (from Twilio's built-in STT)
-      const userText = speechResult?.trim()
+      const userText = speechResult?.trim();
 
       if (!userText) {
-        console.log('[Twilio Voice] No speech detected')
+        console.log("[Twilio Voice] No speech detected");
         return new NextResponse(generateEndCallTwiML(), {
-          headers: { 'Content-Type': 'application/xml' }
-        })
+          headers: { "Content-Type": "application/xml" },
+        });
       }
 
-      console.log('[Twilio Voice] User said:', userText)
+      console.log("[Twilio Voice] User said:", userText);
 
       // Process with Claude
-      const result = await processUserMessage(session, userText)
-      const processingTime = Date.now() - startTime
+      const result = await processUserMessage(session, userText);
+      const processingTime = Date.now() - startTime;
 
-      console.log('[Twilio Voice] Claude response:', {
+      console.log("[Twilio Voice] Claude response:", {
         text: result.text.substring(0, 100),
         toolsUsed: result.toolsUsed,
         shouldEndCall: result.shouldEndCall,
-        processingTimeMs: processingTime
-      })
+        processingTimeMs: processingTime,
+      });
 
       // Update session in background (don't await to save time)
-      updateSession(session.id, userText, result.text).catch(e =>
-        console.error('[Twilio Voice] Session update error:', e)
-      )
+      updateSession(session.id, userText, result.text).catch((e) =>
+        console.error("[Twilio Voice] Session update error:", e),
+      );
 
       // Check if call should end
       if (result.shouldEndCall) {
-        endSession(session.id).catch(e =>
-          console.error('[Twilio Voice] End session error:', e)
-        )
+        endSession(session.id).catch((e) =>
+          console.error("[Twilio Voice] End session error:", e),
+        );
 
         // Try ElevenLabs TTS for farewell
         try {
-          const audioBuffer = await textToSpeech(result.text)
+          const audioBuffer = await textToSpeech(result.text);
           const audioUrl = await uploadTTSAudio(
             audioBuffer,
             session.id,
-            session.messages.length + 1
-          )
-          return new NextResponse(
-            generateEndCallTwiML({ audioUrl }),
-            { headers: { 'Content-Type': 'application/xml' } }
-          )
+            session.messages.length + 1,
+          );
+          return new NextResponse(generateEndCallTwiML({ audioUrl }), {
+            headers: { "Content-Type": "application/xml" },
+          });
         } catch {
           return new NextResponse(
             generateEndCallTwiML({ farewellText: result.text }),
-            { headers: { 'Content-Type': 'application/xml' } }
-          )
+            { headers: { "Content-Type": "application/xml" } },
+          );
         }
       }
 
       // Generate ElevenLabs TTS for response (Pro plan = 60s timeout)
-      let audioUrl: string | undefined
+      let audioUrl: string | undefined;
       try {
-        const audioBuffer = await textToSpeech(result.text)
+        const audioBuffer = await textToSpeech(result.text);
         audioUrl = await uploadTTSAudio(
           audioBuffer,
           session.id,
-          session.messages.length + 1
-        )
+          session.messages.length + 1,
+        );
       } catch (ttsError) {
-        console.error('[Twilio Voice] TTS Error:', ttsError)
+        console.error("[Twilio Voice] TTS Error:", ttsError);
       }
 
       if (audioUrl) {
         const twiml = generateGatherTwiML({
           audioUrl,
-          actionUrl: getActionUrl('process')
-        })
+          actionUrl: getActionUrl("process"),
+        });
         return new NextResponse(twiml, {
-          headers: { 'Content-Type': 'application/xml' }
-        })
+          headers: { "Content-Type": "application/xml" },
+        });
       }
 
       // Fallback to Twilio <Say> if TTS fails
       const twiml = generateSayAndGatherTwiML({
         text: result.text,
-        actionUrl: getActionUrl('process')
-      })
+        actionUrl: getActionUrl("process"),
+      });
 
       return new NextResponse(twiml, {
-        headers: { 'Content-Type': 'application/xml' }
-      })
+        headers: { "Content-Type": "application/xml" },
+      });
     }
 
     // ========================================================================
     // ACTION: END - Call ended
     // ========================================================================
-    if (action === 'end') {
+    if (action === "end") {
       // Find and end session
-      const to = formData.To
-      const tenant = await findTenantByPhone(to) || await findTenantByPhone(from)
-      const tenantId = tenant?.id || 'anonymous'
+      const to = formData.To;
+      const tenant =
+        (await findTenantByPhone(to)) || (await findTenantByPhone(from));
+      const tenantId = tenant?.id || "anonymous";
 
       try {
-        const session = await getOrCreateSession(callSid, tenantId)
-        await endSession(session.id)
-        console.log('[Twilio Voice] Call ended:', callSid)
+        const session = await getOrCreateSession(callSid, tenantId);
+        await endSession(session.id);
+        console.log("[Twilio Voice] Call ended:", callSid);
       } catch (error) {
-        console.error('[Twilio Voice] Error ending session:', error)
+        console.error("[Twilio Voice] Error ending session:", error);
       }
 
-      return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true });
     }
 
     // Unknown action - end call
-    console.warn('[Twilio Voice] Unknown action:', action)
+    console.warn("[Twilio Voice] Unknown action:", action);
     return new NextResponse(generateEndCallTwiML(), {
-      headers: { 'Content-Type': 'application/xml' }
-    })
+      headers: { "Content-Type": "application/xml" },
+    });
   } catch (error) {
-    console.error('[Twilio Voice] Fatal error:', error)
+    console.error("[Twilio Voice] Fatal error:", error);
 
     return new NextResponse(generateErrorTwiML(), {
-      headers: { 'Content-Type': 'application/xml' }
-    })
+      headers: { "Content-Type": "application/xml" },
+    });
   }
 }
 
 // Also handle GET for testing
 export async function GET(req: NextRequest) {
   return NextResponse.json({
-    status: 'ok',
-    endpoint: 'Twilio Voice Webhook',
-    actions: ['start', 'process', 'end'],
-    usage: 'POST /api/twilio/voice?action=start'
-  })
+    status: "ok",
+    endpoint: "Twilio Voice Webhook",
+    actions: ["start", "process", "end"],
+    usage: "POST /api/twilio/voice?action=start",
+  });
 }

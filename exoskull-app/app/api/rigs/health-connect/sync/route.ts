@@ -2,30 +2,34 @@
 // HEALTH CONNECT SYNC API - Receives data from Android bridge
 // =====================================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+export const dynamic = "force-dynamic";
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 // Valid metric types
 const VALID_METRIC_TYPES = [
-  'steps',
-  'sleep',
-  'heart_rate',
-  'hrv',
-  'calories',
-  'distance',
-  'active_minutes',
-  'floors_climbed',
-  'blood_pressure_systolic',
-  'blood_pressure_diastolic',
-  'blood_oxygen',
-  'body_temperature',
-  'weight',
-  'body_fat',
+  "steps",
+  "sleep",
+  "heart_rate",
+  "hrv",
+  "calories",
+  "distance",
+  "active_minutes",
+  "floors_climbed",
+  "blood_pressure_systolic",
+  "blood_pressure_diastolic",
+  "blood_oxygen",
+  "body_temperature",
+  "weight",
+  "body_fat",
 ] as const;
 
 type MetricType = (typeof VALID_METRIC_TYPES)[number];
@@ -52,17 +56,18 @@ interface SyncPayload {
 // =====================================================
 
 export async function POST(request: NextRequest) {
+  const supabase = getSupabase();
   const startTime = Date.now();
 
   try {
     // Get tenant ID from header or auth token
-    const tenantId = request.headers.get('x-tenant-id');
-    const authHeader = request.headers.get('authorization');
+    const tenantId = request.headers.get("x-tenant-id");
+    const authHeader = request.headers.get("authorization");
 
     let userId: string | null = tenantId;
 
     // If no tenant ID header, try to extract from JWT
-    if (!userId && authHeader?.startsWith('Bearer ')) {
+    if (!userId && authHeader?.startsWith("Bearer ")) {
       const token = authHeader.slice(7);
       const {
         data: { user },
@@ -75,8 +80,8 @@ export async function POST(request: NextRequest) {
 
     if (!userId) {
       return NextResponse.json(
-        { error: 'Unauthorized - missing tenant ID or valid token' },
-        { status: 401 }
+        { error: "Unauthorized - missing tenant ID or valid token" },
+        { status: 401 },
       );
     }
 
@@ -85,8 +90,8 @@ export async function POST(request: NextRequest) {
 
     if (!payload.metrics || !Array.isArray(payload.metrics)) {
       return NextResponse.json(
-        { error: 'Invalid payload - metrics array required' },
-        { status: 400 }
+        { error: "Invalid payload - metrics array required" },
+        { status: 400 },
       );
     }
 
@@ -94,7 +99,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         records_synced: 0,
-        message: 'No metrics to sync',
+        message: "No metrics to sync",
       });
     }
 
@@ -107,7 +112,7 @@ export async function POST(request: NextRequest) {
         errors.push(`Invalid metric type: ${metric.type}`);
         continue;
       }
-      if (typeof metric.value !== 'number' || isNaN(metric.value)) {
+      if (typeof metric.value !== "number" || isNaN(metric.value)) {
         errors.push(`Invalid value for ${metric.type}: ${metric.value}`);
         continue;
       }
@@ -120,17 +125,17 @@ export async function POST(request: NextRequest) {
 
     if (validMetrics.length === 0) {
       return NextResponse.json(
-        { error: 'No valid metrics', details: errors },
-        { status: 400 }
+        { error: "No valid metrics", details: errors },
+        { status: 400 },
       );
     }
 
     // Ensure connection exists (create if not)
     const { data: existingConnection } = await supabase
-      .from('exo_rig_connections')
-      .select('id')
-      .eq('tenant_id', userId)
-      .eq('rig_slug', 'health-connect')
+      .from("exo_rig_connections")
+      .select("id")
+      .eq("tenant_id", userId)
+      .eq("rig_slug", "health-connect")
       .single();
 
     let connectionId: string;
@@ -138,27 +143,30 @@ export async function POST(request: NextRequest) {
     if (!existingConnection) {
       // Create connection record for health-connect
       const { data: newConnection, error: createError } = await supabase
-        .from('exo_rig_connections')
+        .from("exo_rig_connections")
         .insert({
           tenant_id: userId,
-          rig_slug: 'health-connect',
-          token_type: 'device',
+          rig_slug: "health-connect",
+          token_type: "device",
           scopes: VALID_METRIC_TYPES,
           metadata: {
-            source: 'android-bridge',
+            source: "android-bridge",
             device_info: payload.device_info || {},
             first_sync: new Date().toISOString(),
           },
-          sync_status: 'success',
+          sync_status: "success",
         })
-        .select('id')
+        .select("id")
         .single();
 
       if (createError) {
-        console.error('[Health Connect] Failed to create connection:', createError);
+        console.error(
+          "[Health Connect] Failed to create connection:",
+          createError,
+        );
         return NextResponse.json(
-          { error: 'Failed to create connection' },
-          { status: 500 }
+          { error: "Failed to create connection" },
+          { status: 500 },
         );
       }
       connectionId = newConnection.id;
@@ -173,7 +181,7 @@ export async function POST(request: NextRequest) {
       value: m.value,
       unit: m.unit || getDefaultUnit(m.type),
       recorded_at: m.recorded_at,
-      source: 'health-connect',
+      source: "health-connect",
       metadata: {
         ...m.metadata,
         device_info: payload.device_info,
@@ -181,17 +189,17 @@ export async function POST(request: NextRequest) {
     }));
 
     const { error: insertError } = await supabase
-      .from('exo_health_metrics')
+      .from("exo_health_metrics")
       .upsert(metricsToInsert, {
-        onConflict: 'tenant_id,metric_type,recorded_at',
+        onConflict: "tenant_id,metric_type,recorded_at",
         ignoreDuplicates: true,
       });
 
     if (insertError) {
-      console.error('[Health Connect] Failed to insert metrics:', insertError);
+      console.error("[Health Connect] Failed to insert metrics:", insertError);
       return NextResponse.json(
-        { error: 'Failed to save metrics', details: insertError.message },
-        { status: 500 }
+        { error: "Failed to save metrics", details: insertError.message },
+        { status: 500 },
       );
     }
 
@@ -199,9 +207,9 @@ export async function POST(request: NextRequest) {
 
     // Get current metadata and merge
     const { data: currentConn } = await supabase
-      .from('exo_rig_connections')
-      .select('metadata')
-      .eq('id', connectionId)
+      .from("exo_rig_connections")
+      .select("metadata")
+      .eq("id", connectionId)
       .single();
 
     const updatedMetadata = {
@@ -213,20 +221,20 @@ export async function POST(request: NextRequest) {
 
     // Update connection status
     await supabase
-      .from('exo_rig_connections')
+      .from("exo_rig_connections")
       .update({
-        sync_status: 'success',
+        sync_status: "success",
         sync_error: null,
         last_sync_at: new Date().toISOString(),
         metadata: updatedMetadata,
       })
-      .eq('id', connectionId);
+      .eq("id", connectionId);
 
     // Log sync
-    await supabase.from('exo_rig_sync_log').insert({
+    await supabase.from("exo_rig_sync_log").insert({
       connection_id: connectionId,
       tenant_id: userId,
-      rig_slug: 'health-connect',
+      rig_slug: "health-connect",
       success: true,
       records_synced: validMetrics.length,
       duration_ms: duration,
@@ -247,7 +255,7 @@ export async function POST(request: NextRequest) {
     const duration = Date.now() - startTime;
     const errorMessage = (error as Error).message;
 
-    console.error('[Health Connect] Sync failed:', error);
+    console.error("[Health Connect] Sync failed:", error);
 
     return NextResponse.json(
       {
@@ -255,7 +263,7 @@ export async function POST(request: NextRequest) {
         error: errorMessage,
         duration_ms: duration,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -265,12 +273,13 @@ export async function POST(request: NextRequest) {
 // =====================================================
 
 export async function GET(request: NextRequest) {
-  const tenantId = request.headers.get('x-tenant-id');
-  const authHeader = request.headers.get('authorization');
+  const supabase = getSupabase();
+  const tenantId = request.headers.get("x-tenant-id");
+  const authHeader = request.headers.get("authorization");
 
   let userId: string | null = tenantId;
 
-  if (!userId && authHeader?.startsWith('Bearer ')) {
+  if (!userId && authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
     const {
       data: { user },
@@ -279,22 +288,23 @@ export async function GET(request: NextRequest) {
   }
 
   if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // Get connection status
   const { data: connection } = await supabase
-    .from('exo_rig_connections')
-    .select('id, sync_status, sync_error, last_sync_at, metadata, created_at')
-    .eq('tenant_id', userId)
-    .eq('rig_slug', 'health-connect')
+    .from("exo_rig_connections")
+    .select("id, sync_status, sync_error, last_sync_at, metadata, created_at")
+    .eq("tenant_id", userId)
+    .eq("rig_slug", "health-connect")
     .single();
 
   if (!connection) {
     return NextResponse.json({
       connected: false,
-      slug: 'health-connect',
-      message: 'Health Connect not configured. Install Android bridge to start syncing.',
+      slug: "health-connect",
+      message:
+        "Health Connect not configured. Install Android bridge to start syncing.",
     });
   }
 
@@ -303,12 +313,12 @@ export async function GET(request: NextRequest) {
   yesterday.setDate(yesterday.getDate() - 1);
 
   const { data: recentMetrics } = await supabase
-    .from('exo_health_metrics')
-    .select('metric_type, value, unit, recorded_at')
-    .eq('tenant_id', userId)
-    .eq('source', 'health-connect')
-    .gte('recorded_at', yesterday.toISOString())
-    .order('recorded_at', { ascending: false })
+    .from("exo_health_metrics")
+    .select("metric_type, value, unit, recorded_at")
+    .eq("tenant_id", userId)
+    .eq("source", "health-connect")
+    .gte("recorded_at", yesterday.toISOString())
+    .order("recorded_at", { ascending: false })
     .limit(100);
 
   // Aggregate by type
@@ -332,15 +342,15 @@ export async function GET(request: NextRequest) {
 
   // Get recent sync logs
   const { data: logs } = await supabase
-    .from('exo_rig_sync_log')
-    .select('success, records_synced, error, duration_ms, created_at')
-    .eq('connection_id', connection.id)
-    .order('created_at', { ascending: false })
+    .from("exo_rig_sync_log")
+    .select("success, records_synced, error, duration_ms, created_at")
+    .eq("connection_id", connection.id)
+    .order("created_at", { ascending: false })
     .limit(10);
 
   return NextResponse.json({
     connected: true,
-    slug: 'health-connect',
+    slug: "health-connect",
     sync_status: connection.sync_status,
     sync_error: connection.sync_error,
     last_sync_at: connection.last_sync_at,
@@ -357,20 +367,20 @@ export async function GET(request: NextRequest) {
 
 function getDefaultUnit(type: MetricType): string {
   const units: Record<MetricType, string> = {
-    steps: 'count',
-    sleep: 'minutes',
-    heart_rate: 'bpm',
-    hrv: 'ms',
-    calories: 'kcal',
-    distance: 'meters',
-    active_minutes: 'minutes',
-    floors_climbed: 'count',
-    blood_pressure_systolic: 'mmHg',
-    blood_pressure_diastolic: 'mmHg',
-    blood_oxygen: 'percent',
-    body_temperature: 'celsius',
-    weight: 'kg',
-    body_fat: 'percent',
+    steps: "count",
+    sleep: "minutes",
+    heart_rate: "bpm",
+    hrv: "ms",
+    calories: "kcal",
+    distance: "meters",
+    active_minutes: "minutes",
+    floors_climbed: "count",
+    blood_pressure_systolic: "mmHg",
+    blood_pressure_diastolic: "mmHg",
+    blood_oxygen: "percent",
+    body_temperature: "celsius",
+    weight: "kg",
+    body_fat: "percent",
   };
-  return units[type] || 'unknown';
+  return units[type] || "unknown";
 }

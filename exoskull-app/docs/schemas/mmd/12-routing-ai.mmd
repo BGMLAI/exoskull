@@ -1,0 +1,41 @@
+graph TB
+    subgraph INPUT["📥 Zadanie wchodzi"]
+        TASK["Pytanie lub<br/>polecenie użytkownika"]
+    end
+
+    subgraph CLASSIFY["🏷️ Klasyfikacja"]
+        CL["Jak trudne<br/>jest to zadanie?"]
+    end
+
+    subgraph TIER1["⚡ Tier 1: Gemini Flash<br/>Ultra-szybki, ultra-tani"]
+        T1["Proste pytania<br/>Klasyfikacja SMS<br/>Ekstrakcja danych<br/>Routing decyzji"]
+    end
+
+    subgraph TIER2["🔵 Tier 2: Claude Haiku<br/>Szybki i zdolny"]
+        T2["Podsumowania<br/>Wykrywanie wzorców<br/>Analiza nastrojów<br/>Priorytetyzacja"]
+    end
+
+    subgraph TIER3["🟣 Tier 3: Kimi 2.5<br/>Głębokie rozumowanie"]
+        T3["Złożona analiza<br/>Wiele domen naraz<br/>128K kontekst<br/>Swarm agentów"]
+    end
+
+    subgraph TIER4["🔴 Tier 4: Claude Opus<br/>Strategiczny mózg"]
+        T4["Meta-koordynacja<br/>Wykrywanie kryzysów<br/>Projektowanie interwencji<br/>Kluczowe decyzje"]
+    end
+
+    TASK --> CL
+    CL -->|"proste"| T1
+    CL -->|"średnie"| T2
+    CL -->|"złożone"| T3
+    CL -->|"krytyczne"| T4
+
+    T1 -->|"nie dał rady"| T2
+    T2 -->|"nie dał rady"| T3
+    T3 -->|"nie dał rady"| T4
+
+    style INPUT fill:#6366f1,stroke:#4f46e5,color:#fff
+    style CLASSIFY fill:#f59e0b,stroke:#d97706,color:#000
+    style TIER1 fill:#22d3ee,stroke:#06b6d4,color:#000
+    style TIER2 fill:#3b82f6,stroke:#2563eb,color:#fff
+    style TIER3 fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style TIER4 fill:#ef4444,stroke:#dc2626,color:#fff

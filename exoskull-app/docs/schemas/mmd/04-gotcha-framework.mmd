@@ -1,0 +1,27 @@
+graph TB
+    subgraph ENGINE["⚙️ GOT - Silnik"]
+        G["<b>Goals</b><br/>Co trzeba zrobić<br/>(procesy, instrukcje)"]
+        O["<b>Orchestration</b><br/>AI Manager<br/>(koordynuje wszystko)"]
+        T["<b>Tools</b><br/>Skrypty wykonawcze<br/>(API, bazy danych)"]
+    end
+
+    subgraph CONTEXT["📋 CHA - Kontekst"]
+        C["<b>Context</b><br/>Wiedza o domenie<br/>(profil, styl, ICP)"]
+        H["<b>Hard Prompts</b><br/>Szablony instrukcji<br/>(wielokrotnego użytku)"]
+        A["<b>Args</b><br/>Ustawienia zachowania<br/>(tryby, harmonogramy)"]
+    end
+
+    G -->|"instruuje"| O
+    O -->|"deleguje"| T
+    C -->|"informuje"| O
+    H -->|"kształtuje"| O
+    A -->|"konfiguruje"| O
+
+    style ENGINE fill:#3b82f6,stroke:#2563eb,color:#fff
+    style CONTEXT fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style G fill:#22c55e,stroke:#16a34a,color:#fff
+    style O fill:#f59e0b,stroke:#d97706,color:#000
+    style T fill:#ef4444,stroke:#dc2626,color:#fff
+    style C fill:#a855f7,stroke:#9333ea,color:#fff
+    style H fill:#ec4899,stroke:#db2777,color:#fff
+    style A fill:#6366f1,stroke:#4f46e5,color:#fff

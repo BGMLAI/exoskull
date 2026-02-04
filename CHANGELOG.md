@@ -6,6 +6,35 @@ All notable changes to ExoSkull are documented here.
 
 ## 2026-02-04
 
+### Faza 3: E2E Testing + Deploy Module 4-7
+
+#### E2E Test Results (post-deploy)
+- **Test suite: 8/8 PASS, 0 FAIL** (46 skipped - require auth session)
+- **CRON endpoints: 7/7 OK** (master-scheduler, intervention-executor, post-conversation, highlight-decay, gold-etl, bronze-etl, silver-etl)
+
+#### Bugs Found & Fixed
+1. `/api/agents` - **500 error**: raw SQL passed as table name in `queryDatabase()` → fixed to use Supabase query builder
+2. `/api/cron/intervention-executor` - **404**: route file never committed → committed & deployed
+3. `/api/twilio/voice/delegate` - **404**: route file never committed → committed & deployed
+4. Test script: removed reference to deleted `/api/ghl/tools`
+
+#### Deployed Module 4-7 Changes (commit `aaf57e6`)
+- Unified thread: cross-channel conversation history (`lib/unified-thread.ts`)
+- Autonomy executor: intervention queue CRON (`cron/intervention-executor`)
+- Delegate voice: third-party calls on user's behalf (`twilio/voice/delegate`)
+- Dashboard: planned actions + mod store widgets
+- Voice: Google Wavenet Polish voice, outbound tenant lookup fix
+- Rigs: health metrics upsert for Google Fit
+- Chat: unified thread logging for web_chat channel
+- Vercel: intervention-executor cron + webhook/cron 60s timeouts
+
+#### Files Changed
+- 16 files, +1684 lines deployed to production
+- Manual Vercel deploy (GitHub auto-deploy not triggering)
+- Build: SUCCESS (0 TS errors, 64 pages generated)
+
+---
+
 ### Stabilizacja: Fazy 0, 1, 2, 4 DONE
 
 #### Faza 0: Fix Build

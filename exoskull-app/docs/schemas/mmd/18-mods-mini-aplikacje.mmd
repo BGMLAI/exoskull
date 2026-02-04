@@ -1,0 +1,40 @@
+graph TB
+    subgraph DETECT["🔍 1. Wykrycie potrzeby"]
+        D1["Użytkownik mówi:<br/>Chcę śledzić sen"]
+        D2["AI wykrywa:<br/>Często mówisz o kawie<br/>→ tracker kofeiny?"]
+        D3["Luka wykryta:<br/>Nigdy nie mówisz<br/>o finansach"]
+    end
+
+    subgraph FIND["🔎 2. Znajdź lub zbuduj"]
+        F1["Core Mods<br/>(wbudowane)"]
+        F2["Community<br/>(od innych)"]
+        F3["Custom<br/>(system buduje)"]
+    end
+
+    subgraph INSTALL["📦 3. Instalacja"]
+        I["Mod aktywny!<br/>Gotowy do użycia<br/>przez głos lub web"]
+    end
+
+    subgraph USE["🎮 4. Używanie"]
+        U1["Głos: Zapisz sen 7h"]
+        U2["Web: Dashboard"]
+        U3["Auto: Oura sync"]
+    end
+
+    subgraph MODS_LIST["🧩 Dostępne Mody"]
+        ML1["😴 Sleep Tracker"]
+        ML2["😊 Mood Logger"]
+        ML3["🏃 Activity Tracker"]
+        ML4["✅ Habit Tracker"]
+        ML5["📋 Task Manager"]
+    end
+
+    DETECT --> FIND
+    F1 & F2 & F3 --> INSTALL
+    INSTALL --> USE
+
+    style DETECT fill:#f59e0b,stroke:#d97706,color:#000
+    style FIND fill:#3b82f6,stroke:#2563eb,color:#fff
+    style INSTALL fill:#22c55e,stroke:#16a34a,color:#fff
+    style USE fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style MODS_LIST fill:#374151,stroke:#6b7280,color:#fff

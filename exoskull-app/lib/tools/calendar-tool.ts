@@ -2,44 +2,57 @@
 // CALENDAR TOOL - Google Calendar via Workspace Rig
 // =====================================================
 
-import { ExoTool, ToolHandler, ToolResult, stringParam, numberParam } from './types';
-import { createClient } from '@supabase/supabase-js';
-import { createGoogleWorkspaceClient } from '../rigs/google-workspace/client';
+import {
+  ExoTool,
+  ToolHandler,
+  ToolResult,
+  stringParam,
+  numberParam,
+} from "./types";
+import { createClient } from "@supabase/supabase-js";
+import { createGoogleWorkspaceClient } from "../rigs/google-workspace/client";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 // =====================================================
 // TOOL DEFINITION
 // =====================================================
 
 export const calendarTool: ExoTool = {
-  name: 'calendar',
-  description: 'Manage Google Calendar events. Get upcoming events, today\'s schedule, create new events, or check availability.',
+  name: "calendar",
+  description:
+    "Manage Google Calendar events. Get upcoming events, today's schedule, create new events, or check availability.",
   parameters: {
-    type: 'object',
+    type: "object",
     properties: {
-      action: stringParam('Action to perform', {
-        enum: ['get_events', 'get_today', 'create_event', 'check_free_busy'],
+      action: stringParam("Action to perform", {
+        enum: ["get_events", "get_today", "create_event", "check_free_busy"],
       }),
       // For get_events
-      start_date: stringParam('Start date in YYYY-MM-DD format'),
-      end_date: stringParam('End date in YYYY-MM-DD format'),
-      max_results: numberParam('Maximum number of events to return', { default: 10 }),
+      start_date: stringParam("Start date in YYYY-MM-DD format"),
+      end_date: stringParam("End date in YYYY-MM-DD format"),
+      max_results: numberParam("Maximum number of events to return", {
+        default: 10,
+      }),
       // For create_event
-      title: stringParam('Event title/summary'),
-      description: stringParam('Event description'),
-      start_time: stringParam('Start time in ISO 8601 format (e.g., 2024-01-15T10:00:00)'),
-      end_time: stringParam('End time in ISO 8601 format'),
-      location: stringParam('Event location'),
-      attendees: stringParam('Comma-separated list of attendee emails'),
+      title: stringParam("Event title/summary"),
+      description: stringParam("Event description"),
+      start_time: stringParam(
+        "Start time in ISO 8601 format (e.g., 2024-01-15T10:00:00)",
+      ),
+      end_time: stringParam("End time in ISO 8601 format"),
+      location: stringParam("Event location"),
+      attendees: stringParam("Comma-separated list of attendee emails"),
       // For check_free_busy
-      check_start: stringParam('Start of availability check period (ISO 8601)'),
-      check_end: stringParam('End of availability check period (ISO 8601)'),
+      check_start: stringParam("Start of availability check period (ISO 8601)"),
+      check_end: stringParam("End of availability check period (ISO 8601)"),
     },
-    required: ['action'],
+    required: ["action"],
   },
 };
 
@@ -48,11 +61,11 @@ export const calendarTool: ExoTool = {
 // =====================================================
 
 async function getWorkspaceClient(tenantId: string) {
-  const { data: connection, error } = await supabase
-    .from('exo_rig_connections')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .eq('rig_type', 'google-workspace')
+  const { data: connection, error } = await getSupabase()
+    .from("exo_rig_connections")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("rig_type", "google-workspace")
     .single();
 
   if (error || !connection) {
@@ -66,7 +79,10 @@ async function getWorkspaceClient(tenantId: string) {
 // HANDLER
 // =====================================================
 
-export const calendarHandler: ToolHandler = async (context, params): Promise<ToolResult> => {
+export const calendarHandler: ToolHandler = async (
+  context,
+  params,
+): Promise<ToolResult> => {
   const {
     action,
     start_date,
@@ -101,20 +117,24 @@ export const calendarHandler: ToolHandler = async (context, params): Promise<Too
     if (!client) {
       return {
         success: false,
-        error: 'Google Workspace not connected. Please connect your Google account first.',
+        error:
+          "Google Workspace not connected. Please connect your Google account first.",
       };
     }
 
     switch (action) {
-      case 'get_events': {
+      case "get_events": {
         const timeMin = start_date
           ? new Date(start_date).toISOString()
           : new Date().toISOString();
         const timeMax = end_date
-          ? new Date(end_date + 'T23:59:59').toISOString()
+          ? new Date(end_date + "T23:59:59").toISOString()
           : undefined;
 
-        const events = await client.getUpcomingEvents('primary', max_results || 10);
+        const events = await client.getUpcomingEvents(
+          "primary",
+          max_results || 10,
+        );
 
         return {
           success: true,
@@ -133,7 +153,7 @@ export const calendarHandler: ToolHandler = async (context, params): Promise<Too
         };
       }
 
-      case 'get_today': {
+      case "get_today": {
         const events = await client.getTodaysEvents();
 
         return {
@@ -148,24 +168,30 @@ export const calendarHandler: ToolHandler = async (context, params): Promise<Too
               location: e.location,
             })),
             count: events.length,
-            date: new Date().toISOString().split('T')[0],
+            date: new Date().toISOString().split("T")[0],
           },
         };
       }
 
-      case 'create_event': {
+      case "create_event": {
         if (!title || !start_time || !end_time) {
           return {
             success: false,
-            error: 'Title, start_time, and end_time are required to create an event',
+            error:
+              "Title, start_time, and end_time are required to create an event",
           };
         }
 
         const attendeeList = attendees
-          ? attendees.split(',').map((email) => ({ email: email.trim(), responseStatus: 'needsAction' }))
+          ? attendees
+              .split(",")
+              .map((email) => ({
+                email: email.trim(),
+                responseStatus: "needsAction",
+              }))
           : undefined;
 
-        const event = await client.createEvent('primary', {
+        const event = await client.createEvent("primary", {
           summary: title,
           description,
           start: { dateTime: start_time },
@@ -181,21 +207,22 @@ export const calendarHandler: ToolHandler = async (context, params): Promise<Too
             title: event.summary,
             start: event.start.dateTime || event.start.date,
             end: event.end.dateTime || event.end.date,
-            message: 'Event created successfully',
+            message: "Event created successfully",
           },
         };
       }
 
-      case 'check_free_busy': {
+      case "check_free_busy": {
         if (!check_start || !check_end) {
           return {
             success: false,
-            error: 'check_start and check_end are required for availability check',
+            error:
+              "check_start and check_end are required for availability check",
           };
         }
 
         const freeBusy = await client.getFreeBusy(check_start, check_end);
-        const primaryBusy = freeBusy['primary']?.busy || [];
+        const primaryBusy = freeBusy["primary"]?.busy || [];
 
         return {
           success: true,
@@ -211,14 +238,14 @@ export const calendarHandler: ToolHandler = async (context, params): Promise<Too
         return { success: false, error: `Unknown action: ${action}` };
     }
   } catch (error) {
-    console.error('[CalendarTool] Error:', {
+    console.error("[CalendarTool] Error:", {
       action,
       tenant_id: context.tenant_id,
       error: error instanceof Error ? error.message : error,
     });
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred',
+      error: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
 };

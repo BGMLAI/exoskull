@@ -1,0 +1,31 @@
+graph LR
+    subgraph DAY1["📱 DZIEŃ 1"]
+        D1["SMS + Głos<br/>Pierwsza rozmowa<br/>Zero instalacji"]
+    end
+
+    subgraph WEEK1["📅 TYDZIEŃ 1"]
+        W1["Codzienne check-in<br/>Śledzenie zadań<br/>Poznawanie Cię"]
+    end
+
+    subgraph WEEK2["🏗️ TYDZIEŃ 2"]
+        W2["Pierwsza mini-app<br/>np. Sleep Tracker<br/>Spersonalizowana"]
+    end
+
+    subgraph MONTH1["📊 MIESIĄC 1-3"]
+        M1["2-3 aplikacje<br/>Integracja urządzeń<br/>Wykrywanie luk"]
+    end
+
+    subgraph MONTH4["🚀 MIESIĄC 4+"]
+        M4["Pełna autonomia<br/>Predykcje AI<br/>Drugi mózg"]
+    end
+
+    DAY1 -->|"Wartość od<br/>PIERWSZEGO dnia"| WEEK1
+    WEEK1 -->|"System się<br/>uczy"| WEEK2
+    WEEK2 -->|"Buduje DLA<br/>CIEBIE"| MONTH1
+    MONTH1 -->|"Pełna<br/>inteligencja"| MONTH4
+
+    style DAY1 fill:#22d3ee,stroke:#06b6d4,color:#000
+    style WEEK1 fill:#3b82f6,stroke:#2563eb,color:#fff
+    style WEEK2 fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style MONTH1 fill:#a855f7,stroke:#9333ea,color:#fff
+    style MONTH4 fill:#6366f1,stroke:#4f46e5,color:#fff

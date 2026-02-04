@@ -1,0 +1,29 @@
+graph TB
+    subgraph SOURCES["📥 Źródła danych"]
+        OURA["⌚ Oura Ring<br/>Sen, HRV, tętno,<br/>aktywność"]
+        PHONE["📱 Telefon<br/>Czas ekranu,<br/>lokalizacja, krokomierz"]
+        VOICE_IN["🎤 Rozmowy<br/>Głos, SMS, chat"]
+        CALENDAR["📅 Kalendarz<br/>Spotkania,<br/>wydarzenia"]
+        MANUAL["✍️ Ręczne<br/>Notatki, nastrój,<br/>nawyki"]
+    end
+
+    subgraph EXOSKULL["🧠 ExoSkull przetwarza"]
+        COLLECT["Zbiera<br/>surowe dane"]
+        CLEAN["Czyści i<br/>waliduje"]
+        ANALYZE["Analizuje<br/>wzorce"]
+        STORE["Zapisuje<br/>na zawsze"]
+    end
+
+    subgraph OUTPUTS["📊 Co z tego wynika"]
+        INSIGHTS["💡 Insighty<br/>np. Kiedy śpisz 7h+,<br/>Twoja energia jest 2x wyższa"]
+        ALERTS["🔔 Alerty<br/>np. Dług senny<br/>przekroczył 6h!"]
+        REPORTS["📈 Raporty<br/>Tygodniowe i<br/>miesięczne podsumowania"]
+    end
+
+    OURA & PHONE & VOICE_IN & CALENDAR & MANUAL --> COLLECT
+    COLLECT --> CLEAN --> ANALYZE --> STORE
+    STORE --> INSIGHTS & ALERTS & REPORTS
+
+    style SOURCES fill:#22d3ee,stroke:#06b6d4,color:#000
+    style EXOSKULL fill:#6366f1,stroke:#4f46e5,color:#fff
+    style OUTPUTS fill:#22c55e,stroke:#16a34a,color:#fff

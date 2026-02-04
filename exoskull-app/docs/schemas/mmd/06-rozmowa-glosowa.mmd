@@ -1,0 +1,22 @@
+sequenceDiagram
+    participant U as 👤 Użytkownik
+    participant STT as 🎤 Transkrypcja<br/>(ElevenLabs STT)
+    participant API as 🌐 API<br/>(/api/voice/chat)
+    participant AI as 🧠 Claude AI<br/>(Sonnet)
+    participant TOOL as 🔧 Narzędzia<br/>(SMS, zadania...)
+    participant TTS as 🔊 Synteza głosu<br/>(ElevenLabs TTS)
+
+    U->>STT: Mówisz coś
+    STT->>API: Tekst z mowy
+    API->>AI: Tekst + kontekst użytkownika
+
+    alt AI potrzebuje narzędzia
+        AI->>TOOL: np. "wyślij SMS"
+        TOOL-->>AI: Wynik akcji
+    end
+
+    AI-->>API: Odpowiedź tekstowa
+    API->>TTS: Tekst do wymówienia
+    TTS-->>U: Słyszysz odpowiedź
+
+    Note over U,TTS: Cała rozmowa trwa 2-4 sekundy

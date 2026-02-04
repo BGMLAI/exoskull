@@ -1,63 +1,74 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { aiChat } from '@/lib/ai'
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { aiChat } from "@/lib/ai";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    const { hour, lastConversationDays } = await req.json()
+    const { hour, lastConversationDays } = await req.json();
 
     // Kontekst dla AI
-    const contextParts = []
+    const contextParts = [];
 
     if (hour !== undefined) {
       const timeOfDay =
-        hour < 10 ? 'rano (przed 10:00)' :
-        hour < 18 ? 'w ciągu dnia (10-18)' :
-        hour < 22 ? 'wieczorem (18-22)' :
-        'późno w nocy (po 22:00)'
-      contextParts.push(`Pora dnia: ${timeOfDay}`)
+        hour < 10
+          ? "rano (przed 10:00)"
+          : hour < 18
+            ? "w ciągu dnia (10-18)"
+            : hour < 22
+              ? "wieczorem (18-22)"
+              : "późno w nocy (po 22:00)";
+      contextParts.push(`Pora dnia: ${timeOfDay}`);
     }
 
     if (lastConversationDays !== undefined && lastConversationDays > 0) {
-      contextParts.push(`Ostatnia rozmowa: ${lastConversationDays} dni temu`)
+      contextParts.push(`Ostatnia rozmowa: ${lastConversationDays} dni temu`);
     } else if (lastConversationDays === 0) {
-      contextParts.push('Ostatnia rozmowa: dzisiaj (kolejna rozmowa tego samego dnia)')
+      contextParts.push(
+        "Ostatnia rozmowa: dzisiaj (kolejna rozmowa tego samego dnia)",
+      );
     }
 
     // Load recent conversation context (last 5 messages)
-    let conversationHistory = ''
+    let conversationHistory = "";
     if (user) {
       try {
         const { data: recentMessages } = await supabase
-          .from('exo_messages')
-          .select('role, content, timestamp')
-          .eq('tenant_id', user.id)
-          .order('timestamp', { ascending: false })
-          .limit(5)
+          .from("exo_messages")
+          .select("role, content, timestamp")
+          .eq("tenant_id", user.id)
+          .order("timestamp", { ascending: false })
+          .limit(5);
 
         if (recentMessages && recentMessages.length > 0) {
-          const summaries = recentMessages.reverse().map(m => {
-            const preview = m.content.substring(0, 100)
-            return `${m.role === 'user' ? 'User' : 'ExoSkull'}: ${preview}`
-          })
-          conversationHistory = summaries.join('\n')
-          contextParts.push(`Ostatnie rozmowy: ${recentMessages.length} wiadomości`)
+          const summaries = recentMessages.reverse().map((m) => {
+            const preview = m.content.substring(0, 100);
+            return `${m.role === "user" ? "User" : "ExoSkull"}: ${preview}`;
+          });
+          conversationHistory = summaries.join("\n");
+          contextParts.push(
+            `Ostatnie rozmowy: ${recentMessages.length} wiadomości`,
+          );
         }
       } catch (e) {
-        console.log('No conversation history yet')
+        console.log("No conversation history yet");
       }
     }
 
-    const context = contextParts.join('. ')
+    const context = contextParts.join(". ");
 
     // Generuj greeting przez Multi-Model Router (routes to Tier 1 - Gemini Flash)
     const response = await aiChat(
       [
         {
-          role: 'system',
+          role: "system",
           content: `Jesteś ExoSkull - drugi mózg użytkownika. Generujesz naturalne powitanie na początku rozmowy głosowej.
 
 ZASADY:
@@ -75,38 +86,40 @@ PRZYKŁADY (inspiracja, nie kopiuj dosłownie):
 - Późno: "Jeszcze nie śpisz?"
 - Po długiej przerwie: "Długo Cię nie było. Co słychać?"
 
-WYGENERUJ TYLKO greeting (bez dodatkowych komentarzy).`
+WYGENERUJ TYLKO greeting (bez dodatkowych komentarzy).`,
         },
         {
-          role: 'user',
+          role: "user",
           content: `Kontekst: ${context}
 
-${conversationHistory ? `\nOstatnie wiadomości:\n${conversationHistory}\n` : ''}
-Wygeneruj naturalne powitanie:`
-        }
+${conversationHistory ? `\nOstatnie wiadomości:\n${conversationHistory}\n` : ""}
+Wygeneruj naturalne powitanie:`,
+        },
       ],
       {
         temperature: 0.8,
         maxTokens: 50,
-        taskCategory: 'simple_response', // Routes to Tier 1 (Gemini Flash - cheapest)
-        tenantId: user?.id
-      }
-    )
+        taskCategory: "simple_response", // Routes to Tier 1 (Gemini Flash - cheapest)
+        tenantId: user?.id,
+      },
+    );
 
-    const greeting = response.content.trim() || 'Hej. Co tam?'
+    const greeting = response.content.trim() || "Hej. Co tam?";
 
     return NextResponse.json({
       greeting,
-      context
-    })
-
+      context,
+    });
   } catch (error) {
-    console.error('Error generating greeting:', error)
+    console.error("Error generating greeting:", error);
 
     // Fallback
-    return NextResponse.json({
-      greeting: 'Hej. Jak się masz?',
-      error: 'Fallback greeting used'
-    }, { status: 200 })
+    return NextResponse.json(
+      {
+        greeting: "Hej. Jak się masz?",
+        error: "Fallback greeting used",
+      },
+      { status: 200 },
+    );
   }
 }

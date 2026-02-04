@@ -5,13 +5,17 @@
  * Default loops are created for new users.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export const dynamic = "force-dynamic";
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 // ============================================================================
 // GET - List loops
@@ -19,24 +23,25 @@ const supabase = createClient(
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const tenantId = searchParams.get('tenantId')
-    const withStats = searchParams.get('withStats') === 'true'
+    const supabase = getSupabase();
+    const { searchParams } = new URL(request.url);
+    const tenantId = searchParams.get("tenantId");
+    const withStats = searchParams.get("withStats") === "true";
 
     if (!tenantId) {
-      return NextResponse.json({ error: 'tenantId required' }, { status: 400 })
+      return NextResponse.json({ error: "tenantId required" }, { status: 400 });
     }
 
     const { data, error } = await supabase
-      .from('user_loops')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('is_active', true)
-      .order('priority', { ascending: false })
+      .from("user_loops")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .eq("is_active", true)
+      .order("priority", { ascending: false });
 
     if (error) {
-      console.error('[Loops API] GET error:', error)
-      return NextResponse.json({ error: 'Database error' }, { status: 500 })
+      console.error("[Loops API] GET error:", error);
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     // Optionally include stats for each loop
@@ -45,23 +50,23 @@ export async function GET(request: NextRequest) {
         data.map(async (loop) => {
           const [opsCount, questsCount, notesCount] = await Promise.all([
             supabase
-              .from('user_ops')
-              .select('id', { count: 'exact', head: true })
-              .eq('tenant_id', tenantId)
-              .eq('loop_slug', loop.slug)
-              .in('status', ['pending', 'active']),
+              .from("user_ops")
+              .select("id", { count: "exact", head: true })
+              .eq("tenant_id", tenantId)
+              .eq("loop_slug", loop.slug)
+              .in("status", ["pending", "active"]),
             supabase
-              .from('user_quests')
-              .select('id', { count: 'exact', head: true })
-              .eq('tenant_id', tenantId)
-              .eq('loop_slug', loop.slug)
-              .eq('status', 'active'),
+              .from("user_quests")
+              .select("id", { count: "exact", head: true })
+              .eq("tenant_id", tenantId)
+              .eq("loop_slug", loop.slug)
+              .eq("status", "active"),
             supabase
-              .from('user_notes')
-              .select('id', { count: 'exact', head: true })
-              .eq('tenant_id', tenantId)
-              .eq('loop_slug', loop.slug),
-          ])
+              .from("user_notes")
+              .select("id", { count: "exact", head: true })
+              .eq("tenant_id", tenantId)
+              .eq("loop_slug", loop.slug),
+          ]);
 
           return {
             ...loop,
@@ -70,20 +75,20 @@ export async function GET(request: NextRequest) {
               activeQuests: questsCount.count || 0,
               totalNotes: notesCount.count || 0,
             },
-          }
-        })
-      )
+          };
+        }),
+      );
 
-      return NextResponse.json({ loops: loopsWithStats })
+      return NextResponse.json({ loops: loopsWithStats });
     }
 
-    return NextResponse.json({ loops: data })
+    return NextResponse.json({ loops: data });
   } catch (error) {
-    console.error('[Loops API] GET error:', error)
+    console.error("[Loops API] GET error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -93,7 +98,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    const supabase = getSupabase();
+    const body = await request.json();
     const {
       tenantId,
       slug,
@@ -103,42 +109,42 @@ export async function POST(request: NextRequest) {
       color,
       priority,
       initDefaults,
-    } = body
+    } = body;
 
     if (!tenantId) {
-      return NextResponse.json({ error: 'tenantId required' }, { status: 400 })
+      return NextResponse.json({ error: "tenantId required" }, { status: 400 });
     }
 
     // Initialize default loops
     if (initDefaults) {
-      const { error } = await supabase.rpc('create_default_loops', {
+      const { error } = await supabase.rpc("create_default_loops", {
         p_tenant_id: tenantId,
-      })
+      });
 
       if (error) {
-        console.error('[Loops API] Init defaults error:', error)
-        return NextResponse.json({ error: 'Database error' }, { status: 500 })
+        console.error("[Loops API] Init defaults error:", error);
+        return NextResponse.json({ error: "Database error" }, { status: 500 });
       }
 
       const { data: loops } = await supabase
-        .from('user_loops')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .order('priority', { ascending: false })
+        .from("user_loops")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .order("priority", { ascending: false });
 
-      return NextResponse.json({ success: true, loops })
+      return NextResponse.json({ success: true, loops });
     }
 
     // Create custom loop
     if (!slug || !name) {
       return NextResponse.json(
-        { error: 'slug and name required' },
-        { status: 400 }
-      )
+        { error: "slug and name required" },
+        { status: 400 },
+      );
     }
 
     const { data, error } = await supabase
-      .from('user_loops')
+      .from("user_loops")
       .insert({
         tenant_id: tenantId,
         slug,
@@ -150,26 +156,26 @@ export async function POST(request: NextRequest) {
         is_default: false,
       })
       .select()
-      .single()
+      .single();
 
     if (error) {
-      if (error.code === '23505') {
+      if (error.code === "23505") {
         return NextResponse.json(
-          { error: 'Loop with this slug already exists' },
-          { status: 409 }
-        )
+          { error: "Loop with this slug already exists" },
+          { status: 409 },
+        );
       }
-      console.error('[Loops API] POST error:', error)
-      return NextResponse.json({ error: 'Database error' }, { status: 500 })
+      console.error("[Loops API] POST error:", error);
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, loop: data })
+    return NextResponse.json({ success: true, loop: data });
   } catch (error) {
-    console.error('[Loops API] POST error:', error)
+    console.error("[Loops API] POST error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -179,49 +185,53 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { loopId, tenantId, ...updates } = body
+    const supabase = getSupabase();
+    const body = await request.json();
+    const { loopId, tenantId, ...updates } = body;
 
     if (!loopId || !tenantId) {
       return NextResponse.json(
-        { error: 'loopId and tenantId required' },
-        { status: 400 }
-      )
+        { error: "loopId and tenantId required" },
+        { status: 400 },
+      );
     }
 
     const dbUpdates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
-    }
+    };
 
-    if (updates.name !== undefined) dbUpdates.name = updates.name
-    if (updates.description !== undefined) dbUpdates.description = updates.description
-    if (updates.icon !== undefined) dbUpdates.icon = updates.icon
-    if (updates.color !== undefined) dbUpdates.color = updates.color
-    if (updates.priority !== undefined) dbUpdates.priority = updates.priority
-    if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive
-    if (updates.attentionScore !== undefined) dbUpdates.attention_score = updates.attentionScore
-    if (updates.lastActivityAt !== undefined) dbUpdates.last_activity_at = updates.lastActivityAt
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.description !== undefined)
+      dbUpdates.description = updates.description;
+    if (updates.icon !== undefined) dbUpdates.icon = updates.icon;
+    if (updates.color !== undefined) dbUpdates.color = updates.color;
+    if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
+    if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
+    if (updates.attentionScore !== undefined)
+      dbUpdates.attention_score = updates.attentionScore;
+    if (updates.lastActivityAt !== undefined)
+      dbUpdates.last_activity_at = updates.lastActivityAt;
 
     const { data, error } = await supabase
-      .from('user_loops')
+      .from("user_loops")
       .update(dbUpdates)
-      .eq('id', loopId)
-      .eq('tenant_id', tenantId)
+      .eq("id", loopId)
+      .eq("tenant_id", tenantId)
       .select()
-      .single()
+      .single();
 
     if (error) {
-      console.error('[Loops API] PATCH error:', error)
-      return NextResponse.json({ error: 'Database error' }, { status: 500 })
+      console.error("[Loops API] PATCH error:", error);
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, loop: data })
+    return NextResponse.json({ success: true, loop: data });
   } catch (error) {
-    console.error('[Loops API] PATCH error:', error)
+    console.error("[Loops API] PATCH error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -231,49 +241,50 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const loopId = searchParams.get('loopId')
-    const tenantId = searchParams.get('tenantId')
+    const supabase = getSupabase();
+    const { searchParams } = new URL(request.url);
+    const loopId = searchParams.get("loopId");
+    const tenantId = searchParams.get("tenantId");
 
     if (!loopId || !tenantId) {
       return NextResponse.json(
-        { error: 'loopId and tenantId required' },
-        { status: 400 }
-      )
+        { error: "loopId and tenantId required" },
+        { status: 400 },
+      );
     }
 
     // Check if it's a default loop
     const { data: loop } = await supabase
-      .from('user_loops')
-      .select('is_default')
-      .eq('id', loopId)
-      .eq('tenant_id', tenantId)
-      .single()
+      .from("user_loops")
+      .select("is_default")
+      .eq("id", loopId)
+      .eq("tenant_id", tenantId)
+      .single();
 
     if (loop?.is_default) {
       return NextResponse.json(
-        { error: 'Cannot delete default loops' },
-        { status: 403 }
-      )
+        { error: "Cannot delete default loops" },
+        { status: 403 },
+      );
     }
 
     const { error } = await supabase
-      .from('user_loops')
+      .from("user_loops")
       .delete()
-      .eq('id', loopId)
-      .eq('tenant_id', tenantId)
+      .eq("id", loopId)
+      .eq("tenant_id", tenantId);
 
     if (error) {
-      console.error('[Loops API] DELETE error:', error)
-      return NextResponse.json({ error: 'Database error' }, { status: 500 })
+      console.error("[Loops API] DELETE error:", error);
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('[Loops API] DELETE error:', error)
+    console.error("[Loops API] DELETE error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    )
+      { error: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 },
+    );
   }
 }

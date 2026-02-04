@@ -2,15 +2,22 @@
 // OURA SYNC API - Sync sleep/activity/HRV into exo_health_metrics
 // =====================================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { OuraClient } from '@/lib/rigs/oura/client';
-import type { OuraSleepPeriod, OuraDailyActivity } from '@/lib/rigs/oura/client';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { OuraClient } from "@/lib/rigs/oura/client";
+import type {
+  OuraSleepPeriod,
+  OuraDailyActivity,
+} from "@/lib/rigs/oura/client";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+export const dynamic = "force-dynamic";
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 const DEFAULT_DAYS = 7;
 
@@ -29,11 +36,12 @@ interface HealthMetricInsert {
 // =====================================================
 
 export async function POST(request: NextRequest) {
+  const supabase = getSupabase();
   const startTime = Date.now();
-  const tenantId = request.headers.get('x-tenant-id');
+  const tenantId = request.headers.get("x-tenant-id");
 
   if (!tenantId) {
-    return NextResponse.json({ error: 'Missing tenant ID' }, { status: 401 });
+    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
   }
   const tenantIdValue = tenantId;
 
@@ -41,34 +49,34 @@ export async function POST(request: NextRequest) {
     const { days: bodyDays } = (await request.json().catch(() => ({}))) as {
       days?: number;
     };
-    const queryDays = request.nextUrl.searchParams.get('days');
+    const queryDays = request.nextUrl.searchParams.get("days");
     const days = normalizeDays(queryDays, bodyDays);
 
     const { data: connection, error: connError } = await supabase
-      .from('exo_rig_connections')
-      .select('*')
-      .eq('tenant_id', tenantIdValue)
-      .eq('rig_slug', 'oura')
+      .from("exo_rig_connections")
+      .select("*")
+      .eq("tenant_id", tenantIdValue)
+      .eq("rig_slug", "oura")
       .single();
 
     if (connError || !connection) {
       return NextResponse.json(
-        { error: 'Rig not connected', slug: 'oura' },
-        { status: 404 }
+        { error: "Rig not connected", slug: "oura" },
+        { status: 404 },
       );
     }
 
     if (!connection.access_token) {
       return NextResponse.json(
-        { error: 'Missing access token', slug: 'oura' },
-        { status: 400 }
+        { error: "Missing access token", slug: "oura" },
+        { status: 400 },
       );
     }
 
     await supabase
-      .from('exo_rig_connections')
-      .update({ sync_status: 'syncing', sync_error: null })
-      .eq('id', connection.id);
+      .from("exo_rig_connections")
+      .update({ sync_status: "syncing", sync_error: null })
+      .eq("id", connection.id);
 
     const client = new OuraClient(connection.access_token);
 
@@ -82,40 +90,42 @@ export async function POST(request: NextRequest) {
       tenantId: tenantIdValue,
       sleepPeriods: sleepPeriods.data || [],
       dailyActivity: dailyActivity.data || [],
-      source: 'oura',
+      source: "oura",
     });
 
     if (metrics.length > 0) {
-      const { error: insertError } = await supabase.from('exo_health_metrics').upsert(metrics, {
-        onConflict: 'tenant_id,metric_type,recorded_at,source',
-        ignoreDuplicates: true,
-      });
+      const { error: insertError } = await supabase
+        .from("exo_health_metrics")
+        .upsert(metrics, {
+          onConflict: "tenant_id,metric_type,recorded_at,source",
+          ignoreDuplicates: true,
+        });
 
       if (insertError) {
-        console.error('[Oura Sync] Failed to upsert metrics:', {
+        console.error("[Oura Sync] Failed to upsert metrics:", {
           error: insertError.message,
           tenantId: tenantIdValue,
           count: metrics.length,
         });
-        throw new Error('Failed to save health metrics');
+        throw new Error("Failed to save health metrics");
       }
     }
 
     const duration = Date.now() - startTime;
 
     await supabase
-      .from('exo_rig_connections')
+      .from("exo_rig_connections")
       .update({
-        sync_status: 'success',
+        sync_status: "success",
         sync_error: null,
         last_sync_at: new Date().toISOString(),
       })
-      .eq('id', connection.id);
+      .eq("id", connection.id);
 
-    await supabase.from('exo_rig_sync_log').insert({
+    await supabase.from("exo_rig_sync_log").insert({
       connection_id: connection.id,
       tenant_id: tenantIdValue,
-      rig_slug: 'oura',
+      rig_slug: "oura",
       success: true,
       records_synced: metrics.length,
       duration_ms: duration,
@@ -127,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      slug: 'oura',
+      slug: "oura",
       records_synced: metrics.length,
       duration_ms: duration,
       data: {
@@ -137,22 +147,22 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const duration = Date.now() - startTime;
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    const message = error instanceof Error ? error.message : "Unknown error";
 
-    console.error('[Oura Sync] Failed:', error);
+    console.error("[Oura Sync] Failed:", error);
 
     await supabase
-      .from('exo_rig_connections')
+      .from("exo_rig_connections")
       .update({
-        sync_status: 'error',
+        sync_status: "error",
         sync_error: message,
       })
-      .eq('tenant_id', tenantIdValue)
-      .eq('rig_slug', 'oura');
+      .eq("tenant_id", tenantIdValue)
+      .eq("rig_slug", "oura");
 
     return NextResponse.json(
-      { success: false, slug: 'oura', error: message, duration_ms: duration },
-      { status: 500 }
+      { success: false, slug: "oura", error: message, duration_ms: duration },
+      { status: 500 },
     );
   }
 }
@@ -162,33 +172,37 @@ export async function POST(request: NextRequest) {
 // =====================================================
 
 export async function GET(request: NextRequest) {
-  const tenantId = request.headers.get('x-tenant-id');
+  const supabase = getSupabase();
+  const tenantId = request.headers.get("x-tenant-id");
 
   if (!tenantId) {
-    return NextResponse.json({ error: 'Missing tenant ID' }, { status: 401 });
+    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
   }
 
   const { data: connection, error: connError } = await supabase
-    .from('exo_rig_connections')
-    .select('id, sync_status, sync_error, last_sync_at, metadata')
-    .eq('tenant_id', tenantId)
-    .eq('rig_slug', 'oura')
+    .from("exo_rig_connections")
+    .select("id, sync_status, sync_error, last_sync_at, metadata")
+    .eq("tenant_id", tenantId)
+    .eq("rig_slug", "oura")
     .single();
 
   if (connError || !connection) {
-    return NextResponse.json({ connected: false, slug: 'oura' }, { status: 200 });
+    return NextResponse.json(
+      { connected: false, slug: "oura" },
+      { status: 200 },
+    );
   }
 
   const { data: logs } = await supabase
-    .from('exo_rig_sync_log')
-    .select('success, records_synced, error, duration_ms, created_at')
-    .eq('connection_id', connection.id)
-    .order('created_at', { ascending: false })
+    .from("exo_rig_sync_log")
+    .select("success, records_synced, error, duration_ms, created_at")
+    .eq("connection_id", connection.id)
+    .order("created_at", { ascending: false })
     .limit(10);
 
   return NextResponse.json({
     connected: true,
-    slug: 'oura',
+    slug: "oura",
     sync_status: connection.sync_status,
     sync_error: connection.sync_error,
     last_sync_at: connection.last_sync_at,
@@ -214,8 +228,8 @@ function getDateRange(days: number) {
   startDate.setDate(startDate.getDate() - days);
 
   return {
-    startDate: startDate.toISOString().split('T')[0],
-    endDate: endDate.toISOString().split('T')[0],
+    startDate: startDate.toISOString().split("T")[0],
+    endDate: endDate.toISOString().split("T")[0],
   };
 }
 
@@ -225,15 +239,18 @@ function buildMetricsFromOura(params: {
   dailyActivity: OuraDailyActivity[];
   source: string;
 }): HealthMetricInsert[] {
-  const sleepByDay = new Map<string, {
-    totalSleepSeconds: number;
-    longestSleepSeconds: number;
-    hrv: number | null;
-    heartRate: number | null;
-  }>();
+  const sleepByDay = new Map<
+    string,
+    {
+      totalSleepSeconds: number;
+      longestSleepSeconds: number;
+      hrv: number | null;
+      heartRate: number | null;
+    }
+  >();
 
   for (const period of params.sleepPeriods) {
-    if (period.type !== 'sleep' && period.type !== 'long_sleep') continue;
+    if (period.type !== "sleep" && period.type !== "long_sleep") continue;
 
     const existing = sleepByDay.get(period.day) || {
       totalSleepSeconds: 0,
@@ -275,9 +292,9 @@ function buildMetricsFromOura(params: {
     if (sleep && sleep.totalSleepSeconds > 0) {
       metrics.push({
         tenant_id: params.tenantId,
-        metric_type: 'sleep',
+        metric_type: "sleep",
         value: Math.round(sleep.totalSleepSeconds / 60),
-        unit: 'minutes',
+        unit: "minutes",
         recorded_at: recordedAt,
         source: params.source,
       });
@@ -286,9 +303,9 @@ function buildMetricsFromOura(params: {
     if (sleep?.hrv !== null && sleep?.hrv !== undefined) {
       metrics.push({
         tenant_id: params.tenantId,
-        metric_type: 'hrv',
+        metric_type: "hrv",
         value: Math.round(sleep.hrv),
-        unit: 'ms',
+        unit: "ms",
         recorded_at: recordedAt,
         source: params.source,
       });
@@ -297,9 +314,9 @@ function buildMetricsFromOura(params: {
     if (sleep?.heartRate !== null && sleep?.heartRate !== undefined) {
       metrics.push({
         tenant_id: params.tenantId,
-        metric_type: 'heart_rate',
+        metric_type: "heart_rate",
         value: Math.round(sleep.heartRate),
-        unit: 'bpm',
+        unit: "bpm",
         recorded_at: recordedAt,
         source: params.source,
       });
@@ -309,9 +326,9 @@ function buildMetricsFromOura(params: {
     if (activity?.steps && activity.steps > 0) {
       metrics.push({
         tenant_id: params.tenantId,
-        metric_type: 'steps',
+        metric_type: "steps",
         value: activity.steps,
-        unit: 'count',
+        unit: "count",
         recorded_at: recordedAt,
         source: params.source,
       });
@@ -320,9 +337,9 @@ function buildMetricsFromOura(params: {
     if (activity?.calories && activity.calories > 0) {
       metrics.push({
         tenant_id: params.tenantId,
-        metric_type: 'calories',
+        metric_type: "calories",
         value: activity.calories,
-        unit: 'kcal',
+        unit: "kcal",
         recorded_at: recordedAt,
         source: params.source,
       });

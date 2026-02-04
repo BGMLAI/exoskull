@@ -9,8 +9,10 @@
  * Schedule: every 15 minutes
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { runSelfUpdate, runDecay } from '@/lib/learning/self-updater'
+import { NextRequest, NextResponse } from "next/server";
+import { runSelfUpdate, runDecay } from "@/lib/learning/self-updater";
+
+export const dynamic = "force-dynamic";
 
 // ============================================================================
 // AUTHENTICATION
@@ -18,23 +20,23 @@ import { runSelfUpdate, runDecay } from '@/lib/learning/self-updater'
 
 function validateCronAuth(request: NextRequest): boolean {
   // Check for Vercel CRON secret
-  const authHeader = request.headers.get('authorization')
+  const authHeader = request.headers.get("authorization");
   if (authHeader === `Bearer ${process.env.CRON_SECRET}`) {
-    return true
+    return true;
   }
 
   // Check for internal pg_cron call (via service role)
-  const serviceKey = request.headers.get('x-service-key')
+  const serviceKey = request.headers.get("x-service-key");
   if (serviceKey === process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return true
+    return true;
   }
 
   // Development mode
-  if (process.env.NODE_ENV === 'development') {
-    return true
+  if (process.env.NODE_ENV === "development") {
+    return true;
   }
 
-  return false
+  return false;
 }
 
 // ============================================================================
@@ -42,19 +44,19 @@ function validateCronAuth(request: NextRequest): boolean {
 // ============================================================================
 
 export async function GET(request: NextRequest) {
-  const startTime = Date.now()
+  const startTime = Date.now();
 
   // Auth check
   if (!validateCronAuth(request)) {
-    console.warn('[PostConversation] Unauthorized CRON attempt')
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    console.warn("[PostConversation] Unauthorized CRON attempt");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  console.log('[PostConversation] Starting CRON job...')
+  console.log("[PostConversation] Starting CRON job...");
 
   try {
     // Run the self-update cycle
-    const result = await runSelfUpdate()
+    const result = await runSelfUpdate();
 
     const response = {
       success: true,
@@ -66,21 +68,21 @@ export async function GET(request: NextRequest) {
         highlights_boosted: result.highlightsBoosted,
         processing_time_ms: result.processingTimeMs,
       },
-    }
+    };
 
-    console.log('[PostConversation] CRON completed:', response)
-    return NextResponse.json(response)
+    console.log("[PostConversation] CRON completed:", response);
+    return NextResponse.json(response);
   } catch (error) {
-    console.error('[PostConversation] CRON failed:', error)
+    console.error("[PostConversation] CRON failed:", error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
         timestamp: new Date().toISOString(),
         duration_ms: Date.now() - startTime,
       },
-      { status: 500 }
-    )
+      { status: 500 },
+    );
   }
 }
 
@@ -89,36 +91,36 @@ export async function GET(request: NextRequest) {
 // ============================================================================
 
 export async function POST(request: NextRequest) {
-  const startTime = Date.now()
+  const startTime = Date.now();
 
   // Auth check
   if (!validateCronAuth(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const body = await request.json().catch(() => ({}))
-    const action = body.action || 'update'
+    const body = await request.json().catch(() => ({}));
+    const action = body.action || "update";
 
-    let result
+    let result;
 
     switch (action) {
-      case 'update':
-        result = await runSelfUpdate()
-        break
-      case 'decay':
-        result = await runDecay()
-        break
-      case 'both':
-        const updateResult = await runSelfUpdate()
-        const decayResult = await runDecay()
-        result = { ...updateResult, ...decayResult }
-        break
+      case "update":
+        result = await runSelfUpdate();
+        break;
+      case "decay":
+        result = await runDecay();
+        break;
+      case "both":
+        const updateResult = await runSelfUpdate();
+        const decayResult = await runDecay();
+        result = { ...updateResult, ...decayResult };
+        break;
       default:
         return NextResponse.json(
           { error: `Unknown action: ${action}` },
-          { status: 400 }
-        )
+          { status: 400 },
+        );
     }
 
     return NextResponse.json({
@@ -127,15 +129,15 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
       duration_ms: Date.now() - startTime,
       result,
-    })
+    });
   } catch (error) {
-    console.error('[PostConversation] Manual trigger failed:', error)
+    console.error("[PostConversation] Manual trigger failed:", error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
-    )
+      { status: 500 },
+    );
   }
 }

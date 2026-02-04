@@ -1,0 +1,27 @@
+graph LR
+    subgraph RAW["🥉 BRONZE - Surowe dane"]
+        B["Wszystko co przychodzi<br/>NIGDY nie kasowane<br/>Format: Parquet<br/>Miejsce: Cloudflare R2"]
+    end
+
+    subgraph CLEAN["🥈 SILVER - Oczyszczone"]
+        S["Dane po walidacji<br/>Duplikaty usunięte<br/>Brakujące uzupełnione<br/>Miejsce: Supabase Postgres"]
+    end
+
+    subgraph AGG["🥇 GOLD - Podsumowania"]
+        G["Dzienne raporty zdrowia<br/>Tygodniowa produktywność<br/>Miesięczne finanse<br/>Miejsce: Materialized Views"]
+    end
+
+    subgraph QUERY["🔍 Kto używa"]
+        DASH["Dashboard<br/>(wykresy)"]
+        AI_Q["AI<br/>(analiza wzorców)"]
+        CRON_Q["CRON<br/>(raporty)"]
+    end
+
+    RAW -->|"co godzinę<br/>ETL @ 01:00"| CLEAN
+    CLEAN -->|"codziennie<br/>ETL @ 02:00"| AGG
+    AGG --> DASH & AI_Q & CRON_Q
+
+    style RAW fill:#cd7f32,stroke:#a0522d,color:#fff
+    style CLEAN fill:#c0c0c0,stroke:#808080,color:#000
+    style AGG fill:#ffd700,stroke:#daa520,color:#000
+    style QUERY fill:#6366f1,stroke:#4f46e5,color:#fff

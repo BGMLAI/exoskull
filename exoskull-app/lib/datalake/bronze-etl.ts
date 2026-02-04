@@ -6,8 +6,8 @@
  * Uses incremental sync based on last sync timestamp per tenant/data_type.
  */
 
-import { createClient } from '@supabase/supabase-js'
-import { writeToBronze, type DataType } from '../storage/r2-client'
+import { createClient } from "@supabase/supabase-js";
+import { writeToBronze, type DataType } from "../storage/r2-client";
 import {
   conversationsToParquet,
   messagesToParquet,
@@ -15,37 +15,39 @@ import {
   type ConversationRecord,
   type MessageRecord,
   type JobLogRecord,
-} from '../storage/parquet-writer'
+} from "../storage/parquet-writer";
 
 // Service role client for ETL (bypasses RLS)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface ETLResult {
-  tenant_id: string
-  data_type: DataType
-  records_processed: number
-  bytes_written: number
-  success: boolean
-  duration_ms: number
-  error?: string
+  tenant_id: string;
+  data_type: DataType;
+  records_processed: number;
+  bytes_written: number;
+  success: boolean;
+  duration_ms: number;
+  error?: string;
 }
 
 export interface ETLSummary {
-  started_at: string
-  completed_at: string
-  duration_ms: number
-  tenants_processed: number
-  total_records: number
-  total_bytes: number
-  results: ETLResult[]
-  errors: Array<{ tenant_id: string; data_type: string; error: string }>
+  started_at: string;
+  completed_at: string;
+  duration_ms: number;
+  tenants_processed: number;
+  total_records: number;
+  total_bytes: number;
+  results: ETLResult[];
+  errors: Array<{ tenant_id: string; data_type: string; error: string }>;
 }
 
 // ============================================================================
@@ -55,20 +57,23 @@ export interface ETLSummary {
 /**
  * Get last sync timestamp for a tenant/data_type
  */
-async function getLastSyncTime(tenantId: string, dataType: DataType): Promise<Date> {
-  const { data, error } = await supabase
-    .from('exo_bronze_sync_log')
-    .select('last_sync_at')
-    .eq('tenant_id', tenantId)
-    .eq('data_type', dataType)
-    .single()
+async function getLastSyncTime(
+  tenantId: string,
+  dataType: DataType,
+): Promise<Date> {
+  const { data, error } = await getSupabase()
+    .from("exo_bronze_sync_log")
+    .select("last_sync_at")
+    .eq("tenant_id", tenantId)
+    .eq("data_type", dataType)
+    .single();
 
   if (error || !data) {
     // No previous sync - return epoch (sync all data)
-    return new Date(0)
+    return new Date(0);
   }
 
-  return new Date(data.last_sync_at)
+  return new Date(data.last_sync_at);
 }
 
 /**
@@ -79,23 +84,24 @@ async function updateSyncTime(
   dataType: DataType,
   syncTime: Date,
   recordsSynced: number,
-  bytesWritten: number
+  bytesWritten: number,
 ): Promise<void> {
-  const { error } = await supabase
-    .from('exo_bronze_sync_log')
-    .upsert({
+  const { error } = await getSupabase().from("exo_bronze_sync_log").upsert(
+    {
       tenant_id: tenantId,
       data_type: dataType,
       last_sync_at: syncTime.toISOString(),
       records_synced: recordsSynced,
       bytes_written: bytesWritten,
       updated_at: new Date().toISOString(),
-    }, {
-      onConflict: 'tenant_id,data_type',
-    })
+    },
+    {
+      onConflict: "tenant_id,data_type",
+    },
+  );
 
   if (error) {
-    console.error(`[Bronze ETL] Failed to update sync log:`, error)
+    console.error(`[Bronze ETL] Failed to update sync log:`, error);
   }
 }
 
@@ -107,22 +113,22 @@ async function updateSyncTime(
  * ETL conversations for a single tenant
  */
 export async function etlConversations(tenantId: string): Promise<ETLResult> {
-  const dataType: DataType = 'conversations'
-  const startTime = Date.now()
-  const lastSync = await getLastSyncTime(tenantId, dataType)
-  const now = new Date()
+  const dataType: DataType = "conversations";
+  const startTime = Date.now();
+  const lastSync = await getLastSyncTime(tenantId, dataType);
+  const now = new Date();
 
   try {
     // Fetch new/updated conversations since last sync
-    const { data: conversations, error } = await supabase
-      .from('exo_conversations')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .gte('updated_at', lastSync.toISOString())
-      .lt('updated_at', now.toISOString())
-      .order('started_at', { ascending: true })
+    const { data: conversations, error } = await getSupabase()
+      .from("exo_conversations")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .gte("updated_at", lastSync.toISOString())
+      .lt("updated_at", now.toISOString())
+      .order("started_at", { ascending: true });
 
-    if (error) throw error
+    if (error) throw error;
 
     if (!conversations || conversations.length === 0) {
       return {
@@ -132,14 +138,14 @@ export async function etlConversations(tenantId: string): Promise<ETLResult> {
         bytes_written: 0,
         success: true,
         duration_ms: Date.now() - startTime,
-      }
+      };
     }
 
     // Transform to Parquet record format
-    const records: ConversationRecord[] = conversations.map(c => ({
+    const records: ConversationRecord[] = conversations.map((c) => ({
       id: c.id,
       tenant_id: c.tenant_id,
-      channel: c.channel || 'voice',
+      channel: c.channel || "voice",
       started_at: c.started_at,
       ended_at: c.ended_at,
       duration_seconds: c.duration_seconds,
@@ -148,10 +154,10 @@ export async function etlConversations(tenantId: string): Promise<ETLResult> {
       insights: JSON.stringify(c.insights || []),
       created_at: c.created_at,
       updated_at: c.updated_at || c.created_at,
-    }))
+    }));
 
     // Convert to Parquet
-    const parquetBuffer = conversationsToParquet(records)
+    const parquetBuffer = conversationsToParquet(records);
 
     // Write to R2
     const result = await writeToBronze({
@@ -160,14 +166,20 @@ export async function etlConversations(tenantId: string): Promise<ETLResult> {
       data: parquetBuffer,
       date: now,
       metadata: { recordsCount: String(records.length) },
-    })
+    });
 
     if (!result.success) {
-      throw new Error(result.error || 'Failed to write to R2')
+      throw new Error(result.error || "Failed to write to R2");
     }
 
     // Update sync log
-    await updateSyncTime(tenantId, dataType, now, records.length, result.bytesWritten)
+    await updateSyncTime(
+      tenantId,
+      dataType,
+      now,
+      records.length,
+      result.bytesWritten,
+    );
 
     return {
       tenant_id: tenantId,
@@ -176,9 +188,9 @@ export async function etlConversations(tenantId: string): Promise<ETLResult> {
       bytes_written: result.bytesWritten,
       success: true,
       duration_ms: Date.now() - startTime,
-    }
+    };
   } catch (error) {
-    console.error(`[Bronze ETL] Conversations failed for ${tenantId}:`, error)
+    console.error(`[Bronze ETL] Conversations failed for ${tenantId}:`, error);
     return {
       tenant_id: tenantId,
       data_type: dataType,
@@ -186,8 +198,8 @@ export async function etlConversations(tenantId: string): Promise<ETLResult> {
       bytes_written: 0,
       success: false,
       duration_ms: Date.now() - startTime,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
   }
 }
 
@@ -195,22 +207,22 @@ export async function etlConversations(tenantId: string): Promise<ETLResult> {
  * ETL messages for a single tenant
  */
 export async function etlMessages(tenantId: string): Promise<ETLResult> {
-  const dataType: DataType = 'messages'
-  const startTime = Date.now()
-  const lastSync = await getLastSyncTime(tenantId, dataType)
-  const now = new Date()
+  const dataType: DataType = "messages";
+  const startTime = Date.now();
+  const lastSync = await getLastSyncTime(tenantId, dataType);
+  const now = new Date();
 
   try {
     // Fetch new messages since last sync
-    const { data: messages, error } = await supabase
-      .from('exo_messages')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .gte('created_at', lastSync.toISOString())
-      .lt('created_at', now.toISOString())
-      .order('timestamp', { ascending: true })
+    const { data: messages, error } = await getSupabase()
+      .from("exo_messages")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .gte("created_at", lastSync.toISOString())
+      .lt("created_at", now.toISOString())
+      .order("timestamp", { ascending: true });
 
-    if (error) throw error
+    if (error) throw error;
 
     if (!messages || messages.length === 0) {
       return {
@@ -220,11 +232,11 @@ export async function etlMessages(tenantId: string): Promise<ETLResult> {
         bytes_written: 0,
         success: true,
         duration_ms: Date.now() - startTime,
-      }
+      };
     }
 
     // Transform to Parquet record format
-    const records: MessageRecord[] = messages.map(m => ({
+    const records: MessageRecord[] = messages.map((m) => ({
       id: m.id,
       conversation_id: m.conversation_id,
       tenant_id: m.tenant_id,
@@ -235,10 +247,10 @@ export async function etlMessages(tenantId: string): Promise<ETLResult> {
       audio_url: m.audio_url,
       transcription_confidence: m.transcription_confidence,
       context: JSON.stringify(m.context || {}),
-    }))
+    }));
 
     // Convert to Parquet
-    const parquetBuffer = messagesToParquet(records)
+    const parquetBuffer = messagesToParquet(records);
 
     // Write to R2
     const result = await writeToBronze({
@@ -247,14 +259,20 @@ export async function etlMessages(tenantId: string): Promise<ETLResult> {
       data: parquetBuffer,
       date: now,
       metadata: { recordsCount: String(records.length) },
-    })
+    });
 
     if (!result.success) {
-      throw new Error(result.error || 'Failed to write to R2')
+      throw new Error(result.error || "Failed to write to R2");
     }
 
     // Update sync log
-    await updateSyncTime(tenantId, dataType, now, records.length, result.bytesWritten)
+    await updateSyncTime(
+      tenantId,
+      dataType,
+      now,
+      records.length,
+      result.bytesWritten,
+    );
 
     return {
       tenant_id: tenantId,
@@ -263,9 +281,9 @@ export async function etlMessages(tenantId: string): Promise<ETLResult> {
       bytes_written: result.bytesWritten,
       success: true,
       duration_ms: Date.now() - startTime,
-    }
+    };
   } catch (error) {
-    console.error(`[Bronze ETL] Messages failed for ${tenantId}:`, error)
+    console.error(`[Bronze ETL] Messages failed for ${tenantId}:`, error);
     return {
       tenant_id: tenantId,
       data_type: dataType,
@@ -273,8 +291,8 @@ export async function etlMessages(tenantId: string): Promise<ETLResult> {
       bytes_written: 0,
       success: false,
       duration_ms: Date.now() - startTime,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
   }
 }
 
@@ -282,16 +300,17 @@ export async function etlMessages(tenantId: string): Promise<ETLResult> {
  * ETL scheduled job logs for a single tenant
  */
 export async function etlJobLogs(tenantId: string): Promise<ETLResult> {
-  const dataType: DataType = 'voice_calls' // Using voice_calls for job logs
-  const startTime = Date.now()
-  const lastSync = await getLastSyncTime(tenantId, dataType)
-  const now = new Date()
+  const dataType: DataType = "voice_calls"; // Using voice_calls for job logs
+  const startTime = Date.now();
+  const lastSync = await getLastSyncTime(tenantId, dataType);
+  const now = new Date();
 
   try {
     // Fetch new job logs since last sync
-    const { data: logs, error } = await supabase
-      .from('exo_scheduled_job_logs')
-      .select(`
+    const { data: logs, error } = await getSupabase()
+      .from("exo_scheduled_job_logs")
+      .select(
+        `
         id,
         job_id,
         tenant_id,
@@ -302,13 +321,14 @@ export async function etlJobLogs(tenantId: string): Promise<ETLResult> {
         result_payload,
         error_message,
         exo_scheduled_jobs!inner(job_name)
-      `)
-      .eq('tenant_id', tenantId)
-      .gte('created_at', lastSync.toISOString())
-      .lt('created_at', now.toISOString())
-      .order('scheduled_at', { ascending: true })
+      `,
+      )
+      .eq("tenant_id", tenantId)
+      .gte("created_at", lastSync.toISOString())
+      .lt("created_at", now.toISOString())
+      .order("scheduled_at", { ascending: true });
 
-    if (error) throw error
+    if (error) throw error;
 
     if (!logs || logs.length === 0) {
       return {
@@ -318,18 +338,23 @@ export async function etlJobLogs(tenantId: string): Promise<ETLResult> {
         bytes_written: 0,
         success: true,
         duration_ms: Date.now() - startTime,
-      }
+      };
     }
 
     // Transform to Parquet record format
-    const records: JobLogRecord[] = logs.map(l => {
+    const records: JobLogRecord[] = logs.map((l) => {
       // Handle the joined table - could be an object or array depending on Supabase version
-      const jobInfo = l.exo_scheduled_jobs as { job_name: string } | { job_name: string }[] | null
-      const jobName = Array.isArray(jobInfo) ? jobInfo[0]?.job_name : jobInfo?.job_name
+      const jobInfo = l.exo_scheduled_jobs as
+        | { job_name: string }
+        | { job_name: string }[]
+        | null;
+      const jobName = Array.isArray(jobInfo)
+        ? jobInfo[0]?.job_name
+        : jobInfo?.job_name;
       return {
         id: l.id,
         job_id: l.job_id,
-        job_name: jobName || 'unknown',
+        job_name: jobName || "unknown",
         tenant_id: l.tenant_id,
         scheduled_at: l.scheduled_at,
         executed_at: l.executed_at,
@@ -337,11 +362,11 @@ export async function etlJobLogs(tenantId: string): Promise<ETLResult> {
         channel_used: l.channel_used,
         result_payload: JSON.stringify(l.result_payload || {}),
         error_message: l.error_message,
-      }
-    })
+      };
+    });
 
     // Convert to Parquet
-    const parquetBuffer = jobLogsToParquet(records)
+    const parquetBuffer = jobLogsToParquet(records);
 
     // Write to R2
     const result = await writeToBronze({
@@ -350,14 +375,20 @@ export async function etlJobLogs(tenantId: string): Promise<ETLResult> {
       data: parquetBuffer,
       date: now,
       metadata: { recordsCount: String(records.length) },
-    })
+    });
 
     if (!result.success) {
-      throw new Error(result.error || 'Failed to write to R2')
+      throw new Error(result.error || "Failed to write to R2");
     }
 
     // Update sync log
-    await updateSyncTime(tenantId, dataType, now, records.length, result.bytesWritten)
+    await updateSyncTime(
+      tenantId,
+      dataType,
+      now,
+      records.length,
+      result.bytesWritten,
+    );
 
     return {
       tenant_id: tenantId,
@@ -366,9 +397,9 @@ export async function etlJobLogs(tenantId: string): Promise<ETLResult> {
       bytes_written: result.bytesWritten,
       success: true,
       duration_ms: Date.now() - startTime,
-    }
+    };
   } catch (error) {
-    console.error(`[Bronze ETL] Job logs failed for ${tenantId}:`, error)
+    console.error(`[Bronze ETL] Job logs failed for ${tenantId}:`, error);
     return {
       tenant_id: tenantId,
       data_type: dataType,
@@ -376,8 +407,8 @@ export async function etlJobLogs(tenantId: string): Promise<ETLResult> {
       bytes_written: 0,
       success: false,
       duration_ms: Date.now() - startTime,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
   }
 }
 
@@ -389,18 +420,18 @@ export async function etlJobLogs(tenantId: string): Promise<ETLResult> {
  * Run full Bronze ETL for all tenants
  */
 export async function runBronzeETL(): Promise<ETLSummary> {
-  const startedAt = new Date()
-  const results: ETLResult[] = []
+  const startedAt = new Date();
+  const results: ETLResult[] = [];
 
-  console.log(`[Bronze ETL] Starting at ${startedAt.toISOString()}`)
+  console.log(`[Bronze ETL] Starting at ${startedAt.toISOString()}`);
 
   // Get all active tenants
-  const { data: tenants, error } = await supabase
-    .from('exo_tenants')
-    .select('id')
+  const { data: tenants, error } = await getSupabase()
+    .from("exo_tenants")
+    .select("id");
 
   if (error) {
-    console.error('[Bronze ETL] Failed to fetch tenants:', error)
+    console.error("[Bronze ETL] Failed to fetch tenants:", error);
     return {
       started_at: startedAt.toISOString(),
       completed_at: new Date().toISOString(),
@@ -409,12 +440,14 @@ export async function runBronzeETL(): Promise<ETLSummary> {
       total_records: 0,
       total_bytes: 0,
       results: [],
-      errors: [{ tenant_id: 'system', data_type: 'tenants', error: error.message }],
-    }
+      errors: [
+        { tenant_id: "system", data_type: "tenants", error: error.message },
+      ],
+    };
   }
 
   if (!tenants || tenants.length === 0) {
-    console.log('[Bronze ETL] No tenants found')
+    console.log("[Bronze ETL] No tenants found");
     return {
       started_at: startedAt.toISOString(),
       completed_at: new Date().toISOString(),
@@ -424,28 +457,28 @@ export async function runBronzeETL(): Promise<ETLSummary> {
       total_bytes: 0,
       results: [],
       errors: [],
-    }
+    };
   }
 
-  console.log(`[Bronze ETL] Processing ${tenants.length} tenants`)
+  console.log(`[Bronze ETL] Processing ${tenants.length} tenants`);
 
   // Process each tenant
   for (const tenant of tenants) {
-    console.log(`[Bronze ETL] Processing tenant: ${tenant.id}`)
+    console.log(`[Bronze ETL] Processing tenant: ${tenant.id}`);
 
     // Run ETL for each data type
-    const conversationsResult = await etlConversations(tenant.id)
-    results.push(conversationsResult)
+    const conversationsResult = await etlConversations(tenant.id);
+    results.push(conversationsResult);
 
-    const messagesResult = await etlMessages(tenant.id)
-    results.push(messagesResult)
+    const messagesResult = await etlMessages(tenant.id);
+    results.push(messagesResult);
 
     // Note: Job logs ETL commented out until table structure is verified
     // const jobLogsResult = await etlJobLogs(tenant.id)
     // results.push(jobLogsResult)
   }
 
-  const completedAt = new Date()
+  const completedAt = new Date();
 
   // Build summary
   const summary: ETLSummary = {
@@ -457,13 +490,13 @@ export async function runBronzeETL(): Promise<ETLSummary> {
     total_bytes: results.reduce((sum, r) => sum + r.bytes_written, 0),
     results,
     errors: results
-      .filter(r => !r.success)
-      .map(r => ({
+      .filter((r) => !r.success)
+      .map((r) => ({
         tenant_id: r.tenant_id,
         data_type: r.data_type,
-        error: r.error || 'Unknown error',
+        error: r.error || "Unknown error",
       })),
-  }
+  };
 
   console.log(`[Bronze ETL] Complete:`, {
     duration_ms: summary.duration_ms,
@@ -471,22 +504,24 @@ export async function runBronzeETL(): Promise<ETLSummary> {
     records: summary.total_records,
     bytes: summary.total_bytes,
     errors: summary.errors.length,
-  })
+  });
 
-  return summary
+  return summary;
 }
 
 /**
  * Run ETL for a specific tenant (for manual testing)
  */
-export async function runBronzeETLForTenant(tenantId: string): Promise<ETLResult[]> {
-  const results: ETLResult[] = []
+export async function runBronzeETLForTenant(
+  tenantId: string,
+): Promise<ETLResult[]> {
+  const results: ETLResult[] = [];
 
-  const conversationsResult = await etlConversations(tenantId)
-  results.push(conversationsResult)
+  const conversationsResult = await etlConversations(tenantId);
+  results.push(conversationsResult);
 
-  const messagesResult = await etlMessages(tenantId)
-  results.push(messagesResult)
+  const messagesResult = await etlMessages(tenantId);
+  results.push(messagesResult);
 
-  return results
+  return results;
 }
