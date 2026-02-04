@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { UnifiedThreadView } from "@/components/dashboard/UnifiedThreadView";
-import { DashboardStatsSection } from "@/components/dashboard/DashboardStatsSection";
+import { DashboardInboxView } from "@/components/dashboard/DashboardInboxView";
 
 export const dynamic = "force-dynamic";
 
@@ -35,11 +34,8 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="h-[60vh] md:h-[70vh] min-h-[500px]">
-        <UnifiedThreadView tenantId={user.id} assistantName={assistantName} />
-      </div>
-      <DashboardStatsSection tenantId={user.id} />
+    <div className="h-full">
+      <DashboardInboxView tenantId={user.id} assistantName={assistantName} />
     </div>
   );
 }

@@ -4,6 +4,71 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## 2026-02-05
+
+### GHL-Style 3-Column Dashboard + Message-to-Task Conversion
+
+Przebudowa dashboardu na layout 3-kolumnowy inspirowany GHL Conversations + funkcja konwersji wiadomosci na taski.
+
+#### What was done
+- **3-kolumnowy layout dashboardu:**
+  - LEWA: InboxSidebar z filtrami (all, unread, email, sms, voice, web_chat) i lista wiadomosci
+  - SRODEK: ConversationCenter - chat z IORS o wybranych wiadomosciach (SSE streaming + voice input)
+  - PRAWA: AcceptanceThread + MessageDetails (szczegoly wiadomosci + akcje)
+
+- **Email ingestion do unified thread:**
+  - Nowy modul `lib/rigs/email-ingest.ts` z deduplikacja
+  - Integracja z sync endpoint (google, google-workspace, microsoft-365)
+  - Nowy source type: `email_import`
+
+- **Message → Task conversion:**
+  - Nowa tabela `exo_projects` (name, color, status)
+  - Kolumna `linked_task_id` w `exo_unified_messages`
+  - API: `POST /api/messages/[id]/to-task`
+  - API: `GET/POST /api/projects`
+  - UI w MessageDetails z wyborem projektu
+
+- **Fix TypeScript errors:**
+  - google-workspace/google: brak profile w dashboard - uzywamy email z pierwszej wiadomosci
+  - microsoft-365: `profile.mail` zamiast `profile.email`
+
+#### Why
+- Uzytkownik chcial panel jak GHL Conversations
+- Wszystkie wiadomosci (email, SMS, voice) powinny wpadac do threads
+- Potrzeba konwersji wiadomosci na taski z przypisaniem do projektow
+
+#### Files created
+- `components/inbox/InboxSidebar.tsx`
+- `components/inbox/MessageListItem.tsx`
+- `components/inbox/ConversationCenter.tsx`
+- `components/inbox/MessageDetails.tsx`
+- `components/inbox/index.ts`
+- `components/dashboard/DashboardInboxView.tsx`
+- `lib/rigs/email-ingest.ts`
+- `app/api/unified-thread/route.ts`
+- `app/api/messages/[id]/to-task/route.ts`
+- `app/api/projects/route.ts`
+- `supabase/migrations/20260205000003_projects_linked_task.sql`
+
+#### Files modified
+- `app/dashboard/page.tsx` (nowy layout)
+- `app/api/rigs/[slug]/sync/route.ts` (email ingestion + fixes)
+- `lib/unified-thread.ts` (email_import source type)
+- `components/dashboard/AcceptanceThread.tsx` (compact prop)
+
+#### Database changes
+- Nowa tabela: `exo_projects`
+- Nowa kolumna: `exo_unified_messages.linked_task_id`
+- Nowy FK: `exo_tasks.project_id -> exo_projects.id`
+
+#### Notes for future agents
+- Dashboard wymaga uruchomienia migracji `20260205000003_projects_linked_task.sql`
+- Email ingestion deduplikuje po `source_id` + `channel: 'email'`
+- ConversationCenter uzywa Web Speech API (wymaga HTTPS w prod)
+- Projects API zwraca tylko active projects (status = 'active')
+
+---
+
 ## 2026-02-04
 
 ### Google OAuth Comprehensive Scopes + Email Inbox Widget

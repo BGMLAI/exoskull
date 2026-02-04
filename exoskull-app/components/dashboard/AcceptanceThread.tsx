@@ -58,6 +58,7 @@ interface StatusCardData {
 interface AcceptanceThreadProps {
   tenantId: string;
   className?: string;
+  compact?: boolean;
 }
 
 // ============================================================================
@@ -322,6 +323,7 @@ function NotificationItem({ notification }: { notification: Notification }) {
 export function AcceptanceThread({
   tenantId,
   className,
+  compact = false,
 }: AcceptanceThreadProps) {
   const [interventions, setInterventions] = useState<Intervention[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);

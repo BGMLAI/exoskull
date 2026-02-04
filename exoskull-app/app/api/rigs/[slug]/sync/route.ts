@@ -13,6 +13,10 @@ import { createGoogleWorkspaceClient } from "@/lib/rigs/google-workspace/client"
 import { createMicrosoft365Client } from "@/lib/rigs/microsoft-365/client";
 import { GoogleFitClient } from "@/lib/rigs/google-fit/client";
 import { createGoogleClient } from "@/lib/rigs/google/client";
+import {
+  ingestGmailMessages,
+  ingestOutlookMessages,
+} from "@/lib/rigs/email-ingest";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +120,16 @@ export async function POST(
           throw new Error("Failed to create Google Workspace client");
 
         const dashboard = await client.getDashboardData();
+
+        // Email ingestion to unified thread
+        // Note: Google Workspace dashboard doesn't include profile, use from/to from first email
+        const userEmail = dashboard.gmail.recentEmails[0]?.to || "";
+        const emailResult = await ingestGmailMessages(
+          tenantId,
+          dashboard.gmail.recentEmails,
+          userEmail,
+        );
+
         syncResult = {
           success: true,
           records:
@@ -126,6 +140,8 @@ export async function POST(
             unreadEmails: dashboard.gmail.unreadCount,
             todaysEvents: dashboard.calendar.todaysEvents.length,
             recentFiles: dashboard.drive.recentFiles.length,
+            emails_ingested: emailResult.ingested,
+            emails_skipped: emailResult.skipped,
           },
         };
         break;
@@ -136,6 +152,15 @@ export async function POST(
         if (!client) throw new Error("Failed to create Microsoft 365 client");
 
         const dashboard = await client.getDashboardData();
+
+        // Email ingestion to unified thread
+        const userEmail = dashboard.profile?.mail || "";
+        const emailResult = await ingestOutlookMessages(
+          tenantId,
+          dashboard.outlook.recentEmails,
+          userEmail,
+        );
+
         syncResult = {
           success: true,
           records:
@@ -146,6 +171,8 @@ export async function POST(
             unreadEmails: dashboard.outlook.unreadCount,
             todaysEvents: dashboard.calendar.todaysEvents.length,
             recentFiles: dashboard.onedrive.recentFiles.length,
+            emails_ingested: emailResult.ingested,
+            emails_skipped: emailResult.skipped,
           },
         };
         break;
@@ -199,6 +226,15 @@ export async function POST(
           await upsertHealthMetrics(healthMetrics);
         }
 
+        // Email ingestion to unified thread
+        // Note: Google workspace dashboard doesn't include profile, use from/to from first email
+        const userEmail = dashboard.workspace.gmail.recentEmails[0]?.to || "";
+        const emailResult = await ingestGmailMessages(
+          tenantId,
+          dashboard.workspace.gmail.recentEmails,
+          userEmail,
+        );
+
         syncResult = {
           success: true,
           records:
@@ -233,6 +269,8 @@ export async function POST(
               recent: dashboard.photos.recentPhotos.length,
             },
             metrics_upserted: healthMetrics.length,
+            emails_ingested: emailResult.ingested,
+            emails_skipped: emailResult.skipped,
           },
         };
         break;
