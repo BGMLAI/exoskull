@@ -4,6 +4,73 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-04] Admin Panel - Full Operations Dashboard
+
+### Added - Complete Admin Panel (9 pages, 13 API endpoints, 5 DB tables)
+
+**Database Migration** (`20260205000001_admin_panel.sql`):
+
+- `admin_users` - Role-based admin access control
+- `admin_cron_runs` - Cron execution logging with duration/status/result
+- `admin_error_log` - Centralized error logging with severity/source/stack traces
+- `admin_api_logs` - API request logging for latency tracking (p50/p95/p99)
+- `admin_daily_snapshot` - Pre-calculated daily metrics (active users, AI costs, cron health, errors)
+- Helper functions: `get_cron_health_summary()`, `get_admin_overview()`, `cleanup_admin_logs()`
+- Full RLS policies (service_role only)
+
+**Admin Utilities** (`lib/admin/`):
+
+- `auth.ts` - `verifyAdmin()`, `requireAdmin()`, `getAdminSupabase()`
+- `logger.ts` - Error/cron/API request logging helpers
+- `cron-wrapper.ts` - `withCronLogging()` HOF for wrapping existing cron routes
+
+**Admin Pages** (`app/admin/`):
+| Page | Features |
+|------|----------|
+| Command Center (`/admin`) | Heartbeat stats, recent crons, recent errors, cron health table (30s polling) |
+| Cron Jobs (`/admin/cron`) | All 14 jobs, expandable rows, "Run Now" button, 60s polling |
+| AI Router (`/admin/ai`) | Per-model stats, tier distribution, daily cost trend, period selector |
+| Business KPIs (`/admin/business`) | MRR, churn, LTV, ARPU, trial conversion, tier/engagement distributions, dunning |
+| Users (`/admin/users`) | Paginated table, search, engagement badges, churn risk indicators |
+| User Deep-Dive (`/admin/users/[id]`) | Stats, MITs, installations, patterns, interventions, conversations |
+| Autonomy (`/admin/autonomy`) | MAPE-K cycles, guardian stats, feedback breakdown, value conflicts |
+| Data Pipeline (`/admin/data-pipeline`) | Bronze→Silver→Gold status, gold view row counts, sync logs |
+| Self-Optimize (`/admin/insights`) | 10-category analysis engine, severity cards, re-analyze button |
+| Logs (`/admin/logs`) | Tabbed error/API logs, filters, latency percentiles, expandable stack traces |
+
+**Self-Optimization Engine** (10 analysis categories):
+
+1. Cron health (failure detection)
+2. AI cost optimization (per-model analysis)
+3. Engagement scoring (churn risk detection)
+4. Intervention effectiveness (approval/success rates)
+5. Pipeline freshness (ETL lag detection)
+6. Learning events (knowledge growth tracking)
+7. Revenue/MRR trends (growth analysis)
+8. Popular mods (adoption patterns → feature suggestions)
+9. User feedback (satisfaction → improvement proposals)
+10. Cost efficiency (cost-per-user, revenue-per-cost ratios)
+
+**New Cron Job**: `/api/cron/admin-metrics` (daily at 05:30 UTC) - calculates daily snapshots
+
+### Files Created
+
+- 1 migration, 3 lib utilities, 2 components, 9 pages, 13 API routes, 1 cron job = 29 new files
+
+### Files Modified
+
+- `vercel.json` - Added admin-metrics cron schedule
+
+### How to Verify
+
+1. Run migration: `supabase db push`
+2. Add yourself to `admin_users` table
+3. Visit `/admin` - should see Command Center
+4. All 9 pages should load without errors
+5. `npm run build` passes clean
+
+---
+
 ## [2026-02-03] MODUL 1: GOTCHA Framework - Formalizacja
 
 ### Added - Pełna struktura GOTCHA Framework
@@ -61,6 +128,7 @@ CHA (Context):
 ```
 
 ### Files Created (16 total)
+
 ```
 exoskull-app/
 ├── goals/
@@ -87,6 +155,7 @@ exoskull-app/
 ```
 
 ### Notes for Future Agents
+
 - Goals define WHAT to achieve, not HOW system behaves
 - Args control runtime behavior (model tiers, sync intervals)
 - Hardprompts are reusable templates for LLM sub-tasks
@@ -99,9 +168,11 @@ exoskull-app/
 ## [2026-02-03] MODUL 2: Knowledge Layer (Tyrolka Framework)
 
 ### Verified/Enhanced
+
 Complete Knowledge Layer implementation verified and enhanced.
 
 **API Endpoints** (all working):
+
 - `/api/knowledge/loops` - CRUD for life domains
 - `/api/knowledge/campaigns` - CRUD for major initiatives
 - `/api/knowledge/quests` - CRUD for projects
@@ -111,16 +182,19 @@ Complete Knowledge Layer implementation verified and enhanced.
 - `/api/knowledge/upload` - POST file upload (supports PDF, DOCX, images, video up to 1GB)
 
 **Components Enhanced**:
+
 - `OpCard.tsx` - Added onToggleStatus prop, checkbox UI, recurring indicator
 - `NoteCard.tsx` - NEW - Display notes with type icon, AI summary, tags
 
 **Components Created**:
+
 - `LoopFormDialog.tsx` - Create/edit loops with icon/color pickers
 - `CampaignFormDialog.tsx` - Create/edit campaigns
 - `QuestFormDialog.tsx` - Create/edit quests with tags
 - `OpFormDialog.tsx` - Create/edit ops with recurring support
 
 **View Components** (verified existing):
+
 - `KnowledgeHeader.tsx` - Header with tabs (Hierarchia/Notatki/Dokumenty) + search + add menu
 - `HierarchyView.tsx` - 4-column responsive layout (Loops→Campaigns→Quests→Ops)
 - `NotesView.tsx` - Notes grid with type filter, search, pagination
@@ -128,10 +202,12 @@ Complete Knowledge Layer implementation verified and enhanced.
 - `DocumentsList.tsx` - Document list with status badges, delete with confirmation
 
 **Lib Created**:
+
 - `lib/hooks/useKnowledge.ts` - Data fetching hooks (useLoops, useCampaigns, useQuests, useOps, useNotes, useDocuments)
 - `lib/api/knowledge.ts` - CRUD helper functions with error handling
 
 ### Files Changed
+
 - `components/knowledge/OpCard.tsx`
 - `components/knowledge/NoteCard.tsx` (NEW)
 - `components/knowledge/LoopFormDialog.tsx` (NEW)
@@ -150,6 +226,7 @@ Complete Knowledge Layer implementation verified and enhanced.
 Built AI tools for Claude tool use and expanded health tracking mods.
 
 **lib/tools/** (NEW - 6 files):
+
 - `types.ts` - Tool type definitions (ExoTool, ToolHandler, ToolResult)
 - `index.ts` - Tool registry with TOOL_REGISTRY, getAllToolDefinitions(), executeTool()
 - `task-tool.ts` - Task CRUD wrapper around TaskManagerExecutor
@@ -158,26 +235,31 @@ Built AI tools for Claude tool use and expanded health tracking mods.
 - `search-tool.ts` - Web search via Tavily API
 
 **app/api/tools/** (NEW - 2 files):
+
 - `route.ts` - Main tool dispatcher (POST execute, GET list)
 - `search/route.ts` - Dedicated web search endpoint
 
 ### Added - Health Mod Executors
 
 **lib/mods/executors/** (2 new files):
+
 - `sleep-tracker.ts` - Sleep tracking with Oura integration + manual fallback
 - `activity-tracker.ts` - Activity/workout tracking with Oura/manual entries
 
 ### Added - Database Migration
 
 **supabase/migrations/20260203000001_sleep_activity_tables.sql**:
+
 - `exo_sleep_entries` - Sleep session tracking (Oura, manual, health-connect)
 - `exo_activity_entries` - Activity/workout tracking
 - `exo_health_goals` - Health goal tracking
 
 ### Modified
+
 - `lib/mods/executors/index.ts` - Registered SleepTrackerExecutor, ActivityTrackerExecutor
 
 ### Environment Variables
+
 - `TAVILY_API_KEY` - Required for web search tool
 
 ---
@@ -185,16 +267,19 @@ Built AI tools for Claude tool use and expanded health tracking mods.
 ## [2026-02-03] MODUL 5: Integrations (Rigs)
 
 ### Added
+
 - Oura OAuth routes and dedicated sync endpoint that writes to `exo_health_metrics`
 - `lib/rigs/oura/types.ts` and type exports from the Oura client
 - Health dashboard charts: Sleep, Activity, HRV
 
 ### Changed
+
 - Google Workspace client: Gmail drafts, Calendar event update/delete/list, tasks sync helper
 - Rig sync now upserts health metrics for `google` and `google-fit`
 - Health page copy now references Oura/Google Fit + Health Connect
 
 ### Files
+
 - `lib/rigs/oura/types.ts`
 - `lib/rigs/oura/client.ts`
 - `app/api/rigs/oura/connect/route.ts`
@@ -215,19 +300,20 @@ Built a complete voice pipeline for phone calls using HTTP turn-by-turn pattern.
 
 **New files created:**
 
-| File | Purpose |
-|------|---------|
-| `lib/voice/twilio-client.ts` | TwiML generation, outbound calls |
-| `lib/voice/elevenlabs-tts.ts` | Text-to-Speech with caching |
-| `lib/voice/elevenlabs-stt.ts` | Speech-to-Text with Deepgram fallback |
-| `lib/voice/conversation-handler.ts` | Claude conversation + tools |
-| `lib/voice/index.ts` | Module exports |
-| `app/api/twilio/voice/route.ts` | Main webhook (start/process/end) |
-| `app/api/twilio/status/route.ts` | Call status callbacks |
-| `app/api/twilio/outbound/route.ts` | Initiate outbound calls |
-| `app/api/voice/sessions/route.ts` | Voice session history API |
+| File                                | Purpose                               |
+| ----------------------------------- | ------------------------------------- |
+| `lib/voice/twilio-client.ts`        | TwiML generation, outbound calls      |
+| `lib/voice/elevenlabs-tts.ts`       | Text-to-Speech with caching           |
+| `lib/voice/elevenlabs-stt.ts`       | Speech-to-Text with Deepgram fallback |
+| `lib/voice/conversation-handler.ts` | Claude conversation + tools           |
+| `lib/voice/index.ts`                | Module exports                        |
+| `app/api/twilio/voice/route.ts`     | Main webhook (start/process/end)      |
+| `app/api/twilio/status/route.ts`    | Call status callbacks                 |
+| `app/api/twilio/outbound/route.ts`  | Initiate outbound calls               |
+| `app/api/voice/sessions/route.ts`   | Voice session history API             |
 
 **Migration:** `20260202000027_voice_sessions.sql`
+
 - `exo_voice_sessions` table for conversation state
 - `voice-audio` storage bucket for TTS audio
 
@@ -257,25 +343,26 @@ twilio@^5.0.0
 
 **Data Pipeline Status:** All layers operational
 
-| Layer | Status | Files |
-|-------|--------|-------|
-| Bronze ETL | WORKING | `lib/datalake/bronze-etl.ts`, `app/api/cron/bronze-etl/route.ts` |
-| Silver ETL | WORKING | `lib/datalake/silver-etl.ts`, `app/api/cron/silver-etl/route.ts` |
-| Gold ETL | WORKING | `lib/datalake/gold-etl.ts`, `app/api/cron/gold-etl/route.ts` |
-| R2 Storage | CONFIGURED | Credentials in `.env.local` |
-| Cron Jobs | CONFIGURED | `vercel.json` (01:00, 02:00, 03:00 UTC) |
+| Layer      | Status     | Files                                                            |
+| ---------- | ---------- | ---------------------------------------------------------------- |
+| Bronze ETL | WORKING    | `lib/datalake/bronze-etl.ts`, `app/api/cron/bronze-etl/route.ts` |
+| Silver ETL | WORKING    | `lib/datalake/silver-etl.ts`, `app/api/cron/silver-etl/route.ts` |
+| Gold ETL   | WORKING    | `lib/datalake/gold-etl.ts`, `app/api/cron/gold-etl/route.ts`     |
+| R2 Storage | CONFIGURED | Credentials in `.env.local`                                      |
+| Cron Jobs  | CONFIGURED | `vercel.json` (01:00, 02:00, 03:00 UTC)                          |
 
 ### Added - Analytics Module
 
 **New files created:**
 
-| File | Purpose |
-|------|---------|
+| File                             | Purpose                                                     |
+| -------------------------------- | ----------------------------------------------------------- |
 | `lib/analytics/duckdb-client.ts` | DuckDB query generation for Bronze layer, R2 file discovery |
-| `lib/analytics/queries.ts` | Pre-built queries for Gold/Silver layer dashboards |
-| `lib/analytics/index.ts` | Unified exports for analytics module |
+| `lib/analytics/queries.ts`       | Pre-built queries for Gold/Silver layer dashboards          |
+| `lib/analytics/index.ts`         | Unified exports for analytics module                        |
 
 **Analytics queries available:**
+
 - `getDailySummary()` - Gold layer, <100ms
 - `getWeeklySummary()` - Gold layer, <100ms
 - `getMonthlySummary()` - Gold layer, <100ms
@@ -286,6 +373,7 @@ twilio@^5.0.0
 - `getPeriodComparison()` - Week-over-week comparison
 
 **DuckDB utilities:**
+
 - `generateDuckDBSQL()` - Generate SQL for ad-hoc Bronze queries
 - `getDuckDBConfig()` - R2 connection config for DuckDB
 - `ANALYTICS_QUERIES` - Pre-built query templates
@@ -295,6 +383,7 @@ twilio@^5.0.0
 **Migration:** `20260202000026_gold_refresh_function.sql`
 
 **RPC Functions:**
+
 - `refresh_gold_view(view_name)` - Refresh single materialized view with CONCURRENTLY
 - `refresh_all_gold_views()` - Refresh all 4 Gold views, returns status
 
@@ -303,6 +392,7 @@ twilio@^5.0.0
 **File:** `docs/data-pipeline-testing.md`
 
 Comprehensive stress-test guide covering:
+
 - Bronze ETL testing (R2 connection, single/all tenants)
 - Silver ETL testing (data quality checks)
 - Gold ETL testing (RPC functions, benchmarks)
@@ -312,13 +402,13 @@ Comprehensive stress-test guide covering:
 
 ### Files Changed
 
-| File | Change |
-|------|--------|
-| `lib/analytics/duckdb-client.ts` | NEW - DuckDB client for Bronze layer |
-| `lib/analytics/queries.ts` | NEW - Dashboard query functions |
-| `lib/analytics/index.ts` | NEW - Module exports |
-| `supabase/migrations/20260202000026_gold_refresh_function.sql` | NEW - RPC functions |
-| `docs/data-pipeline-testing.md` | NEW - Testing documentation |
+| File                                                           | Change                               |
+| -------------------------------------------------------------- | ------------------------------------ |
+| `lib/analytics/duckdb-client.ts`                               | NEW - DuckDB client for Bronze layer |
+| `lib/analytics/queries.ts`                                     | NEW - Dashboard query functions      |
+| `lib/analytics/index.ts`                                       | NEW - Module exports                 |
+| `supabase/migrations/20260202000026_gold_refresh_function.sql` | NEW - RPC functions                  |
+| `docs/data-pipeline-testing.md`                                | NEW - Testing documentation          |
 
 ### How to Verify
 
@@ -340,12 +430,14 @@ curl -X GET "https://exoskull.xyz/api/cron/gold-etl"
 ### Fixed - Voice Function (exoskull-voice)
 
 **Critical bugs fixed:**
+
 - Changed table reference from `tasks` → `exo_tasks`
 - Changed column reference from `user_id` → `tenant_id`
 - Changed user lookup from `users` table → `exo_tenants` table
 - Changed phone column from `phone_number` → `phone`
 
 **Added - Claude Tool Use:**
+
 - `add_task` - Create new tasks via voice
 - `complete_task` - Mark tasks as done (fuzzy title match)
 - `list_tasks` - List pending/done/all tasks
@@ -353,6 +445,7 @@ curl -X GET "https://exoskull.xyz/api/cron/gold-etl"
 ### Fixed - Scheduled Jobs System
 
 **SQL Function Fix:**
+
 - Created migration `20260202000025_fix_scheduled_job_function.sql`
 - Fixed `get_users_for_scheduled_job` function with explicit type casts
 - Resolved "structure of query does not match function result type" error
@@ -360,20 +453,24 @@ curl -X GET "https://exoskull.xyz/api/cron/gold-etl"
 ### Configuration
 
 **Tenant Setup:**
+
 - Added phone number `+48607090956` to tenant
 - Added consent for all 10 user-facing scheduled jobs
 
 **Twilio Webhook:**
+
 - Updated +48732144112 webhook from old Supabase project to correct one
 - URL: `https://uvupnwvkzreikurymncs.supabase.co/functions/v1/exoskull-voice?action=start`
 
 **Supabase Secrets:**
+
 - Added `ANTHROPIC_API_KEY`
 - Added `ELEVENLABS_API_KEY`
 
 ### Changed - ElevenLabs Voice ID
 
 Updated voice ID in 5 files from `vhGAGQee0VjHonqyxGxd` to `Qs4qmNrqlneCgYPLSNQ7`:
+
 - `components/voice/GlobalVoiceButton.tsx`
 - `app/dashboard/voice/page.tsx`
 - `lib/cron/dispatcher.ts`
@@ -396,6 +493,7 @@ Updated voice ID in 5 files from `vhGAGQee0VjHonqyxGxd` to `Qs4qmNrqlneCgYPLSNQ7
 Implements `IModExecutor` interface for daily mood tracking:
 
 **Data:**
+
 - Mood value (1-10 scale)
 - Energy level (1-10)
 - Emotions (multi-select from 15 predefined emotions)
@@ -403,6 +501,7 @@ Implements `IModExecutor` interface for daily mood tracking:
 - Notes
 
 **Insights:**
+
 - Mood trend detection (improving/stable/declining)
 - Missing check-in reminders
 - Weekly consistency tracking
@@ -423,6 +522,7 @@ Implements `IModExecutor` interface for daily mood tracking:
 Full habit tracking with streaks and completion rates:
 
 **Data:**
+
 - Habit definitions (name, description, frequency)
 - Daily/weekly frequency support
 - Target days for weekly habits
@@ -430,6 +530,7 @@ Full habit tracking with streaks and completion rates:
 - Icon and color customization
 
 **Insights:**
+
 - Daily progress (X/Y habits completed)
 - Streak achievements (7+ days)
 - Broken streak warnings
@@ -450,31 +551,37 @@ Full habit tracking with streaks and completion rates:
 **Migration:** `20260202000014_mood_habit_tables.sql`
 
 **Tables:**
+
 - `exo_mood_entries` - Mood check-in records
 - `exo_habits` - Habit definitions
 - `exo_habit_completions` - Completion log
 
 **Indexes:**
+
 - Efficient queries by tenant + date
 - Fast lookup for today's entries
 
 **Analytics Views:**
+
 - `silver_mood_daily` - Daily mood aggregations
 - `silver_habits_weekly` - Weekly completion rates
 
 ### Changed - Executor Registry
 
 **Updated:** `lib/mods/executors/index.ts`
+
 - Added `MoodTrackerExecutor`
 - Added `HabitTrackerExecutor`
 - Factory functions for both
 
 **Implemented Mods:** 3 total
+
 - task-manager
 - mood-tracker
 - habit-tracker
 
 ### Notes for Future Agents
+
 - Both Mods are standalone (no Rigs required)
 - Use `x-tenant-id` header for API calls
 - Mood check-in times configurable in mod config
@@ -489,14 +596,15 @@ Full habit tracking with streaks and completion rates:
 **Multi-Model Router** (`lib/ai/`)
 Complete AI cost optimization system with 4-tier model routing:
 
-| Tier | Model | Cost/1M | Use Cases |
-|------|-------|---------|-----------|
-| 1 | Gemini 1.5 Flash | $0.075 | Classification, simple responses |
-| 2 | Claude 3.5 Haiku | $0.80 | Summarization, analysis |
-| 3 | Kimi K2.5 | ~$0.50 | Complex reasoning, long context |
-| 4 | Claude Opus 4.5 | $15.00 | Crisis, meta-coordination |
+| Tier | Model            | Cost/1M | Use Cases                        |
+| ---- | ---------------- | ------- | -------------------------------- |
+| 1    | Gemini 1.5 Flash | $0.075  | Classification, simple responses |
+| 2    | Claude 3.5 Haiku | $0.80   | Summarization, analysis          |
+| 3    | Kimi K2.5        | ~$0.50  | Complex reasoning, long context  |
+| 4    | Claude Opus 4.5  | $15.00  | Crisis, meta-coordination        |
 
 **Core Components:**
+
 - `lib/ai/types.ts` - TypeScript interfaces for entire AI system
 - `lib/ai/config.ts` - Model configurations, pricing, tier mappings
 - `lib/ai/task-classifier.ts` - Automatic task complexity classification
@@ -505,11 +613,13 @@ Complete AI cost optimization system with 4-tier model routing:
 - `lib/ai/index.ts` - Factory functions and convenience API
 
 **Provider Implementations:**
+
 - `lib/ai/providers/gemini-provider.ts` - Google Gemini integration
 - `lib/ai/providers/anthropic-provider.ts` - Claude Haiku & Opus
 - `lib/ai/providers/kimi-provider.ts` - Moonshot AI (Kimi K2.5)
 
 **Features:**
+
 - Automatic task classification based on keywords and complexity
 - Tier escalation on failure (1 → 2 → 3 → 4)
 - Circuit breaker with 5-minute cooldown after 3 failures
@@ -518,36 +628,41 @@ Complete AI cost optimization system with 4-tier model routing:
 - Usage tracking (database migration included)
 
 **API:**
+
 ```typescript
-import { aiChat, aiQuick, aiCritical } from '@/lib/ai'
+import { aiChat, aiQuick, aiCritical } from "@/lib/ai";
 
 // Auto-routed based on complexity
-const response = await aiChat(messages)
+const response = await aiChat(messages);
 
 // Explicit tier hints
-await aiChat(messages, { taskCategory: 'simple_response' }) // Tier 1
-await aiChat(messages, { forceTier: 4 })                    // Tier 4
-await aiQuick(prompt)    // Tier 1 - Gemini Flash
-await aiCritical(prompt) // Tier 4 - Claude Opus
+await aiChat(messages, { taskCategory: "simple_response" }); // Tier 1
+await aiChat(messages, { forceTier: 4 }); // Tier 4
+await aiQuick(prompt); // Tier 1 - Gemini Flash
+await aiCritical(prompt); // Tier 4 - Claude Opus
 ```
 
 ### Added - Database Migration
+
 - `supabase/migrations/20260202000013_ai_usage_tracking.sql`
 - `exo_ai_usage` table for request tracking
 - `mv_ai_daily_costs` materialized view for cost analysis
 - Helper functions: `log_ai_usage()`, `get_ai_usage_summary()`
 
 ### Changed - Greeting Generation
+
 - `app/api/generate-greeting/route.ts` now uses Multi-Model Router
 - Routes to Tier 1 (Gemini Flash) for cost optimization
 - ~95% cost reduction vs direct GPT-4 calls
 
 ### Dependencies
+
 ```bash
 npm install @anthropic-ai/sdk @google/generative-ai
 ```
 
 ### Environment Variables Required
+
 ```env
 ANTHROPIC_API_KEY=sk-ant-...
 GOOGLE_AI_API_KEY=AIza...
@@ -561,6 +676,7 @@ KIMI_API_KEY=sk-...  # Optional
 ### Added - Google Tasks API
 
 **Google Workspace Client** - extended with Tasks API:
+
 - `getTaskLists()` - List all task lists
 - `getDefaultTaskList()` - Get primary task list
 - `getTasks()` - List tasks (with showCompleted option)
@@ -574,10 +690,12 @@ KIMI_API_KEY=sk-...  # Optional
 - `getOverdueTasks()` - Overdue tasks
 
 ### Changed - OAuth Scopes
+
 - Added `https://www.googleapis.com/auth/tasks` to google-workspace
 - Added `https://www.googleapis.com/auth/tasks.readonly` to google-workspace
 
 ### Changed - Task Manager Mod
+
 - Google Tasks is now **primary source** (default)
 - Unified view: Google Tasks + Todoist + Notion + ExoSkull
 - `create_task` defaults to Google Tasks
@@ -585,6 +703,7 @@ KIMI_API_KEY=sk-...  # Optional
 - Added `google_tasklist_id` config option
 
 ### Files Changed
+
 - `lib/rigs/google-workspace/client.ts` - Full Google Tasks API
 - `lib/rigs/oauth.ts` - Added Tasks scopes
 - `lib/mods/executors/task-manager.ts` - Google integration
@@ -597,6 +716,7 @@ KIMI_API_KEY=sk-...  # Optional
 ### Added - Rig Clients
 
 **Notion Client** (`lib/rigs/notion/client.ts`)
+
 - Full Notion API v2022-06-28 integration
 - Search (pages, databases)
 - Pages (CRUD, archive)
@@ -607,6 +727,7 @@ KIMI_API_KEY=sk-...  # Optional
 - Dashboard data aggregation
 
 **Todoist Client** (`lib/rigs/todoist/client.ts`)
+
 - Full Todoist REST API v2 integration
 - Tasks (CRUD, complete, reopen)
 - Projects (CRUD)
@@ -620,6 +741,7 @@ KIMI_API_KEY=sk-...  # Optional
 ### Added - Task Manager Mod Executor
 
 **First Mod Implementation** (`lib/mods/executors/task-manager.ts`)
+
 - Implements `IModExecutor` interface
 - Unified task view across Notion + Todoist + ExoSkull internal tasks
 - Task normalization (source, title, status, priority, dueDate)
@@ -641,10 +763,12 @@ KIMI_API_KEY=sk-...  # Optional
 ### Added - API Routes
 
 **Mod API** (`app/api/mods/[slug]/route.ts`)
+
 - GET: Get mod data, insights, actions
 - POST: Execute mod action
 
 **Rig Sync API** (`app/api/rigs/[slug]/sync/route.ts`)
+
 - POST: Trigger manual sync for any Rig
 - GET: Get sync status and history
 - Supports: Notion, Todoist, Google Workspace, Microsoft 365, Google Fit
@@ -652,11 +776,13 @@ KIMI_API_KEY=sk-...  # Optional
 ### Added - Executor Registry
 
 **Executor Index** (`lib/mods/executors/index.ts`)
+
 - `getModExecutor(slug)` - Get executor for a mod
 - `hasModExecutor(slug)` - Check if mod is implemented
 - `getImplementedMods()` - List implemented mods
 
 ### Environment Variables Required
+
 ```
 NOTION_CLIENT_ID=
 NOTION_CLIENT_SECRET=
@@ -665,6 +791,7 @@ TODOIST_CLIENT_SECRET=
 ```
 
 ### Notes for Future Agents
+
 - Task Manager Mod is first fully working Mod
 - Pattern established for other Mod implementations
 - Notion/Todoist OAuth configs already in `lib/rigs/oauth.ts`
@@ -675,18 +802,22 @@ TODOIST_CLIENT_SECRET=
 ## [2026-02-02] Voice Schedule Tools
 
 ### Fixed
+
 - **Cloudflare Tunnel** - VAPI nie mogło wywoływać narzędzi (tunel nieaktywny)
 
 ### Added - Voice Schedule Tools
+
 - `get_schedule` - Lista check-inów użytkownika
 - `create_checkin` - Nowe przypomnienie (name, time, frequency, channel, message)
 - `toggle_checkin` - Włącz/wyłącz check-in
 
 ### Added - Database
+
 - **Migration:** `20260202000012_user_checkins.sql`
 - **Table:** `exo_user_checkins`
 
 ### Files Changed
+
 - `components/voice/GlobalVoiceButton.tsx` - 3 nowe narzędzia VAPI
 - `app/api/voice/tools/route.ts` - Handlery schedule
 - `lib/voice/system-prompt.ts` - Sekcja 3.5 Harmonogram
@@ -696,6 +827,7 @@ TODOIST_CLIENT_SECRET=
 ## [2026-02-02] Android & Workspace Rigs
 
 ### Added - New Rigs
+
 **Migration:** `20260202000011_android_workspace_rigs.sql`
 
 - **Google Fit / HealthConnect** - Steps, sleep, heart rate from Android
@@ -703,16 +835,19 @@ TODOIST_CLIENT_SECRET=
 - **Microsoft 365** - Outlook, Calendar, OneDrive, Teams
 
 ### Added - OAuth Infrastructure
+
 - `lib/rigs/oauth.ts` - Universal OAuth handler with configs for all providers
 - `app/api/rigs/[slug]/connect/route.ts` - Start OAuth flow
 - `app/api/rigs/[slug]/callback/route.ts` - Handle OAuth callback
 
 ### Added - API Clients
+
 - `lib/rigs/google-fit/client.ts` - Google Fit API (steps, sleep, heart rate, calories)
 - `lib/rigs/google-workspace/client.ts` - Gmail, Calendar, Drive APIs
 - `lib/rigs/microsoft-365/client.ts` - Outlook, Calendar, OneDrive APIs
 
 ### Environment Variables Required
+
 ```
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
@@ -725,21 +860,26 @@ MICROSOFT_CLIENT_SECRET=
 ## [2026-02-02] Mods & Rigs System (Exoskulleton)
 
 ### Added - Database Schema
+
 **Migration:** `20260202000010_mods_rigs_schema.sql`
 
 New tables:
+
 - `exo_registry` - Registry of all Mods, Rigs, and Quests
 - `exo_user_installations` - User's installed items
 - `exo_rig_connections` - OAuth tokens for Rig integrations
 - `exo_rig_sync_log` - Sync history
 
 ### Added - Seed Data
+
 Pre-populated registry with:
+
 - **10 Rigs:** Oura, Fitbit, Apple Health, Google Calendar, Notion, Todoist, Philips Hue, Home Assistant, Plaid, Stripe
 - **9 Mods:** Sleep Tracker, Energy Monitor, HRV Tracker, Focus Mode, Task Manager, Calendar Assistant, Mood Tracker, Habit Tracker, Spending Tracker
 - **5 Quests:** 7-Day Sleep Reset, Digital Detox, Morning Routine, Mindfulness Week, Fitness Kickstart
 
 ### Added - API Routes
+
 - `GET /api/registry` - Browse Exoskulleton marketplace
 - `GET /api/registry/[slug]` - Get item details
 - `GET /api/installations` - User's installed items
@@ -748,6 +888,7 @@ Pre-populated registry with:
 - `DELETE /api/installations/[id]` - Uninstall
 
 ### Added - Type Definitions
+
 - `lib/rigs/types.ts` - Rig interfaces
 - `lib/rigs/index.ts` - Rig definitions with OAuth config
 - `lib/mods/types.ts` - Mod interfaces
@@ -758,12 +899,15 @@ Pre-populated registry with:
 ## [2026-02-02] IP Research & Final Cleanup
 
 ### Research - IP/Legal Analysis
+
 Completed comprehensive research on intellectual property compliance:
+
 - **OpenClaw** - MIT License allows unrestricted use (SAFE)
 - **Claude Code** - Not used as component, only Anthropic API (SAFE)
 - **Anthropic API** - Commercial use allowed for non-competing products (SAFE)
 
 ### Removed - Remaining External References from ARCHITECTURE.md
+
 - Line 257: `(OpenClaw-compatible)` → removed
 - Line 1911: `NEW (OpenClaw)` → `NEW`
 - Line 1916: `NEW (OpenClaw)` → `NEW`
@@ -773,7 +917,9 @@ Completed comprehensive research on intellectual property compliance:
 - Line 2987: `3.1 (OpenClaw + IORS...)` → `3.1`
 
 ### Verified - No IP Violations
+
 ExoSkull does NOT violate any intellectual property rights of:
+
 - OpenClaw (MIT License - full commercial use allowed)
 - Claude Code (not used as component)
 - Anthropic (API usage per Commercial Terms)
@@ -783,20 +929,26 @@ ExoSkull does NOT violate any intellectual property rights of:
 ## [2026-02-02] Terminology & IP Protection
 
 ### Added - Gaming/Sci-Fi Terminology
+
 **ARCHITECTURE.md** now uses consistent naming:
+
 - **Mods** = User-facing abilities & extensions (sleep tracker, focus mode)
 - **Rigs** = Tools & integrations (Oura sync, Calendar)
 - **Quests** = Weekly development programs (7-day challenges)
 - **Exoskulleton** = Marketplace/catalog for Mods, Rigs, Quests
 
 ### Removed - External Brand References
+
 Removed all "inspired by", "X-pattern", "X-style" references that could suggest copying:
+
 - Cleaned ARCHITECTURE.md (OpenClaw, MemOS, Pi Agent references)
 - Changed "SOURCES & INSPIRATION" → "TECHNOLOGY STACK"
 - Kept brand names we USE (Kimi, LangGraph, Claude) - that's tech stack, not copying
 
 ### Added - IP Guardrails
+
 **CLAUDE.md** now includes:
+
 - Never mention architecture was "inspired by" external products
 - TODO: Legal research before launch (trademarks, IP review)
 
@@ -805,26 +957,32 @@ Removed all "inspired by", "X-pattern", "X-style" references that could suggest 
 ## [2026-02-02] Application Testing & Bug Fixes
 
 ### Fixed - Tasks RLS Policy
+
 **Problem:** Użytkownicy nie mogli dodawać zadań przez dashboard
 **Root cause:** Polityka RLS miała tylko `USING` bez `WITH CHECK` - INSERT wymaga obu
 **Solution:** Dodano `WITH CHECK (tenant_id = auth.uid())`
 
 **Migrations:**
+
 - `20260202000008_fix_tasks_rls.sql` - Naprawiona polityka RLS
 - `20260202000009_drop_permissive_policy.sql` - Usunięta zbyt permisywna polityka
 
 ### Fixed - Migration Duplicate
+
 **Problem:** Dwa pliki migracji z tym samym numerem 20260202000004
 **Solution:** Przemianowano `silver_to_public.sql` na `20260202000007`
 
 ### Fixed - Silver Layer RLS Idempotency
+
 **Problem:** Migracja failowała przy ponownym uruchomieniu (polityki już istniały)
 **Solution:** Dodano `DROP POLICY IF EXISTS` przed każdym `CREATE POLICY`
 
 ### Added - VAPI Webhook Handler
+
 **File:** `app/api/vapi/webhook/route.ts`
 
 Obsługuje:
+
 - `assistant-request` → zwraca `variableValues` (zadania, imię, historia)
 - `end-of-call-report` → zapisuje rozmowę do bazy
 - `function-call` → `get_tasks`, `create_task`, `complete_task`
@@ -832,20 +990,22 @@ Obsługuje:
 Wzorzec z IORS - zmienne wstrzykiwane przez webhook zamiast tool calls.
 
 ### Changed - Voice System Prompt
+
 **File:** `lib/voice/system-prompt.ts`
 
 Usunięto instrukcje o narzędziach do zadań. Asystent teraz kieruje użytkowników do dashboardu dla zarządzania zadaniami. Rozmowa głosowa = dyskusja, wsparcie. Dashboard = zarządzanie listami.
 
 ### Test Results
-| Test | Status |
-|------|--------|
-| Build (30 routes) | ✅ PASS |
-| TypeScript | ✅ PASS |
-| Bronze ETL | ✅ 200 OK, 345ms |
-| Silver ETL | ✅ 200 OK, 1559ms |
-| Gold ETL | ✅ 200 OK, 1202ms |
-| GHL Webhook | ✅ 200 OK |
-| Voice Tools | ✅ 200 OK |
+
+| Test              | Status            |
+| ----------------- | ----------------- |
+| Build (30 routes) | ✅ PASS           |
+| TypeScript        | ✅ PASS           |
+| Bronze ETL        | ✅ 200 OK, 345ms  |
+| Silver ETL        | ✅ 200 OK, 1559ms |
+| Gold ETL          | ✅ 200 OK, 1202ms |
+| GHL Webhook       | ✅ 200 OK         |
+| Voice Tools       | ✅ 200 OK         |
 
 ---
 
@@ -854,25 +1014,30 @@ Usunięto instrukcje o narzędziach do zadań. Asystent teraz kieruje użytkowni
 ### Changed - Simplified Authentication
 
 **OAuth → Private Integration Token**
+
 - Removed OAuth flow complexity in favor of simpler Private Integration Token
 - Token stored in env vars (`GHL_PRIVATE_TOKEN`, `GHL_LOCATION_ID`)
 - No more per-tenant token management, token refresh callbacks
 
 **Updated Files:**
+
 - `lib/ghl/client.ts` - Simplified to Bearer auth only
 - `lib/cron/dispatcher.ts` - Updated `getGHLClient()` to use env vars
 - `app/api/ghl/tools/route.ts` - Updated `getGHLClient()` to use env vars
 
 **Removed:**
+
 - `app/api/ghl/oauth/start/route.ts` - OAuth initiation (not needed)
 - `app/api/ghl/oauth/callback/route.ts` - OAuth callback (not needed)
 
 **Database Migration** (`20260202000004_simplify_ghl_schema.sql`)
+
 - Dropped `exo_ghl_oauth_states` table (not needed)
 - Removed token columns from `exo_ghl_connections` table
 - Dropped unused helper functions (`get_ghl_connection`, `update_ghl_tokens`)
 
 ### Setup Instructions
+
 1. GHL → Agency Settings → Private Integrations → Create
 2. Copy token to env: `GHL_PRIVATE_TOKEN=xxx`
 3. Set location ID: `GHL_LOCATION_ID=xxx`
@@ -884,6 +1049,7 @@ Usunięto instrukcje o narzędziach do zadań. Asystent teraz kieruje użytkowni
 ### Added - GoHighLevel as Central Communication Hub
 
 **GHL Library** (`lib/ghl/`)
+
 - `client.ts` - Private Integration Token auth with rate limiting (100/10s)
 - `messaging.ts` - Unified messaging: SMS, Email, WhatsApp, Facebook, Instagram
 - `contacts.ts` - CRM contact management: CRUD, tags, notes, tasks
@@ -894,6 +1060,7 @@ Usunięto instrukcje o narzędziach do zadań. Asystent teraz kieruje użytkowni
 - `index.ts` - Central export for all GHL functions
 
 **API Routes**
+
 - `app/api/webhooks/ghl/route.ts` - Inbound webhooks (messages, contacts, appointments)
 - `app/api/ghl/tools/route.ts` - AI tools endpoint (9 tools for VAPI/agents)
 
@@ -911,6 +1078,7 @@ Usunięto instrukcje o narzędziach do zadań. Asystent teraz kieruje użytkowni
 | `ghl_move_opportunity` | Move in pipeline |
 
 **Database Migration** (`20260202000003_ghl_integration.sql`)
+
 - `exo_ghl_connections` - Tenant-location mapping
 - `exo_ghl_contacts` - Contact mapping
 - `exo_ghl_messages` - Message log for analytics
@@ -921,12 +1089,14 @@ Usunięto instrukcje o narzędziach do zadań. Asystent teraz kieruje użytkowni
 ### Changed
 
 **lib/cron/dispatcher.ts**
+
 - SMS: GHL as primary, Twilio as fallback
 - Added: Email dispatch via GHL
 - Added: WhatsApp dispatch via GHL
 - Channel priority: Voice (VAPI) > WhatsApp > SMS > Email
 
 **ARCHITECTURE.md**
+
 - Updated channel orchestration to reflect GHL hub
 - Added "GHL Integration Architecture" section
 - Updated tech stack table
@@ -956,6 +1126,7 @@ GHL_WEBHOOK_SECRET=xxx (optional)
 ```
 
 ### Notes for Future Agents
+
 - GHL OAuth flow is ready - user needs to connect via `/api/ghl/oauth/start?tenant_id=xxx`
 - All GHL functions have rate limiting built-in (100 req/10s)
 - Twilio remains as SMS fallback when GHL not connected
@@ -968,18 +1139,21 @@ GHL_WEBHOOK_SECRET=xxx (optional)
 ### Added - Gold Layer (Pre-Aggregated Dashboard Views)
 
 **lib/datalake/gold-etl.ts**
+
 - Materialized view refresh logic
 - Functions: `runGoldETL()`, `refreshSingleView()`, `getGoldStats()`, `getRefreshHistory()`
 - Sequential refresh to avoid resource contention
 - Automatic logging to `exo_gold_sync_log`
 
 **app/api/cron/gold-etl/route.ts**
+
 - POST: Trigger full refresh (auth required via `x-cron-secret`)
 - POST with `view_name`: Refresh single view
 - GET: Status + stats + recent history
 - Schedule: Daily at 02:00 UTC
 
 **supabase/migrations/20260202000006_gold_schema.sql**
+
 - `exo_gold_daily_summary` - Daily conversation aggregations
 - `exo_gold_weekly_summary` - Weekly aggregations with active days
 - `exo_gold_monthly_summary` - Monthly aggregations
@@ -988,6 +1162,7 @@ GHL_WEBHOOK_SECRET=xxx (optional)
 - Unique indexes for CONCURRENTLY refresh (no read locks)
 
 **vercel.json**
+
 ```json
 { "path": "/api/cron/gold-etl", "schedule": "0 2 * * *" }
 ```
@@ -1001,6 +1176,7 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
 ```
 
 ### Notes for Future Agents
+
 - Gold views depend on Silver tables (`exo_silver_*`)
 - Refresh uses CONCURRENTLY (requires unique index, no locks)
 - Query Gold views for dashboard (sub-10ms response)
@@ -1011,6 +1187,7 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
 ## [2026-02-02] Emotion Intelligence Architecture
 
 ### Added - ARCHITECTURE.md: Layer 11 Emotion Intelligence
+
 - **Multi-Modal Emotion Detection** (from IORS)
   - Voice biomarkers: pitch, rate, pauses, energy, jitter, shimmer
   - Text sentiment: GPT-4o-mini / Gemini Flash
@@ -1034,12 +1211,14 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
   - Ambient audio analysis (opt-in, on-device only)
 
 ### Changed
+
 - Layer numbering: 11-20 → 12-21 (emotion layer inserted as L11)
 - Layer 3 extended with emotion_signals input modality
 - Tech Stack updated with emotion detection tools
 - Roadmap Phase 2 includes emotion intelligence tasks
 
 ### Architecture
+
 - Version: 3.0 → 3.1 (OpenClaw + IORS Emotion Intelligence)
 - Total layers: 20 → 21
 
@@ -1048,6 +1227,7 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
 ## [2026-02-02] Voice-First System
 
 ### Added - Global Voice Button
+
 - **GlobalVoiceButton** (`components/voice/GlobalVoiceButton.tsx`)
   - Fixed position button in top-left corner of dashboard
   - One-click to start VAPI voice conversation with ExoAI
@@ -1069,6 +1249,7 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
   - Real-time audio to text conversion
 
 ### Philosophy
+
 - Voice-first: every interaction starts with voice
 - Global button always accessible - never more than one click away
 - All voice interactions go through ExoAI (no separate "notes" vs "conversation")
@@ -1078,6 +1259,7 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
 ## [2026-02-02] Data Lake Silver Layer
 
 ### Added - Silver Layer ETL
+
 - **Parquet Reader** (`lib/storage/parquet-reader.ts`)
   - Read Parquet files from R2 using hyparquet
   - Type-safe readers for conversations, messages, voice calls, SMS logs
@@ -1103,6 +1285,7 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
   - `exo_silver_sync_log` - ETL tracking per tenant/data_type
 
 ### Tested
+
 - 30 records successfully transformed (18 conversations, 12 messages)
 - All 4 data types processing correctly
 - Incremental sync working (only new Bronze files processed)
@@ -1112,6 +1295,7 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
 ## [2026-02-01] Dashboard Expansion
 
 ### Added - Chat Panel
+
 - **ChatPanel Component** (`components/voice/ChatPanel.tsx`)
   - Real-time transcript display during voice calls
   - User messages (blue, right), Agent messages (gray, left)
@@ -1124,6 +1308,7 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
   - Interim transcript support (partial → final)
 
 ### Added - CRON Dashboard
+
 - **Schedule Page** (`app/dashboard/schedule/page.tsx`)
   - Full UI for managing scheduled jobs
   - Toggle jobs on/off
@@ -1132,6 +1317,7 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
   - Manual job trigger for testing
 
 ### Added - Dynamic Widgets
+
 - **TasksWidget** (`components/widgets/TasksWidget.tsx`)
   - Task completion stats (pending/in_progress/done)
   - Links to tasks page
@@ -1152,6 +1338,7 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
   - Dynamic greeting based on time
 
 ### Added - Knowledge System
+
 - **Migration** (`supabase/migrations/20260201000008_knowledge_system.sql`)
   - `exo_user_documents` table (file metadata)
   - `exo_document_chunks` table (embeddings with pgvector)
@@ -1174,11 +1361,13 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
   - Placeholder UI with planned features
 
 ### Changed - Navigation
+
 - **Layout** (`app/dashboard/layout.tsx`)
   - Added "Harmonogram" (Clock icon)
   - Added "Wiedza" (FileText icon)
 
 ### Dependencies
+
 - `recharts` - Chart library for React
 
 ---
@@ -1186,6 +1375,7 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
 ## [2026-02-01] Data Lake Bronze Layer
 
 ### Added
+
 - **R2 Storage Client** (`lib/storage/r2-client.ts`)
   - S3-compatible client for Cloudflare R2
   - `writeToBronze()` - Upload Parquet files
@@ -1216,6 +1406,7 @@ Bronze (R2 Parquet)  →  Silver (Postgres)  →  Gold (Materialized Views)
   - Enables incremental ETL (only new records)
 
 ### R2 Path Structure
+
 ```
 exoskull-bronze/
   {tenant_id}/
@@ -1227,6 +1418,7 @@ exoskull-bronze/
 ```
 
 ### Environment Variables
+
 ```env
 R2_ACCOUNT_ID=xxx
 R2_ACCESS_KEY_ID=xxx
@@ -1235,6 +1427,7 @@ R2_BUCKET_NAME=exoskull-bronze
 ```
 
 ### Cost
+
 - Cloudflare R2: $0.015/GB/mo, zero egress fees
 - 10GB free tier
 
@@ -1243,6 +1436,7 @@ R2_BUCKET_NAME=exoskull-bronze
 ## [2026-02-01] CRON Scheduling System
 
 ### Added
+
 - **Master Scheduler** (`app/api/cron/master-scheduler/route.ts`)
   - Central coordinator running hourly via Vercel Cron
   - Timezone-aware scheduling per user
@@ -1275,6 +1469,7 @@ R2_BUCKET_NAME=exoskull-bronze
 ### Database (Supabase Migrations)
 
 **`20260201000002_scheduled_jobs_system.sql`:**
+
 - `exo_scheduled_jobs` - 15 job definitions
 - `exo_user_job_preferences` - Per-user settings
 - `exo_scheduled_job_logs` - Execution history
@@ -1282,6 +1477,7 @@ R2_BUCKET_NAME=exoskull-bronze
 - Helper functions: `get_users_for_scheduled_job()`, `check_user_rate_limit()`, `log_job_execution()`
 
 **`20260201000004_job_consent_model.sql`:**
+
 - `exo_user_job_consents` - Track user consent from conversations
 - `record_job_consent()` - Enable job for user
 - `revoke_job_consent()` - Disable or pause job
@@ -1331,6 +1527,7 @@ SELECT revoke_job_consent('tenant-uuid', 'morning_checkin');
 ```
 
 ### Environment Variables
+
 ```env
 CRON_SECRET=exoskull-cron-2026  # Required for Vercel Cron auth
 ```
@@ -1340,6 +1537,7 @@ CRON_SECRET=exoskull-cron-2026  # Required for Vercel Cron auth
 ## [2026-02-01] Voice System - ElevenLabs Integration
 
 ### Added
+
 - **Prompt Caching System** (`lib/voice/system-prompt.ts`)
   - Static system prompt (~1200 tokens) for OpenAI automatic caching
   - Dynamic context builder for time-based greetings
@@ -1364,6 +1562,7 @@ CRON_SECRET=exoskull-cron-2026  # Required for Vercel Cron auth
   - 5MB file size limit, audio/mpeg only
 
 ### Changed
+
 - **Voice Configuration** (`app/dashboard/voice/page.tsx`)
   - Voice provider: `11labs` (was `openai`)
   - Voice ID: `vhGAGQee0VjHonqyxGxd` (user's custom cloned voice)
@@ -1371,32 +1570,37 @@ CRON_SECRET=exoskull-cron-2026  # Required for Vercel Cron auth
   - Added VAPI timing optimizations (responseDelaySeconds, etc.)
 
 ### Fixed
+
 - VAPI 400 Bad Request: Changed voice provider from `eleven-labs` to `11labs`
 - ElevenLabs blocked error: User added BYOK via VAPI dashboard
 
 ### Environment Variables
+
 ```env
 ELEVENLABS_API_KEY=sk_xxx  # Required for audio cache generation
 ```
 
 ### Cost Optimization Summary
-| Optimization | Savings |
-|--------------|---------|
-| OpenAI prompt caching | ~50% on input tokens |
+
+| Optimization           | Savings                   |
+| ---------------------- | ------------------------- |
+| OpenAI prompt caching  | ~50% on input tokens      |
 | ElevenLabs audio cache | ~60-70% on common phrases |
-| gpt-4o-mini model | ~90% vs gpt-4 |
+| gpt-4o-mini model      | ~90% vs gpt-4             |
 
 ---
 
 ## [2026-02-01] Voice Tools Integration
 
 ### Added
+
 - **VAPI Tools Endpoint** (`app/api/voice/tools/route.ts`)
   - `get_tasks`: Fetch user's tasks during voice conversation
   - `create_task`: Add new task via voice
   - `complete_task`: Mark task as done via voice
 
 ### Changed
+
 - Voice page now passes `tenant_id` via URL query params
 - Tools use public cloudflare tunnel URL for VAPI access
 
@@ -1408,14 +1612,18 @@ ELEVENLABS_API_KEY=sk_xxx  # Required for audio cache generation
 ## [YYYY-MM-DD] Feature Name
 
 ### Added
+
 - New features
 
 ### Changed
+
 - Changes to existing functionality
 
 ### Fixed
+
 - Bug fixes
 
 ### Removed
+
 - Removed features
 ```
