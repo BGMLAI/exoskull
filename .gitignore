@@ -20,3 +20,10 @@ nul
 
 # Word temp files
 ~$*.docx
+
+# Local project directories (not submodules)
+IORS_Master_Project/
+Windows-MCP/
+boy burger/
+
+.vercel
