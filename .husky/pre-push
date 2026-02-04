@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+
+# Pre-push hook: run route tests if dev server is available
+cd exoskull-app
+
+echo "[pre-push] Checking if dev server is running..."
+curl -s --max-time 3 http://localhost:3000/api/pulse > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+  echo "[pre-push] Dev server detected. Running route tests..."
+  npx tsx scripts/test-all-routes.ts 2>&1
+  TEST_EXIT=$?
+  if [ $TEST_EXIT -ne 0 ]; then
+    echo "[pre-push] ROUTE TESTS FAILED - check test output above"
+    exit 1
+  fi
+  echo "[pre-push] All route tests passed"
+else
+  echo "[pre-push] Dev server not running - skipping route tests"
+  echo "[pre-push] To run manually: npm run test:routes"
+fi
