@@ -238,8 +238,24 @@ export default async function LandingPage() {
 
         {/* Footer */}
         <footer className="text-center text-slate-600 text-sm py-8 mt-12">
-          ExoSkull &copy; {new Date().getFullYear()}. Adaptive Life Operating
-          System.
+          <div className="flex gap-6 justify-center mb-4">
+            <Link
+              href="/privacy"
+              className="text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              Polityka Prywatnosci
+            </Link>
+            <Link
+              href="/terms"
+              className="text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              Regulamin
+            </Link>
+          </div>
+          <p>
+            ExoSkull &copy; {new Date().getFullYear()} Fundacja Lokalny
+            Certyfikowany
+          </p>
         </footer>
       </div>
     </div>
