@@ -1,103 +1,130 @@
-'use client'
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Plug, Check, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Plug,
+  Check,
+  ExternalLink,
+  RefreshCw,
+  AlertCircle,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface RigConnection {
-  rig_slug: string
-  sync_status: 'pending' | 'syncing' | 'success' | 'error'
-  last_sync_at: string | null
-  metadata: Record<string, unknown>
+  rig_slug: string;
+  sync_status: "pending" | "syncing" | "success" | "error";
+  last_sync_at: string | null;
+  metadata: Record<string, unknown>;
 }
 
 interface RigInfo {
-  slug: string
-  name: string
-  icon: string
-  description: string
+  slug: string;
+  name: string;
+  icon: string;
+  description: string;
 }
 
 // Main integrations to show
 const FEATURED_RIGS: RigInfo[] = [
   {
-    slug: 'google',
-    name: 'Google',
-    icon: '🌐',
-    description: 'Fit, Gmail, Calendar, Drive, YouTube, Photos',
+    slug: "google",
+    name: "Google",
+    icon: "🌐",
+    description: "Fit, Gmail, Calendar, Drive, YouTube, Photos",
   },
   {
-    slug: 'microsoft-365',
-    name: 'Microsoft 365',
-    icon: '🟦',
-    description: 'Outlook, Calendar, OneDrive, Teams',
+    slug: "microsoft-365",
+    name: "Microsoft 365",
+    icon: "🟦",
+    description: "Outlook, Calendar, OneDrive, Teams",
   },
   {
-    slug: 'notion',
-    name: 'Notion',
-    icon: '📓',
-    description: 'Bazy danych i notatki',
+    slug: "notion",
+    name: "Notion",
+    icon: "📓",
+    description: "Bazy danych i notatki",
   },
   {
-    slug: 'todoist',
-    name: 'Todoist',
-    icon: '✅',
-    description: 'Zadania i projekty',
+    slug: "todoist",
+    name: "Todoist",
+    icon: "✅",
+    description: "Zadania i projekty",
   },
-]
+];
 
 interface IntegrationsWidgetProps {
-  connections?: RigConnection[]
-  loading?: boolean
+  connections?: RigConnection[];
+  loading?: boolean;
+  tenantId?: string | null;
+  onSyncComplete?: (slug: string, data: Record<string, unknown>) => void;
 }
 
-export function IntegrationsWidget({ connections = [], loading }: IntegrationsWidgetProps) {
-  const [connectionsMap, setConnectionsMap] = useState<Map<string, RigConnection>>(new Map())
-  const [syncing, setSyncing] = useState<string | null>(null)
+export function IntegrationsWidget({
+  connections = [],
+  loading,
+  tenantId,
+  onSyncComplete,
+}: IntegrationsWidgetProps) {
+  const [connectionsMap, setConnectionsMap] = useState<
+    Map<string, RigConnection>
+  >(new Map());
+  const [syncing, setSyncing] = useState<string | null>(null);
 
   useEffect(() => {
-    const map = new Map<string, RigConnection>()
+    const map = new Map<string, RigConnection>();
     connections.forEach((conn) => {
-      map.set(conn.rig_slug, conn)
-    })
-    setConnectionsMap(map)
-  }, [connections])
+      map.set(conn.rig_slug, conn);
+    });
+    setConnectionsMap(map);
+  }, [connections]);
 
   const handleConnect = (slug: string) => {
     // Redirect to OAuth flow
-    window.location.href = `/api/rigs/${slug}/connect`
-  }
+    window.location.href = `/api/rigs/${slug}/connect`;
+  };
 
   const handleSync = async (slug: string) => {
-    setSyncing(slug)
+    if (!tenantId) {
+      console.error("[IntegrationsWidget] Cannot sync: missing tenantId");
+      return;
+    }
+    setSyncing(slug);
     try {
-      const response = await fetch(`/api/rigs/${slug}/sync`, { method: 'POST' })
+      const response = await fetch(`/api/rigs/${slug}/sync`, {
+        method: "POST",
+        headers: { "x-tenant-id": tenantId },
+      });
       if (response.ok) {
+        const result = await response.json();
+        onSyncComplete?.(slug, result.data || {});
         // Refresh the page to show updated data
-        window.location.reload()
+        window.location.reload();
+      } else {
+        const err = await response.json().catch(() => ({}));
+        console.error("[IntegrationsWidget] Sync failed:", err);
       }
     } catch (error) {
-      console.error('Sync failed:', error)
+      console.error("[IntegrationsWidget] Sync failed:", error);
     } finally {
-      setSyncing(null)
+      setSyncing(null);
     }
-  }
+  };
 
   const formatLastSync = (dateStr: string | null) => {
-    if (!dateStr) return 'Nigdy'
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / (1000 * 60))
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    if (!dateStr) return "Nigdy";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffMins < 1) return 'Przed chwilą'
-    if (diffMins < 60) return `${diffMins} min temu`
-    if (diffHours < 24) return `${diffHours}h temu`
-    return `${diffDays}d temu`
-  }
+    if (diffMins < 1) return "Przed chwilą";
+    if (diffMins < 60) return `${diffMins} min temu`;
+    if (diffHours < 24) return `${diffHours}h temu`;
+    return `${diffDays}d temu`;
+  };
 
   if (loading) {
     return (
@@ -111,15 +138,20 @@ export function IntegrationsWidget({ connections = [], loading }: IntegrationsWi
         <CardContent>
           <div className="animate-pulse space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-gray-200 dark:bg-gray-800 rounded" />
+              <div
+                key={i}
+                className="h-16 bg-gray-200 dark:bg-gray-800 rounded"
+              />
             ))}
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
-  const connectedCount = FEATURED_RIGS.filter((rig) => connectionsMap.has(rig.slug)).length
+  const connectedCount = FEATURED_RIGS.filter((rig) =>
+    connectionsMap.has(rig.slug),
+  ).length;
 
   return (
     <Card>
@@ -136,10 +168,12 @@ export function IntegrationsWidget({ connections = [], loading }: IntegrationsWi
       </CardHeader>
       <CardContent className="space-y-3">
         {FEATURED_RIGS.map((rig) => {
-          const connection = connectionsMap.get(rig.slug)
-          const isConnected = !!connection && connection.sync_status !== 'error'
-          const hasError = connection?.sync_status === 'error'
-          const isSyncing = syncing === rig.slug || connection?.sync_status === 'syncing'
+          const connection = connectionsMap.get(rig.slug);
+          const isConnected =
+            !!connection && connection.sync_status !== "error";
+          const hasError = connection?.sync_status === "error";
+          const isSyncing =
+            syncing === rig.slug || connection?.sync_status === "syncing";
 
           return (
             <div
@@ -176,7 +210,9 @@ export function IntegrationsWidget({ connections = [], loading }: IntegrationsWi
                       disabled={isSyncing}
                       className="h-8 px-2"
                     >
-                      <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                      <RefreshCw
+                        className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`}
+                      />
                     </Button>
                     <Button
                       variant="outline"
@@ -199,7 +235,7 @@ export function IntegrationsWidget({ connections = [], loading }: IntegrationsWi
                 )}
               </div>
             </div>
-          )
+          );
         })}
 
         <a
@@ -210,5 +246,5 @@ export function IntegrationsWidget({ connections = [], loading }: IntegrationsWi
         </a>
       </CardContent>
     </Card>
-  )
+  );
 }
