@@ -104,12 +104,24 @@ export async function refreshAccessToken(
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-// Minimal Google Scopes (for initial OAuth testing)
-// Once OAuth flow confirmed working, expand incrementally
+// Minimal Google Scopes (profile only)
 const GOOGLE_MINIMAL_SCOPES = [
   "openid",
   "https://www.googleapis.com/auth/userinfo.email",
   "https://www.googleapis.com/auth/userinfo.profile",
+];
+
+// Core Google Scopes (Gmail + Calendar - primary use case)
+const GOOGLE_CORE_SCOPES = [
+  ...GOOGLE_MINIMAL_SCOPES,
+
+  // Gmail
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
+
+  // Calendar
+  "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/calendar.events",
 ];
 
 // Full Google Scopes (enable after OAuth confirmed working + APIs enabled in GCP)
@@ -177,7 +189,7 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
   google: () => ({
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
-    scopes: GOOGLE_MINIMAL_SCOPES, // TODO: Switch to GOOGLE_COMPREHENSIVE_SCOPES after OAuth confirmed working
+    scopes: GOOGLE_CORE_SCOPES, // Gmail + Calendar; expand to GOOGLE_COMPREHENSIVE_SCOPES after GCP verification
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     redirectUri: `${BASE_URL}/api/rigs/google/callback`,
@@ -187,7 +199,7 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
   "google-fit": () => ({
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
-    scopes: GOOGLE_MINIMAL_SCOPES, // TODO: Switch to GOOGLE_COMPREHENSIVE_SCOPES after OAuth confirmed working
+    scopes: GOOGLE_CORE_SCOPES, // Gmail + Calendar; expand to GOOGLE_COMPREHENSIVE_SCOPES after GCP verification
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     redirectUri: `${BASE_URL}/api/rigs/google-fit/callback`,
@@ -197,7 +209,7 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
   "google-workspace": () => ({
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
-    scopes: GOOGLE_MINIMAL_SCOPES, // TODO: Switch to GOOGLE_COMPREHENSIVE_SCOPES after OAuth confirmed working
+    scopes: GOOGLE_CORE_SCOPES, // Gmail + Calendar; expand to GOOGLE_COMPREHENSIVE_SCOPES after GCP verification
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     redirectUri: `${BASE_URL}/api/rigs/google-workspace/callback`,
@@ -207,7 +219,7 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
   "google-calendar": () => ({
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
-    scopes: GOOGLE_MINIMAL_SCOPES, // TODO: Switch to GOOGLE_COMPREHENSIVE_SCOPES after OAuth confirmed working
+    scopes: GOOGLE_CORE_SCOPES, // Gmail + Calendar; expand to GOOGLE_COMPREHENSIVE_SCOPES after GCP verification
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     redirectUri: `${BASE_URL}/api/rigs/google-calendar/callback`,
