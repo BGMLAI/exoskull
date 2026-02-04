@@ -19,6 +19,10 @@ const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '+48732144112'
 // Type alias for language (Twilio uses specific enum)
 type TwilioLanguage = Parameters<VoiceResponse['say']>[0]['language']
 
+// Best available Polish voice for fallback (Google Wavenet = natural sounding)
+const TWILIO_POLISH_VOICE = 'Google.pl-PL-Wavenet-B' // Male, natural
+const TWILIO_POLISH_LANGUAGE: TwilioLanguage = 'pl-PL' as TwilioLanguage
+
 // Initialize Twilio client (lazy)
 let twilioClient: twilio.Twilio | null = null
 
@@ -62,7 +66,7 @@ export function generateGatherTwiML(options: GatherOptions): string {
   if (audioUrl) {
     response.play(audioUrl)
   } else if (fallbackText) {
-    response.say({ language: language as TwilioLanguage }, fallbackText)
+    response.say({ voice: TWILIO_POLISH_VOICE, language: TWILIO_POLISH_LANGUAGE }, fallbackText)
   }
 
   // Gather speech input
@@ -74,7 +78,7 @@ export function generateGatherTwiML(options: GatherOptions): string {
   })
 
   // Fallback if no speech detected
-  response.say({ language: language as TwilioLanguage }, 'Nie usłyszałem. Do usłyszenia!')
+  response.say({ voice: TWILIO_POLISH_VOICE, language: TWILIO_POLISH_LANGUAGE }, 'Nie usłyszałem. Do usłyszenia!')
 
   return response.toString()
 }
@@ -102,7 +106,7 @@ export function generatePlayAndGatherTwiML(options: {
   })
 
   // If no input, ask again
-  response.say({ language: language as TwilioLanguage }, 'Czy jest coś jeszcze?')
+  response.say({ voice: TWILIO_POLISH_VOICE, language: TWILIO_POLISH_LANGUAGE }, 'Czy jest coś jeszcze?')
 
   response.gather({
     input: ['speech'],
@@ -112,7 +116,7 @@ export function generatePlayAndGatherTwiML(options: {
   })
 
   // Final goodbye
-  response.say({ language: language as TwilioLanguage }, 'Do usłyszenia!')
+  response.say({ voice: TWILIO_POLISH_VOICE, language: TWILIO_POLISH_LANGUAGE }, 'Do usłyszenia!')
 
   return response.toString()
 }
@@ -125,14 +129,14 @@ export function generateEndCallTwiML(options?: {
   farewellText?: string
   language?: string
 }): string {
-  const { audioUrl, farewellText = 'Do usłyszenia!', language = 'pl-PL' } = options || {}
+  const { audioUrl, farewellText = 'Do usłyszenia!' } = options || {}
 
   const response = new VoiceResponse()
 
   if (audioUrl) {
     response.play(audioUrl)
   } else {
-    response.say({ language: language as TwilioLanguage }, farewellText)
+    response.say({ voice: TWILIO_POLISH_VOICE, language: TWILIO_POLISH_LANGUAGE }, farewellText)
   }
 
   response.hangup()
@@ -143,9 +147,9 @@ export function generateEndCallTwiML(options?: {
 /**
  * Generate TwiML for error scenarios
  */
-export function generateErrorTwiML(language: string = 'pl-PL'): string {
+export function generateErrorTwiML(): string {
   const response = new VoiceResponse()
-  response.say({ language: language as TwilioLanguage }, 'Przepraszam, wystąpił błąd. Spróbuj ponownie później.')
+  response.say({ voice: TWILIO_POLISH_VOICE, language: TWILIO_POLISH_LANGUAGE }, 'Przepraszam, wystąpił błąd. Spróbuj ponownie później.')
   response.hangup()
   return response.toString()
 }
@@ -162,7 +166,7 @@ export function generateSayAndGatherTwiML(options: {
 
   const response = new VoiceResponse()
 
-  response.say({ language: language as TwilioLanguage }, text)
+  response.say({ voice: TWILIO_POLISH_VOICE, language: TWILIO_POLISH_LANGUAGE }, text)
 
   response.gather({
     input: ['speech'],
@@ -171,7 +175,7 @@ export function generateSayAndGatherTwiML(options: {
     action: actionUrl
   })
 
-  response.say({ language: language as TwilioLanguage }, 'Czy jest coś jeszcze?')
+  response.say({ voice: TWILIO_POLISH_VOICE, language: TWILIO_POLISH_LANGUAGE }, 'Czy jest coś jeszcze?')
 
   response.gather({
     input: ['speech'],
@@ -180,7 +184,7 @@ export function generateSayAndGatherTwiML(options: {
     action: actionUrl
   })
 
-  response.say({ language: language as TwilioLanguage }, 'Do usłyszenia!')
+  response.say({ voice: TWILIO_POLISH_VOICE, language: TWILIO_POLISH_LANGUAGE }, 'Do usłyszenia!')
 
   return response.toString()
 }

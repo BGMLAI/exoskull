@@ -10,3 +10,13 @@ node_modules/
 ovh_manager/ovh_credentials.json
 exoskull-app/README.md
 .claude/
+
+# Agent artifacts
+AGENT_DONE_*.md
+AGENT_PROMPTS.md
+
+# Windows artifacts
+nul
+
+# Word temp files
+~$*.docx

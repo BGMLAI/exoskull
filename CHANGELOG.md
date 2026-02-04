@@ -4,7 +4,253 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## 2026-02-04
+
+### Stabilizacja: Fazy 0, 1, 2, 4 DONE
+
+#### Faza 0: Fix Build
+- Fix TS error `res.clone` w `scripts/test-all-routes.ts:389`
+- Build: 0 errors, npm run build SUCCESS
+
+#### Faza 1: GHL Dead Code Cleanup
+- Usunieto 11 plikow GHL (~3500 linii dead code):
+  - `lib/ghl/` (9 plikow: client, messaging, contacts, calendar, workflows, opportunities, social, ai-processor, index)
+  - `app/api/ghl/tools/route.ts`
+  - `app/api/webhooks/ghl/route.ts`
+- Zmodyfikowano 3 pliki (usunieto GHL importy, zostawiono Twilio/Resend):
+  - `lib/voice/conversation-handler.ts` - SMS via Twilio, email via Resend
+  - `lib/autonomy/executor.ts` - SMS via Twilio, email via Resend
+  - `lib/cron/dispatcher.ts` - SMS via Twilio, email via Resend
+- System prompt: usunieto "(przez GHL)" z opisu kanalow
+- WhatsApp/Messenger: zwracaja "nie skonfigurowany" (brak fallbacku bez GHL)
+- Env vars: usunieto GHL_PRIVATE_TOKEN, GHL_LOCATION_ID, GHL_WEBHOOK_SECRET z .env.local
+
+#### Faza 2: Migracje
+- 42 migracji total, 41 bylo na produkcji
+- Zaaplikowano brakujaca: `20260203000006_unified_thread.sql`
+- Wszystkie migracje zsynchronizowane
+
+#### Faza 4: Env Vars
+- Vercel: 13 env vars skonfigurowanych (brak GHL - dobrze)
+- Brakuje: RESEND_API_KEY, TAVILY_API_KEY (nie blokuja core, email/search disabled)
+
+#### Status po stabilizacji
+- Build: PASS (0 TS errors)
+- Migracje: 42/42 zaaplikowane
+- Dead code: -3500 linii
+- Kanaly: Voice (Twilio), SMS (Twilio), Email (Resend - wymaga klucza)
+
+---
+
+### PLAN STABILIZACJI APLIKACJI v2
+
+**Kontekst:** 7 modulow zbudowanych przez rozne agenty (02-03 Feb), komunikacja przeanalizowana (GHL vs Twilio vs DIY). Decyzja: Twilio stays, GHL = dead code do usuniecia.
+
+**Status budowania:** FAIL - 1 blad TS w `scripts/test-all-routes.ts:389`
+**Migracje:** 43 pliki (Jan 31 - Feb 3)
+**Produkcja:** Vercel (exoskull.xyz), 13 env vars (brak GHL)
+
+---
+
+#### FAZA 0: BUILD FIX (blokuje deploy)
+
+| # | Zadanie | Plik | Priorytet |
+|---|---------|------|-----------|
+| 0.1 | Fix TS error `res.clone` condition | `scripts/test-all-routes.ts:389` | KRYTYCZNY |
+| 0.2 | Verify clean build po fix | `npx next build` | KRYTYCZNY |
+
+---
+
+#### FAZA 1: DEAD CODE CLEANUP (GHL removal)
+
+**Decyzja:** GHL nie jest skonfigurowany na produkcji. Caly kod GHL to dead code.
+
+| # | Zadanie | Pliki | Wplyw |
+|---|---------|-------|-------|
+| 1.1 | Usun GHL library files | `lib/ghl/client.ts`, `lib/ghl/messaging.ts`, `lib/ghl/contacts.ts`, `lib/ghl/ai-processor.ts` | Zero - nie uzywane na prod |
+| 1.2 | Usun GHL webhook route | `app/api/webhooks/ghl/route.ts` | Zero - brak env vars |
+| 1.3 | Usun GHL imports z conversation-handler | `lib/voice/conversation-handler.ts` (linie 14-16) | Zero - fallback na Twilio juz dziala |
+| 1.4 | Uproszczenie send_sms/send_email - usun GHL branch | `lib/voice/conversation-handler.ts` (linie 749-766, 795-810) | Twilio/Resend staja sie jedyna sciezka |
+| 1.5 | Usun GHL env vars z .env.local | `.env.local` (GHL_PRIVATE_TOKEN, GHL_LOCATION_ID, GHL_WEBHOOK_SECRET) | Porzadek |
+| 1.6 | GHL migracje - zostaw (nie usuwac z DB) | `20260202000003`, `20260202000004` | Tabele moga zostac, nie szkodza |
+
+---
+
+#### FAZA 2: WERYFIKACJA MIGRACJI
+
+**43 migracje - trzeba potwierdzic co jest na produkcji.**
+
+| # | Zadanie | Metoda |
+|---|---------|--------|
+| 2.1 | Sprawdz ktore migracje sa applied na remote Supabase | `supabase migration list --linked` |
+| 2.2 | Zidentyfikuj brakujace migracje | Porownaj local vs remote |
+| 2.3 | Apply brakujace (jesli sa) | `supabase db push` lub manual SQL |
+| 2.4 | Sprawdz unified_thread migracja (najnowsza - 000006) | Czy tabele istnieja na prod? |
+
+---
+
+#### FAZA 3: TESTY END-TO-END (krytyczne sciezki)
+
+| # | Sciezka | Test | Oczekiwany wynik |
+|---|---------|------|-----------------|
+| 3.1 | Voice inbound call | Zadzwon na +48732144112 | IORS odpowiada po polsku, ElevenLabs TTS |
+| 3.2 | Voice outbound call | Claude uzywa `make_call` tool | Twilio dzwoni, delegate conversation dziala |
+| 3.3 | SMS send | Claude uzywa `send_sms` tool | Twilio wysyla SMS bezposrednio |
+| 3.4 | Email send | Claude uzywa `send_email` tool | Resend wysyla email (sprawdz RESEND_API_KEY na Vercel) |
+| 3.5 | Web chat | `/dashboard/chat` | Odpowiedz tekstowa, tools dzialaja |
+| 3.6 | Onboarding flow | Nowy user → `/onboarding` | Discovery conversation → profil zapisany |
+| 3.7 | Dashboard load | `/dashboard` | Widgety laduja, realtime dziala |
+| 3.8 | Knowledge CRUD | `/dashboard/knowledge` | Loops/Campaigns/Quests/Ops CRUD |
+| 3.9 | CRON master-scheduler | `/api/cron/master-scheduler` | Nie crashuje, dispatches work |
+| 3.10 | CRON intervention-executor | `/api/cron/intervention-executor` | Przetwarza queue |
+
+---
+
+#### FAZA 4: BRAKUJACE ENV VARS NA VERCEL
+
+| Zmienna | Status | Akcja |
+|---------|--------|-------|
+| `RESEND_API_KEY` | ? (moze brak) | Sprawdz i dodaj jesli brak |
+| `TAVILY_API_KEY` | ? (moze brak) | Sprawdz - potrzebny dla web_search tool |
+| `OPENAI_API_KEY` | Jest | OK |
+| `ELEVENLABS_API_KEY` | Jest | OK |
+| `TWILIO_*` | Jest (3 vars) | OK |
+| `ANTHROPIC_API_KEY` | Jest | OK |
+| `SUPABASE_*` | Jest (3 vars) | OK |
+| `CRON_SECRET` | Jest | OK |
+
+---
+
+#### FAZA 5: KOMUNIKACJA - NOWA ARCHITEKTURA
+
+**Decyzja z analizy:** Twilio = jedyny provider. Przyszlosc = Direct Meta APIs.
+
+| # | Zadanie | Priorytet | Oszczednosc |
+|---|---------|-----------|-------------|
+| 5.1 | WhatsApp: Meta Cloud API bezposrednio (zamiast Twilio BSP) | MEDIUM | ~$100/mo przy 2K conv |
+| 5.2 | Messenger: Meta Graph API (FREE) | MEDIUM | Caly kanal za $0 |
+| 5.3 | Instagram DM: Meta Graph API (FREE) | LOW | Caly kanal za $0 |
+| 5.4 | Email: Resend (obecny) + Amazon SES dla bulk | LOW | $75/mo savings at scale |
+| 5.5 | SMS: Evaluate Plivo vs Twilio | LOW | 33% savings na SMS |
+
+**Wymagania do 5.1-5.3:**
+- Meta Business Account (czy juz masz?)
+- Meta App Review (WhatsApp, Messenger, Instagram permissions)
+- WhatsApp Business Profile verification (1-4 tygodnie)
+
+---
+
+#### FAZA 6: JAKOSCI KODU (tech debt z multi-agent build)
+
+| # | Zadanie | Opis |
+|---|---------|------|
+| 6.1 | Audit typow TS | 7 modulow pisanych przez rozne agenty - niespojne typy |
+| 6.2 | Usun duplikaty | Sprawdz overlapping exports miedzy lib/tools/ i lib/voice/conversation-handler |
+| 6.3 | Consolidate session storage | Dwa systemy: `exo_voice_sessions` (legacy) + `exo_unified_messages` (nowy) |
+| 6.4 | knowledge page inconsistency | `tenant_id` vs `tenantId` (camelCase) w roznych routach |
+| 6.5 | Error handling audit | Sprawdz czy wszystkie catch maja proper logging (per CLAUDE.md) |
+| 6.6 | Usun nieuzywane importy/pliki | VAPI remnants, duplicate components |
+
+---
+
+#### FAZA 7: MONITORING & OBSERVABILITY
+
+| # | Zadanie | Opis |
+|---|---------|------|
+| 7.1 | Vercel logs monitoring | Sprawdzaj logi po deploy |
+| 7.2 | Supabase monitoring | Connection pool, RLS errors, slow queries |
+| 7.3 | Twilio error webhooks | Konfiguruj error webhook URL |
+| 7.4 | Uptime monitoring | Prosty ping na /api/health + alerting |
+
+---
+
+#### PRIORYTETYZACJA
+
+```
+TERAZ (blokujace):
+  Faza 0 → Build fix
+  Faza 1 → GHL cleanup
+  Faza 2 → Migration verification
+  Faza 4 → Missing env vars
+
+NASTEPNIE (stabilizacja):
+  Faza 3 → E2E tests
+  Faza 6 → Tech debt
+
+POZNIEJ (optymalizacja):
+  Faza 5 → Direct Meta APIs
+  Faza 7 → Monitoring
+```
+
+---
+
 ## 2026-02-03
+
+### Full Auth Route Testing (Cookie-based SSR)
+
+**Upgraded:** Test runner now uses proper Supabase SSR cookie-based authentication instead of Bearer tokens. All 55 routes fully authenticated - **55/55 PASS**.
+
+**Changes to `exoskull-app/scripts/test-all-routes.ts`:**
+- Replaced Bearer token auth with Supabase SSR cookie (`sb-{ref}-auth-token`) using `encodeURIComponent` session JSON
+- Added `x-tenant-id` header for routes that need it (rigs, mods, voice, schedule)
+- Added `{userId}` path substitution for routes needing tenant_id/userId query params
+- Fixed knowledge sub-route params: `tenantId` (camelCase) vs `tenant_id` (snake_case)
+- Strict expected statuses (200 instead of accepting 401 as pass)
+- Error response body always captured on failures
+
+**Key findings:**
+- Dashboard pages redirect 307 to /onboarding (test user has pending onboarding)
+- Knowledge main route uses `tenant_id`, sub-routes use `tenantId` (inconsistent)
+- All auth-protected routes work correctly with SSR cookie auth
+
+---
+
+### Test Paths & Route Tester
+
+**Added:** Complete test coverage documentation (133 test paths in 18 categories) and automated test runner script.
+
+**New files:**
+- `exoskull-app/TEST_PATHS.md` - All 133 API endpoints and pages with methods, auth requirements, expected responses
+- `exoskull-app/scripts/test-all-routes.ts` - Automated test runner (`npx tsx scripts/test-all-routes.ts`)
+
+**Categories covered:** Pages, Auth, Conversations, Voice, Twilio, Onboarding, Knowledge, Autonomy, Rigs, Mods, Registry, Installations, Schedule/CRON, Health Metrics, Tools/Agents, Audio, System, Negative tests
+
+**How to verify:**
+```bash
+cd exoskull-app && npm run dev  # in one terminal
+npx tsx scripts/test-all-routes.ts  # in another
+```
+
+---
+
+### Voice Pipeline Fixes + Delegate Calling + SMS/Email
+
+**Problem:** IORS claimed it couldn't call people, didn't use user's name, voice kept changing (ElevenLabs TTS failures → Twilio robotic fallback), system prompt referenced non-existent GHL tools.
+
+**Fixes applied:**
+- Rewrote system prompt to be shorter, more natural, with correct tool references
+- Added 3 new IORS_TOOLS: `make_call`, `send_sms`, `send_email`
+- Created `/api/twilio/voice/delegate` webhook for third-party calls (IORS calls pizzeria/doctor/etc. on behalf of user)
+- Delegate call flow: create session → outbound call → separate conversation → SMS summary to user
+- Fixed all Twilio `<Say>` elements to use `Google.pl-PL-Wavenet-B` voice (consistent fallback)
+- Fixed outbound calls: tenant resolution now checks `To` field before `From`
+- Added `TWILIO_PHONE_NUMBER` env var to Vercel
+- Reduced Claude max_tokens for faster voice responses (200 first call, 150 follow-up)
+- Dynamic context now includes installed Mods and stronger name emphasis
+
+**New files:**
+- `app/api/twilio/voice/delegate/route.ts` - delegate voice webhook (3rd party calls)
+
+**Files changed:**
+- `lib/voice/system-prompt.ts` - complete rewrite (natural, correct tools)
+- `lib/voice/conversation-handler.ts` - added make_call/send_sms/send_email tools + execution
+- `lib/voice/twilio-client.ts` - consistent Polish Wavenet voice on all Say elements
+- `app/api/twilio/voice/route.ts` - fixed tenant resolution for outbound calls
+- `app/api/twilio/outbound/route.ts` - passes tenant_id in webhook URL
+
+**Env vars added:** TWILIO_PHONE_NUMBER, RESEND_API_KEY (pending)
+
+---
 
 ### MVP Complete - GOTCHA + ATLAS (6 Phases)
 

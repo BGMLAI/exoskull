@@ -165,7 +165,6 @@ const tests: TestPath[] = [
   // ── 17. SYSTEM ──
   { id: 120, category: 'system', method: 'GET', path: '/api/pulse', auth: 'cron', expectedStatus: 200, description: 'Health check (pulse)' },
   { id: 121, category: 'system', method: 'POST', path: '/api/pulse', auth: 'admin', body: { userId: 'test-runner' }, expectedStatus: [200, 500], description: 'Pulse POST - manual trigger' },
-  { id: 123, category: 'system', method: 'GET', path: '/api/ghl/tools', auth: 'user', expectedStatus: 200, description: 'GHL tools' },
 
   // ── 18. NEGATIVE TESTS ──
   { id: 125, category: 'negative', method: 'GET', path: '/api/user/profile', auth: 'none', expectedStatus: [401, 403], description: 'No auth -> 401' },

@@ -9,12 +9,22 @@
     },
     "app/api/voice/**/*.ts": {
       "maxDuration": 60
+    },
+    "app/api/webhooks/**/*.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/**/*.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [
     {
       "path": "/api/cron/master-scheduler",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/intervention-executor",
+      "schedule": "*/15 * * * *"
     },
     {
       "path": "/api/cron/bronze-etl",

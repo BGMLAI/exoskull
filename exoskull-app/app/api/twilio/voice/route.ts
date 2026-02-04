@@ -143,8 +143,10 @@ export async function POST(req: NextRequest) {
     // ACTION: PROCESS - Handle speech input
     // ========================================================================
     if (action === 'process') {
-      // Get session
-      const tenant = await findTenantByPhone(from)
+      // Get session - for outbound calls, From is our Twilio number so
+      // we try To first, then From, then fall back to session's tenant_id
+      const to = formData.To
+      const tenant = await findTenantByPhone(to) || await findTenantByPhone(from)
       const tenantId = tenant?.id || 'anonymous'
       const session = await getOrCreateSession(callSid, tenantId)
 
@@ -241,7 +243,8 @@ export async function POST(req: NextRequest) {
     // ========================================================================
     if (action === 'end') {
       // Find and end session
-      const tenant = await findTenantByPhone(from)
+      const to = formData.To
+      const tenant = await findTenantByPhone(to) || await findTenantByPhone(from)
       const tenantId = tenant?.id || 'anonymous'
 
       try {

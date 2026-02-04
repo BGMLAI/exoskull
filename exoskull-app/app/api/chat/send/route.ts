@@ -35,8 +35,11 @@ export async function POST(request: NextRequest) {
     // Process through Claude with IORS tools
     const result = await processUserMessage(session, message)
 
-    // Save to session
-    await updateSession(session.id, message, result.text)
+    // Save to session + unified thread
+    await updateSession(session.id, message, result.text, {
+      tenantId: user.id,
+      channel: 'web_chat',
+    })
 
     if (result.shouldEndCall) {
       await endSession(session.id)

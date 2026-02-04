@@ -7,9 +7,11 @@ export const revalidate = 0
 export async function GET() {
   try {
     const agents = await queryDatabase(
-      `SELECT * FROM public.exo_agents
-       WHERE is_global = true
-       ORDER BY tier ASC`
+      'exo_agents',
+      {
+        filter: { is_global: true },
+        order: { column: 'tier', ascending: true }
+      }
     )
 
     return NextResponse.json({ data: agents, error: null })

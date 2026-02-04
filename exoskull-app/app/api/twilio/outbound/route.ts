@@ -75,9 +75,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Initiate outbound call
+    // Pass tenant_id in webhook URL so voice handler knows the user
+    const webhookParams = tenantId ? `&tenant_id=${tenantId}` : ''
     const result = await makeOutboundCall({
       to: targetPhone,
-      webhookUrl: `${APP_URL}/api/twilio/voice?action=start`,
+      webhookUrl: `${APP_URL}/api/twilio/voice?action=start${webhookParams}`,
       statusCallbackUrl: `${APP_URL}/api/twilio/status`,
       timeout: 30
     })

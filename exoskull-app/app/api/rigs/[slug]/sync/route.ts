@@ -19,6 +19,16 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+interface HealthMetricInsert {
+  tenant_id: string;
+  metric_type: string;
+  value: number;
+  unit: string;
+  recorded_at: string;
+  source: string;
+  metadata?: Record<string, unknown>;
+}
+
 // =====================================================
 // POST /api/rigs/[slug]/sync - Trigger manual sync
 // =====================================================
@@ -138,6 +148,12 @@ export async function POST(
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 7); // Last 7 days
         const allData = await client.getAllData(startDate, endDate);
+
+        const healthMetrics = buildGoogleFitMetrics(tenantId, allData, 'google-fit');
+        if (healthMetrics.length > 0) {
+          await upsertHealthMetrics(healthMetrics);
+        }
+
         syncResult = {
           success: true,
           records: allData.steps.length + allData.heartRate.length + allData.calories.length,
@@ -145,6 +161,7 @@ export async function POST(
             steps: allData.steps.slice(0, 7),
             heartRate: allData.heartRate.slice(0, 7),
             sleep: allData.sleep.slice(0, 7),
+            metrics_upserted: healthMetrics.length,
           },
         };
         break;
@@ -156,6 +173,16 @@ export async function POST(
         if (!client) throw new Error('Failed to create Google client');
 
         const dashboard = await client.getDashboardData();
+
+        const healthMetrics = buildGoogleDashboardMetrics(
+          tenantId,
+          dashboard.fit,
+          'google'
+        );
+        if (healthMetrics.length > 0) {
+          await upsertHealthMetrics(healthMetrics);
+        }
+
         syncResult = {
           success: true,
           records:
@@ -189,6 +216,7 @@ export async function POST(
             photos: {
               recent: dashboard.photos.recentPhotos.length,
             },
+            metrics_upserted: healthMetrics.length,
           },
         };
         break;
@@ -306,4 +334,133 @@ export async function GET(
     metadata: connection.metadata,
     recent_syncs: logs || [],
   });
+}
+
+// =====================================================
+// HELPERS
+// =====================================================
+
+function toRecordedAt(day: string): string {
+  return new Date(`${day}T00:00:00.000Z`).toISOString();
+}
+
+async function upsertHealthMetrics(metrics: HealthMetricInsert[]) {
+  if (metrics.length === 0) return;
+
+  const { error } = await supabase.from('exo_health_metrics').upsert(metrics, {
+    onConflict: 'tenant_id,metric_type,recorded_at,source',
+    ignoreDuplicates: true,
+  });
+
+  if (error) {
+    console.error('[Rig Sync] Failed to upsert health metrics:', {
+      error: error.message,
+      count: metrics.length,
+    });
+    throw new Error('Failed to save health metrics');
+  }
+}
+
+function buildGoogleFitMetrics(
+  tenantId: string,
+  data: {
+    steps: { date: string; steps: number }[];
+    heartRate: { date: string; bpm: number }[];
+    calories: { date: string; calories: number }[];
+    sleep: { date: string; durationMinutes: number }[];
+    distance: { date: string; meters: number }[];
+  },
+  source: string
+): HealthMetricInsert[] {
+  const metrics: HealthMetricInsert[] = [];
+
+  for (const item of data.steps) {
+    if (item.steps > 0) {
+      metrics.push({
+        tenant_id: tenantId,
+        metric_type: 'steps',
+        value: item.steps,
+        unit: 'count',
+        recorded_at: toRecordedAt(item.date),
+        source,
+      });
+    }
+  }
+
+  for (const item of data.heartRate) {
+    if (item.bpm > 0) {
+      metrics.push({
+        tenant_id: tenantId,
+        metric_type: 'heart_rate',
+        value: item.bpm,
+        unit: 'bpm',
+        recorded_at: toRecordedAt(item.date),
+        source,
+      });
+    }
+  }
+
+  for (const item of data.calories) {
+    if (item.calories > 0) {
+      metrics.push({
+        tenant_id: tenantId,
+        metric_type: 'calories',
+        value: item.calories,
+        unit: 'kcal',
+        recorded_at: toRecordedAt(item.date),
+        source,
+      });
+    }
+  }
+
+  for (const item of data.sleep) {
+    if (item.durationMinutes > 0) {
+      metrics.push({
+        tenant_id: tenantId,
+        metric_type: 'sleep',
+        value: item.durationMinutes,
+        unit: 'minutes',
+        recorded_at: toRecordedAt(item.date),
+        source,
+      });
+    }
+  }
+
+  for (const item of data.distance) {
+    if (item.meters > 0) {
+      metrics.push({
+        tenant_id: tenantId,
+        metric_type: 'distance',
+        value: item.meters,
+        unit: 'meters',
+        recorded_at: toRecordedAt(item.date),
+        source,
+      });
+    }
+  }
+
+  return metrics;
+}
+
+function buildGoogleDashboardMetrics(
+  tenantId: string,
+  fit: {
+    steps: { date: string; steps: number }[];
+    heartRate: { date: string; bpm: number }[];
+    calories: { date: string; calories: number }[];
+    sleep: { date: string; durationMinutes: number }[];
+  },
+  source: string
+): HealthMetricInsert[] {
+  return buildGoogleFitMetrics(
+    tenantId,
+    {
+      steps: fit.steps,
+      heartRate: fit.heartRate,
+      calories: fit.calories,
+      sleep: fit.sleep,
+      distance: [],
+    },
+    source
+  );
 }

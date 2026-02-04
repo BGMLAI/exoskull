@@ -16,7 +16,7 @@ import {
   KnowledgeSummary,
   TaskStats,
 } from '@/lib/dashboard/types'
-import { Zap, MessageSquare } from 'lucide-react'
+import { Zap, MessageSquare, Package, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -252,6 +252,34 @@ export default async function DashboardPage() {
     console.error('Failed to load rig connections:', e)
   }
 
+  // Planned actions (autonomy interventions)
+  let plannedActions: any[] = []
+  try {
+    const { data: interventions } = await supabase
+      .from('exo_interventions')
+      .select('id, title, description, priority, intervention_type, status, scheduled_for, created_at')
+      .eq('tenant_id', user.id)
+      .in('status', ['proposed', 'approved'])
+      .order('created_at', { ascending: false })
+      .limit(10)
+    plannedActions = interventions || []
+  } catch (e: any) {
+    console.error('Failed to load planned actions:', e)
+  }
+
+  // Available mod templates (for ModStore)
+  let availableMods: any[] = []
+  try {
+    const { data: mods } = await supabase
+      .from('exo_mod_registry')
+      .select('id, slug, name, description, icon, category')
+      .eq('is_template', true)
+      .order('name')
+    availableMods = mods || []
+  } catch (e: any) {
+    console.error('Failed to load available mods:', e)
+  }
+
   // Get greeting based on time
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Dzien dobry' : hour < 18 ? 'Witaj' : 'Dobry wieczor'
@@ -310,29 +338,118 @@ export default async function DashboardPage() {
         <IntegrationsWidget connections={rigConnections} />
       </div>
 
-      {/* Info about dynamic widgets - only show if no mods installed */}
-      {installedMods.length === 0 && (
-        <Card className="border-dashed border-2 border-muted">
+      {/* Planned Actions (from autonomy) */}
+      {plannedActions.length > 0 && (
+        <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Zap className="h-5 w-5 text-amber-500" />
-              Twoj dashboard rosnie z Toba
+              <Clock className="h-5 w-5 text-blue-500" />
+              Zaplanowane akcje
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              {assistantName} automatycznie zainstaluje narzedzia dopasowane do Twoich celow.
-              Porozmawiaj z {assistantName} o swoich potrzebach - system dostosuje sie do Ciebie.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="px-2 py-1 bg-muted rounded text-xs">Sen</span>
-              <span className="px-2 py-1 bg-muted rounded text-xs">Nastroj</span>
-              <span className="px-2 py-1 bg-muted rounded text-xs">Nawyki</span>
-              <span className="px-2 py-1 bg-muted rounded text-xs">Cwiczenia</span>
-              <span className="px-2 py-1 bg-muted rounded text-xs">Finanse</span>
+            <div className="space-y-2">
+              {plannedActions.map((action: any) => (
+                <div key={action.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{action.title}</p>
+                    {action.description && (
+                      <p className="text-xs text-muted-foreground truncate">{action.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 ml-2">
+                    <span className={`text-xs px-2 py-0.5 rounded ${
+                      action.priority === 'high' ? 'bg-red-100 text-red-700' :
+                      action.priority === 'medium' ? 'bg-amber-100 text-amber-700' :
+                      'bg-green-100 text-green-700'
+                    }`}>
+                      {action.priority}
+                    </span>
+                    {action.scheduled_for && (
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(action.scheduled_for).toLocaleString('pl-PL', {
+                          hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit'
+                        })}
+                      </span>
+                    )}
+                    <span className={`text-xs px-2 py-0.5 rounded ${
+                      action.status === 'approved' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {action.status === 'proposed' ? 'Oczekuje' : 'Zatwierdzone'}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* App Builder / Mod Store */}
+      {installedMods.length === 0 ? (
+        <Card className="border-dashed border-2 border-blue-200 bg-blue-50/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Package className="h-5 w-5 text-blue-500" />
+              {assistantName} buduje aplikacje dla Ciebie
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Powiedz {assistantName} czego potrzebujesz, a zbuduje Ci dopasowane narzedzia.
+              Mozesz tez przejrzec gotowe Mody i zainstalowac je jednym kliknieciem.
+            </p>
+            <div className="flex gap-3">
+              <Link
+                href="/dashboard/chat"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+              >
+                <MessageSquare className="h-4 w-4" />
+                Porozmawiaj z {assistantName}
+              </Link>
+            </div>
+            {availableMods.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs text-muted-foreground mb-2">Gotowe Mody do instalacji:</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {availableMods.slice(0, 6).map((mod: any) => (
+                    <div key={mod.id} className="flex items-center gap-2 p-2 rounded-lg bg-white border hover:border-blue-300 transition-colors cursor-pointer">
+                      <span className="text-lg">{mod.icon || '📦'}</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium truncate">{mod.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{mod.category || ''}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        availableMods.length > installedMods.length && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                Wiecej Modow
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {availableMods
+                  .filter((mod: any) => !installedMods.some((im: any) => im.slug === mod.slug))
+                  .slice(0, 5)
+                  .map((mod: any) => (
+                    <span key={mod.id} className="flex items-center gap-1 px-2 py-1 bg-muted rounded text-xs">
+                      <span>{mod.icon || '📦'}</span>
+                      {mod.name}
+                    </span>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+        )
       )}
     </div>
   )
