@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 600" fill="none">
+  <!--
+    ExoSkull Logo - Symmetric XO Skull
+    Design: Round skull dome, bold XO face, 4 rounded teeth
+    Symmetry axis: x=256
+  -->
+
+  <!-- Skull dome + body (symmetric around x=256) -->
+  <path d="
+    M256 32
+    C120 32 40 130 40 248
+    C40 330 90 390 140 420
+    L140 480 C140 500 150 510 168 510
+    L192 510 C206 510 212 500 212 486
+    L212 470 C212 460 220 452 232 452
+    L236 452
+    L236 486 C236 500 242 510 256 510
+    C270 510 276 500 276 486
+    L276 452 L280 452
+    C292 452 300 460 300 470
+    L300 486 C300 500 306 510 320 510
+    L344 510 C362 510 372 500 372 480
+    L372 420
+    C422 390 472 330 472 248
+    C472 130 392 32 256 32Z
+  " fill="black"/>
+
+  <!-- X letter - bold white, centered at ~170, y-center ~260 -->
+  <g fill="white">
+    <!-- Left stroke of X (top-left to bottom-right) -->
+    <path d="
+      M100 160 L140 160 C148 160 154 164 158 172
+      L186 230 L210 270
+      L186 310 L158 368
+      C154 376 148 380 140 380
+      L100 380 C92 380 88 374 92 366
+      L140 280 C144 272 144 268 140 260
+      L92 174 C88 166 92 160 100 160Z
+    "/>
+    <!-- Right stroke of X (top-right to bottom-left, mirrored) -->
+    <path d="
+      M240 160 L200 160 C192 160 186 164 182 172
+      L154 230 L130 270
+      L154 310 L182 368
+      C186 376 192 380 200 380
+      L240 380 C248 380 252 374 248 366
+      L200 280 C196 272 196 268 200 260
+      L248 174 C252 166 248 160 240 160Z
+    "/>
+  </g>
+
+  <!-- O letter - bold white ring, centered at ~370, y-center ~270 -->
+  <path d="
+    M370 155
+    C420 155 460 200 460 270
+    C460 340 420 385 370 385
+    C320 385 280 340 280 270
+    C280 200 320 155 370 155Z
+    M370 210
+    C345 210 328 235 328 270
+    C328 305 345 330 370 330
+    C395 330 412 305 412 270
+    C412 235 395 210 370 210Z
+  " fill="white"/>
+</svg>

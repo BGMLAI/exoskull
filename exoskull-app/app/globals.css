@@ -3,49 +3,111 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  /*
+   * ExoSkull Theme System
+   * 3 branded themes: dark-ops, xo-minimal, neural
+   * Default (:root) = xo-minimal (light, clean)
+   * .dark fallback kept for system dark mode compatibility
+   */
+
+  /* ===== Theme B: XO Minimal (default / light) ===== */
+  :root,
+  .xo-minimal {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 0 0% 3.5%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 0 0% 3.5%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --popover-foreground: 0 0% 3.5%;
+    --primary: 0 0% 3.5%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 0 0% 3.5%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 354 100% 64%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 0 0% 3.5%;
+    --radius: 0.625rem;
+
+    /* XO Minimal specific */
+    --sidebar-bg: 0 0% 100%;
+    --sidebar-border: 240 6% 90%;
+    --sidebar-text: 0 0% 3.5%;
+    --sidebar-muted: 240 4% 46%;
+    --sidebar-active: 0 0% 3.5%;
+    --sidebar-active-text: 0 0% 98%;
   }
 
+  /* ===== Theme A: Dark Ops ===== */
+  .dark-ops,
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --background: 0 0% 4%;
+    --foreground: 240 5% 90%;
+    --card: 240 4% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 4% 10%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 191 100% 50%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 215 25% 17%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 38 100% 50%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 354 100% 64%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 191 100% 50%;
+    --radius: 0.625rem;
+
+    /* Dark Ops specific */
+    --sidebar-bg: 0 0% 2%;
+    --sidebar-border: 240 4% 12%;
+    --sidebar-text: 240 5% 75%;
+    --sidebar-muted: 240 5% 45%;
+    --sidebar-active: 191 100% 50%;
+    --sidebar-active-text: 0 0% 0%;
+    --glow-color: 191 100% 50%;
+  }
+
+  /* ===== Theme C: Neural ===== */
+  .neural {
+    --background: 270 65% 7%;
+    --foreground: 213 31% 91%;
+    --card: 270 50% 11%;
+    --card-foreground: 213 33% 97%;
+    --popover: 270 50% 11%;
+    --popover-foreground: 213 33% 97%;
+    --primary: 263 70% 66%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 260 47% 17%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 260 47% 17%;
+    --muted-foreground: 215 16% 62%;
+    --accent: 187 92% 43%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 347 77% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 263 45% 25%;
+    --input: 263 45% 25%;
+    --ring: 263 70% 66%;
+    --radius: 0.625rem;
+
+    /* Neural specific */
+    --sidebar-bg: 270 60% 5%;
+    --sidebar-border: 263 45% 18%;
+    --sidebar-text: 213 31% 80%;
+    --sidebar-muted: 215 16% 50%;
+    --sidebar-active: 263 70% 66%;
+    --sidebar-active-text: 0 0% 100%;
+    --glow-color: 263 70% 66%;
   }
 }
 
@@ -56,4 +118,61 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ===== Theme-specific enhancements ===== */
+
+/* Dark Ops: Cyan glow on card hover */
+.dark-ops .card-glow:hover,
+.dark .card-glow:hover {
+  box-shadow:
+    0 0 15px hsl(var(--glow-color) / 0.15),
+    0 0 3px hsl(var(--glow-color) / 0.1);
+  border-color: hsl(var(--glow-color) / 0.3);
+}
+
+/* Neural: Glassmorphism cards */
+.neural .glass-card {
+  backdrop-filter: blur(12px);
+  background: hsl(var(--card) / 0.6);
+  border: 1px solid hsl(var(--border) / 0.5);
+}
+
+/* Neural: Gradient text for headings */
+.neural .gradient-text {
+  background: linear-gradient(135deg, hsl(263 70% 66%), hsl(187 92% 43%));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Neural: Background gradient */
+.neural body,
+.neural {
+  background: linear-gradient(180deg, hsl(270 65% 7%) 0%, hsl(270 80% 3%) 100%);
+}
+
+/* Neural: Animated background dots */
+.neural .neural-bg {
+  background-image: radial-gradient(
+    hsl(var(--primary) / 0.08) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
+}
+
+/* XO Minimal: Clean flat style enforcement */
+.xo-minimal .flat-card {
+  box-shadow: none;
+  border: 1px solid hsl(var(--border));
+}
+
+/* Smooth theme transitions */
+body,
+.dark-ops,
+.xo-minimal,
+.neural {
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
 }
