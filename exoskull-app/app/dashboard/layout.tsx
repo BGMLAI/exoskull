@@ -4,16 +4,14 @@ import Link from "next/link";
 import {
   Home,
   CheckSquare,
-  MessageSquare,
   Settings,
   Clock,
   FileText,
   Menu,
   Heart,
   TrendingUp,
-  Shield,
 } from "lucide-react";
-import { DashboardShell } from "@/components/dashboard/DashboardShell";
+
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +25,6 @@ import {
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard/tasks", label: "Zadania", icon: CheckSquare },
   { href: "/dashboard/schedule", label: "Harmonogram", icon: Clock },
   { href: "/dashboard/knowledge", label: "Wiedza", icon: FileText },
@@ -38,9 +35,9 @@ const NAV_ITEMS = [
 // Subset for mobile bottom tab bar (5 max for usability)
 const MOBILE_TAB_ITEMS = [
   { href: "/dashboard", label: "Home", icon: Home },
-  { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard/tasks", label: "Zadania", icon: CheckSquare },
   { href: "/dashboard/health", label: "Zdrowie", icon: Heart },
+  { href: "/dashboard/knowledge", label: "Wiedza", icon: FileText },
   { href: "/dashboard/settings", label: "Wiecej", icon: Settings },
 ];
 
@@ -157,8 +154,8 @@ export default async function DashboardLayout({
         </header>
 
         {/* Main content */}
-        <main className="flex-1 overflow-auto pb-16 md:pb-0">
-          <DashboardShell tenantId={user.id}>{children}</DashboardShell>
+        <main className="flex-1 min-h-0 overflow-hidden pb-16 md:pb-0">
+          {children}
         </main>
 
         {/* Mobile bottom tab bar */}

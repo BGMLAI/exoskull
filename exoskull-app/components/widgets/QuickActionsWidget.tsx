@@ -1,9 +1,17 @@
-'use client'
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Zap, Mic, Plus, Calendar, FileText, Heart, Settings } from 'lucide-react'
-import Link from 'next/link'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Zap,
+  Mic,
+  Plus,
+  Calendar,
+  FileText,
+  Heart,
+  Settings,
+} from "lucide-react";
+import Link from "next/link";
 
 export function QuickActionsWidget() {
   return (
@@ -16,7 +24,7 @@ export function QuickActionsWidget() {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-          <Link href="/dashboard/voice">
+          <Link href="/dashboard/chat">
             <Button variant="outline" className="w-full justify-start gap-2">
               <Mic className="h-4 w-4" />
               Rozmowa
@@ -55,5 +63,5 @@ export function QuickActionsWidget() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
