@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const cronSecret = process.env.CRON_SECRET || "exoskull-cron-2026";
+    const cronSecret = process.env.CRON_SECRET;
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-cron-secret": cronSecret,
+        "x-cron-secret": cronSecret || "",
       },
       body: JSON.stringify({ source: "admin-trigger" }),
     });

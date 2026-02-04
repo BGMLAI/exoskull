@@ -28,6 +28,7 @@ import {
   type ScheduledJob,
   type UserJobConfig,
 } from "@/lib/cron/dispatcher";
+import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -35,27 +36,6 @@ function getSupabase() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   return createClient(supabaseUrl, supabaseServiceKey);
-}
-
-function getCronSecret() {
-  return process.env.CRON_SECRET || "exoskull-cron-2026";
-}
-
-/**
- * Verify cron authorization
- * Accepts: x-cron-secret header OR Authorization: Bearer token
- */
-function verifyCronAuth(req: NextRequest): boolean {
-  const cronSecret = getCronSecret();
-  // Method 1: Custom header (for manual testing)
-  const headerSecret = req.headers.get("x-cron-secret");
-  if (headerSecret === cronSecret) return true;
-
-  // Method 2: Vercel Cron (Authorization header)
-  const authHeader = req.headers.get("authorization");
-  if (authHeader === `Bearer ${cronSecret}`) return true;
-
-  return false;
 }
 
 /**

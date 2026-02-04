@@ -6,19 +6,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { processDunning } from "@/lib/business/dunning";
+import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
-
-function verifyCronAuth(req: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET || "exoskull-cron-2026";
-  const headerSecret = req.headers.get("x-cron-secret");
-  if (headerSecret === cronSecret) return true;
-
-  const authHeader = req.headers.get("authorization");
-  if (authHeader === `Bearer ${cronSecret}`) return true;
-
-  return false;
-}
 
 export async function GET(req: NextRequest) {
   if (!verifyCronAuth(req)) {

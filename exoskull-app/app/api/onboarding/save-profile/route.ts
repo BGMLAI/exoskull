@@ -3,6 +3,15 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+interface LoopPayload {
+  slug: string;
+  name: string;
+  icon: string;
+  color: string;
+  isCustom: boolean;
+  aspects: [string, string, string];
+}
+
 /**
  * POST /api/onboarding/save-profile - Save onboarding form data
  */
@@ -29,6 +38,7 @@ export async function POST(request: NextRequest) {
     console.log("[SaveProfile] Saving for tenant:", user.id, {
       preferred_name: body.preferred_name,
       primary_goal: body.primary_goal,
+      loops_count: body.selected_loops?.length || 0,
       fields: Object.keys(body).length,
     });
 
@@ -52,6 +62,13 @@ export async function POST(request: NextRequest) {
     if (body.language) updateData.language = body.language;
     if (body.timezone) updateData.timezone = body.timezone;
 
+    // Build loop_aspects for discovery_data backup
+    const loopAspects: Record<string, string[]> = {};
+    const selectedLoops: LoopPayload[] = body.selected_loops || [];
+    for (const loop of selectedLoops) {
+      loopAspects[loop.slug] = loop.aspects;
+    }
+
     // Discovery data (JSON fields)
     updateData.discovery_data = {
       challenge: body.challenge || null,
@@ -63,6 +80,7 @@ export async function POST(request: NextRequest) {
       autonomy: body.autonomy_level || "minor",
       weekend_checkins: body.weekend_checkins ?? false,
       notes: body.notes || null,
+      loop_aspects: loopAspects,
       source: "onboarding_form",
       completed_at: new Date().toISOString(),
     };
@@ -85,6 +103,45 @@ export async function POST(request: NextRequest) {
         { error: `Blad zapisu: ${updateError.message}` },
         { status: 500 },
       );
+    }
+
+    // Create user_loops with aspects
+    if (selectedLoops.length > 0) {
+      const loopRows = selectedLoops.map((loop, index) => ({
+        tenant_id: user.id,
+        slug: loop.slug,
+        name: loop.name,
+        icon: loop.icon,
+        color: loop.color,
+        is_default: !loop.isCustom,
+        is_active: true,
+        aspects: loop.aspects,
+        priority: index + 1,
+      }));
+
+      const { error: loopsError } = await supabase
+        .from("user_loops")
+        .upsert(loopRows, { onConflict: "tenant_id,slug" });
+
+      if (loopsError) {
+        console.error("[SaveProfile] Error creating loops:", {
+          code: loopsError.code,
+          message: loopsError.message,
+          details: loopsError.details,
+          userId: user.id,
+          loopCount: loopRows.length,
+        });
+        // Non-fatal: profile was saved, loops creation failed
+        // Don't return error - the profile data is already saved
+        console.warn("[SaveProfile] Loops creation failed but profile saved");
+      } else {
+        console.log(
+          "[SaveProfile] Created",
+          loopRows.length,
+          "loops for tenant:",
+          user.id,
+        );
+      }
     }
 
     console.log("[SaveProfile] Profile saved for tenant:", user.id);

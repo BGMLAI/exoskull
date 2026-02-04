@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { runSelfUpdate, runDecay } from "@/lib/learning/self-updater";
+import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -19,20 +20,12 @@ export const dynamic = "force-dynamic";
 // ============================================================================
 
 function validateCronAuth(request: NextRequest): boolean {
-  // Check for Vercel CRON secret
-  const authHeader = request.headers.get("authorization");
-  if (authHeader === `Bearer ${process.env.CRON_SECRET}`) {
-    return true;
-  }
+  // Shared cron auth (Bearer token, x-cron-secret header, dev bypass)
+  if (verifyCronAuth(request)) return true;
 
-  // Check for internal pg_cron call (via service role)
+  // Additional: internal pg_cron call (via service role)
   const serviceKey = request.headers.get("x-service-key");
   if (serviceKey === process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return true;
-  }
-
-  // Development mode
-  if (process.env.NODE_ENV === "development") {
     return true;
   }
 

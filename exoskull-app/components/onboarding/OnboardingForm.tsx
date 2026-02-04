@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -14,6 +14,9 @@ import {
   Clock,
   Globe,
   Sparkles,
+  Plus,
+  X,
+  Repeat,
 } from "lucide-react";
 
 // ============================================================================
@@ -24,10 +27,19 @@ interface OnboardingFormProps {
   onComplete: () => void;
 }
 
+interface LoopSelection {
+  slug: string;
+  name: string;
+  icon: string;
+  color: string;
+  isCustom: boolean;
+  aspects: [string, string, string];
+}
+
 interface OnboardingData {
   preferred_name: string;
   primary_goal: string;
-  secondary_goals: string[];
+  selected_loops: LoopSelection[];
   challenge: string;
   communication_style: string;
   preferred_channel: string;
@@ -43,27 +55,97 @@ interface OnboardingData {
   notes: string;
 }
 
-interface QuestionConfig {
+// Step types: "question" = standard question, "loops" = loop picker, "aspects" = per-loop aspects
+type StepType = "question" | "loops" | "aspects";
+
+interface Step {
+  type: StepType;
+  // For "question" steps:
+  questionId?: keyof OnboardingData;
+  title: string;
+  subtitle?: string;
+  inputType?:
+    | "text"
+    | "select"
+    | "multiselect"
+    | "textarea"
+    | "time"
+    | "toggle";
+  options?: { value: string; label: string; icon?: string }[];
+  placeholder?: string;
+  required?: boolean;
+  icon: React.ReactNode;
+  // For "aspects" steps:
+  loopIndex?: number;
+}
+
+// ============================================================================
+// PREDEFINED LOOPS
+// ============================================================================
+
+interface LoopOption {
+  slug: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+const PREDEFINED_LOOPS: LoopOption[] = [
+  { slug: "health", name: "Zdrowie", icon: "💪", color: "#10B981" },
+  { slug: "work", name: "Praca", icon: "💼", color: "#3B82F6" },
+  { slug: "relationships", name: "Relacje", icon: "👥", color: "#EC4899" },
+  { slug: "finance", name: "Finanse", icon: "💰", color: "#F59E0B" },
+  { slug: "growth", name: "Rozwój", icon: "🌱", color: "#8B5CF6" },
+  { slug: "creativity", name: "Kreatywność", icon: "🎨", color: "#F472B6" },
+  { slug: "fun", name: "Rozrywka", icon: "🎮", color: "#22D3EE" },
+  { slug: "habits", name: "Nawyki", icon: "🔄", color: "#A78BFA" },
+  { slug: "sleep", name: "Sen", icon: "😴", color: "#6366F1" },
+  { slug: "sport", name: "Sport", icon: "⚽", color: "#EF4444" },
+  { slug: "learning", name: "Nauka", icon: "📚", color: "#14B8A6" },
+];
+
+// Suggested aspect placeholders per loop slug
+const ASPECT_HINTS: Record<string, string[]> = {
+  health: ["np. jakość snu", "np. regularność ćwiczeń", "np. dieta"],
+  work: ["np. produktywność", "np. zarządzanie czasem", "np. relacje w pracy"],
+  relationships: ["np. czas z rodziną", "np. znajomi", "np. partner/ka"],
+  finance: ["np. oszczędności", "np. inwestycje", "np. budżet miesięczny"],
+  growth: ["np. czytanie", "np. medytacja", "np. nowe umiejętności"],
+  creativity: ["np. pisanie", "np. muzyka", "np. rysowanie"],
+  fun: ["np. gry", "np. filmy", "np. podróże"],
+  habits: [
+    "np. poranna rutyna",
+    "np. nawyki zdrowotne",
+    "np. nawyki produktywne",
+  ],
+  sleep: ["np. pora zasypiania", "np. jakość snu", "np. rutyna wieczorna"],
+  sport: ["np. bieganie", "np. siłownia", "np. rozciąganie"],
+  learning: ["np. kursy online", "np. języki obce", "np. książki"],
+};
+
+const DEFAULT_HINTS = ["np. aspekt 1", "np. aspekt 2", "np. aspekt 3"];
+
+// ============================================================================
+// STATIC QUESTIONS (before and after loops)
+// ============================================================================
+
+interface QuestionDef {
   id: keyof OnboardingData;
   title: string;
   subtitle?: string;
-  type: "text" | "select" | "multiselect" | "textarea" | "time" | "toggle";
+  inputType: "text" | "select" | "multiselect" | "textarea" | "time" | "toggle";
   options?: { value: string; label: string; icon?: string }[];
   placeholder?: string;
   required?: boolean;
   icon: React.ReactNode;
 }
 
-// ============================================================================
-// QUESTIONS CONFIG
-// ============================================================================
-
-const QUESTIONS: QuestionConfig[] = [
+const QUESTIONS_BEFORE_LOOPS: QuestionDef[] = [
   {
     id: "preferred_name",
     title: "Jak mam się do Ciebie zwracać?",
     subtitle: "Imię, pseudonim, cokolwiek - jak wolisz.",
-    type: "text",
+    inputType: "text",
     placeholder: "np. Tomek, Kasia, Boss...",
     required: true,
     icon: <User className="w-6 h-6" />,
@@ -72,7 +154,7 @@ const QUESTIONS: QuestionConfig[] = [
     id: "primary_goal",
     title: "Co jest Twoim głównym celem?",
     subtitle: "Wybierz to, co teraz jest najważniejsze.",
-    type: "select",
+    inputType: "select",
     options: [
       { value: "productivity", label: "Produktywność", icon: "🎯" },
       { value: "health", label: "Zdrowie", icon: "💪" },
@@ -83,28 +165,14 @@ const QUESTIONS: QuestionConfig[] = [
     required: true,
     icon: <Target className="w-6 h-6" />,
   },
-  {
-    id: "secondary_goals",
-    title: "Które obszary chcesz ogarnąć?",
-    subtitle: "Wybierz wszystkie, które Cię interesują.",
-    type: "multiselect",
-    options: [
-      { value: "health", label: "Zdrowie" },
-      { value: "work", label: "Praca" },
-      { value: "finance", label: "Finanse" },
-      { value: "relationships", label: "Relacje" },
-      { value: "habits", label: "Nawyki" },
-      { value: "sleep", label: "Sen" },
-      { value: "sport", label: "Sport" },
-      { value: "learning", label: "Nauka" },
-    ],
-    icon: <Sparkles className="w-6 h-6" />,
-  },
+];
+
+const QUESTIONS_AFTER_LOOPS: QuestionDef[] = [
   {
     id: "challenge",
     title: "Największe wyzwanie?",
     subtitle: "Co najbardziej Ci teraz przeszkadza? Napisz swoimi słowami.",
-    type: "textarea",
+    inputType: "textarea",
     placeholder:
       'np. "Nie mogę się skupić", "Za dużo na głowie", "Nie śpię dobrze"...',
     icon: <Target className="w-6 h-6" />,
@@ -113,7 +181,7 @@ const QUESTIONS: QuestionConfig[] = [
     id: "communication_style",
     title: "Jak mam z Tobą rozmawiać?",
     subtitle: "Każdy styl działa inaczej.",
-    type: "select",
+    inputType: "select",
     options: [
       { value: "direct", label: "Bezpośrednio", icon: "⚡" },
       { value: "warm", label: "Ciepło", icon: "🤗" },
@@ -126,7 +194,7 @@ const QUESTIONS: QuestionConfig[] = [
     id: "preferred_channel",
     title: "Głos czy tekst?",
     subtitle: "Jak wolisz się ze mną kontaktować?",
-    type: "select",
+    inputType: "select",
     options: [
       { value: "voice", label: "Głos", icon: "🎙️" },
       { value: "sms", label: "Tekst/SMS", icon: "💬" },
@@ -138,7 +206,7 @@ const QUESTIONS: QuestionConfig[] = [
     id: "morning_checkin_time",
     title: "Poranny check-in",
     subtitle: "O której mam się odezwać rano?",
-    type: "time",
+    inputType: "time",
     placeholder: "07:00",
     icon: <Clock className="w-6 h-6" />,
   },
@@ -146,7 +214,7 @@ const QUESTIONS: QuestionConfig[] = [
     id: "evening_checkin_time",
     title: "Wieczorny check-in",
     subtitle: "O której mam zapytać jak minął dzień?",
-    type: "time",
+    inputType: "time",
     placeholder: "21:00",
     icon: <Clock className="w-6 h-6" />,
   },
@@ -154,7 +222,7 @@ const QUESTIONS: QuestionConfig[] = [
     id: "quiet_hours_start",
     title: "Godziny ciszy - początek",
     subtitle: "Od której mam nie przeszkadzać?",
-    type: "time",
+    inputType: "time",
     placeholder: "22:00",
     icon: <Clock className="w-6 h-6" />,
   },
@@ -162,7 +230,7 @@ const QUESTIONS: QuestionConfig[] = [
     id: "quiet_hours_end",
     title: "Godziny ciszy - koniec",
     subtitle: "Od której mogę się odezwać?",
-    type: "time",
+    inputType: "time",
     placeholder: "07:00",
     icon: <Clock className="w-6 h-6" />,
   },
@@ -170,7 +238,7 @@ const QUESTIONS: QuestionConfig[] = [
     id: "devices",
     title: "Jakich urządzeń używasz?",
     subtitle: "Pomaga mi dopasować integracje.",
-    type: "multiselect",
+    inputType: "multiselect",
     options: [
       { value: "android", label: "Android" },
       { value: "iphone", label: "iPhone" },
@@ -185,7 +253,7 @@ const QUESTIONS: QuestionConfig[] = [
     id: "autonomy_level",
     title: "Ile autonomii mi dajesz?",
     subtitle: "Jak bardzo mogę działać sam?",
-    type: "select",
+    inputType: "select",
     options: [
       { value: "ask", label: "Pytaj o wszystko", icon: "🔒" },
       { value: "minor", label: "Drobnostki sam, reszta pytaj", icon: "🔓" },
@@ -197,7 +265,7 @@ const QUESTIONS: QuestionConfig[] = [
     id: "language",
     title: "Język",
     subtitle: "W jakim języku mam mówić?",
-    type: "select",
+    inputType: "select",
     options: [
       { value: "pl", label: "Polski", icon: "🇵🇱" },
       { value: "en", label: "English", icon: "🇬🇧" },
@@ -209,14 +277,14 @@ const QUESTIONS: QuestionConfig[] = [
     id: "weekend_checkins",
     title: "Check-iny w weekendy?",
     subtitle: "Czy mam się odzywać też w sobotę i niedzielę?",
-    type: "toggle",
+    inputType: "toggle",
     icon: <Clock className="w-6 h-6" />,
   },
   {
     id: "notes",
     title: "Cokolwiek jeszcze?",
     subtitle: "Opcjonalne. Coś co powinienem wiedzieć?",
-    type: "textarea",
+    inputType: "textarea",
     placeholder: 'np. "Mam ADHD", "Pracuję nocami", "Lubię żarty"...',
     icon: <Sparkles className="w-6 h-6" />,
   },
@@ -227,14 +295,16 @@ const QUESTIONS: QuestionConfig[] = [
 // ============================================================================
 
 export function OnboardingForm({ onComplete }: OnboardingFormProps) {
-  const [step, setStep] = useState(0);
+  const [stepIndex, setStepIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [customLoopName, setCustomLoopName] = useState("");
+
   const [data, setData] = useState<OnboardingData>({
     preferred_name: "",
     primary_goal: "",
-    secondary_goals: [],
+    selected_loops: [],
     challenge: "",
     communication_style: "direct",
     preferred_channel: "voice",
@@ -250,9 +320,71 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     notes: "",
   });
 
-  const question = QUESTIONS[step];
-  const totalSteps = QUESTIONS.length;
-  const progress = ((step + 1) / totalSteps) * 100;
+  // ============================================================================
+  // BUILD DYNAMIC STEPS
+  // ============================================================================
+
+  const steps: Step[] = useMemo(() => {
+    const result: Step[] = [];
+
+    // Pre-loop questions
+    for (const q of QUESTIONS_BEFORE_LOOPS) {
+      result.push({
+        type: "question",
+        questionId: q.id,
+        title: q.title,
+        subtitle: q.subtitle,
+        inputType: q.inputType,
+        options: q.options,
+        placeholder: q.placeholder,
+        required: q.required,
+        icon: q.icon,
+      });
+    }
+
+    // Loops selection step
+    result.push({
+      type: "loops",
+      title: "Które obszary życia chcesz śledzić?",
+      subtitle: "Wybierz swoje Loops - możesz też dodać własne.",
+      required: true,
+      icon: <Repeat className="w-6 h-6" />,
+    });
+
+    // Dynamic aspect steps (one per selected loop)
+    for (let i = 0; i < data.selected_loops.length; i++) {
+      const loop = data.selected_loops[i];
+      result.push({
+        type: "aspects",
+        loopIndex: i,
+        title: `${loop.icon} ${loop.name} - co dokładnie?`,
+        subtitle: "Podaj 3 konkretne aspekty, które chcesz śledzić.",
+        required: true,
+        icon: <Target className="w-6 h-6" />,
+      });
+    }
+
+    // Post-loop questions
+    for (const q of QUESTIONS_AFTER_LOOPS) {
+      result.push({
+        type: "question",
+        questionId: q.id,
+        title: q.title,
+        subtitle: q.subtitle,
+        inputType: q.inputType,
+        options: q.options,
+        placeholder: q.placeholder,
+        required: q.required,
+        icon: q.icon,
+      });
+    }
+
+    return result;
+  }, [data.selected_loops]);
+
+  const currentStep = steps[stepIndex];
+  const totalSteps = steps.length;
+  const progress = ((stepIndex + 1) / totalSteps) * 100;
 
   // ============================================================================
   // HANDLERS
@@ -270,23 +402,103 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     updateField(field, updated);
   };
 
-  const canProceed = () => {
-    if (!question.required) return true;
-    const value = data[question.id];
+  const toggleLoop = (loopOpt: LoopOption) => {
+    setData((prev) => {
+      const exists = prev.selected_loops.find((l) => l.slug === loopOpt.slug);
+      if (exists) {
+        return {
+          ...prev,
+          selected_loops: prev.selected_loops.filter(
+            (l) => l.slug !== loopOpt.slug,
+          ),
+        };
+      }
+      return {
+        ...prev,
+        selected_loops: [
+          ...prev.selected_loops,
+          {
+            slug: loopOpt.slug,
+            name: loopOpt.name,
+            icon: loopOpt.icon,
+            color: loopOpt.color,
+            isCustom: false,
+            aspects: ["", "", ""],
+          },
+        ],
+      };
+    });
+  };
+
+  const addCustomLoop = () => {
+    const name = customLoopName.trim();
+    if (!name) return;
+    const slug = name
+      .toLowerCase()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z0-9_]/g, "");
+    if (data.selected_loops.find((l) => l.slug === slug)) return;
+
+    setData((prev) => ({
+      ...prev,
+      selected_loops: [
+        ...prev.selected_loops,
+        {
+          slug,
+          name,
+          icon: "✨",
+          color: "#94A3B8",
+          isCustom: true,
+          aspects: ["", "", ""],
+        },
+      ],
+    }));
+    setCustomLoopName("");
+  };
+
+  const updateAspect = (
+    loopIndex: number,
+    aspectIndex: number,
+    value: string,
+  ) => {
+    setData((prev) => {
+      const loops = [...prev.selected_loops];
+      const aspects = [...loops[loopIndex].aspects] as [string, string, string];
+      aspects[aspectIndex] = value;
+      loops[loopIndex] = { ...loops[loopIndex], aspects };
+      return { ...prev, selected_loops: loops };
+    });
+  };
+
+  const canProceed = (): boolean => {
+    if (!currentStep) return false;
+
+    if (currentStep.type === "loops") {
+      return data.selected_loops.length > 0;
+    }
+
+    if (currentStep.type === "aspects") {
+      const loop = data.selected_loops[currentStep.loopIndex!];
+      return loop.aspects.every((a) => a.trim().length > 0);
+    }
+
+    // Standard question
+    if (!currentStep.required) return true;
+    const value = data[currentStep.questionId!];
     if (Array.isArray(value)) return value.length > 0;
     return !!value;
   };
 
   const nextStep = () => {
-    if (step < totalSteps - 1) {
-      setStep(step + 1);
+    if (stepIndex < totalSteps - 1) {
+      setStepIndex(stepIndex + 1);
     } else {
       handleSubmit();
     }
   };
 
   const prevStep = () => {
-    if (step > 0) setStep(step - 1);
+    if (stepIndex > 0) setStepIndex(stepIndex - 1);
   };
 
   const handleSubmit = async () => {
@@ -294,11 +506,16 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
     setSubmitError(null);
 
     try {
-      // Save profile data
+      const payload = {
+        ...data,
+        // Backward compat: secondary_goals = slugs of selected loops
+        secondary_goals: data.selected_loops.map((l) => l.slug),
+      };
+
       const response = await fetch("/api/onboarding/save-profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -310,7 +527,6 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
         throw new Error(errorBody.error || `Save failed (${response.status})`);
       }
 
-      // Mark onboarding as complete
       const completeResponse = await fetch("/api/onboarding/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -343,20 +559,147 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
   };
 
   // ============================================================================
-  // RENDER HELPERS
+  // RENDER: LOOPS PICKER
   // ============================================================================
 
-  const renderInput = () => {
-    const value = data[question.id];
+  const renderLoopsPicker = () => {
+    const selectedSlugs = data.selected_loops.map((l) => l.slug);
 
-    switch (question.type) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          {PREDEFINED_LOOPS.map((loop) => {
+            const selected = selectedSlugs.includes(loop.slug);
+            return (
+              <button
+                key={loop.slug}
+                onClick={() => toggleLoop(loop)}
+                className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition-all text-left ${
+                  selected
+                    ? "bg-blue-600/30 border-blue-500 text-white"
+                    : "bg-slate-700/30 border-slate-600 text-slate-300 hover:bg-slate-700/60"
+                }`}
+              >
+                <span className="text-lg">{loop.icon}</span>
+                <span className="text-base">{loop.name}</span>
+                {selected && (
+                  <Check className="w-4 h-4 ml-auto text-blue-400" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Custom loops already added */}
+        {data.selected_loops
+          .filter((l) => l.isCustom)
+          .map((loop) => (
+            <div
+              key={loop.slug}
+              className="flex items-center gap-2 px-4 py-3 rounded-xl border bg-blue-600/30 border-blue-500 text-white"
+            >
+              <span className="text-lg">{loop.icon}</span>
+              <span className="text-base">{loop.name}</span>
+              <button
+                onClick={() =>
+                  setData((prev) => ({
+                    ...prev,
+                    selected_loops: prev.selected_loops.filter(
+                      (l) => l.slug !== loop.slug,
+                    ),
+                  }))
+                }
+                className="ml-auto text-slate-400 hover:text-red-400 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+
+        {/* Add custom loop */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={customLoopName}
+            onChange={(e) => setCustomLoopName(e.target.value)}
+            placeholder="Dodaj własny loop..."
+            className="flex-1 bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            onKeyDown={(e) => e.key === "Enter" && addCustomLoop()}
+          />
+          <Button
+            onClick={addCustomLoop}
+            disabled={!customLoopName.trim()}
+            className="bg-slate-600 hover:bg-slate-500 text-white px-4"
+          >
+            <Plus className="w-5 h-5" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================================
+  // RENDER: ASPECTS INPUT
+  // ============================================================================
+
+  const renderAspectsInput = (loopIndex: number) => {
+    const loop = data.selected_loops[loopIndex];
+    if (!loop) return null;
+
+    const hints = ASPECT_HINTS[loop.slug] || DEFAULT_HINTS;
+
+    return (
+      <div className="space-y-4">
+        <div
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+          style={{ backgroundColor: `${loop.color}20`, color: loop.color }}
+        >
+          <span className="text-lg">{loop.icon}</span>
+          <span className="font-medium">{loop.name}</span>
+        </div>
+
+        {[0, 1, 2].map((i) => (
+          <div key={i}>
+            <label className="block text-sm text-slate-400 mb-1">
+              Aspekt {i + 1}
+            </label>
+            <input
+              type="text"
+              value={loop.aspects[i] || ""}
+              onChange={(e) => updateAspect(loopIndex, i, e.target.value)}
+              placeholder={hints[i] || `Aspekt ${i + 1}`}
+              className="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+              autoFocus={i === 0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && i === 2 && canProceed()) {
+                  nextStep();
+                }
+              }}
+            />
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // ============================================================================
+  // RENDER: STANDARD QUESTION INPUT
+  // ============================================================================
+
+  const renderQuestionInput = () => {
+    if (!currentStep || currentStep.type !== "question") return null;
+    const value = data[currentStep.questionId!];
+
+    switch (currentStep.inputType) {
       case "text":
         return (
           <input
             type="text"
             value={(value as string) || ""}
-            onChange={(e) => updateField(question.id, e.target.value)}
-            placeholder={question.placeholder}
+            onChange={(e) =>
+              updateField(currentStep.questionId!, e.target.value)
+            }
+            placeholder={currentStep.placeholder}
             className="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
             autoFocus
             onKeyDown={(e) => e.key === "Enter" && canProceed() && nextStep()}
@@ -367,8 +710,10 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
         return (
           <textarea
             value={(value as string) || ""}
-            onChange={(e) => updateField(question.id, e.target.value)}
-            placeholder={question.placeholder}
+            onChange={(e) =>
+              updateField(currentStep.questionId!, e.target.value)
+            }
+            placeholder={currentStep.placeholder}
             rows={3}
             className="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg resize-none"
             autoFocus
@@ -378,12 +723,11 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
       case "select":
         return (
           <div className="grid grid-cols-1 gap-3">
-            {question.options?.map((option) => (
+            {currentStep.options?.map((option) => (
               <button
                 key={option.value}
                 onClick={() => {
-                  updateField(question.id, option.value);
-                  // Auto-advance on select
+                  updateField(currentStep.questionId!, option.value);
                   setTimeout(() => nextStep(), 300);
                 }}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
@@ -405,14 +749,16 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
       case "multiselect":
         return (
           <div className="grid grid-cols-2 gap-3">
-            {question.options?.map((option) => {
+            {currentStep.options?.map((option) => {
               const selected = ((value as string[]) || []).includes(
                 option.value,
               );
               return (
                 <button
                   key={option.value}
-                  onClick={() => toggleMultiSelect(question.id, option.value)}
+                  onClick={() =>
+                    toggleMultiSelect(currentStep.questionId!, option.value)
+                  }
                   className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition-all ${
                     selected
                       ? "bg-blue-600/30 border-blue-500 text-white"
@@ -433,8 +779,10 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
         return (
           <input
             type="time"
-            value={(value as string) || question.placeholder || ""}
-            onChange={(e) => updateField(question.id, e.target.value)}
+            value={(value as string) || currentStep.placeholder || ""}
+            onChange={(e) =>
+              updateField(currentStep.questionId!, e.target.value)
+            }
             className="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
           />
         );
@@ -444,7 +792,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
           <div className="flex gap-4">
             <button
               onClick={() => {
-                updateField(question.id, true);
+                updateField(currentStep.questionId!, true);
                 setTimeout(() => nextStep(), 300);
               }}
               className={`flex-1 px-6 py-4 rounded-xl border text-lg transition-all ${
@@ -457,7 +805,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
             </button>
             <button
               onClick={() => {
-                updateField(question.id, false);
+                updateField(currentStep.questionId!, false);
                 setTimeout(() => nextStep(), 300);
               }}
               className={`flex-1 px-6 py-4 rounded-xl border text-lg transition-all ${
@@ -472,6 +820,33 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
         );
     }
   };
+
+  // ============================================================================
+  // RENDER: STEP CONTENT
+  // ============================================================================
+
+  const renderStepContent = () => {
+    if (!currentStep) return null;
+
+    if (currentStep.type === "loops") {
+      return renderLoopsPicker();
+    }
+
+    if (currentStep.type === "aspects") {
+      return renderAspectsInput(currentStep.loopIndex!);
+    }
+
+    return renderQuestionInput();
+  };
+
+  // Should we hide the "Dalej" button? (select and toggle auto-advance)
+  const isAutoAdvance =
+    currentStep?.type === "question" &&
+    (currentStep.inputType === "select" || currentStep.inputType === "toggle");
+
+  // Is this step skippable?
+  const isSkippable =
+    !currentStep?.required && !isAutoAdvance && currentStep?.type !== "aspects";
 
   // ============================================================================
   // RENDER
@@ -512,7 +887,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
           <div className="mb-8">
             <div className="flex justify-between text-sm text-slate-500 mb-2">
               <span>
-                {step + 1} / {totalSteps}
+                {stepIndex + 1} / {totalSteps}
               </span>
               <span>{Math.round(progress)}%</span>
             </div>
@@ -524,22 +899,22 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
             </div>
           </div>
 
-          {/* Question icon */}
+          {/* Step icon */}
           <div className="flex items-center gap-3 mb-2 text-blue-400">
-            {question.icon}
+            {currentStep?.icon}
           </div>
 
-          {/* Question title */}
+          {/* Step title */}
           <h2 className="text-2xl font-semibold text-white mb-1">
-            {question.title}
+            {currentStep?.title}
           </h2>
 
-          {question.subtitle && (
-            <p className="text-slate-400 mb-6">{question.subtitle}</p>
+          {currentStep?.subtitle && (
+            <p className="text-slate-400 mb-6">{currentStep.subtitle}</p>
           )}
 
-          {/* Input */}
-          <div className="mb-8">{renderInput()}</div>
+          {/* Step content */}
+          <div className="mb-8">{renderStepContent()}</div>
 
           {/* Navigation */}
           <div className="flex justify-between">
@@ -547,19 +922,19 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
               onClick={prevStep}
               variant="ghost"
               className="text-slate-400 hover:text-white"
-              disabled={step === 0}
+              disabled={stepIndex === 0}
             >
               <ChevronLeft className="w-5 h-5 mr-1" />
               Wstecz
             </Button>
 
-            {question.type !== "select" && question.type !== "toggle" && (
+            {!isAutoAdvance && (
               <Button
                 onClick={nextStep}
-                disabled={question.required && !canProceed()}
+                disabled={currentStep?.required && !canProceed()}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
-                {step === totalSteps - 1 ? (
+                {stepIndex === totalSteps - 1 ? (
                   <>
                     Gotowe
                     <Check className="w-5 h-5 ml-1" />
@@ -573,18 +948,15 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
               </Button>
             )}
 
-            {/* Skip button for optional questions */}
-            {!question.required &&
-              question.type !== "select" &&
-              question.type !== "toggle" && (
-                <Button
-                  onClick={nextStep}
-                  variant="ghost"
-                  className="text-slate-500 hover:text-slate-300"
-                >
-                  Pomiń
-                </Button>
-              )}
+            {isSkippable && (
+              <Button
+                onClick={nextStep}
+                variant="ghost"
+                className="text-slate-500 hover:text-slate-300"
+              >
+                Pomiń
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

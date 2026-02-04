@@ -15,29 +15,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runBronzeETL, runBronzeETLForTenant } from "@/lib/datalake/bronze-etl";
 import { checkR2Connection, getBronzeStats } from "@/lib/storage/r2-client";
+import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
-
-function getCronSecret() {
-  return process.env.CRON_SECRET || "exoskull-cron-2026";
-}
-
-/**
- * Verify cron authorization
- * Accepts: x-cron-secret header OR Authorization: Bearer token
- */
-function verifyCronAuth(req: NextRequest): boolean {
-  const cronSecret = getCronSecret();
-  // Method 1: Custom header (for manual testing)
-  const headerSecret = req.headers.get("x-cron-secret");
-  if (headerSecret === cronSecret) return true;
-
-  // Method 2: Vercel Cron (Authorization header)
-  const authHeader = req.headers.get("authorization");
-  if (authHeader === `Bearer ${cronSecret}`) return true;
-
-  return false;
-}
 
 /**
  * POST /api/cron/bronze-etl
