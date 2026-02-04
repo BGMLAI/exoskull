@@ -189,7 +189,7 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
   google: () => ({
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
-    scopes: GOOGLE_CORE_SCOPES, // Gmail + Calendar; expand to GOOGLE_COMPREHENSIVE_SCOPES after GCP verification
+    scopes: GOOGLE_COMPREHENSIVE_SCOPES,
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     redirectUri: `${BASE_URL}/api/rigs/google/callback`,
@@ -199,7 +199,7 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
   "google-fit": () => ({
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
-    scopes: GOOGLE_CORE_SCOPES, // Gmail + Calendar; expand to GOOGLE_COMPREHENSIVE_SCOPES after GCP verification
+    scopes: GOOGLE_COMPREHENSIVE_SCOPES,
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     redirectUri: `${BASE_URL}/api/rigs/google-fit/callback`,
@@ -209,7 +209,7 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
   "google-workspace": () => ({
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
-    scopes: GOOGLE_CORE_SCOPES, // Gmail + Calendar; expand to GOOGLE_COMPREHENSIVE_SCOPES after GCP verification
+    scopes: GOOGLE_COMPREHENSIVE_SCOPES,
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     redirectUri: `${BASE_URL}/api/rigs/google-workspace/callback`,
@@ -219,7 +219,7 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
   "google-calendar": () => ({
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
-    scopes: GOOGLE_CORE_SCOPES, // Gmail + Calendar; expand to GOOGLE_COMPREHENSIVE_SCOPES after GCP verification
+    scopes: GOOGLE_COMPREHENSIVE_SCOPES,
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     redirectUri: `${BASE_URL}/api/rigs/google-calendar/callback`,
