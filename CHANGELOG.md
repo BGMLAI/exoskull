@@ -6,6 +6,49 @@ All notable changes to ExoSkull are documented here.
 
 ## 2026-02-04
 
+### Google OAuth Comprehensive Scopes + Email Inbox Widget
+
+Rozszerzenie integracji Google o pelne scopy (Gmail, Calendar, Drive, Fit, YouTube, Photos, Contacts, Tasks, Docs/Sheets/Slides) oraz dodanie widgetu skrzynki odbiorczej.
+
+#### What was done
+- Zmiana z `GOOGLE_CORE_SCOPES` (Gmail + Calendar) na `GOOGLE_COMPREHENSIVE_SCOPES` (40+ scopes)
+- Nowy endpoint `/api/rigs/[slug]/emails` - dedykowany do pobierania maili
+- Nowy komponent `EmailInboxWidget` - wyswietla ostatnie maile z licznikiem nieprzeczytanych
+- Fix `IntegrationsWidget` - dodano `tenantId` prop i header `x-tenant-id` (naprawia 401 na sync)
+- Integracja w `/dashboard/settings` - EmailInboxWidget auto-fetchuje maile po polaczeniu
+
+#### Why
+- Uzytkownik chcial widziec swoje maile na dashboardzie
+- Sync button nie dzialal (brakowalo headera z tenant ID)
+- Uzytkownik chcial maksymalnie duzo scopow dla pelnej funkcjonalnosci Google
+
+#### Files changed
+- `lib/rigs/oauth.ts` (modified - comprehensive scopes)
+- `app/api/rigs/[slug]/emails/route.ts` (new)
+- `components/widgets/EmailInboxWidget.tsx` (new)
+- `components/widgets/IntegrationsWidget.tsx` (modified - tenantId prop)
+- `app/dashboard/settings/page.tsx` (modified - EmailInboxWidget integration)
+
+#### Google APIs Required in GCP
+- Gmail API
+- Google Calendar API
+- Google Drive API
+- Google Docs/Sheets/Slides API
+- Google Tasks API
+- Google Fit API
+- People API (Contacts)
+- YouTube Data API v3
+- YouTube Analytics API
+- Photos Library API
+
+#### Notes for future agents
+- Uzytkownik musi re-autoryzowac Google zeby dostac nowe scopy
+- Non-Workspace accounts dzialaja normalnie (scopy sa per-API, nie per-account-type)
+- EmailInboxWidget auto-fetchuje na mount jesli isConnected=true
+- Comprehensive scopes moga wymagac verification w Google Cloud (unverified warning dla testowych userow)
+
+---
+
 ### Dashboard Stats Section (below Unified Thread)
 
 Dodano sekcje ze statystykami, podsumowaniem dnia, szybkimi ustawieniami i kalendarzem ponizej Unified Thread na glownym dashboardzie.
