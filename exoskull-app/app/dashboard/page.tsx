@@ -8,6 +8,7 @@ import { HealthWidget } from "@/components/widgets/HealthWidget";
 import { KnowledgeWidget } from "@/components/widgets/KnowledgeWidget";
 import { DashboardRealtime } from "@/components/dashboard/DashboardRealtime";
 import { DynamicModWidget } from "@/components/widgets/DynamicModWidget";
+import { GuardianWidget } from "@/components/widgets/GuardianWidget";
 import {
   CalendarItem,
   ConversationStats,
@@ -378,6 +379,7 @@ export default async function DashboardPage() {
         <CalendarWidget items={calendarItems} />
         <HealthWidget summary={healthSummary} />
         <KnowledgeWidget summary={knowledgeSummary} />
+        <GuardianWidget />
       </div>
 
       {/* Quick actions & Integrations */}

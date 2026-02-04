@@ -49,6 +49,30 @@
     {
       "path": "/api/cron/gold-etl",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/business-metrics",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/dunning",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/guardian-effectiveness",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/guardian-values",
+      "schedule": "0 8 * * 0"
+    },
+    {
+      "path": "/api/cron/engagement-scoring",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/drip-engine",
+      "schedule": "0 */6 * * *"
     }
   ]
 }

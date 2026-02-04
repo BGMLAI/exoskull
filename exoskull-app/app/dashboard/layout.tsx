@@ -1,10 +1,21 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { Home, CheckSquare, MessageSquare, Settings, Clock, FileText, Menu, Heart } from 'lucide-react'
-import { DashboardShell } from '@/components/dashboard/DashboardShell'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { Button } from '@/components/ui/button'
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import {
+  Home,
+  CheckSquare,
+  MessageSquare,
+  Settings,
+  Clock,
+  FileText,
+  Menu,
+  Heart,
+  TrendingUp,
+  Shield,
+} from "lucide-react";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,36 +23,39 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu";
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: Home },
-  { href: '/dashboard/chat', label: 'Chat', icon: MessageSquare },
-  { href: '/dashboard/tasks', label: 'Zadania', icon: CheckSquare },
-  { href: '/dashboard/schedule', label: 'Harmonogram', icon: Clock },
-  { href: '/dashboard/knowledge', label: 'Wiedza', icon: FileText },
-  { href: '/dashboard/health', label: 'Zdrowie', icon: Heart },
-]
+  { href: "/dashboard", label: "Dashboard", icon: Home },
+  { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
+  { href: "/dashboard/tasks", label: "Zadania", icon: CheckSquare },
+  { href: "/dashboard/schedule", label: "Harmonogram", icon: Clock },
+  { href: "/dashboard/knowledge", label: "Wiedza", icon: FileText },
+  { href: "/dashboard/health", label: "Zdrowie", icon: Heart },
+  { href: "/dashboard/business", label: "Biznes", icon: TrendingUp },
+];
 
 // Subset for mobile bottom tab bar (5 max for usability)
 const MOBILE_TAB_ITEMS = [
-  { href: '/dashboard', label: 'Home', icon: Home },
-  { href: '/dashboard/chat', label: 'Chat', icon: MessageSquare },
-  { href: '/dashboard/tasks', label: 'Zadania', icon: CheckSquare },
-  { href: '/dashboard/health', label: 'Zdrowie', icon: Heart },
-  { href: '/dashboard/settings', label: 'Wiecej', icon: Settings },
-]
+  { href: "/dashboard", label: "Home", icon: Home },
+  { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
+  { href: "/dashboard/tasks", label: "Zadania", icon: CheckSquare },
+  { href: "/dashboard/health", label: "Zdrowie", icon: Heart },
+  { href: "/dashboard/settings", label: "Wiecej", icon: Settings },
+];
 
 export default async function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/login')
+    redirect("/login");
   }
 
   return (
@@ -119,13 +133,20 @@ export default async function DashboardLayout({
                 ))}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard/settings" className="flex items-center gap-2">
+                  <Link
+                    href="/dashboard/settings"
+                    className="flex items-center gap-2"
+                  >
                     <Settings className="h-4 w-4" />
                     <span>Ustawienia</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <form action="/api/auth/signout" method="post" className="w-full">
+                <form
+                  action="/api/auth/signout"
+                  method="post"
+                  className="w-full"
+                >
                   <DropdownMenuItem asChild>
                     <button className="w-full text-left">Wyloguj</button>
                   </DropdownMenuItem>
@@ -137,9 +158,7 @@ export default async function DashboardLayout({
 
         {/* Main content */}
         <main className="flex-1 overflow-auto pb-16 md:pb-0">
-          <DashboardShell tenantId={user.id}>
-            {children}
-          </DashboardShell>
+          <DashboardShell tenantId={user.id}>{children}</DashboardShell>
         </main>
 
         {/* Mobile bottom tab bar */}
@@ -157,5 +176,5 @@ export default async function DashboardLayout({
         </nav>
       </div>
     </div>
-  )
+  );
 }

@@ -12,6 +12,7 @@ import {
   updateSession,
   endSession,
 } from "@/lib/voice/conversation-handler";
+import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Rate limit check
+    const rateCheck = await checkRateLimit(user.id, "conversations");
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: rateCheck.upgradeMessage || "Limit rozmow osiagniety" },
+        { status: 429 },
+      );
+    }
+
     // Get or create session
     const sessionKey =
       conversationId ||
@@ -43,6 +53,9 @@ export async function POST(request: NextRequest) {
 
     // Process through Claude with IORS tools
     const result = await processUserMessage(session, message);
+
+    // Track usage
+    await incrementUsage(user.id, "conversations").catch(() => {});
 
     // Save to session + unified thread
     await updateSession(session.id, message, result.text, {

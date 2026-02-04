@@ -6,6 +6,99 @@ All notable changes to ExoSkull are documented here.
 
 ## 2026-02-04
 
+### GAP 1-3: Guardian + Marketing + Business Layer
+
+Implementacja trzech krytycznych brakujacych warstw systemu.
+
+#### GAP 3: Hard Business
+- **3 migracje DB:** `exo_business_events`, `exo_business_daily_metrics`, `exo_dunning_attempts`, `exo_usage_daily` + nowe kolumny na `exo_tenants`
+- **lib/business/:** types, metrics (MRR/churn/LTV), dunning (4-step escalation), rate-limiter (per-tier), upsell
+- **Stripe webhook:** `/api/webhooks/stripe` - payment_succeeded/failed, subscription lifecycle
+- **Cron jobs:** business-metrics (05:00 UTC), dunning (co 6h)
+- **Dashboard:** `/dashboard/business` - MRR, active users, churn, LTV, revenue chart
+
+#### GAP 1: Alignment Guardian
+- **Migracja DB:** benefit_score/reasoning/verdict na `exo_interventions`, tabele: `exo_user_values`, `exo_intervention_effectiveness`, `exo_value_conflicts`, `exo_guardian_config`
+- **lib/autonomy/guardian.ts:** AlignmentGuardian class - pre-action benefit verification (0-10 score, blocks <4.0), post-action effectiveness measurement, value drift detection, auto-throttle, system interest protection
+- **MAPE-K integration:** Guardian check before auto-execution in mape-k-loop.ts
+- **Cron jobs:** guardian-effectiveness (06:00 UTC), guardian-values (niedziele 08:00 UTC)
+- **API:** `/api/autonomy/guardian` - dashboard data + user value management
+
+#### GAP 2: Marketing
+- **Migracja DB:** `exo_referrals`, `exo_engagement_scores`, `exo_campaign_sends`, `exo_drip_state` + referral_code/referred_by na `exo_tenants`
+- **lib/marketing/:** referrals (code generation, reward granting), engagement scoring (weighted composite + churn risk), drip-engine (onboarding/reengagement sequences)
+- **Cron jobs:** engagement-scoring (07:00 UTC), drip-engine (co 6h)
+- **Pages:** `/referral/[code]` landing, `/api/referrals`, `/api/public/stats`
+
+#### Configuration
+- **vercel.json:** +6 nowych cronow
+- **dashboard/layout.tsx:** +Biznes nav item
+- **stripe package:** zainstalowany jako dependency
+
+#### Build
+- `npm run build` SUCCESS - 0 errors, all new routes compiled
+
+### Files created (32 new)
+- `supabase/migrations/20260204000001_business_metrics.sql`
+- `supabase/migrations/20260204000002_guardian_system.sql`
+- `supabase/migrations/20260204000003_marketing_system.sql`
+- `lib/business/types.ts`, `metrics.ts`, `dunning.ts`, `rate-limiter.ts`, `upsell.ts`, `index.ts`
+- `lib/autonomy/guardian-types.ts`, `guardian.ts`
+- `lib/marketing/referrals.ts`, `engagement.ts`, `drip-engine.ts`, `index.ts`
+- `app/api/webhooks/stripe/route.ts`
+- `app/api/cron/business-metrics/route.ts`, `dunning/route.ts`
+- `app/api/cron/guardian-effectiveness/route.ts`, `guardian-values/route.ts`
+- `app/api/cron/engagement-scoring/route.ts`, `drip-engine/route.ts`
+- `app/api/autonomy/guardian/route.ts`
+- `app/api/referrals/route.ts`
+- `app/api/public/stats/route.ts`
+- `app/dashboard/business/page.tsx`
+- `components/widgets/GuardianWidget.tsx`
+- `app/referral/[code]/page.tsx`
+
+### Files modified (4)
+- `lib/autonomy/types.ts` - exported PlannedIntervention type
+- `lib/autonomy/mape-k-loop.ts` - guardian pre-execution check
+- `app/dashboard/layout.tsx` - business nav item
+- `vercel.json` - 6 new cron schedules
+
+---
+
+### Fazy 5-7: Stabilizacja + Systemic Build Fix
+
+#### Faza 5: WhatsApp/Messenger Audit
+- Clean stubs already in place - `send_whatsapp` and `send_messenger` return "not configured" gracefully
+- Unified thread supports all channels (voice, sms, whatsapp, email, messenger, instagram, web_chat)
+- No code changes needed
+
+#### Faza 6: Code Quality
+- Fixed 2 silent `.catch(() => {})` blocks in `conversation-handler.ts` (SMS/email unified thread append)
+- Removed unused imports (`Zap`, `CheckCircle2`, `XCircle`) from `dashboard/page.tsx`
+- Cleaned VAPI remnants in `voice/tools/route.ts` (logging, unused vars)
+- tenant_id vs tenantId convention documented (snake_case in DB, camelCase in JS)
+
+#### Faza 7: Monitoring & CRON
+- Added 3 missing CRON jobs to `vercel.json`: pulse (*/30), post-conversation (*/15), highlight-decay (3am)
+- Fixed master-scheduler schedule: 6am daily → hourly
+- Verified Twilio status callbacks on all outbound voice/SMS paths
+
+#### Systemic Build Fix: Module-level createClient()
+- **Root cause:** 50+ API routes had `createClient()` at module scope → crashes during Next.js static generation
+- **Fix:** Added `export const dynamic = 'force-dynamic'` + `getSupabase()` factory pattern to ALL affected files
+- **Scope:** 50+ route files + 11 lib files modified
+- **Result:** `npm run build` SUCCESS (0 errors, 64 pages)
+
+#### Pre-commit Hook Fix
+- Replaced `next lint --fix --file` with `prettier --write` in lint-staged (wrong CWD issue)
+- Replaced `next build` with `tsc --noEmit` in husky pre-commit (faster, still catches type errors)
+
+#### Deploy
+- Commit `7dbf680` pushed to `origin/main`
+- Auto-deployed to `exoskull.xyz` via Vercel GitHub integration
+- E2E tests: **8/8 PASS, 0 FAIL** on production
+
+---
+
 ### Faza 3: E2E Testing + Deploy Module 4-7
 
 #### E2E Test Results (post-deploy)

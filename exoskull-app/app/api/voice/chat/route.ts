@@ -14,6 +14,7 @@ import {
   endSession,
 } from "@/lib/voice/conversation-handler";
 import { textToSpeech } from "@/lib/voice/elevenlabs-tts";
+import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 
 export const dynamic = "force-dynamic";
 
@@ -41,12 +42,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Rate limit check (voice minutes)
+    const rateCheck = await checkRateLimit(user.id, "voice_minutes");
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: rateCheck.upgradeMessage || "Limit minut glosowych osiagniety",
+        },
+        { status: 429 },
+      );
+    }
+
     // Get or create voice session
     const callSid = sessionId || `web-${user.id}-${Date.now()}`;
     const session = await getOrCreateSession(callSid, user.id);
 
     // Process through Claude with tools
     const result = await processUserMessage(session, message);
+
+    // Track usage
+    await incrementUsage(user.id, "voice_minutes").catch(() => {});
 
     // Update session with conversation
     await updateSession(session.id, message, result.text);
