@@ -11,15 +11,26 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      console.error("[SaveProfile] No user session:", {
+        authError: authError?.message,
+      });
+      return NextResponse.json(
+        { error: "Sesja wygasla. Zaloguj sie ponownie." },
+        { status: 401 },
+      );
     }
 
     const body = await request.json();
 
-    console.log("[SaveProfile] Received data for tenant:", user.id);
+    console.log("[SaveProfile] Saving for tenant:", user.id, {
+      preferred_name: body.preferred_name,
+      primary_goal: body.primary_goal,
+      fields: Object.keys(body).length,
+    });
 
     // Build update object from form data
     const updateData: Record<string, any> = {
@@ -63,9 +74,15 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id);
 
     if (updateError) {
-      console.error("[SaveProfile] Error updating tenant:", updateError);
+      console.error("[SaveProfile] Error updating tenant:", {
+        code: updateError.code,
+        message: updateError.message,
+        details: updateError.details,
+        hint: updateError.hint,
+        userId: user.id,
+      });
       return NextResponse.json(
-        { error: "Failed to save profile" },
+        { error: `Blad zapisu: ${updateError.message}` },
         { status: 500 },
       );
     }

@@ -15,13 +15,19 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      console.error("[Complete API] No user session");
+      return NextResponse.json(
+        { error: "Sesja wygasla. Zaloguj sie ponownie." },
+        { status: 401 },
+      );
     }
 
     const body = await request.json().catch(() => ({}));
     const method = body.method || "form";
 
-    // Update tenant status
+    console.log("[Complete API] Starting for user:", user.id, { method });
+
+    // Update tenant status - THIS IS THE CRITICAL STEP
     const { error: updateError } = await supabase
       .from("exo_tenants")
       .update({
@@ -31,47 +37,65 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id);
 
     if (updateError) {
-      console.error("[Complete API] Error updating status:", updateError);
+      console.error("[Complete API] Error updating status:", {
+        code: updateError.code,
+        message: updateError.message,
+        details: updateError.details,
+        userId: user.id,
+      });
       return NextResponse.json(
-        { error: "Failed to complete" },
+        { error: `Blad zapisu statusu: ${updateError.message}` },
         { status: 500 },
       );
     }
 
-    // Log onboarding session
-    await supabase.from("exo_onboarding_sessions").insert({
-      tenant_id: user.id,
-      step: 1,
-      step_name: "onboarding",
-      completed_at: new Date().toISOString(),
-      conversation_id: body.conversationId || null,
-      data: { method },
-    });
+    // Non-critical operations below - don't let them break the flow
+    try {
+      await supabase.from("exo_onboarding_sessions").insert({
+        tenant_id: user.id,
+        step: 1,
+        step_name: "onboarding",
+        completed_at: new Date().toISOString(),
+        conversation_id: body.conversationId || null,
+        data: { method },
+      });
+    } catch (e) {
+      console.warn(
+        "[Complete API] Non-critical: onboarding session log failed:",
+        e,
+      );
+    }
 
     // Schedule first check-in if morning time was set
-    const { data: tenant } = await supabase
-      .from("exo_tenants")
-      .select("morning_checkin_time, preferred_name, checkin_enabled")
-      .eq("id", user.id)
-      .single();
-
-    if (tenant?.checkin_enabled && tenant?.morning_checkin_time) {
-      // Create morning check-in job preference
-      const { data: morningJob } = await supabase
-        .from("exo_scheduled_jobs")
-        .select("id")
-        .eq("job_name", "morning_checkin")
+    try {
+      const { data: tenant } = await supabase
+        .from("exo_tenants")
+        .select("morning_checkin_time, preferred_name, checkin_enabled")
+        .eq("id", user.id)
         .single();
 
-      if (morningJob) {
-        await supabase.from("exo_user_job_preferences").upsert({
-          tenant_id: user.id,
-          job_id: morningJob.id,
-          enabled: true,
-          preferred_time: tenant.morning_checkin_time,
-          custom_message: `Cześć ${tenant.preferred_name || ""}! Jak się dziś czujesz?`,
-        });
+      if (tenant?.checkin_enabled && tenant?.morning_checkin_time) {
+        const { data: morningJob } = await supabase
+          .from("exo_scheduled_jobs")
+          .select("id")
+          .eq("job_name", "morning_checkin")
+          .single();
+
+        if (morningJob) {
+          await supabase.from("exo_user_job_preferences").upsert({
+            tenant_id: user.id,
+            job_id: morningJob.id,
+            enabled: true,
+            preferred_time: tenant.morning_checkin_time,
+            custom_message: `Cześć ${tenant.preferred_name || ""}! Jak się dziś czujesz?`,
+          });
+        }
       }
+    } catch (e) {
+      console.warn(
+        "[Complete API] Non-critical: check-in scheduling failed:",
+        e,
+      );
     }
 
     console.log("[Complete API] Onboarding completed for user:", user.id);
