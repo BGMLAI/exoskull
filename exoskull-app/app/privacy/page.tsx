@@ -2,9 +2,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Polityka Prywatnosci - ExoSkull",
+  title: "Polityka Prywatności - ExoSkull",
   description:
-    "Polityka Prywatnosci aplikacji ExoSkull. Dowiedz sie jak chronimy Twoje dane osobowe.",
+    "Polityka Prywatności aplikacji ExoSkull. Dowiedz się jak chronimy Twoje dane osobowe.",
 };
 
 export default function PrivacyPolicyPage() {
@@ -25,10 +25,10 @@ export default function PrivacyPolicyPage() {
 
         <article className="prose prose-invert prose-slate max-w-none">
           <h1 className="text-4xl font-bold text-white mb-2">
-            Polityka Prywatnosci
+            Polityka Prywatności
           </h1>
           <p className="text-slate-400 mb-8">
-            Wersja 2.0.0 | Obowiazuje od: 4 lutego 2026 r.
+            Wersja 2.0.0 | Obowiązuje od: 4 lutego 2026 r.
           </p>
 
           <hr className="border-slate-700 my-8" />
@@ -68,14 +68,14 @@ export default function PrivacyPolicyPage() {
             </tbody>
           </table>
 
-          {/* 2. CHARAKTER USLUGI */}
-          <h2>2. Charakter uslugi</h2>
+          {/* 2. CHARAKTER USŁUGI */}
+          <h2>2. Charakter usługi</h2>
           <p>
-            ExoSkull to narzedzie technologiczne wspierajace produktywnosc i
-            organizacje zycia codziennego. ExoSkull <strong>nie jest</strong>{" "}
-            usluga medyczna, terapeutyczna, prawna ani finansowa. Wszelkie
-            wyniki, sugestie i rekomendacje generowane przez AI maja charakter
-            wylacznie informacyjny i orientacyjny.
+            ExoSkull to narzędzie technologiczne wspierające produktywność i
+            organizację życia codziennego. ExoSkull <strong>nie jest</strong>{" "}
+            usługą medyczną, terapeutyczną, prawną ani finansową. Wszelkie
+            wyniki, sugestie i rekomendacje generowane przez AI mają charakter
+            wyłącznie informacyjny i orientacyjny.
           </p>
 
           {/* 3. DANE */}
@@ -83,92 +83,92 @@ export default function PrivacyPolicyPage() {
 
           <h3>3.1 Dane konta</h3>
           <p>
-            Numer telefonu lub email (logowanie), haslo (zaszyfrowane bcrypt),
-            jezyk, strefa czasowa. Opcjonalnie: imie, awatar, data urodzenia.
+            Numer telefonu lub email (logowanie), hasło (zaszyfrowane bcrypt),
+            język, strefa czasowa. Opcjonalnie: imię, awatar, data urodzenia.
           </p>
 
           <h3>3.2 Dane techniczne</h3>
           <p>
-            Adres IP, rodzaj urzadzenia i OS, wersja przegladarki, identyfikator
-            urzadzenia (MFA), zanonimizowane logi bledow, crash reports.
+            Adres IP, rodzaj urządzenia i OS, wersja przeglądarki, identyfikator
+            urządzenia (MFA), zanonimizowane logi błędów, crash reports.
           </p>
 
           <h3>3.3 System Tier</h3>
           <p>
-            <strong>Tier 1 (domyslny):</strong> Dane przetwarzane lokalnie na
-            urzadzeniu. Serwer otrzymuje jedynie zagregowane statystyki (liczba
-            sesji, dlugosc, uzywane funkcje) - bez tresci rozmow.
+            <strong>Tier 1 (domyślny):</strong> Dane przetwarzane lokalnie na
+            urządzeniu. Serwer otrzymuje jedynie zagregowane statystyki (liczba
+            sesji, długość, używane funkcje) - bez treści rozmów.
           </p>
           <p>
             <strong>Tier 2 (opt-in):</strong> Dodatkowo: zanonimizowane wzorce
-            behawioralne, biomarkery glosowe (pitch, tempo - nie nagrania), dane
+            behawioralne, biomarkery głosowe (pitch, tempo - nie nagrania), dane
             z wearables (HRV, sen), wzorce lokalizacyjne (typ, nie GPS).
           </p>
           <p>
-            <strong>Tier 3 (opt-in + kompensacja):</strong> Pelne transkrypty
-            rozmow, nagrania audio, nagrania ekranu (max 2h/tydz.) - kazde za
-            oddzielna zgoda. Kompensacja: darmowy dostep + 200 PLN/mies.
+            <strong>Tier 3 (opt-in + kompensacja):</strong> Pełne transkrypty
+            rozmów, nagrania audio, nagrania ekranu (max 2h/tydz.) - każde za
+            oddzielną zgodą. Kompensacja: darmowy dostęp + 200 PLN/mies.
           </p>
 
-          <h3>3.4 Integracje zewnetrzne (Rigs)</h3>
+          <h3>3.4 Integracje zewnętrzne (Rigs)</h3>
           <p>
-            Google Fit, Apple Health, Oura, Microsoft 365, Notion, Plaid - kazda
-            wymaga oddzielnej zgody OAuth. Mozna cofnac w dowolnym momencie.
+            Google Fit, Apple Health, Oura, Microsoft 365, Notion, Plaid - każda
+            wymaga oddzielnej zgody OAuth. Można cofnąć w dowolnym momencie.
           </p>
 
           {/* 4. CELE */}
           <h2>4. Cele przetwarzania</h2>
           <ul>
             <li>
-              <strong>Swiadczenie uslugi:</strong> personalizacja,
+              <strong>Świadczenie usługi:</strong> personalizacja,
               synchronizacja, powiadomienia (Art. 6(1)(b) RODO)
             </li>
             <li>
-              <strong>Bezpieczenstwo:</strong> MFA, wykrywanie naduzyc,
+              <strong>Bezpieczeństwo:</strong> MFA, wykrywanie nadużyć,
               monitoring (Art. 6(1)(f) RODO)
             </li>
             <li>
-              <strong>Poprawa uslugi:</strong> analiza agregatow, diagnostyka,
-              rozwoj funkcji (Art. 6(1)(f) RODO)
+              <strong>Poprawa usługi:</strong> analiza agregatów, diagnostyka,
+              rozwój funkcji (Art. 6(1)(f) RODO)
             </li>
             <li>
-              <strong>Badania naukowe i rozwoj AI:</strong> federated learning,
+              <strong>Badania naukowe i rozwój AI:</strong> federated learning,
               trening modeli, publikacje (Zgoda + Art. 89 RODO)
             </li>
             <li>
-              <strong>Marketing:</strong> wylacznie za zgoda (Art. 6(1)(a) RODO)
+              <strong>Marketing:</strong> wyłącznie za zgodą (Art. 6(1)(a) RODO)
             </li>
           </ul>
 
-          {/* 5. UDOSTEPNIANIE */}
-          <h2>5. Udostepnianie danych</h2>
+          {/* 5. UDOSTĘPNIANIE */}
+          <h2>5. Udostępnianie danych</h2>
           <p>
             <strong>Nie sprzedajemy danych osobowych.</strong> Korzystamy z
-            podwykonawcow (Supabase, Vercel, Cloudflare, VAPI, Anthropic,
-            Google, Stripe, Plaid i in.) na podstawie umow DPA. Transfer poza
+            podwykonawców (Supabase, Vercel, Cloudflare, VAPI, Anthropic,
+            Google, Stripe, Plaid i in.) na podstawie umów DPA. Transfer poza
             EOG zabezpieczony Standardowymi Klauzulami Umownymi (SCC).
           </p>
           <p>
-            Dane udostepniane do badan sa zawsze zanonimizowane lub
-            pseudonimizowane. Dane w pelni zanonimizowane nie stanowia danych
-            osobowych i moga byc wykorzystywane bezterminowo.
+            Dane udostępniane do badań są zawsze zanonimizowane lub
+            pseudonimizowane. Dane w pełni zanonimizowane nie stanowią danych
+            osobowych i mogą być wykorzystywane bezterminowo.
           </p>
 
           {/* 6. PRZECHOWYWANIE */}
           <h2>6. Okres przechowywania</h2>
           <ul>
-            <li>Dane konta: przez okres korzystania z uslugi</li>
-            <li>120 dni nieaktywnosci: automatyczne usuniecie</li>
+            <li>Dane konta: przez okres korzystania z usługi</li>
+            <li>120 dni nieaktywności: automatyczne usunięcie</li>
             <li>
               Dane badawcze zanonimizowane: do 10 lat (Tier 1), 5 lat (Tier 2-3)
             </li>
-            <li>Logi bezpieczenstwa: 1-2 lata</li>
+            <li>Logi bezpieczeństwa: 1-2 lata</li>
           </ul>
 
           {/* 7. PRAWA */}
           <h2>7. Twoje prawa (RODO)</h2>
           <ul>
-            <li>Prawo dostepu (Art. 15)</li>
+            <li>Prawo dostępu (Art. 15)</li>
             <li>Prawo do sprostowania (Art. 16)</li>
             <li>Prawo do usunięcia (Art. 17)</li>
             <li>Prawo do ograniczenia przetwarzania (Art. 18)</li>
@@ -181,44 +181,44 @@ export default function PrivacyPolicyPage() {
             </li>
           </ul>
           <p>
-            Realizacja praw: Ustawienia &gt; Prywatnosc lub email:
+            Realizacja praw: Ustawienia &gt; Prywatność lub email:
             privacy@exoskull.xyz
           </p>
 
-          {/* 8. BEZPIECZENSTWO */}
-          <h2>8. Bezpieczenstwo</h2>
+          {/* 8. BEZPIECZEŃSTWO */}
+          <h2>8. Bezpieczeństwo</h2>
           <p>
             Szyfrowanie AES-256-GCM (at rest), TLS 1.3 (in transit), SQLCipher
-            (na urzadzeniu). Row Level Security w bazie danych. MFA.
-            Powiadomienie o naruszeniach w ciagu 72h (Art. 33 RODO).
+            (na urządzeniu). Row Level Security w bazie danych. MFA.
+            Powiadomienie o naruszeniach w ciągu 72h (Art. 33 RODO).
           </p>
 
           {/* 9. COOKIES */}
           <h2>9. Cookies</h2>
           <p>
-            Niezbedne: session_token, csrf_token, device_id. Nie uzywamy Google
+            Niezbędne: session_token, csrf_token, device_id. Nie używamy Google
             Analytics ani Facebook Pixel. Analityka: self-hosted Plausible (bez
             cookies, GDPR compliant).
           </p>
 
           {/* 10. DZIECI */}
-          <h2>10. Osoby niepelnoletnie</h2>
+          <h2>10. Osoby niepełnoletnie</h2>
           <p>
-            ExoSkull jest przeznaczony wylacznie dla osob 18+. Nie zbieramy
-            swiadomie danych osob ponizej 18 roku zycia.
+            ExoSkull jest przeznaczony wyłącznie dla osób 18+. Nie zbieramy
+            świadomie danych osób poniżej 18 roku życia.
           </p>
 
           {/* 11. ZMIANY */}
           <h2>11. Zmiany w polityce</h2>
           <p>
             O istotnych zmianach informujemy emailem z 30-dniowym wyprzedzeniem.
-            Kontynuacja korzystania po tym okresie oznacza akceptacje zmian.
+            Kontynuacja korzystania po tym okresie oznacza akceptację zmian.
           </p>
 
           {/* KONTAKT */}
           <h2>12. Kontakt</h2>
           <p>
-            Prywatnosc: privacy@exoskull.xyz | DPO: dpo@exoskull.xyz | Wsparcie:
+            Prywatność: privacy@exoskull.xyz | DPO: dpo@exoskull.xyz | Wsparcie:
             support@exoskull.xyz
           </p>
           <p className="text-sm text-slate-500">
@@ -229,8 +229,8 @@ export default function PrivacyPolicyPage() {
           <hr className="border-slate-700 my-8" />
 
           <p className="text-sm text-slate-500">
-            Pelna tresc Polityki Prywatnosci (wersja 2.0.0) dostepna jest w
-            formacie dokumentu na zadanie: privacy@exoskull.xyz
+            Pełna treść Polityki Prywatności (wersja 2.0.0) dostępna jest w
+            formacie dokumentu na żądanie: privacy@exoskull.xyz
           </p>
         </article>
 
@@ -240,7 +240,7 @@ export default function PrivacyPolicyPage() {
               href="/privacy"
               className="text-slate-400 hover:text-white transition-colors"
             >
-              Polityka Prywatnosci
+              Polityka Prywatności
             </Link>
             <Link
               href="/terms"
@@ -252,7 +252,7 @@ export default function PrivacyPolicyPage() {
               href="/"
               className="text-slate-400 hover:text-white transition-colors"
             >
-              Strona glowna
+              Strona główna
             </Link>
           </div>
           ExoSkull &copy; {new Date().getFullYear()} Fundacja Lokalny

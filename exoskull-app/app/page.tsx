@@ -5,9 +5,9 @@ import type { Metadata } from "next";
 import { SocialProof } from "@/components/landing/SocialProof";
 
 export const metadata: Metadata = {
-  title: "ExoSkull - Adaptacyjny System Operacyjny Zycia | AI Second Brain",
+  title: "ExoSkull - Adaptacyjny System Operacyjny Życia | AI Second Brain",
   description:
-    "ExoSkull to Twoj drugi mozg. Osobisty AI ktory uczy sie kim jestes, buduje narzedzia i dziala za Ciebie. Voice-first, adaptive, proactive.",
+    "ExoSkull to Twój drugi mózg. Osobisty AI który uczy się kim jesteś, buduje narzędzia i działa za Ciebie. Voice-first, adaptive, proactive.",
   keywords: [
     "AI assistant",
     "second brain",
@@ -19,9 +19,9 @@ export const metadata: Metadata = {
     "task management",
   ],
   openGraph: {
-    title: "ExoSkull - Twoj Drugi Mozg",
+    title: "ExoSkull - Twój Drugi Mózg",
     description:
-      "Adaptacyjny system operacyjny dla Twojego zycia. AI ktory uczy sie, buduje narzedzia i dziala za Ciebie.",
+      "Adaptacyjny system operacyjny dla Twojego życia. AI który uczy się, buduje narzędzia i działa za Ciebie.",
     url: "https://exoskull.xyz",
     siteName: "ExoSkull",
     type: "website",
@@ -29,9 +29,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ExoSkull - Twoj Drugi Mozg",
+    title: "ExoSkull - Twój Drugi Mózg",
     description:
-      "Adaptacyjny system operacyjny dla Twojego zycia. AI ktory uczy sie, buduje narzedzia i dziala za Ciebie.",
+      "Adaptacyjny system operacyjny dla Twojego życia. AI który uczy się, buduje narzędzia i działa za Ciebie.",
   },
   robots: {
     index: true,
@@ -46,7 +46,7 @@ const JSON_LD = {
   applicationCategory: "LifestyleApplication",
   operatingSystem: "Web, Android",
   description:
-    "Adaptacyjny system operacyjny zycia - osobisty AI ktory uczy sie kim jestes i pomaga Ci byc lepszym.",
+    "Adaptacyjny system operacyjny życia - osobisty AI który uczy się kim jesteś i pomaga Ci być lepszym.",
   url: "https://exoskull.xyz",
   offers: {
     "@type": "Offer",
@@ -67,18 +67,18 @@ const JSON_LD = {
 const TESTIMONIALS = [
   {
     quote:
-      "IORS wykryl ze nie spie wystarczajaco i sam dostosowal moj harmonogram. Genialne.",
-    name: "Michal K.",
+      "IORS wykrył że nie śpię wystarczająco i sam dostosował mój harmonogram. Genialne.",
+    name: "Michał K.",
     role: "Programista",
   },
   {
-    quote: "Zaczynalem od SMS-a, teraz nie wyobrazam sobie dnia bez ExoSkull.",
+    quote: "Zaczynałem od SMS-a, teraz nie wyobrażam sobie dnia bez ExoSkull.",
     name: "Anna W.",
     role: "Project Manager",
   },
   {
     quote:
-      "Wreszcie cos co naprawde sie do mnie dostosowuje zamiast na odwrot.",
+      "Wreszcie coś co naprawdę się do mnie dostosowuje zamiast na odwrót.",
     name: "Tomek R.",
     role: "Freelancer",
   },
@@ -108,7 +108,7 @@ export default async function LandingPage() {
             href="/login"
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-sm font-medium"
           >
-            Zaloguj sie
+            Zaloguj się
           </Link>
         </nav>
 
@@ -120,8 +120,8 @@ export default async function LandingPage() {
             <span className="text-blue-400">Built For You. By AI.</span>
           </h2>
           <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-            ExoSkull to adaptacyjny system operacyjny dla Twojego zycia. IORS -
-            Twoj osobisty AI - uczy sie, buduje narzedzia i dziala za Ciebie.
+            ExoSkull to adaptacyjny system operacyjny dla Twojego życia. IORS -
+            Twój osobisty AI - uczy się, buduje narzędzia i działa za Ciebie.
           </p>
           <div className="flex gap-4 justify-center">
             <Link
@@ -142,8 +142,8 @@ export default async function LandingPage() {
             <div className="text-3xl mb-4">🎙️</div>
             <h3 className="text-xl font-semibold mb-3">Voice-First</h3>
             <p className="text-slate-400">
-              Rozmawiaj glosowo z IORSem. Dodawaj zadania, sprawdzaj sen, planuj
-              dzien - po prostu powiedz.
+              Rozmawiaj głosowo z IORSem. Dodawaj zadania, sprawdzaj sen, planuj
+              dzień - po prostu powiedz.
             </p>
           </div>
 
@@ -151,7 +151,7 @@ export default async function LandingPage() {
             <div className="text-3xl mb-4">🧠</div>
             <h3 className="text-xl font-semibold mb-3">Adaptive</h3>
             <p className="text-slate-400">
-              IORS uczy sie Twoich nawykow, wykrywa emocje, dostosowuje styl i
+              IORS uczy się Twoich nawyków, wykrywa emocje, dostosowuje styl i
               kolory UI do Twojego stanu.
             </p>
           </div>
@@ -161,31 +161,31 @@ export default async function LandingPage() {
             <h3 className="text-xl font-semibold mb-3">Proactive Mods</h3>
             <p className="text-slate-400">
               IORS automatycznie buduje mikro-aplikacje dopasowane do Twoich
-              celow. Sen, nastroj, finanse, nawyki.
+              celów. Sen, nastrój, finanse, nawyki.
             </p>
           </div>
         </div>
 
         {/* How it works */}
         <div className="text-center mb-20">
-          <h3 className="text-3xl font-bold mb-8">Jak to dziala?</h3>
+          <h3 className="text-3xl font-bold mb-8">Jak to działa?</h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[
-              { step: "1", title: "Rejestracja", desc: "15 pytan, 2 minuty" },
+              { step: "1", title: "Rejestracja", desc: "15 pytań, 2 minuty" },
               {
                 step: "2",
-                title: "IORS sie konfiguruje",
-                desc: "Auto-instaluje Mody na podstawie Twoich celow",
+                title: "IORS się konfiguruje",
+                desc: "Auto-instaluje Mody na podstawie Twoich celów",
               },
               {
                 step: "3",
                 title: "Rozmawiaj",
-                desc: "Glos lub tekst - IORS zawsze slucha",
+                desc: "Głos lub tekst - IORS zawsze słucha",
               },
               {
                 step: "4",
-                title: "Zyj lepiej",
-                desc: "IORS dziala w tle, Ty zyjesz",
+                title: "Żyj lepiej",
+                desc: "IORS działa w tle, Ty żyjesz",
               },
             ].map((item) => (
               <div key={item.step} className="text-center">
@@ -202,7 +202,7 @@ export default async function LandingPage() {
         {/* Testimonials */}
         <div className="mb-20">
           <h3 className="text-3xl font-bold text-center mb-10">
-            Co mowia uzytkownicy?
+            Co mówią użytkownicy?
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {TESTIMONIALS.map((t) => (
@@ -226,7 +226,7 @@ export default async function LandingPage() {
         <div className="text-center py-12 bg-slate-800/30 rounded-2xl border border-slate-700">
           <h3 className="text-3xl font-bold mb-4">Gotowy?</h3>
           <p className="text-slate-400 mb-6">
-            Twoj IORS czeka. Bez karty kredytowej.
+            Twój IORS czeka. Bez karty kredytowej.
           </p>
           <Link
             href="/login"
@@ -243,7 +243,7 @@ export default async function LandingPage() {
               href="/privacy"
               className="text-slate-500 hover:text-slate-300 transition-colors"
             >
-              Polityka Prywatnosci
+              Polityka Prywatności
             </Link>
             <Link
               href="/terms"
