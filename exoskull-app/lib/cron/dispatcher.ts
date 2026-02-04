@@ -3,11 +3,10 @@
  *
  * Handles dispatching scheduled jobs to:
  * - Twilio (voice calls + SMS)
- * - GHL (SMS, Email, WhatsApp, Messenger, etc.)
+ * - Resend (email)
  */
 
 import { createClient } from '@supabase/supabase-js'
-import { GHLClient, sendSms as ghlSendSms, sendEmail as ghlSendEmail, sendWhatsApp as ghlSendWhatsApp } from '@/lib/ghl'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -32,7 +31,6 @@ export interface UserJobConfig {
   preferred_channel: string
   custom_time: string | null
   tenant_name: string
-  ghl_contact_id?: string  // GHL contact ID for messaging
   schedule_settings: {
     notification_channels?: { voice?: boolean; sms?: boolean; email?: boolean; whatsapp?: boolean }
     rate_limits?: { max_calls_per_day?: number; max_sms_per_day?: number }
@@ -46,41 +44,15 @@ export interface DispatchResult {
   channel: 'voice' | 'sms' | 'email' | 'whatsapp'
   call_id?: string
   message_sid?: string
-  ghl_message_id?: string
   error?: string
-  provider?: 'twilio' | 'ghl'
+  provider?: 'twilio' | 'resend'
 }
 
 // Twilio Configuration
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
 const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || '+48732143210'
-
-/**
- * Get GHL client
- *
- * With Private Integration Token, we use a single token for the entire system.
- * No per-tenant OAuth tokens needed - just env vars.
- */
-function getGHLClient(): GHLClient | null {
-  const client = new GHLClient()
-  return client.isConfigured() ? client : null
-}
-
-/**
- * Get GHL contact ID for user
- */
-async function getGHLContactId(tenantId: string): Promise<string | null> {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-  const { data } = await supabase
-    .from('exo_ghl_contacts')
-    .select('ghl_contact_id')
-    .eq('tenant_id', tenantId)
-    .single()
-
-  return data?.ghl_contact_id || null
-}
+const RESEND_API_KEY = process.env.RESEND_API_KEY
 
 /**
  * Get the system prompt for a specific job type
@@ -238,7 +210,7 @@ function getSmsMessage(job: ScheduledJob, user: UserJobConfig): string {
 }
 
 /**
- * Dispatch SMS via GHL (primary) or Twilio (fallback)
+ * Dispatch SMS via Twilio
  */
 export async function dispatchSms(
   job: ScheduledJob,
@@ -248,32 +220,11 @@ export async function dispatchSms(
     return { success: false, channel: 'sms', error: 'User has no phone number' }
   }
 
-  const message = getSmsMessage(job, user)
-
-  // Try GHL first
-  const ghlClient = await getGHLClient()
-  const ghlContactId = user.ghl_contact_id || await getGHLContactId(user.tenant_id)
-
-  if (ghlClient && ghlContactId) {
-    try {
-      const result = await ghlSendSms(ghlClient, ghlContactId, message)
-      console.log(`✅ GHL SMS sent to ${user.tenant_id}: ${result.messageId}`)
-      return {
-        success: true,
-        channel: 'sms',
-        ghl_message_id: result.messageId,
-        provider: 'ghl'
-      }
-    } catch (error) {
-      console.error(`⚠️ GHL SMS failed, falling back to Twilio:`, error)
-      // Fall through to Twilio
-    }
-  }
-
-  // Fallback to Twilio
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
-    return { success: false, channel: 'sms', error: 'No SMS provider configured (GHL not connected, Twilio not configured)' }
+    return { success: false, channel: 'sms', error: 'Twilio not configured' }
   }
+
+  const message = getSmsMessage(job, user)
 
   try {
     const response = await fetch(
@@ -295,21 +246,21 @@ export async function dispatchSms(
     const data = await response.json()
 
     if (response.ok && data.sid) {
-      console.log(`✅ Twilio SMS sent to ${user.tenant_id}: ${data.sid}`)
+      console.log(`[Dispatcher] SMS sent to ${user.tenant_id}: ${data.sid}`)
       return { success: true, channel: 'sms', message_sid: data.sid, provider: 'twilio' }
     } else {
-      console.error(`❌ Twilio SMS failed for ${user.tenant_id}:`, data)
+      console.error(`[Dispatcher] SMS failed for ${user.tenant_id}:`, data)
       return { success: false, channel: 'sms', error: data.message || JSON.stringify(data) }
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    console.error(`❌ SMS dispatch error for ${user.tenant_id}:`, errorMessage)
+    console.error(`[Dispatcher] SMS error for ${user.tenant_id}:`, errorMessage)
     return { success: false, channel: 'sms', error: errorMessage }
   }
 }
 
 /**
- * Dispatch Email via GHL
+ * Dispatch Email via Resend
  */
 export async function dispatchEmail(
   job: ScheduledJob,
@@ -319,17 +270,12 @@ export async function dispatchEmail(
     return { success: false, channel: 'email', error: 'User has no email address' }
   }
 
-  const ghlClient = await getGHLClient()
-  const ghlContactId = user.ghl_contact_id || await getGHLContactId(user.tenant_id)
-
-  if (!ghlClient || !ghlContactId) {
-    return { success: false, channel: 'email', error: 'GHL not connected for this tenant' }
+  if (!RESEND_API_KEY) {
+    return { success: false, channel: 'email', error: 'Email not configured (missing RESEND_API_KEY)' }
   }
 
-  const name = user.tenant_name || ''
   const language = user.language || 'pl'
 
-  // Email content based on job type
   const subjects: Record<string, Record<string, string>> = {
     day_summary: {
       pl: 'Twoje podsumowanie dnia od ExoSkull',
@@ -342,58 +288,46 @@ export async function dispatchEmail(
   }
 
   const subject = subjects[job.job_name]?.[language] || subjects.day_summary[language]
-  const body = getSmsMessage(job, user) // Reuse SMS messages for email body
+  const body = getSmsMessage(job, user)
 
   try {
-    const result = await ghlSendEmail(ghlClient, ghlContactId, subject, body)
-    console.log(`✅ GHL Email sent to ${user.tenant_id}: ${result.messageId}`)
-    return {
-      success: true,
-      channel: 'email',
-      ghl_message_id: result.messageId,
-      provider: 'ghl'
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'IORS <iors@exoskull.xyz>',
+        to: [user.email],
+        subject,
+        text: body,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[Dispatcher] Email failed for ${user.tenant_id}:`, errorText)
+      return { success: false, channel: 'email', error: `Resend error: ${response.status}` }
     }
+
+    console.log(`[Dispatcher] Email sent to ${user.tenant_id}`)
+    return { success: true, channel: 'email', provider: 'resend' }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    console.error(`❌ Email dispatch error for ${user.tenant_id}:`, errorMessage)
+    console.error(`[Dispatcher] Email error for ${user.tenant_id}:`, errorMessage)
     return { success: false, channel: 'email', error: errorMessage }
   }
 }
 
 /**
- * Dispatch WhatsApp message via GHL
+ * WhatsApp not available (requires direct Meta API integration)
  */
 export async function dispatchWhatsApp(
-  job: ScheduledJob,
-  user: UserJobConfig
+  _job: ScheduledJob,
+  _user: UserJobConfig
 ): Promise<DispatchResult> {
-  if (!user.phone) {
-    return { success: false, channel: 'whatsapp', error: 'User has no phone number' }
-  }
-
-  const ghlClient = await getGHLClient()
-  const ghlContactId = user.ghl_contact_id || await getGHLContactId(user.tenant_id)
-
-  if (!ghlClient || !ghlContactId) {
-    return { success: false, channel: 'whatsapp', error: 'GHL not connected for this tenant' }
-  }
-
-  const message = getSmsMessage(job, user)
-
-  try {
-    const result = await ghlSendWhatsApp(ghlClient, ghlContactId, message)
-    console.log(`✅ GHL WhatsApp sent to ${user.tenant_id}: ${result.messageId}`)
-    return {
-      success: true,
-      channel: 'whatsapp',
-      ghl_message_id: result.messageId,
-      provider: 'ghl'
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    console.error(`❌ WhatsApp dispatch error for ${user.tenant_id}:`, errorMessage)
-    return { success: false, channel: 'whatsapp', error: errorMessage }
-  }
+  return { success: false, channel: 'whatsapp', error: 'WhatsApp not configured' }
 }
 
 /**
