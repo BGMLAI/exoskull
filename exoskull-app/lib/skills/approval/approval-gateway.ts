@@ -9,6 +9,7 @@ import { GeneratedSkill, SkillApprovalRequest } from "../types";
 import {
   generateDisclosure,
   formatDisclosureForSms,
+  formatDisclosureForEmail,
 } from "./disclosure-generator";
 
 function getServiceSupabase() {
@@ -197,7 +198,23 @@ export async function confirmChannel(
           })
           .eq("id", approvalRequestId);
 
-        // TODO: Send notification to channel 2
+        // Send notification to channel 2
+        const { data: tenantData } = await supabase
+          .from("exo_tenants")
+          .select("phone, email, name")
+          .eq("id", request.tenant_id)
+          .single();
+
+        if (tenantData) {
+          const ch2Result = await sendChannel2Notification(request, tenantData);
+          if (!ch2Result.success) {
+            console.warn(
+              "[ApprovalGateway] Channel 2 notification failed:",
+              ch2Result.error,
+            );
+          }
+        }
+
         return { status: "channel_1_confirmed" };
       }
     }
@@ -347,6 +364,61 @@ async function sendSmNotification(
     console.error("[ApprovalGateway] SMS send error:", error);
     return { success: false, error: (error as Error).message };
   }
+}
+
+/**
+ * Send notification via channel 2 (the channel different from channel 1)
+ */
+async function sendChannel2Notification(
+  request: SkillApprovalRequest,
+  tenant: { phone?: string; email?: string; name?: string },
+): Promise<{ success: boolean; error?: string }> {
+  const channel2 = request.channel_2;
+
+  if (channel2 === "sms" && tenant.phone) {
+    return sendSmNotification(
+      tenant.phone,
+      { summary: `Potwierdz skill (krok 2/2)` },
+      request.confirmation_code,
+    );
+  }
+
+  if (channel2 === "email" && tenant.email) {
+    try {
+      const supabase = getServiceSupabase();
+      const { subject, body } = formatDisclosureForEmail(
+        {
+          name: "Skill",
+          description: "",
+          version: "1.0",
+          generated_by: "ai",
+        } as GeneratedSkill,
+        { summary: `Potwierdz skill (krok 2/2)`, details: {} },
+        request.confirmation_code,
+      );
+
+      await supabase.from("exo_notifications").insert({
+        tenant_id: request.tenant_id,
+        channel: "email",
+        subject,
+        body,
+        status: "pending",
+      });
+
+      console.log(
+        `[ApprovalGateway] Channel 2 email notification queued for ${tenant.email}`,
+      );
+      return { success: true };
+    } catch (error) {
+      console.error("[ApprovalGateway] Channel 2 email error:", error);
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
+  console.warn(
+    `[ApprovalGateway] No delivery method for channel 2: ${channel2}`,
+  );
+  return { success: false, error: `Cannot deliver to channel: ${channel2}` };
 }
 
 /**

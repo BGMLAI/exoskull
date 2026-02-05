@@ -175,6 +175,8 @@ export class MAPEKLoop {
       rigsResult,
       alertsResult,
       patternsResult,
+      moodResult,
+      upcomingTasksResult,
     ] = await Promise.all([
       // Conversations last 24h
       this.supabase
@@ -254,6 +256,28 @@ export class MAPEKLoop {
         .eq("status", "active")
         .order("confidence", { ascending: false })
         .limit(5),
+
+      // Latest mood entry (last 24h)
+      this.supabase
+        .from("exo_mood_entries")
+        .select("mood_value, energy_level, emotions, logged_at")
+        .eq("tenant_id", tenantId)
+        .gte("logged_at", dayAgo.toISOString())
+        .order("logged_at", { ascending: false })
+        .limit(1)
+        .single(),
+
+      // Tasks due in next 24h (proxy for calendar events)
+      this.supabase
+        .from("exo_tasks")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("status", "pending")
+        .gte("due_date", now.toISOString())
+        .lte(
+          "due_date",
+          new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+        ),
     ]);
 
     // Process sleep data into hours array
@@ -296,10 +320,14 @@ export class MAPEKLoop {
       recentPatterns: patternsResult.data?.map((p) => p.description) || [],
       activeAlerts: alertsResult.count || 0,
       lastInteractionAt: lastInteractionResult.data?.created_at || null,
-      currentMood: null, // TODO: Get from mood tracker
-      energyLevel: null, // TODO: Get from energy tracker
-      upcomingEvents24h: 0, // TODO: Get from calendar
-      freeTimeBlocks: 0, // TODO: Calculate from calendar
+      currentMood:
+        moodResult.data?.emotions?.[0] ||
+        (moodResult.data?.mood_value
+          ? `${moodResult.data.mood_value}/10`
+          : null),
+      energyLevel: moodResult.data?.energy_level || null,
+      upcomingEvents24h: upcomingTasksResult.count || 0,
+      freeTimeBlocks: Math.max(0, 8 - (upcomingTasksResult.count || 0)),
       connectedRigs: rigsResult.data?.map((r) => r.rig_slug) || [],
       lastSyncTimes,
     };
