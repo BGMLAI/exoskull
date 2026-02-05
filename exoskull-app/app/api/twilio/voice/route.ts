@@ -168,7 +168,9 @@ export async function POST(req: NextRequest) {
       console.log("[Twilio Voice] User said:", userText);
 
       // Process with Claude
-      const result = await processUserMessage(session, userText);
+      const result = await processUserMessage(session, userText, {
+        recordingUrl: recordingUrl || undefined,
+      });
       const processingTime = Date.now() - startTime;
 
       console.log("[Twilio Voice] Claude response:", {

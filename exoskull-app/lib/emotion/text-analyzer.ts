@@ -9,7 +9,12 @@
  * Also detects crisis keywords for the crisis-detector module.
  */
 
-import type { EmotionState, PrimaryEmotion, TextSentiment } from "./types";
+import type {
+  EmotionState,
+  PrimaryEmotion,
+  TextSentiment,
+  VoiceFeatures,
+} from "./types";
 
 // ============================================================================
 // CRISIS KEYWORD LISTS
@@ -360,6 +365,7 @@ function buildEmotionState(
   matchedKeywords: string[],
   crisisKeywords: string[],
   source: EmotionState["source"],
+  voiceFeatures?: VoiceFeatures | null,
 ): EmotionState {
   const primary = LABEL_TO_PRIMARY[topLabel] || "neutral";
   const vad = EMOTION_VAD[topLabel] || EMOTION_VAD["neutral"];
@@ -383,18 +389,44 @@ function buildEmotionState(
     crisis_keywords_matched: crisisKeywords,
   };
 
+  // Fusion: adjust VAD based on voice prosody (Phase 2)
+  let finalValence = vad.valence;
+  let finalArousal = vad.arousal;
+  let finalSource = source;
+
+  if (voiceFeatures && voiceFeatures.speech_rate > 0) {
+    finalSource = "fusion";
+
+    // High speech rate (>180 WPM) → excitement/anxiety → boost arousal
+    if (voiceFeatures.speech_rate > 180) {
+      finalArousal = Math.min(1.0, finalArousal + 0.15);
+    }
+    // Low speech rate (<100 WPM) → sadness/fatigue → lower arousal
+    if (voiceFeatures.speech_rate < 100) {
+      finalArousal = Math.max(0, finalArousal - 0.1);
+    }
+    // Many pauses (>8/min) → hesitancy → slight negative valence
+    if (voiceFeatures.pause_frequency > 8) {
+      finalValence = Math.max(-1.0, finalValence - 0.1);
+    }
+    // Long pauses (>1s avg) → emotional difficulty → lower arousal
+    if (voiceFeatures.pause_duration_avg > 1.0) {
+      finalArousal = Math.max(0, finalArousal - 0.05);
+    }
+  }
+
   return {
     primary_emotion: primary,
     intensity,
     secondary_emotions: secondary,
-    valence: vad.valence,
-    arousal: vad.arousal,
+    valence: Math.round(finalValence * 100) / 100,
+    arousal: Math.round(finalArousal * 100) / 100,
     dominance: vad.dominance,
     confidence: topScore,
-    source,
+    source: finalSource,
     raw_data: {
       text_sentiment: textSentiment,
-      voice_features: null,
+      voice_features: voiceFeatures || null,
       face_detected: null,
     },
   };
@@ -414,7 +446,10 @@ function buildEmotionState(
  *
  * Crisis keywords are always scanned regardless of strategy.
  */
-export async function analyzeEmotion(text: string): Promise<EmotionState> {
+export async function analyzeEmotion(
+  text: string,
+  voiceFeatures?: VoiceFeatures | null,
+): Promise<EmotionState> {
   // Always scan for crisis keywords (fast, no API)
   const crisisFlags = scanCrisisKeywords(text);
 
@@ -427,6 +462,7 @@ export async function analyzeEmotion(text: string): Promise<EmotionState> {
       [],
       crisisFlags,
       "text_keywords",
+      voiceFeatures,
     );
   }
 
@@ -442,6 +478,7 @@ export async function analyzeEmotion(text: string): Promise<EmotionState> {
       matchedKeywords,
       crisisFlags,
       "text_hf",
+      voiceFeatures,
     );
   }
 
@@ -454,5 +491,6 @@ export async function analyzeEmotion(text: string): Promise<EmotionState> {
     matchedKeywords,
     crisisFlags,
     "text_keywords",
+    voiceFeatures,
   );
 }

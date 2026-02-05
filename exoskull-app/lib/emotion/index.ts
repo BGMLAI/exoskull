@@ -3,6 +3,7 @@
  */
 
 export { analyzeEmotion, scanCrisisKeywords } from "./text-analyzer";
+export { analyzeVoiceProsody } from "./voice-analyzer";
 export { detectCrisis } from "./crisis-detector";
 export { getAdaptivePrompt } from "./adaptive-responses";
 export { logEmotion, getEmotionHistory } from "./logger";

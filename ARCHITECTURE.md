@@ -55,7 +55,7 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 | **Dynamic Skills** | ✅ Live | Full 6-stage pipeline: detector → generator → validator → sandbox → approval → registry. Dashboard UI, suggestions widget, circuit breaker |
 | **Goals System** | ✅ Live | AI-assisted goal extraction, auto-progress tracking, momentum/trajectory detection, voice tools (define_goal, log_goal_progress, check_goals), dashboard at /dashboard/goals |
 | **Gap Detection** | ✅ Live | Weekly CRON (Sun 09:00), 7 life domains, skill suggestions, auto-expire 14d |
-| **Emotion Intel** | ✅ Phase 1 | Crisis detection (3-layer + fail-safe), 5 adaptive response modes, VAD model, text analyzer. Phase 2 planned: voice prosody, facial analysis |
+| **Emotion Intel** | ✅ Live | Crisis detection (3-layer + fail-safe), 5 adaptive response modes, VAD model, text + voice fusion analyzer, prosody extraction (Deepgram), emotion trends dashboard. Phase 3: pitch/energy, facial analysis |
 | **Integrations** | ✅ Live | Google (40+ scopes), Facebook/Meta (Ads, Commerce, WhatsApp), Apple, Microsoft (Teams, SharePoint) |
 | **WhatsApp/Messenger** | 🟡 Partial | Enhanced WhatsApp via Meta API (placeholder for direct), Messenger placeholder |
 | **Android App** | 🔴 Planned | Zero-install SMS/Voice works as alternative |
@@ -276,7 +276,7 @@ exoskull inventory           # Show installed Mods/Rigs/active Quests
 │   Layer 8: Proactive Gap Detection                    ✅    │
 │   Layer 9: Self-Defining Success Metrics              ✅    │
 │   Layer 10: Self-Optimization (MAPE-K + Guardian)     ⏳    │
-│   Layer 11: Emotion Intelligence & Crisis Detection   ✅ P1 │
+│   Layer 11: Emotion Intelligence & Crisis Detection   ✅    │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -1739,7 +1739,7 @@ MAPE_K_Loop = {
 
 ---
 
-## Layer 11: Emotion Intelligence & Crisis Detection — ✅ PHASE 1 IMPLEMENTED
+## Layer 11: Emotion Intelligence & Crisis Detection — ✅ IMPLEMENTED (Phase 2)
 
 **Multi-modal emotional awareness with automated crisis intervention.**
 
@@ -2106,9 +2106,9 @@ Emotion_Intelligence = {
 | L6: MCP Skills Registry | Mod + Rig system with Exoskulleton | ✅ Live |
 | L7: Discovery & Relationship | Onboarding (~60 topics), profile extraction | ✅ Live |
 | L8: Gap Detection | Tables exist, logic planned | 🔴 Planned |
-| L9: Success Metrics | Planned | 🔴 Planned |
+| L9: Success Metrics | Goal engine, dashboard, CRON auto-progress, voice tools | ✅ Live |
 | L10: Self-Optimization | Guardian + MAPE-K tables, partial logic | ⏳ Partial |
-| L11: Emotion Intelligence | Architecture designed, not implemented | 🔴 Planned |
+| L11: Emotion Intelligence | Text + voice fusion, crisis detection, adaptive responses, trends dashboard | ✅ Live |
 | L12: Total Recall Memory | Daily summaries, search, 50+ msg context | ✅ Live |
 | L13: Data Lake | Bronze/Silver/Gold ETL pipeline | ✅ Live |
 | L14: Skill Memory & Dynamic Generation | Full pipeline live (6 stages, dashboard, suggestions, circuit breaker) | ✅ Live |
@@ -3069,7 +3069,7 @@ Guardrails = {
 | **Knowledge** | Tyrolka (Loops→Campaigns→Quests→Ops→Notes), file upload, embeddings | ✅ Live |
 | **Autonomy** | MAPE-K loop, guardian system, intervention executor | ⏳ Partial |
 | **Communication Hub** | GoHighLevel (planned), WhatsApp/Messenger (placeholder) | ⏳ Planned |
-| **Emotion Detection** | Deepgram prosody (voice), face-api.js (face), sentiment.js (text) | ⏳ Planned |
+| **Emotion Detection** | HuggingFace + PL keywords (text), Deepgram word-timing prosody (voice), crisis detection (3-layer), adaptive prompts, trends dashboard | ✅ Live |
 | **Hosting** | Vercel (frontend + API), Supabase (DB), Cloudflare R2 (storage) | ✅ Live |
 
 ---
@@ -3261,12 +3261,16 @@ TWILIO_PHONE_NUMBER=+1xxx
 - [x] Guardian system + MAPE-K tables + intervention executor (partial)
 - [x] Full gap detection system (Layer 8) — weekly CRON (Sun 09:00), 7 life domains, skill suggestions, auto-expire 14d
 - [x] Self-Defining Success Metrics (Layer 9) — AI goal extraction, auto-progress tracking, momentum/trajectory, voice tools, dashboard
-- [x] **Emotion Intelligence Layer (Layer 11) — Phase 1**
+- [x] **Emotion Intelligence Layer (Layer 11) — Phase 1 + Phase 2**
   - [x] Text-based emotion analysis (VAD model, Polish language)
   - [x] Crisis detection (3-layer: keyword + pattern + context + fail-safe)
   - [x] 5 adaptive response modes (empathetic, motivational, calming, neutral, crisis)
-  - [x] Emotion logger with DB persistence (exo_emotion_logs, exo_crisis_events)
-  - [ ] Phase 2: Voice prosody analysis (pitch, tempo, energy)
+  - [x] Emotion logger with DB persistence (exo_emotion_log)
+  - [x] Phase 2: Voice prosody analysis (speech rate, pause metrics via Deepgram word timings)
+  - [x] Phase 2: Text + voice fusion engine (VAD adjustment from prosody)
+  - [x] Phase 2: Emotion trends API + Recharts dashboard chart
+  - [ ] Phase 3: Pitch/energy extraction (Hume or Deepgram utterance features)
+  - [ ] Phase 3: Facial expression analysis (face-api.js)
   - [ ] Phase 2: Facial expression analysis (webcam/smartglasses)
   - [ ] Phase 2: Behavioral monitoring (IAT, screen activity)
 - [x] Skill Memory & Dynamic Generation (Layer 14)

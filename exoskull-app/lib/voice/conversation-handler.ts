@@ -1570,6 +1570,7 @@ function shouldEndCall(userText: string): boolean {
 export async function processUserMessage(
   session: VoiceSession,
   userMessage: string,
+  options?: { recordingUrl?: string },
 ): Promise<ConversationResult> {
   const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
@@ -1621,6 +1622,17 @@ export async function processUserMessage(
       sessionId: session.id,
       personalityAdaptedTo: adaptive.mode,
     }).catch(() => {});
+
+    // Phase 2: background voice prosody enrichment (non-blocking)
+    if (options?.recordingUrl) {
+      enrichWithVoiceProsody(
+        session.tenantId,
+        session.id,
+        userMessage,
+        options.recordingUrl,
+        adaptive.mode,
+      ).catch(() => {});
+    }
   }
 
   // Build messages array - ZAWSZE używaj unified thread (cross-channel context)
@@ -1802,4 +1814,42 @@ export async function findTenantByPhone(
     .single();
 
   return tenant3 || null;
+}
+
+// ============================================================================
+// VOICE PROSODY ENRICHMENT (Phase 2 — background, non-blocking)
+// ============================================================================
+
+async function enrichWithVoiceProsody(
+  tenantId: string,
+  sessionId: string,
+  messageText: string,
+  recordingUrl: string,
+  adaptedTo: string,
+): Promise<void> {
+  try {
+    const { analyzeVoiceProsody } =
+      await import("@/lib/emotion/voice-analyzer");
+    const voiceFeatures = await analyzeVoiceProsody(recordingUrl);
+    if (!voiceFeatures) return;
+
+    // Re-run emotion analysis with voice features for fused result
+    const fusedEmotion = await analyzeEmotion(messageText, voiceFeatures);
+
+    // Log the enriched emotion (supplements the text-only log)
+    await logEmotion(tenantId, fusedEmotion, messageText, {
+      sessionId,
+      personalityAdaptedTo: adaptedTo,
+    });
+
+    console.log("[ConversationHandler] Voice-enriched emotion logged:", {
+      source: fusedEmotion.source,
+      speechRate: voiceFeatures.speech_rate,
+      pauses: voiceFeatures.pause_frequency,
+    });
+  } catch (error) {
+    console.error("[ConversationHandler] Voice enrichment failed:", {
+      error: error instanceof Error ? error.message : error,
+    });
+  }
 }
