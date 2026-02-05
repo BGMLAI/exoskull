@@ -4,6 +4,74 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-05] feat: Autonomous Outbound Engine (Layer 16)
+
+### What was done
+- Created `lib/autonomy/outbound-triggers.ts` — 3 trigger types: crisis follow-up, inactivity detection (48h+), negative emotion trend (3+ negative in 24h)
+- Created `lib/autonomy/escalation-manager.ts` — Multi-channel escalation pipeline: SMS → Voice Call → Emergency Contact, with auto-cancellation when user responds
+- Created `lib/autonomy/emergency-notifier.ts` — Sends SMS to user's emergency contact (only with consent + matching crisis type)
+- Modified `lib/autonomy/executor.ts` — Added `notify_emergency_contact` action handler
+- Created `app/api/cron/outbound-monitor/route.ts` — CRON (every 2h): processes escalation chains + checks all tenants for emotion/inactivity triggers
+- Modified `lib/voice/conversation-handler.ts` — Auto-schedules crisis follow-up chain after crisis detection
+- Created DB migration `20260206000005_outbound_system.sql` — emergency contacts table + proactive outbound log + rate limiting function
+
+### Why
+- ExoSkull was reactive-only (responded during conversations, never initiated contact)
+- Crisis detection existed but had no follow-up mechanism
+- No way to check on users who go silent
+- Emergency contact notification required for safety-critical crisis scenarios
+
+### Files changed
+- `lib/autonomy/outbound-triggers.ts` (NEW)
+- `lib/autonomy/escalation-manager.ts` (NEW)
+- `lib/autonomy/emergency-notifier.ts` (NEW)
+- `lib/autonomy/executor.ts` (MODIFIED)
+- `lib/voice/conversation-handler.ts` (MODIFIED)
+- `app/api/cron/outbound-monitor/route.ts` (NEW)
+- `supabase/migrations/20260206000005_outbound_system.sql` (NEW)
+
+### Safety rules
+- Max 2 proactive per day per tenant (crisis exempt)
+- Emergency contacts only notified with user consent + matching crisis type
+- Escalation auto-cancels when user responds
+- All outbound logged to exo_proactive_log
+
+### Notes for future agents
+- Escalation chains stored in intervention action_payload (escalation_chain_id, escalation_level)
+- Crisis follow-up delays: SMS +4h, Call +24h, Emergency +48h
+- Dedup windows: crisis 24h, inactivity 72h, emotion trend 48h
+- The outbound-monitor CRON needs to be added to vercel.json cron schedule
+
+---
+
+## [2026-02-05] feat: Emotion Intelligence Phase 2 — Voice Prosody + Trends Dashboard (Layer 11)
+
+### What was done
+- **Voice Prosody Extraction** (`voice-analyzer.ts`) — Downloads Twilio recording, sends to Deepgram nova-2 (PL), extracts word-level timing → computes speech_rate (WPM), pause_frequency (pauses/min), pause_duration_avg (seconds). Returns null on any failure (non-blocking).
+- **Text+Voice Fusion** (`text-analyzer.ts`) — Optional `voiceFeatures` param. Fusion adjustments: speech_rate >180WPM → arousal +0.15, <100WPM → arousal -0.10, pause_frequency >8/min → valence -0.10, pause_duration_avg >1.0s → arousal -0.05.
+- **Background Voice Enrichment** (`conversation-handler.ts`) — Text emotion logged immediately. Voice prosody runs fire-and-forget after response, re-logs fused emotion.
+- **Emotion Trends API** (`/api/emotion/trends?days=7|14|30`) — Calls `get_emotion_trends()` SQL function.
+- **EmotionTrendsChart** (`EmotionTrendsChart.tsx`) — Recharts ComposedChart, valence Area + arousal Line, trend indicator, Polish labels.
+- **ARCHITECTURE.md** — L9 → ✅ Live, L11 → ✅ Live (Phase 2)
+
+### Files changed
+- `lib/emotion/voice-analyzer.ts` (NEW)
+- `app/api/emotion/trends/route.ts` (NEW)
+- `components/health/EmotionTrendsChart.tsx` (NEW)
+- `lib/emotion/text-analyzer.ts` (fusion logic)
+- `lib/emotion/index.ts` (export)
+- `lib/voice/conversation-handler.ts` (recordingUrl + enrichWithVoiceProsody)
+- `app/api/twilio/voice/route.ts` (pass recordingUrl)
+- `app/dashboard/health/page.tsx` (embed chart)
+- `ARCHITECTURE.md` (L9 + L11 status)
+
+### Notes for future agents
+- Pitch/energy NOT available from Deepgram word timings — Phase 3 (Hume AI or utterance features)
+- `RecordingUrl` only present when Twilio call-level recording enabled
+- Voice enrichment is fire-and-forget — text-only emotion already logged on failure
+
+---
+
 ## [2026-02-05] feat: Dynamic Skills Pipeline Complete (Layer 14)
 
 ### What was done

@@ -47,9 +47,9 @@ export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
     provider: "kimi",
     tier: 3,
     displayName: "Kimi K2.5",
-    inputCostPer1M: 0.5, // Placeholder pricing
-    outputCostPer1M: 2.0,
-    maxTokens: 128000, // 128K context window
+    inputCostPer1M: 0.6, // $0.60 per 1M input tokens
+    outputCostPer1M: 2.5, // $2.50 per 1M output tokens
+    maxTokens: 256000, // 256K context window
     supportsTools: true,
     supportsStreaming: true,
   },

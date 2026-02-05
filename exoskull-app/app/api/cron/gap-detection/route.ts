@@ -8,6 +8,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { detectGaps } from "@/lib/agents/specialized/gap-detector";
+import {
+  executeSwarm,
+  getSwarmDefinition,
+  collectSwarmContext,
+} from "@/lib/ai/swarm";
 
 export const dynamic = "force-dynamic";
 
@@ -70,15 +75,63 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const duration = Date.now() - startTime;
+    const gapDuration = Date.now() - startTime;
 
-    console.log("[GapDetection] Cron complete:", {
+    console.log("[GapDetection] Deterministic analysis complete:", {
       tenantsChecked: tenants.length,
       successCount,
       errorCount,
       totalGaps,
-      durationMs: duration,
+      durationMs: gapDuration,
     });
+
+    // =========================================================
+    // SWARM ENHANCEMENT: AI-powered synthesis (additive)
+    // Run for tenants with significant gaps only
+    // =========================================================
+    let swarmResults = 0;
+    const swarmDefinition = getSwarmDefinition("gap_detection");
+
+    if (swarmDefinition && totalGaps > 0) {
+      // Run swarm for up to 5 tenants with gaps (cost control)
+      const tenantsWithGaps = tenants.slice(0, 5);
+
+      for (const tenant of tenantsWithGaps) {
+        try {
+          const context = await collectSwarmContext(
+            supabase,
+            tenant.id,
+            "gap_detection",
+          );
+          const swarmResult = await executeSwarm(swarmDefinition, context);
+
+          // Store swarm synthesis
+          await supabase.from("learning_events").insert({
+            tenant_id: tenant.id,
+            event_type: "swarm_analysis",
+            data: {
+              swarmType: "gap_detection",
+              synthesis: swarmResult.synthesis,
+              agentsSucceeded: swarmResult.agentsSucceeded,
+              agentsFailed: swarmResult.agentsFailed,
+              totalCost: swarmResult.totalCost,
+              cronTriggered: true,
+            },
+            agent_id: "swarm:gap_detection",
+          });
+
+          swarmResults++;
+        } catch (swarmError) {
+          // Swarm failure is non-critical — existing analysis still works
+          console.warn(
+            `[GapDetection] Swarm failed for tenant ${tenant.id}:`,
+            swarmError instanceof Error ? swarmError.message : swarmError,
+          );
+        }
+      }
+    }
+
+    const duration = Date.now() - startTime;
 
     return NextResponse.json({
       status: "completed",
@@ -86,6 +139,7 @@ export async function GET(req: NextRequest) {
       success_count: successCount,
       error_count: errorCount,
       total_gaps: totalGaps,
+      swarm_analyses: swarmResults,
       errors: errors.length > 0 ? errors.slice(0, 5) : undefined,
       duration_ms: duration,
     });
