@@ -4,6 +4,53 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-05] feat: L16 Autonomy Control Center — Full UI Rebuild
+
+### What was done
+- Refactored monolithic 713-line `app/dashboard/autonomy/page.tsx` into 89-line tabbed orchestrator
+- Created `components/ui/tabs.tsx` — shadcn/ui Tabs (Radix)
+- Created `components/dashboard/autonomy/types.ts` — shared types + constants
+- Created `components/dashboard/autonomy/useAutonomyData.ts` — centralized hook (6 parallel fetches, 11 mutations)
+- Created 5 tab components: OverviewTab, PermissionsTab, InterventionsTab, GuardianTab, ActivityLogTab
+- **NEW: Guardian tab** — values editor (add/edit/drift), conflict resolution, throttle config
+- **NEW: Activity Log tab** — MAPE-K cycles display with manual trigger
+- **Enhanced: Permissions** — edit dialog, spending/daily limits, expiry dates, delete confirmation (AlertDialog)
+- **Enhanced: Interventions** — reject reasons, 4-level feedback (helpful/neutral/unhelpful/harmful), executing section
+
+### Why
+- Guardian API (`/api/autonomy/guardian`) was 100% unused by UI
+- MAPE-K cycles (`/api/autonomy/execute?type=cycles`) were 100% unused by UI
+- Original page was monolithic (713 lines), mixing data fetching, state, and rendering
+- Missing features: no edit grants, no reject reasons, limited feedback (only 2 options vs 4)
+
+### Files changed
+- `components/ui/tabs.tsx` (NEW)
+- `components/dashboard/autonomy/types.ts` (NEW)
+- `components/dashboard/autonomy/useAutonomyData.ts` (NEW)
+- `components/dashboard/autonomy/OverviewTab.tsx` (NEW)
+- `components/dashboard/autonomy/PermissionsTab.tsx` (NEW)
+- `components/dashboard/autonomy/InterventionsTab.tsx` (NEW)
+- `components/dashboard/autonomy/GuardianTab.tsx` (NEW)
+- `components/dashboard/autonomy/ActivityLogTab.tsx` (NEW)
+- `app/dashboard/autonomy/page.tsx` (REWRITTEN — 713→89 lines)
+
+### How to verify
+1. `npm run build` — zero TS errors
+2. Navigate to `/dashboard/autonomy` — 5 tabs render
+3. Overview: stats, quick actions, pending alert, recent activity
+4. Permissions: create/edit/toggle/delete grants
+5. Interventions: approve/reject with reason, 4-level feedback
+6. Guardian: edit values, resolve conflicts, save throttle config
+7. Activity: MAPE-K cycles, manual trigger
+
+### Notes for future agents
+- All backend APIs now fully surfaced — no unused endpoints remain in L16
+- `useAutonomyData` hook is the single source of truth for all autonomy state
+- Guardian data shape: `{ values, config, stats, conflicts }` from `/api/autonomy/guardian`
+- Cycles come from `/api/autonomy/execute?type=cycles&limit=20`
+
+---
+
 ## [2026-02-05] feat: L10 Self-Optimization — MAPE-K Completion
 
 ### What was done
