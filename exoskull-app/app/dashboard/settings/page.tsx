@@ -33,6 +33,8 @@ import {
   Trash2,
   Download,
   AlertTriangle,
+  Puzzle,
+  Sparkles,
 } from "lucide-react";
 import {
   Dialog,
@@ -77,6 +79,8 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [connections, setConnections] = useState<any[]>([]);
+  const [activeMods, setActiveMods] = useState<any[]>([]);
+  const [activeSkills, setActiveSkills] = useState<any[]>([]);
 
   const [profileForm, setProfileForm] = useState<ProfileFormState>({
     preferred_name: "",
@@ -171,6 +175,21 @@ export default function SettingsPage() {
           .eq("tenant_id", user.id);
 
         setConnections(rigConnections || []);
+
+        // Load active mods
+        const { data: mods } = await supabase
+          .from("exo_mod_installs")
+          .select("id, mod_slug, mod_name, enabled, installed_at")
+          .eq("tenant_id", user.id);
+        setActiveMods(mods || []);
+
+        // Load active skills
+        const { data: skills } = await supabase
+          .from("exo_dynamic_skills")
+          .select("id, name, status, created_at")
+          .eq("tenant_id", user.id)
+          .eq("status", "active");
+        setActiveSkills(skills || []);
       }
     } catch (err) {
       console.error("[SettingsPage] Error:", err);
@@ -617,6 +636,73 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <IntegrationsWidget connections={connections} tenantId={tenantId} />
+        </CardContent>
+      </Card>
+
+      {/* Active Extensions — Mods & Skills */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Puzzle className="h-5 w-5" />
+            Aktywne rozszerzenia
+          </CardTitle>
+          <CardDescription>
+            Mody i skille aktywowane automatycznie przez system
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Mods */}
+          {activeMods.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Mody
+              </p>
+              {activeMods.map((mod) => (
+                <div
+                  key={mod.id}
+                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                >
+                  <div className="flex items-center gap-2">
+                    <Puzzle className="w-4 h-4 text-blue-500" />
+                    <span className="text-sm font-medium">
+                      {mod.mod_name || mod.mod_slug}
+                    </span>
+                  </div>
+                  <Badge variant={mod.enabled ? "default" : "secondary"}>
+                    {mod.enabled ? "Aktywny" : "Wylaczony"}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Skills */}
+          {activeSkills.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Skille
+              </p>
+              {activeSkills.map((skill) => (
+                <div
+                  key={skill.id}
+                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-500" />
+                    <span className="text-sm font-medium">{skill.name}</span>
+                  </div>
+                  <Badge variant="default">Aktywny</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeMods.length === 0 && activeSkills.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Brak aktywnych rozszerzen. System automatycznie zainstaluje mody i
+              skille na podstawie Twoich potrzeb.
+            </p>
+          )}
         </CardContent>
       </Card>
 
