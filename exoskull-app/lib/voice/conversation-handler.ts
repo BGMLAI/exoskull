@@ -1096,32 +1096,27 @@ export async function processUserMessage(
   const dynamicContext = await buildDynamicContext(session.tenantId);
   const fullSystemPrompt = STATIC_SYSTEM_PROMPT + dynamicContext;
 
-  // Build messages array - prefer unified thread for cross-channel context
+  // Build messages array - ZAWSZE używaj unified thread (cross-channel context)
+  // Limit 50 wiadomości + przyszłe digests dla długoterminowej pamięci
   let messages: Anthropic.MessageParam[];
   try {
-    const threadMessages = await getThreadContext(session.tenantId, 20);
+    const threadMessages = await getThreadContext(session.tenantId, 50);
+    // ZAWSZE używaj unified thread - nawet jeśli puste (nowy user)
+    // Nie fallback do session.messages (per-session, unreliable)
+    messages = [...threadMessages, { role: "user", content: userMessage }];
+
     if (threadMessages.length > 0) {
-      // Use unified thread (includes voice + SMS + WhatsApp + etc.)
-      messages = [...threadMessages, { role: "user", content: userMessage }];
-    } else {
-      // Fallback to voice session only (first message or thread empty)
-      messages = [
-        ...session.messages.map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        })),
-        { role: "user", content: userMessage },
-      ];
+      console.log(
+        `[ConversationHandler] Loaded ${threadMessages.length} messages from unified thread`,
+      );
     }
-  } catch {
-    // Fallback to voice session if unified thread fails
-    messages = [
-      ...session.messages.map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
-      { role: "user", content: userMessage },
-    ];
+  } catch (error) {
+    console.error(
+      "[ConversationHandler] Failed to load thread context:",
+      error,
+    );
+    // Nawet przy błędzie - nie fallback do session.messages, użyj pustej historii
+    messages = [{ role: "user", content: userMessage }];
   }
 
   const toolsUsed: string[] = [];
@@ -1224,10 +1219,22 @@ export async function generateGreeting(tenantId: string): Promise<string> {
   const userName = tenant?.preferred_name || tenant?.name;
   const assistantName = tenant?.assistant_name || "IORS";
 
-  if (userName) {
+  // Sprawdź czy user ma historię (powracający vs nowy)
+  const threadContext = await getThreadContext(tenantId, 5);
+  const isReturningUser = threadContext.length > 0;
+
+  if (isReturningUser && userName) {
+    // Powracający user z imieniem
+    return `Cześć ${userName}! Miło znów słyszeć. W czym mogę pomóc?`;
+  } else if (isReturningUser) {
+    // Powracający user bez imienia
+    return `Cześć! Miło Cię znów słyszeć. W czym mogę pomóc?`;
+  } else if (userName) {
+    // Nowy user z imieniem
     return `Cześć ${userName}! Tu ${assistantName}. W czym mogę pomóc?`;
   }
 
+  // Nowy user bez imienia
   return `Cześć! Tu ${assistantName}, twój osobisty asystent. W czym mogę pomóc?`;
 }
 

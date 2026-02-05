@@ -178,10 +178,13 @@ export async function POST(req: NextRequest) {
         processingTimeMs: processingTime,
       });
 
-      // Update session in background (don't await to save time)
-      updateSession(session.id, userText, result.text).catch((e) =>
-        console.error("[Twilio Voice] Session update error:", e),
-      );
+      // WAŻNE: Await updateSession żeby wiadomości były w unified thread
+      // zanim przyjdzie następna wiadomość (fix race condition)
+      try {
+        await updateSession(session.id, userText, result.text);
+      } catch (e) {
+        console.error("[Twilio Voice] Session update error:", e);
+      }
 
       // Check if call should end
       if (result.shouldEndCall) {

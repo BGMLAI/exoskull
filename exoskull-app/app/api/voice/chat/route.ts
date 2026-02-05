@@ -54,7 +54,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get or create voice session
-    const callSid = sessionId || `web-${user.id}-${Date.now()}`;
+    // WAŻNE: Stały session ID per user (nie per request) dla ciągłości kontekstu
+    // Jeśli frontend przekazuje sessionId - użyj go, inaczej użyj stałego ID usera
+    const callSid = sessionId || `web-chat-${user.id}`;
     const session = await getOrCreateSession(callSid, user.id);
 
     // Process through Claude with tools
