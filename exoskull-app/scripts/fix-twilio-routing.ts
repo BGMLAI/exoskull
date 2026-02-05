@@ -20,6 +20,7 @@ const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 // Numery do przekonfigurowania
 const PHONE_NUMBERS_TO_FIX = [
   "+48732143210", // Obecnie VAPI → zmień na custom
+  "+48732144112", // Testowy numer - też na VAPI
 ];
 
 // Nowe webhooki (produkcja)
