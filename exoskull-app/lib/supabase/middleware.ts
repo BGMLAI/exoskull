@@ -80,7 +80,6 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/cron/") ||
     pathname.startsWith("/api/public/") ||
     pathname.startsWith("/api/twilio/") ||
-    pathname.startsWith("/api/admin/fix-twilio-routing") || // TEMP: one-time fix - DELETE
     pathname === "/api/pulse";
 
   // ============================================================================
