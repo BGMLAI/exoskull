@@ -1,0 +1,51 @@
+graph TB
+    subgraph SOURCES["📡 Skąd system wie co zaproponować?"]
+        S1["💬 Rozmowy<br/>Co user mówi,<br/>o czym NIE mówi"]
+        S2["📊 Dane z urządzeń<br/>Oura: sen 4h!<br/>Telefon: 10h ekranu"]
+        S3["✅ Zadania<br/>5 przeterminowanych,<br/>3 pilne"]
+        S4["📅 Wzorce<br/>Zawsze zmęczony<br/>w poniedziałki"]
+    end
+
+    subgraph MAPE["🔄 Cykl MAPE-K (co 15 min)"]
+        MON["📡 MONITOR<br/>Zbierz dane<br/>ze wszystkich źródeł"]
+        ANA["🔍 ANALYZE<br/>Znajdź problemy:<br/>• Dług senny >6h<br/>• Za dużo zadań<br/>• Brak aktywności<br/>• Ślepe punkty"]
+        PLAN["📋 PLAN<br/>Zaplanuj interwencje<br/>(max 3 na cykl):<br/>• Alert zdrowotny<br/>• Przypomnienie<br/>• Propozycja moda"]
+        GUARD["🛡️ GUARDIAN<br/>Czy to naprawdę<br/>pomoże?<br/>Score: 0-100"]
+    end
+
+    subgraph DECIDE["🔐 Czy ma uprawnienia?"]
+        AUTO["🟢 Auto-wykonaj<br/>(niski impact, ma zgodę)"]
+        ASK["🟡 Zapytaj usera<br/>(wysoki impact,<br/>brak zgody)"]
+    end
+
+    subgraph ACTIONS["⚡ Typy sugestii"]
+        A1["🔔 Alert zdrowotny<br/>Sen poniżej normy!"]
+        A2["📱 SMS z przypomnieniem<br/>Nie zapomnij o lekach"]
+        A3["📊 Wykryty ślewy punkt<br/>Nie śledzisz finansów"]
+        A4["🧩 Zaproponuj Mod<br/>Chcesz tracker nastroju?"]
+        A5["📅 Optymalizacja<br/>Przenieś spotkanie,<br/>śpisz za mało"]
+    end
+
+    subgraph LEARN["🧠 KNOWLEDGE - Ucz się"]
+        L1["User kliknął: Pomocne ✅"]
+        L2["User kliknął: Niepomocne ❌"]
+        L3["Następne sugestie<br/>będą lepsze"]
+    end
+
+    SOURCES --> MON
+    MON --> ANA --> PLAN --> GUARD
+    GUARD -->|"score > 50"| DECIDE
+    GUARD -->|"score < 50"| BLOCK["🚫 Zablokuj<br/>Za mała korzyść"]
+    AUTO --> ACTIONS
+    ASK -->|"User: TAK"| ACTIONS
+    ACTIONS --> LEARN
+    LEARN -->|"feedback"| MON
+
+    style SOURCES fill:#22d3ee,stroke:#06b6d4,color:#000
+    style MAPE fill:#1e1e2e,stroke:#6366f1,color:#fff
+    style ACTIONS fill:#22c55e,stroke:#16a34a,color:#fff
+    style LEARN fill:#a855f7,stroke:#9333ea,color:#fff
+    style MON fill:#22d3ee,stroke:#06b6d4,color:#000
+    style ANA fill:#3b82f6,stroke:#2563eb,color:#fff
+    style PLAN fill:#f59e0b,stroke:#d97706,color:#000
+    style GUARD fill:#ef4444,stroke:#dc2626,color:#fff

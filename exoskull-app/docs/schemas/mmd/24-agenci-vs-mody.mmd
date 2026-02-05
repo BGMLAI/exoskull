@@ -1,0 +1,43 @@
+graph TB
+    subgraph AGENTS["🤖 AGENCI<br/>(wewnętrzni pracownicy AI)"]
+        A_WHO["<b>Kto?</b> Niewidoczni<br/>dla użytkownika"]
+        A_WHAT["<b>Co robią?</b><br/>Analizują, wykrywają,<br/>decydują, optymalizują"]
+        A_WHERE["<b>Gdzie?</b><br/>lib/agents/<br/>Działają w tle"]
+        A_WHEN["<b>Kiedy?</b><br/>CRON, zdarzenia,<br/>dynamiczny spawning"]
+
+        subgraph A_EXAMPLES["Przykłady agentów"]
+            AE1["🎯 MIT Detector<br/>Twoje Top 3 cele"]
+            AE2["🔍 Gap Detector<br/>Ślepe punkty"]
+            AE3["📊 Pattern Learner<br/>Wzorce zachowań"]
+            AE4["🐣 Spawner<br/>Tworzy nowych agentów"]
+        end
+    end
+
+    subgraph MODS["🧩 MODY<br/>(narzędzia dla użytkownika)"]
+        M_WHO["<b>Kto?</b> Widoczne<br/>dla użytkownika"]
+        M_WHAT["<b>Co robią?</b><br/>Śledzą dane, pokazują<br/>wykresy, dają insighty"]
+        M_WHERE["<b>Gdzie?</b><br/>lib/mods/<br/>Dashboard + Głos"]
+        M_WHEN["<b>Kiedy?</b><br/>Gdy user pyta,<br/>loguje dane, otwiera app"]
+
+        subgraph M_EXAMPLES["Przykłady modów"]
+            ME1["😴 Sleep Tracker<br/>Śledź sen"]
+            ME2["😊 Mood Logger<br/>Zapisuj nastrój"]
+            ME3["✅ Habit Tracker<br/>Nawyki i streak"]
+            ME4["📋 Task Manager<br/>Zadania"]
+        end
+    end
+
+    subgraph RELATION["🔗 Jak się łączą?"]
+        R1["Agent wykrywa lukę<br/>→ Proponuje Mod"]
+        R2["Agent analizuje dane Moda<br/>→ Tworzy insighty"]
+        R3["Agent optymalizuje<br/>→ Mod się poprawia"]
+    end
+
+    AGENTS -->|"proponują"| MODS
+    MODS -->|"dostarczają dane"| AGENTS
+
+    style AGENTS fill:#3b82f6,stroke:#2563eb,color:#fff
+    style MODS fill:#22c55e,stroke:#16a34a,color:#fff
+    style RELATION fill:#f59e0b,stroke:#d97706,color:#000
+    style A_EXAMPLES fill:#1e3a5f,stroke:#3b82f6,color:#fff
+    style M_EXAMPLES fill:#0d3320,stroke:#22c55e,color:#fff

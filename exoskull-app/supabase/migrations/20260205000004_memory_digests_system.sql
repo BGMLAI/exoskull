@@ -158,33 +158,32 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
   RETURN QUERY
-
   -- Recent messages (last N)
-  SELECT
+  (SELECT
     'recent_message'::TEXT as source,
     m.role || ': ' || m.content as content,
     m.created_at
   FROM exo_unified_messages m
   WHERE m.tenant_id = p_tenant_id
   ORDER BY m.created_at DESC
-  LIMIT p_recent_count
+  LIMIT p_recent_count)
 
   UNION ALL
 
   -- This week's daily summaries
-  SELECT
+  (SELECT
     'daily_summary'::TEXT as source,
     COALESCE(ds.final_summary, ds.draft_summary) as content,
     ds.created_at
   FROM exo_daily_summaries ds
   WHERE ds.tenant_id = p_tenant_id
     AND ds.summary_date >= CURRENT_DATE - INTERVAL '7 days'
-  ORDER BY ds.summary_date DESC
+  ORDER BY ds.summary_date DESC)
 
   UNION ALL
 
   -- Last month digest
-  SELECT
+  (SELECT
     'month_digest'::TEXT as source,
     md.narrative_summary as content,
     md.created_at
@@ -192,19 +191,19 @@ BEGIN
   WHERE md.tenant_id = p_tenant_id
     AND md.period_type = 'month'
   ORDER BY md.start_date DESC
-  LIMIT 1
+  LIMIT 1)
 
   UNION ALL
 
   -- Top highlights
-  SELECT
+  (SELECT
     'highlight'::TEXT as source,
     h.category || ': ' || h.content as content,
     h.created_at
   FROM user_memory_highlights h
   WHERE h.user_id = p_tenant_id
   ORDER BY h.importance DESC
-  LIMIT 15;
+  LIMIT 15);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

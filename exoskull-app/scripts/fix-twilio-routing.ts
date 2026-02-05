@@ -6,6 +6,12 @@
  * Uruchom: npx tsx scripts/fix-twilio-routing.ts
  */
 
+import { config } from "dotenv";
+import { resolve } from "path";
+
+// Load .env.local
+config({ path: resolve(process.cwd(), ".env.local") });
+
 import twilio from "twilio";
 
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;

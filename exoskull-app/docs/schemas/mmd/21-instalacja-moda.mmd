@@ -1,0 +1,43 @@
+graph TB
+    subgraph TRIGGER["🎯 Co uruchamia instalację Moda?"]
+        T1["👤 User mówi:<br/>Chcę śledzić sen"]
+        T2["🤖 AI wykrywa cel<br/>po onboardingu:<br/>primary_goal = health"]
+        T3["🔍 Gap Detector:<br/>Nie śledzisz snu!<br/>Zaproponować tracker?"]
+    end
+
+    subgraph LOOKUP["🔎 Szukanie w katalogu"]
+        CAT{"Czy Mod istnieje<br/>w katalogu?"}
+        CATALOG["📦 Katalog Modów<br/>(exo_mod_registry)<br/>7 wbudowanych:<br/>sleep, mood, habit,<br/>energy, focus, task, spending"]
+    end
+
+    subgraph INSTALL_YES["✅ Mod znaleziony"]
+        INS["Dodaj wpis do<br/>exo_tenant_mods<br/>(active = true)"]
+        READY["Mod gotowy!<br/>Użytkownik może<br/>od razu używać"]
+    end
+
+    subgraph INSTALL_NO["❌ Mod NIE istnieje"]
+        NO["Błąd: Mod nie istnieje<br/>w katalogu"]
+        FUTURE["🔮 W PRZYSZŁOŚCI:<br/>System sam zbuduje<br/>custom Mod w 2h<br/>(jeszcze niezaimplementowane)"]
+    end
+
+    subgraph USE["🎮 Jak user używa Moda"]
+        USE1["🎤 Głos:<br/>Zapisz sen 7 godzin"]
+        USE2["💻 Dashboard:<br/>Wykres snu za tydzień"]
+        USE3["⌚ Auto-sync:<br/>Oura Ring → dane snu"]
+        USE4["💡 Insighty:<br/>Twój dług senny: 3h"]
+    end
+
+    T1 & T2 & T3 --> LOOKUP
+    CATALOG --> CAT
+    CAT -->|"TAK"| INS
+    INS --> READY
+    READY --> USE1 & USE2 & USE3 & USE4
+    CAT -->|"NIE"| NO
+    NO --> FUTURE
+
+    style TRIGGER fill:#f59e0b,stroke:#d97706,color:#000
+    style LOOKUP fill:#3b82f6,stroke:#2563eb,color:#fff
+    style INSTALL_YES fill:#22c55e,stroke:#16a34a,color:#fff
+    style INSTALL_NO fill:#ef4444,stroke:#dc2626,color:#fff
+    style USE fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    style CATALOG fill:#6366f1,stroke:#4f46e5,color:#fff
