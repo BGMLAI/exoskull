@@ -73,13 +73,15 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/referral/") ||
     pathname.startsWith("/_next/");
 
-  // Public API routes (webhooks, public stats, CRON with own auth)
+  // Public API routes (webhooks, public stats, CRON with own auth, OAuth flows)
   const isPublicApi =
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/webhooks/") ||
     pathname.startsWith("/api/cron/") ||
     pathname.startsWith("/api/public/") ||
     pathname.startsWith("/api/twilio/") ||
+    pathname.startsWith("/api/rigs/") || // OAuth connect/callback handle their own auth
+    pathname.startsWith("/api/meta/") || // Meta deauth/pages handle their own auth
     pathname === "/api/pulse";
 
   // ============================================================================

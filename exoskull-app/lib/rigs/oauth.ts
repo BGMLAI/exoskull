@@ -189,10 +189,13 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
   google: () => ({
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
-    scopes: GOOGLE_COMPREHENSIVE_SCOPES,
+    scopes: GOOGLE_CORE_SCOPES,
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     redirectUri: `${BASE_URL}/api/rigs/google/callback`,
+    extraAuthParams: {
+      include_granted_scopes: "true", // Incremental auth - add more scopes later
+    },
   }),
 
   // Google Fit / HealthConnect (legacy - use 'google' instead)

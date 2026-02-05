@@ -90,7 +90,12 @@ export async function GET(
     // Build auth URL and redirect
     const authUrl = buildAuthUrl(config, state);
 
-    console.log(`[OAuth] Redirecting to ${slug} auth`);
+    console.log(`[OAuth] Redirecting to ${slug} auth`, {
+      userId: user.id,
+      redirectUri: config.redirectUri,
+      scopeCount: config.scopes.length,
+      authUrlLength: authUrl.length,
+    });
 
     return NextResponse.redirect(authUrl);
   } catch (error) {
