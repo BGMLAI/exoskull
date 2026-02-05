@@ -4,6 +4,94 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-05] Memory System - "Najlepsza pamięć na rynku"
+
+### Added - Complete Memory System (Daily Summaries + Search + Interactive Review)
+
+**Database Migration** (`20260205000004_memory_digests_system.sql`):
+
+- `exo_daily_summaries` - AI-generated daily summaries with user corrections
+  - `draft_summary` / `final_summary` - before/after user review
+  - `user_corrections` JSONB - array of corrections
+  - `mood_score` / `energy_score` - sentiment tracking
+  - `key_events` / `key_topics` / `decisions_made` - extracted data
+  - Vector embedding for semantic search
+- `exo_memory_digests` - Weekly/monthly/yearly compressed summaries
+  - `period_type` - week/month/quarter/year
+  - `narrative_summary` - AI-generated narrative
+  - `patterns_detected` - long-term pattern detection
+- Helper functions:
+  - `get_memory_context(tenant_id, limit)` - Smart context window (50 msgs + summaries + highlights)
+  - `get_or_create_daily_summary(tenant_id)` - Upsert helper
+
+**Memory Core** (`lib/memory/`):
+
+| File               | Functions                                                                                                                   |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `daily-summary.ts` | `createDailySummary()`, `applyCorrection()`, `finalizeSummary()`, `getSummaryForDisplay()`, `getRecentSummaries()`          |
+| `search.ts`        | `keywordSearch()`, `findLastMention()`, `getContextAroundDate()`, `getMemoryTimeline()`, `formatSearchResultsForResponse()` |
+
+**CRON Job** (`app/api/cron/daily-summary/route.ts`):
+
+- Schedule: `0 19 * * *` (21:00 Poland time)
+- For each active tenant:
+  1. Check timezone & quiet hours
+  2. Generate AI draft summary from day's conversations
+  3. Send SMS with summary
+  4. User can reply with corrections
+- Manual trigger via POST with `tenant_id`
+
+**Voice Tools** (added to `conversation-handler.ts`):
+
+| Tool                    | Description                                  |
+| ----------------------- | -------------------------------------------- |
+| `get_daily_summary`     | "Jak minął dzień?" - returns today's summary |
+| `correct_daily_summary` | "To był Marek, nie Tomek" - adds correction  |
+| `search_memory`         | "Kiedy mówiłem o kawie?" - searches memory   |
+
+**ElevenLabs Voice Upgrade**:
+
+- Added `ELEVENLABS_VOICE_ID` env var to Vercel
+- Set to `gFl0NeqphJUaoBLtWrqM` (Piotr Pro PL - professional Polish voice)
+
+### Verified Features
+
+| Feature                           | Status                                                 |
+| --------------------------------- | ------------------------------------------------------ |
+| Outbound calling to user          | ✅ `POST /api/twilio/outbound`                         |
+| Outbound calling to third parties | ✅ Tool `make_call` → `/api/twilio/voice/delegate`     |
+| SMS notifications                 | ✅ Via Twilio                                          |
+| Daily summary CRON                | ✅ Scheduled 21:00 PL                                  |
+| Memory search                     | ✅ Keyword search across messages/summaries/highlights |
+| Voice tools                       | ✅ 3 new tools integrated                              |
+
+### Files Created
+
+- `lib/memory/daily-summary.ts` - Daily summary generation & review
+- `lib/memory/search.ts` - Memory search functionality
+- `app/api/cron/daily-summary/route.ts` - CRON endpoint
+- `supabase/migrations/20260205000004_memory_digests_system.sql` - DB schema
+
+### Files Modified
+
+- `vercel.json` - Added daily-summary CRON schedule
+- `lib/voice/conversation-handler.ts` - Added 3 memory voice tools
+
+### How to Verify
+
+1. Voice: Call +48732144112, ask "Jak minął dzień?"
+2. Voice: Call +48732144112, say "Zadzwoń pod [numer] i powiedz cześć"
+3. Wait for 21:00 or manually trigger `/api/cron/daily-summary`
+4. Search: Ask "Kiedy ostatnio mówiłem o [topic]?"
+
+### Environment Variables Required
+
+```
+ELEVENLABS_VOICE_ID=gFl0NeqphJUaoBLtWrqM  # Added to Vercel
+```
+
+---
+
 ## [2026-02-04] Admin Panel - Full Operations Dashboard
 
 ### Added - Complete Admin Panel (9 pages, 13 API endpoints, 5 DB tables)
