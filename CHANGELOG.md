@@ -4,6 +4,72 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-05] feat: Dynamic Skills Pipeline Complete (Layer 14)
+
+### What was done
+- **Suggestions API** (`/api/skills/suggestions`) — GET pending, PATCH accept/dismiss with auto-generate flow
+- **Suggestions Widget** (`SkillSuggestionsWidget.tsx`) — Optimistic UI, confidence bars, PL source badges
+- **Pre-approval Sandbox** — Pending skills testable before 2FA, sandbox banner, results not logged
+- **Circuit Breaker** (`circuit-breaker.ts`) — Inline check + CRON batch sweep, >30% error rate → revoke
+- **Lifecycle Integration** — `revokeUnhealthySkills()` in daily CRON
+- **ARCHITECTURE.md** — L14 → ✅ LIVE
+
+### Files changed
+- `app/api/skills/suggestions/route.ts` (NEW)
+- `components/skills/SkillSuggestionsWidget.tsx` (NEW)
+- `lib/skills/sandbox/circuit-breaker.ts` (NEW)
+- `app/api/skills/[id]/execute/route.ts` (sandbox flag + circuit breaker)
+- `app/dashboard/skills/[id]/page.tsx` (pending test + sandbox banner)
+- `app/dashboard/skills/page.tsx` (embed widget)
+- `lib/skills/registry/lifecycle-manager.ts` (revokeUnhealthySkills)
+- `app/api/cron/skill-lifecycle/route.ts` (revoke in CRON)
+
+---
+
+## [2026-02-05] feat: Emotion Intelligence System (Layer 11 Phase 1)
+
+### What was done
+- Created `lib/emotion/types.ts` — Core types (EmotionState, CrisisAssessment, CrisisProtocol, AdaptivePrompt, VAD model)
+- Rewrote `lib/emotion/text-analyzer.ts` — Multi-strategy emotion detection (HuggingFace + Polish keywords), crisis keyword scanning (4 categories × 2 languages), VAD mapping (28 emotions from Russell's circumplex model)
+- Created `lib/emotion/crisis-detector.ts` — 3-layer detection (keywords → emotional patterns → AI assessment via Gemini Flash) with fail-safe (if AI fails but keywords present → treat as crisis)
+- Created `lib/emotion/adaptive-responses.ts` — 5 emotion-adaptive response modes (high_sadness, high_anger, anxiety, low_energy, mixed_signals) with Polish prompt injections
+- Created `lib/emotion/logger.ts` — Fire-and-forget emotion logging, crisis events logged synchronously
+- Created `lib/emotion/index.ts` — Module re-exports
+- Modified `lib/voice/conversation-handler.ts` — Parallel emotion analysis with buildDynamicContext(), crisis override, adaptive prompt injection, fixed follow-up call bug (was using bare STATIC_SYSTEM_PROMPT)
+- Created DB migration `20260206000004_emotion_intelligence.sql` — Upgraded exo_emotion_log with VAD dimensions, crisis tracking, get_emotion_trends() function
+- Created API endpoints: POST `/api/emotion/analyze`, GET `/api/emotion/history`
+
+### Why
+- Layer 11 (Emotion Intelligence) was 0% implemented — critical for wellbeing monitoring
+- Crisis detection with Polish hotlines (116 123, 112, 800 120 002, 801 199 990) is a safety requirement
+- Emotion-adaptive responses improve user experience without explicitly stating "I detect you're sad"
+
+### Files changed
+- `lib/emotion/types.ts` (NEW)
+- `lib/emotion/text-analyzer.ts` (REWRITTEN)
+- `lib/emotion/crisis-detector.ts` (NEW)
+- `lib/emotion/adaptive-responses.ts` (NEW)
+- `lib/emotion/logger.ts` (NEW)
+- `lib/emotion/index.ts` (NEW)
+- `lib/voice/conversation-handler.ts` (MODIFIED)
+- `supabase/migrations/20260206000004_emotion_intelligence.sql` (NEW)
+- `app/api/emotion/analyze/route.ts` (NEW)
+- `app/api/emotion/history/route.ts` (NEW)
+
+### How to verify
+1. `cd exoskull-app && npm run build` — passes cleanly
+2. POST `/api/emotion/analyze` with `{ "text": "Czuję się okropnie" }` → should return sad emotion + adaptive mode
+3. POST `/api/emotion/analyze` with `{ "text": "Nie ma sensu żyć" }` → should trigger crisis detection
+4. Run DB migration to upgrade exo_emotion_log table
+
+### Notes for future agents
+- Phase 2 (voice prosody + facial analysis) placeholders exist in types.ts (VoiceFeatures, FaceData)
+- Crisis protocols are in Polish — all hotline numbers are Poland-specific
+- Text analyzer uses HuggingFace as primary, Polish keywords as fallback — no Gemini Flash strategy yet (deferred)
+- The `maxTokensOverride` variable in conversation-handler controls longer crisis responses (400 vs 200 tokens)
+
+---
+
 ## 2026-02-05
 
 ### Layer 9: Self-Defining Success Metrics (Goals System)

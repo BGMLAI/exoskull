@@ -36,6 +36,10 @@ import {
   logProgressByName,
   getGoalsForVoice,
 } from "../goals/engine";
+import { analyzeEmotion } from "@/lib/emotion";
+import { detectCrisis } from "@/lib/emotion/crisis-detector";
+import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
+import { logEmotion } from "@/lib/emotion/logger";
 
 // ============================================================================
 // CONFIGURATION
@@ -1578,9 +1582,46 @@ export async function processUserMessage(
     };
   }
 
-  // Build dynamic context
-  const dynamicContext = await buildDynamicContext(session.tenantId);
-  const fullSystemPrompt = STATIC_SYSTEM_PROMPT + dynamicContext;
+  // Build dynamic context + emotion analysis (parallel)
+  const [dynamicContext, emotionState] = await Promise.all([
+    buildDynamicContext(session.tenantId),
+    analyzeEmotion(userMessage),
+  ]);
+
+  // Crisis check (blocks if detected — safety requirement)
+  const crisis = await detectCrisis(userMessage, emotionState);
+
+  let fullSystemPrompt: string;
+  let maxTokensOverride: number | undefined;
+
+  if (crisis.detected && crisis.protocol) {
+    // CRISIS MODE — protocol overrides everything
+    fullSystemPrompt =
+      crisis.protocol.prompt_override + "\n\n" + dynamicContext;
+    maxTokensOverride = 400; // Longer crisis responses
+    // Log synchronously for legal safety
+    await logEmotion(session.tenantId, emotionState, userMessage, {
+      sessionId: session.id,
+      crisisFlags: crisis.indicators,
+      crisisProtocolTriggered: true,
+      personalityAdaptedTo: "crisis_support",
+    });
+    console.log(
+      `[ConversationHandler] 🚨 CRISIS MODE: ${crisis.type} (severity: ${crisis.severity})`,
+    );
+  } else {
+    // Normal: emotion-adaptive prompt
+    const adaptive = getAdaptivePrompt(emotionState);
+    fullSystemPrompt =
+      STATIC_SYSTEM_PROMPT +
+      dynamicContext +
+      (adaptive.mode !== "neutral" ? "\n\n" + adaptive.instruction : "");
+    // Fire-and-forget logging
+    logEmotion(session.tenantId, emotionState, userMessage, {
+      sessionId: session.id,
+      personalityAdaptedTo: adaptive.mode,
+    }).catch(() => {});
+  }
 
   // Build messages array - ZAWSZE używaj unified thread (cross-channel context)
   // Limit 50 wiadomości + przyszłe digests dla długoterminowej pamięci
@@ -1611,7 +1652,7 @@ export async function processUserMessage(
     // First API call (max_tokens low for voice = short, fast responses)
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 200,
+      max_tokens: maxTokensOverride || 200,
       system: fullSystemPrompt,
       messages,
       tools: IORS_TOOLS,
@@ -1642,11 +1683,11 @@ export async function processUserMessage(
         toolsUsed.push(toolUse.name);
       }
 
-      // Second API call with tool results
+      // Second API call with tool results (reuse emotion-adapted prompt)
       const followUpResponse = await anthropic.messages.create({
         model: CLAUDE_MODEL,
-        max_tokens: 150,
-        system: STATIC_SYSTEM_PROMPT,
+        max_tokens: maxTokensOverride || 150,
+        system: fullSystemPrompt,
         messages: [
           ...messages,
           { role: "assistant", content: response.content },
