@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   archiveUnusedSkills,
   getSkillStats,
+  expireOldSuggestions,
 } from "@/lib/skills/registry/lifecycle-manager";
 
 export const dynamic = "force-dynamic";
@@ -23,12 +24,16 @@ export async function GET(request: NextRequest) {
     // Archive unused skills
     const archiveResult = await archiveUnusedSkills(30);
 
+    // Expire old skill suggestions (>14 days pending)
+    const expiredCount = await expireOldSuggestions(14);
+
     // Get stats
     const stats = await getSkillStats();
 
     return NextResponse.json({
       success: true,
       archived: archiveResult.archivedCount,
+      suggestions_expired: expiredCount,
       stats,
       timestamp: new Date().toISOString(),
     });

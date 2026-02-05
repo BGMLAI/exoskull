@@ -47,6 +47,40 @@ export async function archiveUnusedSkills(
 }
 
 /**
+ * Expire old pending skill suggestions.
+ * Calls the DB function expire_old_skill_suggestions().
+ */
+export async function expireOldSuggestions(
+  daysThreshold: number = 14,
+): Promise<number> {
+  try {
+    const supabase = getServiceSupabase();
+
+    const { data, error } = await supabase.rpc("expire_old_skill_suggestions", {
+      days_threshold: daysThreshold,
+    });
+
+    if (error) {
+      console.error("[LifecycleManager] Expire suggestions error:", error);
+      return 0;
+    }
+
+    const expiredCount = typeof data === "number" ? data : 0;
+
+    if (expiredCount > 0) {
+      console.log(
+        `[LifecycleManager] Expired ${expiredCount} skill suggestions (>${daysThreshold} days)`,
+      );
+    }
+
+    return expiredCount;
+  } catch (error) {
+    console.error("[LifecycleManager] Expire suggestions error:", error);
+    return 0;
+  }
+}
+
+/**
  * Get statistics about skill usage across all tenants
  */
 export async function getSkillStats(): Promise<{

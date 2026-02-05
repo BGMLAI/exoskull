@@ -70,6 +70,10 @@
       "schedule": "0 8 * * 0"
     },
     {
+      "path": "/api/cron/gap-detection",
+      "schedule": "0 9 * * 0"
+    },
+    {
       "path": "/api/cron/engagement-scoring",
       "schedule": "0 7 * * *"
     },
