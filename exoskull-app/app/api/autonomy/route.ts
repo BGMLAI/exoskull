@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createAuthClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,19 +18,27 @@ function getSupabase() {
   );
 }
 
+async function getAuthUser() {
+  const supabase = await createAuthClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user;
+}
+
 // ============================================================================
 // GET - List user's autonomy grants
 // ============================================================================
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabase();
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-
-    if (!userId) {
-      return NextResponse.json({ error: "userId required" }, { status: 400 });
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const userId = user.id;
+
+    const supabase = getSupabase();
 
     const { data, error } = await supabase
       .from("user_autonomy_grants")
@@ -70,20 +79,21 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = getSupabase();
     const body = await request.json();
-    const {
-      userId,
-      actionPattern,
-      category,
-      expiresAt,
-      spendingLimit,
-      dailyLimit,
-    } = body;
+    const { actionPattern, category, expiresAt, spendingLimit, dailyLimit } =
+      body;
 
-    if (!userId || !actionPattern) {
+    const userId = user.id;
+
+    if (!actionPattern) {
       return NextResponse.json(
-        { error: "userId and actionPattern required" },
+        { error: "actionPattern required" },
         { status: 400 },
       );
     }
@@ -148,16 +158,18 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = user.id;
+
     const supabase = getSupabase();
     const body = await request.json();
-    const { grantId, userId, isActive, spendingLimit, dailyLimit, expiresAt } =
-      body;
+    const { grantId, isActive, spendingLimit, dailyLimit, expiresAt } = body;
 
-    if (!grantId || !userId) {
-      return NextResponse.json(
-        { error: "grantId and userId required" },
-        { status: 400 },
-      );
+    if (!grantId) {
+      return NextResponse.json({ error: "grantId required" }, { status: 400 });
     }
 
     const updates: Record<string, unknown> = {
@@ -205,16 +217,18 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = user.id;
+
     const supabase = getSupabase();
     const { searchParams } = new URL(request.url);
     const grantId = searchParams.get("grantId");
-    const userId = searchParams.get("userId");
 
-    if (!grantId || !userId) {
-      return NextResponse.json(
-        { error: "grantId and userId required" },
-        { status: 400 },
-      );
+    if (!grantId) {
+      return NextResponse.json({ error: "grantId required" }, { status: 400 });
     }
 
     const { error } = await supabase

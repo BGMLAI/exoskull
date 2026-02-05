@@ -125,7 +125,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const metadata = session.metadata || {};
+    const metadata = {
+      purpose: "rozmowa ogólna",
+      instructions: "Przeprowadź rozmowę uprzejmie i rzeczowo.",
+      user_name: "użytkownik",
+      ...(session.metadata || {}),
+    };
 
     console.log("[Delegate] Request:", {
       action,

@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch conversation messages
     const { data: messages, error: messagesError } = await supabase
-      .from("exo_conversation_messages")
+      .from("exo_messages")
       .select("role, content, created_at")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });

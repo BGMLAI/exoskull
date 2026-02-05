@@ -20,6 +20,12 @@ function getSupabase() {
 
 export async function POST(req: NextRequest) {
   try {
+    // Require CRON_SECRET or admin auth
+    const authHeader = req.headers.get("authorization");
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const supabase = getSupabase();
 
     const results: any[] = [];

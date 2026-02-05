@@ -63,6 +63,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Verify OpenAI API key before calling
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("[Chat API] OPENAI_API_KEY not configured");
+      return NextResponse.json(
+        { error: "Chat service unavailable — OPENAI_API_KEY not configured" },
+        { status: 503 },
+      );
+    }
+
     // Call OpenAI
     const openaiResponse = await fetch(
       "https://api.openai.com/v1/chat/completions",

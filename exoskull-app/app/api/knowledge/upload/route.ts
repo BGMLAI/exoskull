@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createAuthClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -42,21 +43,23 @@ const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
 
 export async function POST(req: NextRequest) {
   try {
+    // Auth: verify caller
+    const authSupabase = await createAuthClient();
+    const {
+      data: { user },
+    } = await authSupabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const tenantId = user.id;
+
     const supabase = getSupabase();
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
-    const tenantId = formData.get("tenant_id") as string | null;
     const category = formData.get("category") as string | null;
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
-
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: "tenant_id required" },
-        { status: 400 },
-      );
     }
 
     // Validate file type

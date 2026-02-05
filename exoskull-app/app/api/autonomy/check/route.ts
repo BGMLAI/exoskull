@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createAuthClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +24,27 @@ function getSupabase() {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabase();
+    // Auth: verify caller is the user or a service (CRON)
+    const authHeader = request.headers.get("authorization");
+    const isCronCall = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
     const body = await request.json();
     const { userId, action, recordError } = body;
+
+    if (!isCronCall) {
+      const authSupabase = await createAuthClient();
+      const {
+        data: { user },
+      } = await authSupabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      if (userId && userId !== user.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
+    const supabase = getSupabase();
 
     if (!userId || !action) {
       return NextResponse.json(
@@ -92,6 +111,20 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    // Auth: verify caller
+    const authHeader = request.headers.get("authorization");
+    const isCronCall = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+
+    if (!isCronCall) {
+      const authSupabase = await createAuthClient();
+      const {
+        data: { user },
+      } = await authSupabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+    }
+
     const supabase = getSupabase();
     const body = await request.json();
     const { userId, action, errorMessage } = body;

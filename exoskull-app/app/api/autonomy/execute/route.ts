@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createAuthClient } from "@/lib/supabase/server";
 import {
   runAutonomyCycle,
   executeAction,
@@ -33,11 +34,32 @@ function getSupabase() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { operation, tenantId, ...params } = body;
+    // Auth: verify caller is the user or a CRON service
+    const authHeader = request.headers.get("authorization");
+    const isCronCall = authHeader === `Bearer ${process.env.CRON_SECRET}`;
 
-    if (!tenantId) {
-      return NextResponse.json({ error: "tenantId required" }, { status: 400 });
+    const body = await request.json();
+    const { operation, tenantId: bodyTenantId, ...params } = body;
+
+    let tenantId: string;
+
+    if (isCronCall) {
+      if (!bodyTenantId) {
+        return NextResponse.json(
+          { error: "tenantId required" },
+          { status: 400 },
+        );
+      }
+      tenantId = bodyTenantId;
+    } else {
+      const authSupabase = await createAuthClient();
+      const {
+        data: { user },
+      } = await authSupabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      tenantId = user.id;
     }
 
     if (!operation) {
@@ -108,13 +130,34 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    // Auth: verify caller is the user or a CRON service
+    const authHeader = request.headers.get("authorization");
+    const isCronCall = authHeader === `Bearer ${process.env.CRON_SECRET}`;
     const { searchParams } = new URL(request.url);
-    const tenantId = searchParams.get("tenantId");
-    const type = searchParams.get("type") || "pending";
 
-    if (!tenantId) {
-      return NextResponse.json({ error: "tenantId required" }, { status: 400 });
+    let tenantId: string;
+
+    if (isCronCall) {
+      const queryTenantId = searchParams.get("tenantId");
+      if (!queryTenantId) {
+        return NextResponse.json(
+          { error: "tenantId required" },
+          { status: 400 },
+        );
+      }
+      tenantId = queryTenantId;
+    } else {
+      const authSupabase = await createAuthClient();
+      const {
+        data: { user },
+      } = await authSupabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      tenantId = user.id;
     }
+
+    const type = searchParams.get("type") || "pending";
 
     switch (type) {
       case "pending":

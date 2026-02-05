@@ -28,11 +28,14 @@ export async function POST(req: NextRequest) {
 
     // Check if Deepgram API key is configured
     if (!getDeepgramApiKey()) {
-      console.warn("DEEPGRAM_API_KEY not configured, returning placeholder");
-      return NextResponse.json({
-        transcript: "[Transkrypcja niedostepna - brak klucza API]",
-        confidence: 0,
-      });
+      console.error("[Transcribe] DEEPGRAM_API_KEY not configured");
+      return NextResponse.json(
+        {
+          error:
+            "Transcription service unavailable — DEEPGRAM_API_KEY not configured",
+        },
+        { status: 503 },
+      );
     }
 
     // Convert File to ArrayBuffer
