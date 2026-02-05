@@ -9,6 +9,7 @@ import {
   archiveUnusedSkills,
   getSkillStats,
   expireOldSuggestions,
+  revokeUnhealthySkills,
 } from "@/lib/skills/registry/lifecycle-manager";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,9 @@ export async function GET(request: NextRequest) {
     // Expire old skill suggestions (>14 days pending)
     const expiredCount = await expireOldSuggestions(14);
 
+    // Revoke unhealthy skills (>30% error rate)
+    const revokeResult = await revokeUnhealthySkills();
+
     // Get stats
     const stats = await getSkillStats();
 
@@ -34,6 +38,8 @@ export async function GET(request: NextRequest) {
       success: true,
       archived: archiveResult.archivedCount,
       suggestions_expired: expiredCount,
+      skills_revoked: revokeResult.revokedCount,
+      revoked_skills: revokeResult.skills,
       stats,
       timestamp: new Date().toISOString(),
     });

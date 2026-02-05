@@ -276,7 +276,10 @@ export default function SkillDetailPage() {
           "Content-Type": "application/json",
           "x-tenant-id": userId,
         },
-        body: JSON.stringify({ method: testMethod }),
+        body: JSON.stringify({
+          method: testMethod,
+          sandbox: skill.approval_status !== "approved",
+        }),
       });
 
       const data = await res.json();
@@ -460,8 +463,9 @@ export default function SkillDetailPage() {
             </Card>
           )}
 
-          {/* Test Execution (if approved) */}
-          {skill.approval_status === "approved" && (
+          {/* Test Execution (approved or pending sandbox) */}
+          {(skill.approval_status === "approved" ||
+            skill.approval_status === "pending") && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -473,6 +477,12 @@ export default function SkillDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {skill.approval_status === "pending" && (
+                  <div className="text-sm text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    Tryb sandbox — wyniki nie sa zapisywane
+                  </div>
+                )}
                 <div className="flex gap-3">
                   <select
                     value={testMethod}

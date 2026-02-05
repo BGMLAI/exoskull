@@ -81,6 +81,32 @@ export async function expireOldSuggestions(
 }
 
 /**
+ * Revoke unhealthy skills (>30% error rate over last 50 executions).
+ * Uses the circuit breaker batch sweep.
+ */
+export async function revokeUnhealthySkills(
+  minExecutions: number = 10,
+  errorThreshold: number = 0.3,
+): Promise<{ revokedCount: number; skills: string[] }> {
+  try {
+    const { revokeUnhealthySkills: sweep } =
+      await import("@/lib/skills/sandbox/circuit-breaker");
+    const result = await sweep(minExecutions, errorThreshold);
+
+    if (result.revokedCount > 0) {
+      console.log(
+        `[LifecycleManager] Revoked ${result.revokedCount} unhealthy skills: ${result.skills.join(", ")}`,
+      );
+    }
+
+    return result;
+  } catch (error) {
+    console.error("[LifecycleManager] Revoke unhealthy skills error:", error);
+    return { revokedCount: 0, skills: [] };
+  }
+}
+
+/**
  * Get statistics about skill usage across all tenants
  */
 export async function getSkillStats(): Promise<{

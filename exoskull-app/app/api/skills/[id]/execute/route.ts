@@ -1,11 +1,13 @@
 // =====================================================
 // POST /api/skills/[id]/execute - Execute a skill action
+// Supports sandbox mode for pre-approval testing
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { executeInSandbox } from "@/lib/skills/sandbox/restricted-function";
 import { logExecution } from "@/lib/skills/sandbox/execution-logger";
+import { checkCircuitBreaker } from "@/lib/skills/sandbox/circuit-breaker";
 import { SkillExecutionContext } from "@/lib/skills/types";
 
 export const dynamic = "force-dynamic";
@@ -33,26 +35,34 @@ export async function POST(
       action,
       params: actionParams,
       method,
+      sandbox,
     } = body as {
       action?: string;
       params?: Record<string, unknown>;
       method?: "getData" | "getInsights" | "executeAction" | "getActions";
+      sandbox?: boolean;
     };
 
-    // Load the skill
+    // Load the skill - allow pending in sandbox mode
     const supabase = getSupabase();
+    const allowedStatuses = sandbox ? ["approved", "pending"] : ["approved"];
+
     const { data: skill, error: loadError } = await supabase
       .from("exo_generated_skills")
       .select("*")
       .eq("id", skillId)
       .eq("tenant_id", tenantId)
-      .eq("approval_status", "approved")
+      .in("approval_status", allowedStatuses)
       .is("archived_at", null)
       .single();
 
     if (loadError || !skill) {
       return NextResponse.json(
-        { error: "Skill not found or not approved" },
+        {
+          error: sandbox
+            ? "Skill not found"
+            : "Skill not found or not approved",
+        },
         { status: 404 },
       );
     }
@@ -72,8 +82,11 @@ export async function POST(
     // Execute in sandbox
     const result = await executeInSandbox(context, skill.executor_code);
 
-    // Log execution (async, don't block response)
-    logExecution(context, result, action, actionParams).catch(() => {});
+    // Only log and check circuit breaker for non-sandbox (approved) executions
+    if (!sandbox) {
+      logExecution(context, result, action, actionParams).catch(() => {});
+      checkCircuitBreaker(skillId, tenantId).catch(() => {});
+    }
 
     if (!result.success) {
       return NextResponse.json(
@@ -81,6 +94,7 @@ export async function POST(
           success: false,
           error: result.error,
           executionTimeMs: result.executionTimeMs,
+          sandboxMode: !!sandbox,
         },
         { status: 500 },
       );
@@ -90,6 +104,7 @@ export async function POST(
       success: true,
       result: result.result,
       executionTimeMs: result.executionTimeMs,
+      sandboxMode: !!sandbox,
     });
   } catch (error) {
     console.error("[Skills API] Execute error:", error);

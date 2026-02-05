@@ -37,6 +37,7 @@ import {
   Globe,
   Bell,
 } from "lucide-react";
+import { SkillSuggestionsWidget } from "@/components/skills/SkillSuggestionsWidget";
 
 // ============================================================================
 // TYPES
@@ -374,6 +375,14 @@ export default function SkillsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Skill Suggestions */}
+      {userId && (
+        <SkillSuggestionsWidget
+          userId={userId}
+          onSuggestionAccepted={() => userId && loadSkills(userId)}
+        />
+      )}
 
       {/* Filter */}
       <div className="flex gap-4">
