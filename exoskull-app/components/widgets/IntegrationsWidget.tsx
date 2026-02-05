@@ -37,7 +37,13 @@ const FEATURED_RIGS: RigInfo[] = [
     slug: "microsoft-365",
     name: "Microsoft 365",
     icon: "🟦",
-    description: "Outlook, Calendar, OneDrive, Teams",
+    description: "Outlook, Calendar, OneDrive, Teams, SharePoint",
+  },
+  {
+    slug: "facebook",
+    name: "Facebook",
+    icon: "📘",
+    description: "Profil, posty, zdjęcia, strony + Instagram",
   },
   {
     slug: "notion",

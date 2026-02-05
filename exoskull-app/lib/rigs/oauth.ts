@@ -239,6 +239,14 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
       // OneDrive
       "Files.Read",
       "Files.ReadWrite",
+      // Teams
+      "Chat.Read",
+      "Chat.ReadWrite",
+      "Team.ReadBasic.All",
+      // SharePoint
+      "Sites.Read.All",
+      // OneNote
+      "Notes.Read",
       // Profile
       "User.Read",
       "offline_access",
@@ -311,6 +319,44 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
     clientSecret: process.env.SPOTIFY_CLIENT_SECRET || "",
     redirectUri: `${BASE_URL}/api/rigs/spotify/callback`,
   }),
+
+  // =====================================================
+  // FACEBOOK / META (Graph API + Instagram)
+  // =====================================================
+  facebook: () => ({
+    authUrl: "https://www.facebook.com/v21.0/dialog/oauth",
+    tokenUrl: "https://graph.facebook.com/v21.0/oauth/access_token",
+    scopes: [
+      "email",
+      "public_profile",
+      "user_posts",
+      "user_photos",
+      "user_friends",
+      "pages_show_list",
+      "pages_read_engagement",
+      // Instagram (requires FB Page linked to IG Business)
+      "instagram_basic",
+      "instagram_manage_insights",
+    ],
+    clientId: process.env.FACEBOOK_APP_ID || "",
+    clientSecret: process.env.FACEBOOK_APP_SECRET || "",
+    redirectUri: `${BASE_URL}/api/rigs/facebook/callback`,
+  }),
+
+  // =====================================================
+  // APPLE SIGN-IN
+  // =====================================================
+  apple: () => ({
+    authUrl: "https://appleid.apple.com/auth/authorize",
+    tokenUrl: "https://appleid.apple.com/auth/token",
+    scopes: ["name", "email"],
+    clientId: process.env.APPLE_CLIENT_ID || "",
+    clientSecret: process.env.APPLE_CLIENT_SECRET || "", // JWT generated at runtime
+    redirectUri: `${BASE_URL}/api/rigs/apple/callback`,
+    extraAuthParams: {
+      response_mode: "form_post",
+    },
+  }),
 };
 
 // Get OAuth config for a rig
@@ -323,4 +369,101 @@ export function getOAuthConfig(rigSlug: string): OAuthConfig | null {
 // Check if rig supports OAuth
 export function supportsOAuth(rigSlug: string): boolean {
   return rigSlug in RIG_OAUTH_CONFIGS;
+}
+
+// =====================================================
+// TOKEN REFRESH HELPER
+// =====================================================
+
+import { createClient } from "@supabase/supabase-js";
+
+function getServiceSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
+
+/**
+ * Ensure the access token for a rig connection is fresh.
+ * If token expires within 5 minutes, refresh it and update DB.
+ * Returns the (possibly refreshed) access_token.
+ */
+export async function ensureFreshToken(connection: {
+  id: string;
+  rig_slug: string;
+  access_token: string | null;
+  refresh_token: string | null;
+  expires_at: string | null;
+}): Promise<string> {
+  if (!connection.access_token) {
+    throw new Error(`[OAuth] No access token for ${connection.rig_slug}`);
+  }
+
+  // If no expiry info, assume token is valid
+  if (!connection.expires_at) {
+    return connection.access_token;
+  }
+
+  const expiresAt = new Date(connection.expires_at).getTime();
+  const now = Date.now();
+  const fiveMinutes = 5 * 60 * 1000;
+
+  // Token still valid for >5 minutes
+  if (expiresAt - now > fiveMinutes) {
+    return connection.access_token;
+  }
+
+  // Token expired or expiring soon - refresh it
+  if (!connection.refresh_token) {
+    throw new Error(
+      `[OAuth] Token expired for ${connection.rig_slug} and no refresh_token available`,
+    );
+  }
+
+  const config = getOAuthConfig(connection.rig_slug);
+  if (!config) {
+    throw new Error(
+      `[OAuth] No OAuth config for ${connection.rig_slug} - cannot refresh`,
+    );
+  }
+
+  console.log(
+    `[OAuth] Refreshing token for ${connection.rig_slug} (expires: ${connection.expires_at})`,
+  );
+
+  try {
+    const tokens = await refreshAccessToken(config, connection.refresh_token);
+
+    const newExpiresAt = tokens.expires_in
+      ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
+      : null;
+
+    // Update DB with new tokens
+    const supabase = getServiceSupabase();
+    const { error } = await supabase
+      .from("exo_rig_connections")
+      .update({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token || connection.refresh_token,
+        expires_at: newExpiresAt,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", connection.id);
+
+    if (error) {
+      console.error(
+        `[OAuth] Failed to save refreshed token for ${connection.rig_slug}:`,
+        error,
+      );
+    }
+
+    return tokens.access_token;
+  } catch (error) {
+    console.error(
+      `[OAuth] Token refresh failed for ${connection.rig_slug}:`,
+      error,
+    );
+    throw error;
+  }
 }

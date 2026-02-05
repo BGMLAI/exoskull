@@ -1,56 +1,60 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import Link from 'next/link'
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { SocialLoginButtons } from "./social-login-buttons";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { message?: string }
+  searchParams: { message?: string };
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (user) {
     // Check if user needs onboarding
     const { data: tenant } = await supabase
-      .from('exo_tenants')
-      .select('onboarding_status')
-      .eq('id', user.id)
-      .single()
+      .from("exo_tenants")
+      .select("onboarding_status")
+      .eq("id", user.id)
+      .single();
 
-    const needsOnboarding = !tenant?.onboarding_status ||
-      tenant.onboarding_status === 'pending' ||
-      tenant.onboarding_status === 'in_progress'
+    const needsOnboarding =
+      !tenant?.onboarding_status ||
+      tenant.onboarding_status === "pending" ||
+      tenant.onboarding_status === "in_progress";
 
-    redirect(needsOnboarding ? '/onboarding' : '/dashboard')
+    redirect(needsOnboarding ? "/onboarding" : "/dashboard");
   }
 
   async function signIn(formData: FormData) {
-    'use server'
+    "use server";
 
-    const email = formData.get('email') as string
-    const password = formData.get('password') as string
-    const supabase = await createClient()
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    const supabase = await createClient();
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
-    })
+    });
 
     if (error) {
-      redirect('/login?message=Invalid credentials')
+      redirect("/login?message=Invalid credentials");
     }
 
-    redirect('/dashboard')
+    redirect("/dashboard");
   }
 
   async function signUp(formData: FormData) {
-    'use server'
+    "use server";
 
-    const email = formData.get('email') as string
-    const password = formData.get('password') as string
-    const name = formData.get('name') as string
-    const supabase = await createClient()
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    const name = formData.get("name") as string;
+    const supabase = await createClient();
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -60,29 +64,27 @@ export default async function LoginPage({
           name,
         },
       },
-    })
+    });
 
     if (authError) {
-      console.error('Auth error:', authError)
-      redirect(`/login?message=${encodeURIComponent(authError.message)}`)
+      console.error("Auth error:", authError);
+      redirect(`/login?message=${encodeURIComponent(authError.message)}`);
     }
 
     // Create tenant record
     if (authData.user) {
-      const { error: tenantError } = await supabase
-        .from('exo_tenants')
-        .insert({
-          id: authData.user.id,
-          email: authData.user.email!,
-          name: name,
-        })
+      const { error: tenantError } = await supabase.from("exo_tenants").insert({
+        id: authData.user.id,
+        email: authData.user.email!,
+        name: name,
+      });
 
       if (tenantError) {
-        console.error('Tenant creation error:', tenantError)
+        console.error("Tenant creation error:", tenantError);
       }
     }
 
-    redirect('/login?message=Check your email to confirm your account')
+    redirect("/login?message=Check your email to confirm your account");
   }
 
   return (
@@ -103,10 +105,27 @@ export default async function LoginPage({
           </div>
         )}
 
+        {/* Social Login Buttons */}
+        <SocialLoginButtons />
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-slate-700"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-slate-800/50 text-slate-500">
+              Lub zaloguj emailem
+            </span>
+          </div>
+        </div>
+
         <div className="space-y-6">
           <form action={signIn} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-2 text-slate-300">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium mb-2 text-slate-300"
+              >
                 Email
               </label>
               <input
@@ -120,7 +139,10 @@ export default async function LoginPage({
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-2 text-slate-300">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium mb-2 text-slate-300"
+              >
                 Haslo
               </label>
               <input
@@ -146,13 +168,18 @@ export default async function LoginPage({
               <div className="w-full border-t border-slate-700"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-slate-800/50 text-slate-500">Lub</span>
+              <span className="px-2 bg-slate-800/50 text-slate-500">
+                Nowe konto
+              </span>
             </div>
           </div>
 
           <form action={signUp} className="space-y-4">
             <div>
-              <label htmlFor="signup-name" className="block text-sm font-medium mb-2 text-slate-300">
+              <label
+                htmlFor="signup-name"
+                className="block text-sm font-medium mb-2 text-slate-300"
+              >
                 Imie
               </label>
               <input
@@ -166,7 +193,10 @@ export default async function LoginPage({
             </div>
 
             <div>
-              <label htmlFor="signup-email" className="block text-sm font-medium mb-2 text-slate-300">
+              <label
+                htmlFor="signup-email"
+                className="block text-sm font-medium mb-2 text-slate-300"
+              >
                 Email
               </label>
               <input
@@ -180,7 +210,10 @@ export default async function LoginPage({
             </div>
 
             <div>
-              <label htmlFor="signup-password" className="block text-sm font-medium mb-2 text-slate-300">
+              <label
+                htmlFor="signup-password"
+                className="block text-sm font-medium mb-2 text-slate-300"
+              >
                 Haslo
               </label>
               <input
@@ -208,5 +241,5 @@ export default async function LoginPage({
         </p>
       </div>
     </div>
-  )
+  );
 }

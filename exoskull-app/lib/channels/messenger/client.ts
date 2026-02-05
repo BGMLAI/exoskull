@@ -213,6 +213,142 @@ export class MessengerClient {
       fields: "id,first_name,last_name,profile_pic,locale,timezone",
     });
   }
+
+  // =====================================================
+  // RICH MESSAGES (Button Templates, Generic Templates)
+  // =====================================================
+
+  /**
+   * Send a message with button template (up to 3 buttons)
+   */
+  async sendButtonTemplate(
+    recipientId: string,
+    text: string,
+    buttons: Array<{
+      type: "web_url" | "postback";
+      title: string;
+      url?: string;
+      payload?: string;
+    }>,
+  ): Promise<MessengerSendResponse> {
+    return this.request<MessengerSendResponse>("me/messages", "POST", {
+      recipient: { id: recipientId },
+      message: {
+        attachment: {
+          type: "template",
+          payload: {
+            template_type: "button",
+            text,
+            buttons: buttons.map((b) =>
+              b.type === "web_url"
+                ? { type: "web_url", url: b.url, title: b.title }
+                : { type: "postback", title: b.title, payload: b.payload },
+            ),
+          },
+        },
+      },
+      messaging_type: "RESPONSE",
+    });
+  }
+
+  /**
+   * Send a generic template (carousel of cards)
+   */
+  async sendGenericTemplate(
+    recipientId: string,
+    elements: Array<{
+      title: string;
+      subtitle?: string;
+      image_url?: string;
+      buttons?: Array<{
+        type: "web_url" | "postback";
+        title: string;
+        url?: string;
+        payload?: string;
+      }>;
+    }>,
+  ): Promise<MessengerSendResponse> {
+    return this.request<MessengerSendResponse>("me/messages", "POST", {
+      recipient: { id: recipientId },
+      message: {
+        attachment: {
+          type: "template",
+          payload: {
+            template_type: "generic",
+            elements: elements.slice(0, 10).map((el) => ({
+              title: el.title,
+              subtitle: el.subtitle,
+              image_url: el.image_url,
+              buttons: el.buttons?.map((b) =>
+                b.type === "web_url"
+                  ? { type: "web_url", url: b.url, title: b.title }
+                  : { type: "postback", title: b.title, payload: b.payload },
+              ),
+            })),
+          },
+        },
+      },
+      messaging_type: "RESPONSE",
+    });
+  }
+
+  /**
+   * Send an image attachment
+   */
+  async sendImage(
+    recipientId: string,
+    imageUrl: string,
+  ): Promise<MessengerSendResponse> {
+    return this.request<MessengerSendResponse>("me/messages", "POST", {
+      recipient: { id: recipientId },
+      message: {
+        attachment: {
+          type: "image",
+          payload: { url: imageUrl, is_reusable: true },
+        },
+      },
+      messaging_type: "RESPONSE",
+    });
+  }
+
+  // =====================================================
+  // PERSISTENT MENU
+  // =====================================================
+
+  /**
+   * Set persistent menu for the bot
+   */
+  async setPersistentMenu(
+    menuItems: Array<{
+      type: "web_url" | "postback";
+      title: string;
+      url?: string;
+      payload?: string;
+    }>,
+  ): Promise<void> {
+    await this.request("me/messenger_profile", "POST", {
+      persistent_menu: [
+        {
+          locale: "default",
+          composer_input_disabled: false,
+          call_to_actions: menuItems.map((item) =>
+            item.type === "web_url"
+              ? { type: "web_url", title: item.title, url: item.url }
+              : { type: "postback", title: item.title, payload: item.payload },
+          ),
+        },
+      ],
+    });
+  }
+
+  /**
+   * Set get started button payload
+   */
+  async setGetStartedButton(payload: string = "GET_STARTED"): Promise<void> {
+    await this.request("me/messenger_profile", "POST", {
+      get_started: { payload },
+    });
+  }
 }
 
 // =====================================================

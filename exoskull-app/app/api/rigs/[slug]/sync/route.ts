@@ -13,10 +13,12 @@ import { createGoogleWorkspaceClient } from "@/lib/rigs/google-workspace/client"
 import { createMicrosoft365Client } from "@/lib/rigs/microsoft-365/client";
 import { GoogleFitClient } from "@/lib/rigs/google-fit/client";
 import { createGoogleClient } from "@/lib/rigs/google/client";
+import { createFacebookClient } from "@/lib/rigs/facebook/client";
 import {
   ingestGmailMessages,
   ingestOutlookMessages,
 } from "@/lib/rigs/email-ingest";
+import { ensureFreshToken } from "@/lib/rigs/oauth";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +77,20 @@ export async function POST(
       .from("exo_rig_connections")
       .update({ sync_status: "syncing", sync_error: null })
       .eq("id", connection.id);
+
+    // Refresh token if needed (before sync)
+    try {
+      const freshToken = await ensureFreshToken(connection);
+      if (freshToken !== connection.access_token) {
+        connection.access_token = freshToken;
+      }
+    } catch (tokenError) {
+      console.warn(
+        `[Rig Sync] Token refresh skipped for ${slug}:`,
+        (tokenError as Error).message,
+      );
+      // Continue with existing token - some rigs don't need refresh
+    }
 
     // Perform sync based on rig type
     let syncResult: {
@@ -271,6 +287,43 @@ export async function POST(
             metrics_upserted: healthMetrics.length,
             emails_ingested: emailResult.ingested,
             emails_skipped: emailResult.skipped,
+          },
+        };
+        break;
+      }
+
+      case "facebook": {
+        const fbClient = createFacebookClient(connection as RigConnection);
+        if (!fbClient) throw new Error("Failed to create Facebook client");
+
+        const fbDashboard = await fbClient.getDashboardData();
+
+        syncResult = {
+          success: true,
+          records:
+            (fbDashboard.profile ? 1 : 0) +
+            fbDashboard.posts.length +
+            fbDashboard.photos.length +
+            fbDashboard.friends.list.length +
+            fbDashboard.pages.length +
+            (fbDashboard.instagram.profile ? 1 : 0) +
+            fbDashboard.instagram.recentMedia.length,
+          data: {
+            profile: fbDashboard.profile
+              ? {
+                  name: fbDashboard.profile.name,
+                  id: fbDashboard.profile.id,
+                }
+              : null,
+            posts: fbDashboard.posts.length,
+            photos: fbDashboard.photos.length,
+            friends: fbDashboard.friends.totalCount,
+            pages: fbDashboard.pages.length,
+            instagram: {
+              username: fbDashboard.instagram.profile?.username || null,
+              followers: fbDashboard.instagram.profile?.followers_count || 0,
+              recentMedia: fbDashboard.instagram.recentMedia.length,
+            },
           },
         };
         break;
