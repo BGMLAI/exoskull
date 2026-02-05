@@ -15,6 +15,17 @@ import {
   getThreadContext,
   getThreadSummary,
 } from "../unified-thread";
+import {
+  getSummaryForDisplay,
+  applyCorrection,
+  createDailySummary,
+  finalizeSummary,
+} from "../memory/daily-summary";
+import {
+  keywordSearch,
+  findLastMention,
+  formatSearchResultsForResponse,
+} from "../memory/search";
 
 // ============================================================================
 // CONFIGURATION
@@ -348,6 +359,69 @@ const IORS_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["task_description"],
+    },
+  },
+  {
+    name: "get_daily_summary",
+    description:
+      'Pobierz podsumowanie dnia. Użyj gdy user pyta "jak minął dzień", "co robiłem dziś", "pokaż podsumowanie".',
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        date: {
+          type: "string",
+          description: "Data podsumowania (YYYY-MM-DD). Domyślnie dzisiaj.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "correct_daily_summary",
+    description:
+      'Dodaj korektę do podsumowania dnia. Użyj gdy user mówi "to był Marek nie Tomek", "zapomniałeś że byłem na siłowni", "to nieprawda że...".',
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        correction_type: {
+          type: "string",
+          enum: ["correction", "addition", "removal"],
+          description:
+            "Typ korekty: correction (zmiana), addition (dodanie), removal (usunięcie)",
+        },
+        original: {
+          type: "string",
+          description: "Oryginalna treść do zmiany (dla correction/removal)",
+        },
+        corrected: {
+          type: "string",
+          description: "Nowa treść (dla correction/addition)",
+        },
+      },
+      required: ["correction_type", "corrected"],
+    },
+  },
+  {
+    name: "search_memory",
+    description:
+      'Przeszukaj pamięć/historię rozmów. Użyj gdy user pyta "kiedy mówiłem o...", "co ostatnio o...", "znajdź...", "szukaj...".',
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description: "Fraza do wyszukania w pamięci",
+        },
+        date_from: {
+          type: "string",
+          description: "Data początkowa (YYYY-MM-DD), opcjonalne",
+        },
+        date_to: {
+          type: "string",
+          description: "Data końcowa (YYYY-MM-DD), opcjonalne",
+        },
+      },
+      required: ["query"],
     },
   },
 ];
@@ -956,6 +1030,135 @@ async function executeTool(
       }
 
       return `Zajmę się tym w tle. Dam znać jak skończę.`;
+    }
+
+    // ========================================================================
+    // Daily Summary Tools
+    // ========================================================================
+
+    if (toolName === "get_daily_summary") {
+      const date = toolInput.date; // Optional, defaults to today
+      console.log("[ConversationHandler] get_daily_summary:", {
+        date,
+        tenantId,
+      });
+
+      try {
+        // Try to get existing summary
+        let summaryText = await getSummaryForDisplay(tenantId, date);
+
+        if (!summaryText) {
+          // Generate if doesn't exist
+          const summary = await createDailySummary(tenantId);
+          if (summary) {
+            summaryText = await getSummaryForDisplay(tenantId, date);
+          }
+        }
+
+        if (!summaryText) {
+          return "Nie mam jeszcze podsumowania na dziś. Porozmawiajmy najpierw, a potem przygotuję dla Ciebie podsumowanie.";
+        }
+
+        return summaryText;
+      } catch (summaryError) {
+        console.error(
+          "[ConversationHandler] get_daily_summary error:",
+          summaryError,
+        );
+        return "Nie udało się pobrać podsumowania dnia.";
+      }
+    }
+
+    if (toolName === "correct_daily_summary") {
+      const correctionType = toolInput.correction_type;
+      const original = toolInput.original || "";
+      const corrected = toolInput.corrected;
+
+      console.log("[ConversationHandler] correct_daily_summary:", {
+        correctionType,
+        original: original.slice(0, 50),
+        corrected: corrected.slice(0, 50),
+        tenantId,
+      });
+
+      try {
+        // Get today's summary
+        const today = new Date().toISOString().split("T")[0];
+        const { data: summary } = await supabase
+          .from("exo_daily_summaries")
+          .select("id")
+          .eq("tenant_id", tenantId)
+          .eq("summary_date", today)
+          .single();
+
+        if (!summary) {
+          // Create summary first if doesn't exist
+          const newSummary = await createDailySummary(tenantId);
+          if (!newSummary) {
+            return "Nie mam jeszcze podsumowania do poprawienia. Poczekaj na wieczorne podsumowanie.";
+          }
+
+          // Apply correction to new summary
+          await applyCorrection(newSummary.id, {
+            type: correctionType,
+            original,
+            corrected,
+          });
+        } else {
+          // Apply correction to existing summary
+          await applyCorrection(summary.id, {
+            type: correctionType,
+            original,
+            corrected,
+          });
+        }
+
+        // Provide feedback based on correction type
+        if (correctionType === "correction") {
+          return `Zapisałem korektę: "${original}" → "${corrected}". Dziękuję za poprawkę!`;
+        } else if (correctionType === "addition") {
+          return `Dodałem do podsumowania: "${corrected}". Dziękuję za uzupełnienie!`;
+        } else {
+          return `Usunąłem z podsumowania: "${original}". Notuję!`;
+        }
+      } catch (corrError) {
+        console.error(
+          "[ConversationHandler] correct_daily_summary error:",
+          corrError,
+        );
+        return "Nie udało się zapisać korekty. Spróbuj jeszcze raz.";
+      }
+    }
+
+    if (toolName === "search_memory") {
+      const query = toolInput.query;
+      const dateFrom = toolInput.date_from;
+      const dateTo = toolInput.date_to;
+
+      console.log("[ConversationHandler] search_memory:", {
+        query,
+        dateFrom,
+        dateTo,
+        tenantId,
+      });
+
+      try {
+        const results = await keywordSearch({
+          tenantId,
+          query,
+          limit: 10,
+          dateFrom,
+          dateTo,
+        });
+
+        return formatSearchResultsForResponse(results, query);
+      } catch (searchError) {
+        console.error(
+          "[ConversationHandler] search_memory error:",
+          searchError,
+        );
+        return `Nie udało się przeszukać pamięci. Spróbuj jeszcze raz.`;
+      }
     }
 
     return "Nieznane narzędzie";
