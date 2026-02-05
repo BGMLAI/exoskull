@@ -44,19 +44,13 @@ ALTER TABLE exo_skill_suggestions ENABLE ROW LEVEL SECURITY;
 -- Users can only see their own suggestions
 CREATE POLICY "Users can view own suggestions"
   ON exo_skill_suggestions FOR SELECT
-  USING (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
-  ));
+  USING (tenant_id = auth.uid());
 
 -- Users can update own suggestions (accept/reject)
 CREATE POLICY "Users can update own suggestions"
   ON exo_skill_suggestions FOR UPDATE
-  USING (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
-  ))
-  WITH CHECK (tenant_id IN (
-    SELECT id FROM exo_tenants WHERE user_id = auth.uid()
-  ));
+  USING (tenant_id = auth.uid())
+  WITH CHECK (tenant_id = auth.uid());
 
 -- Service role can do everything
 CREATE POLICY "Service role full access suggestions"
