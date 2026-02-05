@@ -157,6 +157,9 @@ export interface MonitorData {
   // Integrations
   connectedRigs: string[];
   lastSyncTimes: Record<string, string>;
+
+  // System health (L10)
+  systemMetrics?: SystemMetrics;
 }
 
 export interface AnalyzeResult {
@@ -374,6 +377,37 @@ export interface GapAnalysis {
   coveragePercent: number;
   severity: "none" | "mild" | "moderate" | "severe";
   suggestedIntervention: string | null;
+}
+
+// ============================================================================
+// SYSTEM METRICS (L10 Self-Optimization)
+// ============================================================================
+
+export interface SystemMetrics {
+  mapekCycles: {
+    total: number;
+    successRate: number;
+    avgDurationMs: number;
+  };
+  skillHealth: {
+    totalExecutions: number;
+    errorRate: number;
+    avgExecutionMs: number;
+  };
+  interventionEffectiveness: {
+    approvalRate: number;
+    executionRate: number;
+    helpfulRate: number;
+  };
+  aiUsage: {
+    requestsToday: number;
+    tokensToday: number;
+    voiceMinutesToday: number;
+  };
+  learningEvents: {
+    patternsDetected7d: number;
+    insightsGenerated7d: number;
+  };
 }
 
 // ============================================================================

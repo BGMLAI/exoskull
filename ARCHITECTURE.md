@@ -275,7 +275,7 @@ exoskull inventory           # Show installed Mods/Rigs/active Quests
 │   Layer 7: Discovery & Onboarding (~60 topics)        ✅    │
 │   Layer 8: Proactive Gap Detection                    ✅    │
 │   Layer 9: Self-Defining Success Metrics              ✅    │
-│   Layer 10: Self-Optimization (MAPE-K + Guardian)     ⏳    │
+│   Layer 10: Self-Optimization (MAPE-K + Guardian)     ✅    │
 │   Layer 11: Emotion Intelligence & Crisis Detection   ✅    │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
@@ -1650,7 +1650,7 @@ Metrics_Generation = {
 
 ---
 
-## Layer 10: Continuous Self-Optimization (MAPE-K Loop) — ⏳ PARTIAL
+## Layer 10: Continuous Self-Optimization (MAPE-K Loop) — ✅ LIVE
 
 **ExoSkull doesn't just track. It LEARNS and IMPROVES its own operation.**
 
@@ -2107,7 +2107,7 @@ Emotion_Intelligence = {
 | L7: Discovery & Relationship | Onboarding (~60 topics), profile extraction | ✅ Live |
 | L8: Gap Detection | Tables exist, logic planned | 🔴 Planned |
 | L9: Success Metrics | Goal engine, dashboard, CRON auto-progress, voice tools | ✅ Live |
-| L10: Self-Optimization | Guardian + MAPE-K tables, partial logic | ⏳ Partial |
+| L10: Self-Optimization | Full MAPE-K loop (6h CRON), system metrics, cross-domain correlations, enhanced A+P+E+K | ✅ Live |
 | L11: Emotion Intelligence | Text + voice fusion, crisis detection, adaptive responses, trends dashboard | ✅ Live |
 | L12: Total Recall Memory | Daily summaries, search, 50+ msg context | ✅ Live |
 | L13: Data Lake | Bronze/Silver/Gold ETL pipeline | ✅ Live |

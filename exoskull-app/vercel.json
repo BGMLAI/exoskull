@@ -96,6 +96,14 @@
     {
       "path": "/api/cron/goal-progress",
       "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/cron/self-optimization",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/outbound-monitor",
+      "schedule": "0 */2 * * *"
     }
   ]
 }

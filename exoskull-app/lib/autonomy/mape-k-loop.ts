@@ -23,6 +23,7 @@ import {
 import { getActionExecutor } from "./action-executor";
 import { getPermissionModel } from "./permission-model";
 import { getAlignmentGuardian } from "./guardian";
+import { collectSystemMetrics } from "../optimization/system-metrics";
 
 // ============================================================================
 // MAPE-K LOOP CLASS
@@ -132,6 +133,30 @@ export class MAPEKLoop {
       `[MAPE-K] Cycle ${cycleId} completed in ${durationMs}ms. ` +
         `Proposed: ${plan.interventions.length}, Executed: ${execute.interventionsExecuted}`,
     );
+
+    // Log to system_optimizations for historical tracking (non-blocking)
+    try {
+      await this.supabase.from("system_optimizations").insert({
+        tenant_id: tenantId,
+        optimization_type: "mapek_cycle",
+        description: `MAPE-K cycle: ${analyze.issues.length} issues, ${plan.interventions.length} proposed, ${execute.interventionsExecuted} executed`,
+        before_state: {
+          issues: analyze.issues.length,
+          gaps: analyze.gaps.length,
+          opportunities: analyze.opportunities.length,
+        },
+        after_state: {
+          proposed: plan.interventions.length,
+          executed: execute.interventionsExecuted,
+          failed: execute.interventionsFailed,
+          learnings: knowledge.learnings.length,
+        },
+        expected_impact: plan.interventions.length > 0 ? "positive" : "neutral",
+        actual_impact: success ? "completed" : "failed",
+      });
+    } catch {
+      // Non-blocking — optimization logging failure doesn't affect cycle
+    }
 
     return {
       cycleId,
@@ -299,6 +324,14 @@ export class MAPEKLoop {
     // Determine HRV trend (simplified)
     const hrvTrend = this.calculateHrvTrend(sleepHoursLast7d);
 
+    // Collect system metrics (non-blocking)
+    let systemMetrics;
+    try {
+      systemMetrics = await collectSystemMetrics(tenantId);
+    } catch {
+      systemMetrics = undefined;
+    }
+
     // Build last sync times
     const lastSyncTimes: Record<string, string> = {};
     if (rigsResult.data) {
@@ -330,6 +363,7 @@ export class MAPEKLoop {
       freeTimeBlocks: Math.max(0, 8 - (upcomingTasksResult.count || 0)),
       connectedRigs: rigsResult.data?.map((r) => r.rig_slug) || [],
       lastSyncTimes,
+      systemMetrics,
     };
   }
 
@@ -439,6 +473,117 @@ export class MAPEKLoop {
         suggestedAction:
           "Connect Google Calendar, health trackers, or other services for richer insights",
       });
+    }
+
+    // 7. Emotion trend analysis (L11 data)
+    try {
+      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const { data: emotionEntries } = await this.supabase
+        .from("exo_emotion_log")
+        .select("valence")
+        .eq("tenant_id", tenantId)
+        .gte("created_at", dayAgo.toISOString());
+
+      if (emotionEntries && emotionEntries.length >= 3) {
+        const negativeCount = emotionEntries.filter(
+          (e) => (e.valence ?? 0) < -0.3,
+        ).length;
+        if (negativeCount >= 3) {
+          issues.push({
+            type: "health_concern",
+            severity: negativeCount >= 5 ? "high" : "medium",
+            description: `Negative emotion trend: ${negativeCount} negative entries in 24h`,
+            data: { negativeCount, totalEntries: emotionEntries.length },
+          });
+          recommendations.push(
+            "User may benefit from a wellness check-in or mood support",
+          );
+        }
+      }
+    } catch {
+      // Non-blocking — emotion data optional
+    }
+
+    // 8. Goal progress analysis (L9 data)
+    try {
+      const { data: atRiskGoals } = await this.supabase
+        .from("exo_user_goals")
+        .select("title, trajectory, wellbeing_weight, category")
+        .eq("tenant_id", tenantId)
+        .eq("status", "active")
+        .in("trajectory", ["off_track", "at_risk"]);
+
+      if (atRiskGoals && atRiskGoals.length > 0) {
+        for (const goal of atRiskGoals) {
+          issues.push({
+            type: "missed_goal",
+            severity:
+              goal.trajectory === "off_track"
+                ? (goal.wellbeing_weight || 0) > 7
+                  ? "high"
+                  : "medium"
+                : "low",
+            description: `Goal "${goal.title}" is ${goal.trajectory === "off_track" ? "off track" : "at risk"}`,
+            data: {
+              goalTitle: goal.title,
+              trajectory: goal.trajectory,
+              category: goal.category,
+            },
+          });
+        }
+      }
+    } catch {
+      // Non-blocking — goal data optional
+    }
+
+    // 9. Productivity drop detection
+    if (
+      monitorData.tasksCreated < 2 &&
+      monitorData.conversationsLast24h < 2 &&
+      monitorData.energyLevel !== null &&
+      monitorData.energyLevel < 5
+    ) {
+      issues.push({
+        type: "productivity_drop",
+        severity: "low",
+        description: `Low activity detected: ${monitorData.tasksCreated} tasks, ${monitorData.conversationsLast24h} conversations, energy ${monitorData.energyLevel}/10`,
+        data: {
+          tasksCreated: monitorData.tasksCreated,
+          conversations: monitorData.conversationsLast24h,
+          energy: monitorData.energyLevel,
+        },
+      });
+    }
+
+    // 10. System health analysis (from system metrics)
+    const sm = monitorData.systemMetrics;
+    if (sm) {
+      if (
+        sm.interventionEffectiveness.approvalRate < 0.3 &&
+        sm.interventionEffectiveness.approvalRate > 0
+      ) {
+        opportunities.push({
+          type: "optimization",
+          description: `Low intervention approval rate (${(sm.interventionEffectiveness.approvalRate * 100).toFixed(0)}%) — system may be over-intervening`,
+          potentialImpact: 8,
+          confidence: 0.85,
+        });
+      }
+
+      if (
+        sm.skillHealth.errorRate > 0.2 &&
+        sm.skillHealth.totalExecutions > 5
+      ) {
+        issues.push({
+          type: "custom",
+          severity: sm.skillHealth.errorRate > 0.4 ? "high" : "medium",
+          description: `Skill execution error rate at ${(sm.skillHealth.errorRate * 100).toFixed(0)}% (${sm.skillHealth.totalExecutions} executions this week)`,
+          data: {
+            errorRate: sm.skillHealth.errorRate,
+            total: sm.skillHealth.totalExecutions,
+          },
+        });
+      }
     }
 
     return {
@@ -744,13 +889,70 @@ export class MAPEKLoop {
       }
     }
 
-    // 3. Log learning event
+    // 3. Cross-domain correlation detection
+    try {
+      const { data: recentCycles } = await this.supabase
+        .from("exo_mapek_cycles")
+        .select("analyze_result")
+        .eq("tenant_id", tenantId)
+        .eq("status", "completed")
+        .order("completed_at", { ascending: false })
+        .limit(5);
+
+      if (recentCycles && recentCycles.length >= 2) {
+        const issueTypes = new Set<string>();
+        for (const cycle of recentCycles) {
+          const ar = cycle.analyze_result as AnalyzeResult | null;
+          if (ar?.issues) {
+            for (const issue of ar.issues) {
+              issueTypes.add(issue.type);
+            }
+          }
+        }
+
+        // Sleep + productivity correlation
+        if (
+          issueTypes.has("sleep_debt") &&
+          issueTypes.has("productivity_drop")
+        ) {
+          learnings.push(
+            "Cross-domain pattern: sleep debt and productivity drop co-occurring — sleep improvement may boost productivity",
+          );
+          patternsDetected++;
+        }
+
+        // Social isolation + mood correlation
+        if (
+          issueTypes.has("social_isolation") &&
+          (issueTypes.has("health_concern") ||
+            issueTypes.has("productivity_drop"))
+        ) {
+          learnings.push(
+            "Cross-domain pattern: social isolation correlates with health/productivity decline",
+          );
+          patternsDetected++;
+        }
+
+        // Goal + activity correlation
+        if (issueTypes.has("missed_goal") && issueTypes.has("task_overload")) {
+          learnings.push(
+            "Cross-domain pattern: missed goals may be caused by task overload — suggest prioritization",
+          );
+          patternsDetected++;
+        }
+      }
+    } catch {
+      // Non-blocking — pattern detection optional
+    }
+
+    // 4. Log learning event
     await this.supabase.from("learning_events").insert({
       tenant_id: tenantId,
-      event_type: "agent_completed",
+      event_type: patternsDetected > 0 ? "pattern_detected" : "agent_completed",
       data: {
         phase: "knowledge",
         feedbackProcessed,
+        patternsDetected,
         learnings,
         interventionsCreated: executeResult.interventionsCreated,
         interventionsExecuted: executeResult.interventionsExecuted,
@@ -825,6 +1027,59 @@ export class MAPEKLoop {
           priority: "low",
           requiresApproval: true,
           reasoning: "Low activity may benefit from gentle nudge",
+        };
+
+      case "missed_goal":
+        return {
+          type: "goal_nudge",
+          title: `Goal needs attention: ${issue.data?.goalTitle || "unknown"}`,
+          description: issue.description,
+          actionPayload: {
+            action: "trigger_checkin",
+            params: {
+              checkinType: "goal_review",
+              message: `Your goal "${issue.data?.goalTitle}" seems to be falling behind. Want to review it?`,
+            },
+          },
+          priority: issue.severity === "high" ? "high" : "medium",
+          requiresApproval: true,
+          reasoning: "Goal off-track or at-risk — user may benefit from review",
+        };
+
+      case "productivity_drop":
+        return {
+          type: "proactive_message",
+          title: "Energy and activity check-in",
+          description: issue.description,
+          actionPayload: {
+            action: "send_notification",
+            params: {
+              title: "How are you doing?",
+              body: "Noticed low activity today. Everything okay? Sometimes a short walk helps.",
+            },
+          },
+          priority: "low",
+          requiresApproval: true,
+          reasoning:
+            "Low activity + low energy may indicate user needs support",
+        };
+
+      case "social_isolation":
+        return {
+          type: "proactive_message",
+          title: "Social connection reminder",
+          description: issue.description,
+          actionPayload: {
+            action: "trigger_checkin",
+            params: {
+              checkinType: "social",
+              message:
+                "It's been a while since we chatted. Want to talk about how things are going?",
+            },
+          },
+          priority: "low",
+          requiresApproval: true,
+          reasoning: "Extended isolation may affect wellbeing",
         };
 
       default:
