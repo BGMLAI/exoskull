@@ -315,6 +315,8 @@ async function dispatchAction(
     case "run_automation":
     case "automation_trigger":
       return await handleRunAutomationFromIntervention(intervention);
+    case "notify_emergency_contact":
+      return await handleNotifyEmergencyContact(intervention);
     case "custom":
       return await handleCustomActionFromIntervention(intervention);
     default:
@@ -595,6 +597,35 @@ async function handleCustomActionFromIntervention(
     message: result.success
       ? `Custom action "${actionName}" executed`
       : `Custom action "${actionName}" failed: ${result.error}`,
+  };
+}
+
+async function handleNotifyEmergencyContact(
+  intervention: Intervention,
+): Promise<ExecutionResult> {
+  const { notifyEmergencyContact } = await import("./emergency-notifier");
+  const result = await notifyEmergencyContact(
+    intervention.tenant_id,
+    intervention.description || "Crisis follow-up",
+    intervention.action_payload.crisis_type as string | undefined,
+  );
+
+  await appendMessage(intervention.tenant_id, {
+    role: "system",
+    content: result.success
+      ? `[Autonomiczna akcja] Powiadomiono kontakt awaryjny: ${result.contactedName}`
+      : `[Autonomiczna akcja] Nie udało się powiadomić kontaktu awaryjnego: ${result.error}`,
+    channel: "sms",
+    direction: "outbound",
+    source_type: "intervention",
+    source_id: intervention.id,
+  }).catch(() => {});
+
+  return {
+    success: result.success,
+    message: result.success
+      ? `Kontakt awaryjny powiadomiony: ${result.contactedName}`
+      : `Nie udało się: ${result.error}`,
   };
 }
 

@@ -1610,6 +1610,16 @@ export async function processUserMessage(
     console.log(
       `[ConversationHandler] 🚨 CRISIS MODE: ${crisis.type} (severity: ${crisis.severity})`,
     );
+    // Schedule proactive follow-up chain (fire-and-forget)
+    import("@/lib/autonomy/outbound-triggers")
+      .then(({ scheduleCrisisFollowUp }) =>
+        scheduleCrisisFollowUp(
+          session.tenantId,
+          crisis.type!,
+          crisis.severity!,
+        ),
+      )
+      .catch(() => {});
   } else {
     // Normal: emotion-adaptive prompt
     const adaptive = getAdaptivePrompt(emotionState);
