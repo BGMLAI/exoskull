@@ -41,9 +41,9 @@ const FEATURED_RIGS: RigInfo[] = [
   },
   {
     slug: "facebook",
-    name: "Facebook",
+    name: "Meta / Facebook",
     icon: "📘",
-    description: "Profil, posty, zdjęcia, strony + Instagram",
+    description: "Posty, Ads, Sklep, Instagram, WhatsApp, Grupy",
   },
   {
     slug: "notion",

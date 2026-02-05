@@ -85,12 +85,60 @@ export interface InstagramMedia {
   comments_count?: number;
 }
 
+export interface FacebookGroup {
+  id: string;
+  name: string;
+  description?: string;
+  member_count: number;
+  privacy: "OPEN" | "CLOSED" | "SECRET";
+  icon?: string;
+  updated_time: string;
+}
+
+export interface FacebookEvent {
+  id: string;
+  name: string;
+  description?: string;
+  start_time: string;
+  end_time?: string;
+  place?: { name: string; location?: { city?: string; country?: string } };
+  is_online: boolean;
+  rsvp_status?: "attending" | "maybe" | "declined" | "not_replied";
+  attending_count?: number;
+  interested_count?: number;
+  cover?: { source: string };
+}
+
+export interface FacebookVideo {
+  id: string;
+  title?: string;
+  description?: string;
+  source: string;
+  picture: string;
+  length: number; // seconds
+  created_time: string;
+  views?: number;
+  likes?: { summary: { total_count: number } };
+  comments?: { summary: { total_count: number } };
+}
+
+export interface FacebookReel {
+  id: string;
+  description?: string;
+  video?: { source: string };
+  thumbnail_url?: string;
+  created_time: string;
+}
+
 export interface FacebookDashboardData {
   profile: FacebookProfile | null;
   posts: FacebookPost[];
   photos: FacebookPhoto[];
   friends: { totalCount: number; list: FacebookFriend[] };
   pages: FacebookPage[];
+  groups: FacebookGroup[];
+  events: FacebookEvent[];
+  videos: FacebookVideo[];
   instagram: {
     profile: InstagramProfile | null;
     recentMedia: InstagramMedia[];
@@ -204,6 +252,172 @@ export class FacebookClient {
   }
 
   // =====================================================
+  // GROUPS (user's groups)
+  // =====================================================
+
+  async getGroups(limit: number = 25): Promise<FacebookGroup[]> {
+    try {
+      const response = await this.fetch<{ data: FacebookGroup[] }>(
+        "me/groups",
+        {
+          fields: "id,name,description,member_count,privacy,icon,updated_time",
+          limit: String(limit),
+        },
+      );
+      return response.data || [];
+    } catch {
+      return [];
+    }
+  }
+
+  // =====================================================
+  // EVENTS (user's events)
+  // =====================================================
+
+  async getEvents(limit: number = 25): Promise<FacebookEvent[]> {
+    try {
+      const response = await this.fetch<{ data: FacebookEvent[] }>(
+        "me/events",
+        {
+          fields:
+            "id,name,description,start_time,end_time,place,is_online,rsvp_status,attending_count,interested_count,cover",
+          limit: String(limit),
+        },
+      );
+      return response.data || [];
+    } catch {
+      return [];
+    }
+  }
+
+  // =====================================================
+  // VIDEOS
+  // =====================================================
+
+  async getVideos(limit: number = 10): Promise<FacebookVideo[]> {
+    try {
+      const response = await this.fetch<{ data: FacebookVideo[] }>(
+        "me/videos/uploaded",
+        {
+          fields:
+            "id,title,description,source,picture,length,created_time,views,likes.summary(true),comments.summary(true)",
+          limit: String(limit),
+        },
+      );
+      return response.data || [];
+    } catch {
+      return [];
+    }
+  }
+
+  // =====================================================
+  // PAGE PUBLISHING (Stories, Reels - requires Page access token)
+  // =====================================================
+
+  /**
+   * Publish a post to a Page (requires page access_token)
+   */
+  async publishPagePost(
+    pageId: string,
+    pageAccessToken: string,
+    message: string,
+    link?: string,
+  ): Promise<{ id: string }> {
+    const url = new URL(`${GRAPH_API}/${pageId}/feed`);
+    url.searchParams.set("access_token", pageAccessToken);
+
+    const body: Record<string, string> = { message };
+    if (link) body.link = link;
+
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        `Facebook publish error: ${response.status} - ${error.error?.message || "Unknown"}`,
+      );
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Publish a Reel to a Page (2-step: create container, then publish)
+   * Requires page access_token and video URL
+   */
+  async publishPageReel(
+    pageId: string,
+    pageAccessToken: string,
+    videoUrl: string,
+    description?: string,
+  ): Promise<{ id: string }> {
+    const url = new URL(`${GRAPH_API}/${pageId}/video_reels`);
+    url.searchParams.set("access_token", pageAccessToken);
+
+    const body: Record<string, string> = {
+      upload_phase: "start",
+      video_url: videoUrl,
+    };
+    if (description) body.description = description;
+
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        `Facebook Reel publish error: ${response.status} - ${error.error?.message || "Unknown"}`,
+      );
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get Page insights (reach, engagement, impressions)
+   */
+  async getPageInsights(
+    pageId: string,
+    pageAccessToken: string,
+    period: "day" | "week" | "days_28" = "day",
+  ): Promise<
+    Array<{
+      name: string;
+      period: string;
+      values: Array<{
+        value: number | Record<string, number>;
+        end_time: string;
+      }>;
+    }>
+  > {
+    const url = new URL(`${GRAPH_API}/${pageId}/insights`);
+    url.searchParams.set("access_token", pageAccessToken);
+    url.searchParams.set(
+      "metric",
+      "page_impressions,page_engaged_users,page_post_engagements,page_fan_adds,page_views_total",
+    );
+    url.searchParams.set("period", period);
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(
+        `Page insights error: ${response.status} - ${error.error?.message || "Unknown"}`,
+      );
+    }
+
+    const data = await response.json();
+    return data.data || [];
+  }
+
+  // =====================================================
   // INSTAGRAM (via Page's Instagram Business Account)
   // =====================================================
 
@@ -244,13 +458,17 @@ export class FacebookClient {
   // =====================================================
 
   async getDashboardData(): Promise<FacebookDashboardData> {
-    const [profile, posts, photos, friends, pages] = await Promise.all([
-      this.getProfile().catch(() => null),
-      this.getRecentPosts(10).catch(() => []),
-      this.getPhotos(10).catch(() => []),
-      this.getFriends(10).catch(() => ({ totalCount: 0, list: [] })),
-      this.getPages().catch(() => []),
-    ]);
+    const [profile, posts, photos, friends, pages, groups, events, videos] =
+      await Promise.all([
+        this.getProfile().catch(() => null),
+        this.getRecentPosts(10).catch(() => []),
+        this.getPhotos(10).catch(() => []),
+        this.getFriends(10).catch(() => ({ totalCount: 0, list: [] })),
+        this.getPages().catch(() => []),
+        this.getGroups(10).catch(() => []),
+        this.getEvents(10).catch(() => []),
+        this.getVideos(5).catch(() => []),
+      ]);
 
     // Try to get Instagram data from first page with IG business account
     let instagramProfile: InstagramProfile | null = null;
@@ -271,6 +489,9 @@ export class FacebookClient {
       photos,
       friends,
       pages,
+      groups,
+      events,
+      videos,
       instagram: {
         profile: instagramProfile,
         recentMedia: instagramMedia,
@@ -300,6 +521,9 @@ export async function syncFacebookData(
       data.photos.length +
       data.friends.list.length +
       data.pages.length +
+      data.groups.length +
+      data.events.length +
+      data.videos.length +
       (data.instagram.profile ? 1 : 0) +
       data.instagram.recentMedia.length;
 

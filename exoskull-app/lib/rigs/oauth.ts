@@ -327,16 +327,34 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
     authUrl: "https://www.facebook.com/v21.0/dialog/oauth",
     tokenUrl: "https://graph.facebook.com/v21.0/oauth/access_token",
     scopes: [
+      // Core
       "email",
       "public_profile",
       "user_posts",
       "user_photos",
       "user_friends",
+      "user_videos",
+      "user_events",
+      "user_likes",
+      // Pages
       "pages_show_list",
       "pages_read_engagement",
+      "pages_manage_posts",
+      "pages_manage_metadata",
+      "pages_read_user_content",
       // Instagram (requires FB Page linked to IG Business)
       "instagram_basic",
       "instagram_manage_insights",
+      "instagram_content_publish",
+      // Ads / Marketing API
+      "ads_management",
+      "ads_read",
+      "business_management",
+      // Commerce / Catalog
+      "catalog_management",
+      // WhatsApp (Cloud API management via same app)
+      "whatsapp_business_management",
+      "whatsapp_business_messaging",
     ],
     clientId: process.env.FACEBOOK_APP_ID || "",
     clientSecret: process.env.FACEBOOK_APP_SECRET || "",

@@ -14,6 +14,8 @@ import { createMicrosoft365Client } from "@/lib/rigs/microsoft-365/client";
 import { GoogleFitClient } from "@/lib/rigs/google-fit/client";
 import { createGoogleClient } from "@/lib/rigs/google/client";
 import { createFacebookClient } from "@/lib/rigs/facebook/client";
+import { createFacebookAdsClient } from "@/lib/rigs/facebook/ads-client";
+import { createFacebookCommerceClient } from "@/lib/rigs/facebook/commerce-client";
 import {
   ingestGmailMessages,
   ingestOutlookMessages,
@@ -298,6 +300,44 @@ export async function POST(
 
         const fbDashboard = await fbClient.getDashboardData();
 
+        // Also sync Ads and Commerce data (best-effort)
+        let adsData: {
+          totalSpend: number;
+          activeCampaigns: number;
+          totalImpressions: number;
+        } | null = null;
+        let commerceData: {
+          catalogs: number;
+          totalProducts: number;
+          recentOrders: number;
+        } | null = null;
+
+        try {
+          const adsClient = createFacebookAdsClient(connection.access_token!);
+          const adsDashboard = await adsClient.getDashboardData();
+          adsData = {
+            totalSpend: adsDashboard.totalSpend,
+            activeCampaigns: adsDashboard.activeCampaigns.length,
+            totalImpressions: adsDashboard.totalImpressions,
+          };
+        } catch {
+          // Ads API may not be available - skip silently
+        }
+
+        try {
+          const commerceClient = createFacebookCommerceClient(
+            connection.access_token!,
+          );
+          const commerceDashboard = await commerceClient.getDashboardData();
+          commerceData = {
+            catalogs: commerceDashboard.catalogs.length,
+            totalProducts: commerceDashboard.totalProducts,
+            recentOrders: commerceDashboard.recentOrders.length,
+          };
+        } catch {
+          // Commerce API may not be available - skip silently
+        }
+
         syncResult = {
           success: true,
           records:
@@ -306,6 +346,9 @@ export async function POST(
             fbDashboard.photos.length +
             fbDashboard.friends.list.length +
             fbDashboard.pages.length +
+            fbDashboard.groups.length +
+            fbDashboard.events.length +
+            fbDashboard.videos.length +
             (fbDashboard.instagram.profile ? 1 : 0) +
             fbDashboard.instagram.recentMedia.length,
           data: {
@@ -319,11 +362,16 @@ export async function POST(
             photos: fbDashboard.photos.length,
             friends: fbDashboard.friends.totalCount,
             pages: fbDashboard.pages.length,
+            groups: fbDashboard.groups.length,
+            events: fbDashboard.events.length,
+            videos: fbDashboard.videos.length,
             instagram: {
               username: fbDashboard.instagram.profile?.username || null,
               followers: fbDashboard.instagram.profile?.followers_count || 0,
               recentMedia: fbDashboard.instagram.recentMedia.length,
             },
+            ads: adsData,
+            commerce: commerceData,
           },
         };
         break;
