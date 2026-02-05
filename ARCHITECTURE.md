@@ -39,23 +39,25 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **Voice Pipeline** | ✅ Live | Twilio → ElevenLabs STT → Claude Sonnet 4 (17 tools) → ElevenLabs TTS |
+| **Voice Pipeline** | ✅ Live | Twilio → ElevenLabs STT → Claude Sonnet 4 (20 tools) → ElevenLabs TTS |
 | **Memory System** | ✅ Live | Daily summaries, keyword search, 50+ msg context, user corrections |
 | **Data Lake** | ✅ Live | Bronze (R2 Parquet) → Silver (Postgres) → Gold (Materialized Views) |
-| **AI Router** | ✅ Live | 4-tier: Gemini Flash → Haiku → Kimi → Opus 4.5 |
+| **AI Router** | ✅ Live | 4-tier: Gemini Flash → Haiku → Sonnet 4.5 → Opus 4.5 (de-escalation) |
 | **Mod System** | ✅ Live | 5 mods: task-manager, mood, habit, sleep, activity |
 | **Rig System** | ✅ Live | 6 rigs: Oura, Google Fit, Google Workspace, MS 365, Notion, Todoist |
 | **Knowledge** | ✅ Live | Tyrolka framework, file upload, pgvector embeddings |
 | **Admin Panel** | ✅ Live | 9 pages, self-optimization engine, CRON management |
-| **CRON System** | ✅ Live | 15 jobs, timezone-aware, rate-limited |
+| **CRON System** | ✅ Live | 19 jobs, timezone-aware, rate-limited |
 | **Onboarding** | ✅ Live | Discovery interview (~60 topics), profile extraction |
-| **Frontend** | ✅ Live | Dashboard, chat, tasks, knowledge, schedule, health, settings |
+| **Frontend** | ✅ Live | Dashboard, chat, tasks, knowledge, schedule, health, goals, skills, settings |
 | **Auth** | ✅ Live | Supabase SSR, RLS, middleware guards |
 | **Outbound Calls** | ✅ Live | Call user + call third parties (delegate system) |
-| **Dynamic Skills** | ✅ Live | Full 6-stage pipeline: detector → generator → validator → sandbox → approval → registry. Dashboard UI, suggestions widget, circuit breaker. See [docs/DYNAMIC_SKILLS_ARCHITECTURE.md](./exoskull-app/docs/DYNAMIC_SKILLS_ARCHITECTURE.md) |
-| **Emotion Intel** | 🔴 Planned | Voice biomarkers, facial analysis, crisis detection |
-| **Gap Detection** | 🔴 Planned | Proactive blind spot identification |
-| **WhatsApp/Messenger** | 🔴 Planned | Placeholder endpoints exist |
+| **Dynamic Skills** | ✅ Live | Full 6-stage pipeline: detector → generator → validator → sandbox → approval → registry. Dashboard UI, suggestions widget, circuit breaker |
+| **Goals System** | ✅ Live | AI-assisted goal extraction, auto-progress tracking, momentum/trajectory detection, voice tools (define_goal, log_goal_progress, check_goals), dashboard at /dashboard/goals |
+| **Gap Detection** | ✅ Live | Weekly CRON (Sun 09:00), 7 life domains, skill suggestions, auto-expire 14d |
+| **Emotion Intel** | ✅ Phase 1 | Crisis detection (3-layer + fail-safe), 5 adaptive response modes, VAD model, text analyzer. Phase 2 planned: voice prosody, facial analysis |
+| **Integrations** | ✅ Live | Google (40+ scopes), Facebook/Meta (Ads, Commerce, WhatsApp), Apple, Microsoft (Teams, SharePoint) |
+| **WhatsApp/Messenger** | 🟡 Partial | Enhanced WhatsApp via Meta API (placeholder for direct), Messenger placeholder |
 | **Android App** | 🔴 Planned | Zero-install SMS/Voice works as alternative |
 | **GHL Integration** | 🔴 Planned | CRM, social media, calendar |
 
@@ -271,10 +273,10 @@ exoskull inventory           # Show installed Mods/Rigs/active Quests
 ┌─────────────────────────────────────────────────────────────┐
 │ TIER 3: INTELLIGENCE LAYER                           ⏳ WIP │
 │   Layer 7: Discovery & Onboarding (~60 topics)        ✅    │
-│   Layer 8: Proactive Gap Detection                    ⏳    │
-│   Layer 9: Self-Defining Success Metrics              ⏳    │
+│   Layer 8: Proactive Gap Detection                    ✅    │
+│   Layer 9: Self-Defining Success Metrics              ✅    │
 │   Layer 10: Self-Optimization (MAPE-K + Guardian)     ⏳    │
-│   Layer 11: Emotion Intelligence & Crisis Detection   🔴    │
+│   Layer 11: Emotion Intelligence & Crisis Detection   ✅ P1 │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -1471,7 +1473,7 @@ Discovery_System = {
 
 ---
 
-## Layer 8: Proactive Gap Detection — ⏳ PLANNED
+## Layer 8: Proactive Gap Detection — ✅ IMPLEMENTED
 
 **ExoSkull monitors what you DON'T talk about - especially things affecting your wellbeing.**
 
@@ -1571,7 +1573,7 @@ Gap_Detection_Engine = {
 
 ---
 
-## Layer 9: Self-Defining Success Metrics — ⏳ PLANNED
+## Layer 9: Self-Defining Success Metrics — ✅ IMPLEMENTED
 
 **ExoSkull doesn't come with pre-built KPIs. It CREATES them with you - based on YOUR wellbeing, not external standards.**
 
@@ -1737,7 +1739,7 @@ MAPE_K_Loop = {
 
 ---
 
-## Layer 11: Emotion Intelligence & Crisis Detection — 🔴 NOT STARTED
+## Layer 11: Emotion Intelligence & Crisis Detection — ✅ PHASE 1 IMPLEMENTED
 
 **Multi-modal emotional awareness with automated crisis intervention.**
 
@@ -3257,12 +3259,16 @@ TWILIO_PHONE_NUMBER=+1xxx
 
 - [ ] Full Kimi K2.5 Swarm integration (100-agent parallel)
 - [x] Guardian system + MAPE-K tables + intervention executor (partial)
-- [ ] Full gap detection system (Layer 8)
-- [ ] **Emotion Intelligence Layer (Layer 11)**
-  - [ ] Multi-modal fusion engine (voice + text + face)
-  - [ ] Crisis detection & escalation protocols
-  - [ ] Emotion-adaptive response system
-  - [ ] Behavioral monitoring (IAT, screen activity)
+- [x] Full gap detection system (Layer 8) — weekly CRON (Sun 09:00), 7 life domains, skill suggestions, auto-expire 14d
+- [x] Self-Defining Success Metrics (Layer 9) — AI goal extraction, auto-progress tracking, momentum/trajectory, voice tools, dashboard
+- [x] **Emotion Intelligence Layer (Layer 11) — Phase 1**
+  - [x] Text-based emotion analysis (VAD model, Polish language)
+  - [x] Crisis detection (3-layer: keyword + pattern + context + fail-safe)
+  - [x] 5 adaptive response modes (empathetic, motivational, calming, neutral, crisis)
+  - [x] Emotion logger with DB persistence (exo_emotion_logs, exo_crisis_events)
+  - [ ] Phase 2: Voice prosody analysis (pitch, tempo, energy)
+  - [ ] Phase 2: Facial expression analysis (webcam/smartglasses)
+  - [ ] Phase 2: Behavioral monitoring (IAT, screen activity)
 - [x] Skill Memory & Dynamic Generation (Layer 14)
   - [x] Database migration (5 tables: exo_generated_skills, exo_skill_versions, exo_skill_execution_log, exo_skill_approval_requests, exo_skill_suggestions)
   - [x] RLS policies + helper functions (get_active_skills, archive_unused_skills, etc.)
