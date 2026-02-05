@@ -1,10 +1,10 @@
 # 🧠 EXOSKULL - Adaptive Life Operating System
 ## Your Second Brain. Built For You. By AI.
 
-**Version:** 3.0
+**Version:** 4.0
 **Created:** 2026-02-01
-**Updated:** 2026-02-01
-**Status:** 🔴 Architecture Design Phase
+**Updated:** 2026-02-05
+**Status:** 🟡 Active Development — MVP Live (exoskull.xyz)
 
 ---
 
@@ -32,6 +32,33 @@ ExoSkull:          Remembers EVERYTHING, forever
 Traditional AI:     One interface (chat/voice)
 ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartglasses
 ```
+
+---
+
+## 📊 IMPLEMENTATION STATUS (as of 2026-02-05)
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| **Voice Pipeline** | ✅ Live | Twilio → ElevenLabs STT → Claude Sonnet 4 (17 tools) → ElevenLabs TTS |
+| **Memory System** | ✅ Live | Daily summaries, keyword search, 50+ msg context, user corrections |
+| **Data Lake** | ✅ Live | Bronze (R2 Parquet) → Silver (Postgres) → Gold (Materialized Views) |
+| **AI Router** | ✅ Live | 4-tier: Gemini Flash → Haiku → Kimi → Opus 4.5 |
+| **Mod System** | ✅ Live | 5 mods: task-manager, mood, habit, sleep, activity |
+| **Rig System** | ✅ Live | 6 rigs: Oura, Google Fit, Google Workspace, MS 365, Notion, Todoist |
+| **Knowledge** | ✅ Live | Tyrolka framework, file upload, pgvector embeddings |
+| **Admin Panel** | ✅ Live | 9 pages, self-optimization engine, CRON management |
+| **CRON System** | ✅ Live | 15 jobs, timezone-aware, rate-limited |
+| **Onboarding** | ✅ Live | Discovery interview (~60 topics), profile extraction |
+| **Frontend** | ✅ Live | Dashboard, chat, tasks, knowledge, schedule, health, settings |
+| **Auth** | ✅ Live | Supabase SSR, RLS, middleware guards |
+| **Outbound Calls** | ✅ Live | Call user + call third parties (delegate system) |
+| **Emotion Intel** | 🔴 Planned | Voice biomarkers, facial analysis, crisis detection |
+| **Gap Detection** | 🔴 Planned | Proactive blind spot identification |
+| **WhatsApp/Messenger** | 🔴 Planned | Placeholder endpoints exist |
+| **Android App** | 🔴 Planned | Zero-install SMS/Voice works as alternative |
+| **GHL Integration** | 🔴 Planned | CRM, social media, calendar |
+
+**Deployment:** https://exoskull.xyz | **Phone:** +48732143210, +48732144112
 
 ---
 
@@ -227,58 +254,60 @@ exoskull inventory           # Show installed Mods/Rigs/active Quests
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ TIER 1: INTERFACE LAYER                                     │
-│   Layer 1: Gateway & Control Plane  │
-│   Layer 2: Omnichannel Presence                             │
-│   Layer 3: Multimodal Input/Output                          │
+│ TIER 1: INTERFACE LAYER                              ✅ LIVE │
+│   Layer 1: Gateway & Control Plane (94 API routes)    ✅    │
+│   Layer 2: Omnichannel (Voice, SMS, Email, Web)       ✅    │
+│   Layer 3: Multimodal Input/Output                    ⏳    │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ TIER 2: ORCHESTRATION LAYER                                 │
-│   Layer 4: Agent Swarm Orchestration │
-│   Layer 5: Multi-Model AI Routing                           │
-│   Layer 6: Mods & Rigs Registry (Exoskulleton)              │
+│ TIER 2: ORCHESTRATION LAYER                          ✅ LIVE │
+│   Layer 4: Agent Swarm Orchestration (Kimi planned)   ⏳    │
+│   Layer 5: Multi-Model AI Routing (4 tiers)           ✅    │
+│   Layer 6: Mods & Rigs Registry (Exoskulleton)        ✅    │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ TIER 3: INTELLIGENCE LAYER                                  │
-│   Layer 7: Discovery & Relationship Building                │
-│   Layer 8: Proactive Gap Detection                          │
-│   Layer 9: Self-Defining Success Metrics                    │
-│   Layer 10: Continuous Self-Optimization (MAPE-K Loop)      │
-│   Layer 11: Emotion Intelligence & Crisis Detection (NEW)   │
+│ TIER 3: INTELLIGENCE LAYER                           ⏳ WIP │
+│   Layer 7: Discovery & Onboarding (~60 topics)        ✅    │
+│   Layer 8: Proactive Gap Detection                    ⏳    │
+│   Layer 9: Self-Defining Success Metrics              ⏳    │
+│   Layer 10: Self-Optimization (MAPE-K + Guardian)     ⏳    │
+│   Layer 11: Emotion Intelligence & Crisis Detection   🔴    │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ TIER 4: MEMORY & DATA LAYER                                 │
-│   Layer 12: Total Recall Memory                │
-│   Layer 13: Data Lake (Bronze/Silver/Gold)                  │
-│   Layer 14: Skill Memory & Cross-Task Reuse                 │
+│ TIER 4: MEMORY & DATA LAYER                          ✅ LIVE │
+│   Layer 12: Total Recall Memory (50+ msg context)     ✅    │
+│   Layer 13: Data Lake (Bronze/Silver/Gold ETL)        ✅    │
+│   Layer 14: Skill Memory & Cross-Task Reuse           ⏳    │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ TIER 5: EXECUTION LAYER                                     │
-│   Layer 15: Custom App Builder            │
-│   Layer 16: Autonomous Actions Framework                    │
-│   Layer 17: Device Integration Mesh                         │
-│   Layer 18: Android-First Integration                       │
+│ TIER 5: EXECUTION LAYER                              ⏳ WIP │
+│   Layer 15: Custom App Builder (Mod system)           ✅    │
+│   Layer 16: Autonomous Actions Framework              ⏳    │
+│   Layer 17: Device Integration (Oura, Google Fit)     ⏳    │
+│   Layer 18: Android-First Integration                 🔴    │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ TIER 6: OPERATIONS LAYER                                    │
-│   Layer 19: CRON & Scheduled Operations                     │
-│   Layer 20: Progressive Deployment Strategy                 │
-│   Layer 21: Comprehensive Guardrails                        │
+│ TIER 6: OPERATIONS LAYER                             ✅ LIVE │
+│   Layer 19: CRON & Scheduled (15 jobs, TZ-aware)      ✅    │
+│   Layer 20: Progressive Deployment (Vercel)           ✅    │
+│   Layer 21: Comprehensive Guardrails                  ✅    │
 └─────────────────────────────────────────────────────────────┘
+
+Legend: ✅ = Live/Complete  ⏳ = Partial/In Progress  🔴 = Not Started
 ```
 
 ---
 
 # TIER 1: INTERFACE LAYER
 
-## Layer 1: Gateway & Control Plane
+## Layer 1: Gateway & Control Plane — ✅ IMPLEMENTED
 
-**Hub-and-spoke architecture for centralized orchestration.**
+**Next.js API Routes (94 endpoints) with Supabase Auth middleware.**
 
 ```javascript
 ExoSkull_Gateway = {
@@ -643,7 +672,7 @@ ExoSkull_Gateway = {
 
 ---
 
-## Layer 2: Omnichannel Presence
+## Layer 2: Omnichannel Presence — ✅ IMPLEMENTED (Voice, SMS, Email, Web)
 
 **ExoSkull is everywhere you are.**
 
@@ -718,7 +747,7 @@ Communication Channels:
 
 ---
 
-## Layer 3: Multimodal Input/Output
+## Layer 3: Multimodal Input/Output — ⏳ PARTIAL (Voice + Text live, Vision/Bio planned)
 
 **ExoSkull doesn't just "talk." It sees, hears, feels, and integrates ALL modalities.**
 
@@ -727,18 +756,25 @@ Multimodal_System = {
 
   input_modalities: {
 
-    // 1. VOICE (primary)
+    // 1. VOICE (primary) — IMPLEMENTED
     voice: {
       channels: [
-        "VAPI calls (scheduled or on-demand)",
+        "Twilio phone calls (custom pipeline, NO VAPI)",  // ✅ LIVE
         "Voice memos (async)",
-        "Always-listening via smartglasses/earbuds (opt-in)"
+        "Always-listening via smartglasses/earbuds (opt-in, future)"
       ],
+      pipeline: {  // ✅ PRODUCTION
+        telephony: "Twilio (+48732143210, +48732144112)",
+        stt: "ElevenLabs STT (Deepgram fallback)",
+        llm: "Claude Sonnet 4 (claude-sonnet-4-20250514)",
+        tts: "ElevenLabs eleven_turbo_v2_5 (Piotr Pro PL)",
+        webhook: "https://exoskull.xyz/api/twilio/voice"
+      },
       capabilities: [
-        "Polish speech recognition (Deepgram)",
-        "Voice biomarker analysis (stress, energy, mood)",
-        "Speaker identification (distinguish user from others)",
-        "Emotion detection (prosody analysis)"
+        "Polish speech recognition (ElevenLabs STT + Deepgram fallback)",  // ✅
+        "Voice biomarker analysis (stress, energy, mood)",  // planned
+        "Speaker identification (distinguish user from others)",  // planned
+        "Emotion detection (prosody analysis)"  // planned
       ],
       use_cases: [
         "Daily check-ins",
@@ -878,7 +914,7 @@ Multimodal_System = {
   output_modalities: {
 
     voice: {
-      synthesis: "ElevenLabs (your cloned voice - future)",
+      synthesis: "ElevenLabs eleven_turbo_v2_5 (Piotr Pro PL - LIVE)",  // ✅
       tone_adaptation: {
         urgent: "Direct, loud, fast ('STOP. You need to sleep NOW.')",
         supportive: "Warm, slow ('Hey, I see you're struggling. Want to talk?')",
@@ -951,9 +987,9 @@ Multimodal_System = {
 
 # TIER 2: ORCHESTRATION LAYER
 
-## Layer 4: Agent Swarm Orchestration (NEW - Kimi K2.5 + LangGraph)
+## Layer 4: Agent Swarm Orchestration (Kimi K2.5 + LangGraph) — ⏳ PARTIAL
 
-**100-agent parallel execution with 4.5x speedup.**
+**AI routing implemented (4 tiers). Kimi 100-agent swarm planned.**
 
 ```javascript
 Agent_Swarm = {
@@ -1098,7 +1134,7 @@ Agent_Swarm = {
 
 ---
 
-## Layer 5: Multi-Model AI Routing
+## Layer 5: Multi-Model AI Routing — ✅ IMPLEMENTED
 
 **Route tasks to optimal model (cost + capability).**
 
@@ -1199,7 +1235,7 @@ AI_Routing = {
 
 ---
 
-## Layer 6: MCP Skills Registry (NEW)
+## Layer 6: MCP Skills Registry — ✅ IMPLEMENTED (Mod + Rig system)
 
 **100+ integrations via Model Context Protocol.**
 
@@ -1329,7 +1365,7 @@ MCP_Skills_Registry = {
 
 # TIER 3: INTELLIGENCE LAYER
 
-## Layer 7: Discovery & Relationship Building
+## Layer 7: Discovery & Relationship Building — ✅ IMPLEMENTED
 
 **ExoSkull doesn't start with features. It starts with conversation.**
 
@@ -1420,7 +1456,7 @@ Discovery_System = {
 
 ---
 
-## Layer 8: Proactive Gap Detection
+## Layer 8: Proactive Gap Detection — ⏳ PLANNED
 
 **ExoSkull monitors what you DON'T talk about - especially things affecting your wellbeing.**
 
@@ -1520,7 +1556,7 @@ Gap_Detection_Engine = {
 
 ---
 
-## Layer 9: Self-Defining Success Metrics
+## Layer 9: Self-Defining Success Metrics — ⏳ PLANNED
 
 **ExoSkull doesn't come with pre-built KPIs. It CREATES them with you - based on YOUR wellbeing, not external standards.**
 
@@ -1597,7 +1633,7 @@ Metrics_Generation = {
 
 ---
 
-## Layer 10: Continuous Self-Optimization (MAPE-K Loop)
+## Layer 10: Continuous Self-Optimization (MAPE-K Loop) — ⏳ PARTIAL
 
 **ExoSkull doesn't just track. It LEARNS and IMPROVES its own operation.**
 
@@ -1686,7 +1722,7 @@ MAPE_K_Loop = {
 
 ---
 
-## Layer 11: Emotion Intelligence & Crisis Detection (NEW - from IORS)
+## Layer 11: Emotion Intelligence & Crisis Detection — 🔴 NOT STARTED
 
 **Multi-modal emotional awareness with automated crisis intervention.**
 
@@ -2043,29 +2079,29 @@ Emotion_Intelligence = {
 
 # QUICK REFERENCE: Layer Mapping
 
-| New Layer | Old Layer | Status |
-|-----------|-----------|--------|
-| L1: Gateway & Control Plane | - | NEW |
-| L2: Omnichannel Presence | L7 | Moved |
-| L3: Multimodal I/O | L6 | Moved + Emotion Signals |
-| L4: Agent Swarm Orchestration | L3 | ENHANCED (Kimi K2.5) |
-| L5: Multi-Model AI Routing | L15 | Moved + Updated |
-| L6: MCP Skills Registry | L13 (partial) | NEW |
-| L7: Discovery & Relationship | L1 | Moved |
-| L8: Gap Detection | L4 | Moved |
-| L9: Success Metrics | L8 | Moved |
-| L10: Self-Optimization | L9 | Moved + MAPE-K |
-| L11: Emotion Intelligence | - | **NEW (from IORS)** |
-| L12: Total Recall Memory | L5 | ENHANCED |
-| L13: Data Lake | L14 | Moved |
-| L14: Skill Memory | - | NEW |
-| L15: Custom App Builder | L2 | MOVED |
-| L16: Autonomous Actions | L17 | Moved |
-| L17: Device Integration | L10 | Moved |
-| L18: Android Integration | L11 | Moved |
-| L19: CRON Operations | L16 | Moved |
-| L20: Progressive Deployment | L12 | Moved |
-| L21: Guardrails | L18 | Moved |
+| Layer | Implementation | Status |
+|-------|---------------|--------|
+| L1: Gateway & Control Plane | 94 API routes, Supabase Auth middleware | ✅ Live |
+| L2: Omnichannel Presence | Voice, SMS, Email, Web chat | ✅ Live |
+| L3: Multimodal I/O | Voice + Text live. Vision/Bio planned | ⏳ Partial |
+| L4: Agent Swarm Orchestration | AI routing live. Kimi swarm planned | ⏳ Partial |
+| L5: Multi-Model AI Routing | 4-tier: Flash → Haiku → Kimi → Opus | ✅ Live |
+| L6: MCP Skills Registry | Mod + Rig system with Exoskulleton | ✅ Live |
+| L7: Discovery & Relationship | Onboarding (~60 topics), profile extraction | ✅ Live |
+| L8: Gap Detection | Tables exist, logic planned | 🔴 Planned |
+| L9: Success Metrics | Planned | 🔴 Planned |
+| L10: Self-Optimization | Guardian + MAPE-K tables, partial logic | ⏳ Partial |
+| L11: Emotion Intelligence | Architecture designed, not implemented | 🔴 Planned |
+| L12: Total Recall Memory | Daily summaries, search, 50+ msg context | ✅ Live |
+| L13: Data Lake | Bronze/Silver/Gold ETL pipeline | ✅ Live |
+| L14: Skill Memory | Planned | 🔴 Planned |
+| L15: Custom App Builder | Mod system (5 mods), Rig system (6 rigs) | ✅ Live |
+| L16: Autonomous Actions | Intervention executor, voice tools | ⏳ Partial |
+| L17: Device Integration | Oura + Google Fit live | ⏳ Partial |
+| L18: Android Integration | Zero-install SMS/Voice. APK planned | 🔴 Planned |
+| L19: CRON Operations | 15 jobs, TZ-aware, rate-limited | ✅ Live |
+| L20: Progressive Deployment | Vercel auto-deploy, exoskull.xyz | ✅ Live |
+| L21: Guardrails | RLS, auth, rate limits, circuit breaker | ✅ Live |
 
 ---
 
@@ -2073,9 +2109,11 @@ Emotion_Intelligence = {
 
 # TIER 4: MEMORY & DATA LAYER
 
-## Layer 12: Total Recall Memory 
+## Layer 12: Total Recall Memory — ✅ IMPLEMENTED
 
 **Your biological brain forgets. ExoSkull remembers EVERYTHING.**
+
+> **Implementation (Feb 5, 2026):** Daily summaries (CRON 21:00 PL), keyword search, unified thread (50+ msg cross-channel context), user corrections, memory timeline. DB function `get_memory_context()` provides smart context window.
 
 ```javascript
 Memory_System = {
@@ -2189,9 +2227,11 @@ Memory_System = {
 
 ---
 
-## Layer 13: Data Lake (Bronze/Silver/Gold)
+## Layer 13: Data Lake (Bronze/Silver/Gold) — ✅ IMPLEMENTED
 
 **IMPLEMENTED FROM DAY 1 - Total Recall requires full data history.**
+
+> **Implementation (Feb 2-3, 2026):** Bronze ETL (01:00 UTC → R2 Parquet), Silver ETL (02:00 UTC → Postgres clean), Gold ETL (04:00 UTC → Materialized Views). DuckDB client exists for ad-hoc analytics but not fully integrated.
 
 > **Decision:** Full Data Lake from the start (not phased). API-only approach would lose historical data needed for pattern detection, ML, and "Total Recall" vision.
 
@@ -2417,7 +2457,7 @@ Data_Lake = {
 
 ---
 
-## Layer 14: Mod Memory & Cross-Task Reuse
+## Layer 14: Mod Memory & Cross-Task Reuse — ⏳ PLANNED
 
 **Persistent mod memory - AI learns and improves over time.**
 
@@ -2504,9 +2544,11 @@ Mod_Memory = {
 
 # TIER 5: EXECUTION LAYER
 
-## Layer 15: Custom App Builder 
+## Layer 15: Custom App Builder — ✅ IMPLEMENTED (Mod System)
 
 **ExoSkull doesn't have "features." It WRITES software for you.**
+
+> **Implementation (Feb 3, 2026):** Mod system with 5 live mods (task-manager, mood-tracker, habit-tracker, sleep-tracker, activity-tracker). Rig system with 6 integrations (Oura, Google Fit, Google Workspace, MS 365, Notion, Todoist). Exoskulleton registry for browsing/installing.
 
 ```javascript
 App_Builder = {
@@ -2579,9 +2621,11 @@ App_Builder = {
 
 ---
 
-## Layer 16: Autonomous Actions Framework
+## Layer 16: Autonomous Actions Framework — ⏳ PARTIAL
 
 **All actions system can take autonomously (with user approval).**
+
+> **Implementation:** Tables exist (exo_interventions, exo_guardian_system). Intervention executor runs every 15min. Voice tools: plan_action, list_planned_actions, cancel_planned_action, delegate_complex_task. Full MAPE-K loop logic partially implemented.
 
 ```javascript
 Autonomous_Actions = {
@@ -2648,9 +2692,11 @@ Autonomous_Actions = {
 
 ---
 
-## Layer 17: Device Integration Mesh
+## Layer 17: Device Integration Mesh — ⏳ PARTIAL
 
 **ExoSkull connects to EVERYTHING.**
+
+> **Implementation:** Oura Ring and Google Fit (Health Connect) rig clients live. OAuth flow + sync endpoints working. More devices planned.
 
 ```javascript
 Device_Mesh = {
@@ -2696,9 +2742,11 @@ Device_Mesh = {
 
 ---
 
-## Layer 18: Android-First Integration
+## Layer 18: Android-First Integration — 🔴 NOT STARTED
 
 **Priority #1: Android devices (most accessible globally).**
+
+> **Status:** Zero-install via SMS/Voice is live (day 1 value). Android APK not yet built.
 
 ```javascript
 Android_Integration = {
@@ -2719,9 +2767,9 @@ Android_Integration = {
   },
 
   zero_install: {
-    day_1: "SMS → reply → system active (no install)",
-    week_1: "SMS + Voice calls (VAPI)",
-    month_1: "Optional app for advanced features"
+    day_1: "SMS → reply → system active (no install)",  // ✅ LIVE
+    week_1: "SMS + Voice calls (Twilio + ElevenLabs)",   // ✅ LIVE
+    month_1: "Optional app for advanced features"         // planned
   }
 }
 ```
@@ -2730,9 +2778,11 @@ Android_Integration = {
 
 # TIER 6: OPERATIONS LAYER
 
-## Layer 19: CRON & Scheduled Operations
+## Layer 19: CRON & Scheduled Operations — ✅ IMPLEMENTED
 
 **Proactive system, not reactive.**
+
+> **Implementation (Feb 1-5, 2026):** 15 Vercel CRON jobs: master-scheduler (hourly), bronze/silver/gold ETL, daily-summary (21:00 PL), intervention-executor (15min), post-conversation (15min), business-metrics, admin-metrics, engagement-scoring, dunning, drip-engine, guardian-effectiveness, guardian-values, pulse (30min), highlight-decay.
 
 ```javascript
 Scheduled_Operations = {
@@ -2764,9 +2814,11 @@ Scheduled_Operations = {
 
 ---
 
-## Layer 20: Progressive Deployment Strategy
+## Layer 20: Progressive Deployment Strategy — ✅ IMPLEMENTED
 
 **Value from DAY 1, not waiting for "complete system."**
+
+> **Implementation:** Vercel auto-deploy from GitHub main branch. Domain: exoskull.xyz. Zero-install SMS/Voice active from day 1.
 
 ```javascript
 Deployment_Strategy = {
@@ -2801,9 +2853,11 @@ Deployment_Strategy = {
 
 ---
 
-## Layer 21: Comprehensive Guardrails
+## Layer 21: Comprehensive Guardrails — ✅ IMPLEMENTED
 
 **Prevent failures, protect privacy, ensure safety.**
+
+> **Implementation:** Supabase RLS on all tables, middleware auth guards, CRON_SECRET protection, rate limiting, circuit breaker in AI router, admin error logging.
 
 ```javascript
 Guardrails = {
@@ -2913,39 +2967,46 @@ Guardrails = {
 
 | Layer | Technology |
 |-------|-----------|
-| **Gateway** | Node.js ≥22, TypeScript, WebSocket, pnpm |
-| **Frontend** | Next.js 14, React 18, TypeScript, Tailwind, shadcn/ui |
-| **Database** | Supabase (PostgreSQL + pgvector) |
-| **Data Lake** | Parquet on S3/R2, DuckDB |
-| **Auth** | Supabase Auth (RLS) |
-| **Backend** | Supabase Edge Functions (Deno) |
-| **Voice** | VAPI (STT: Deepgram, LLM: Claude, TTS: ElevenLabs) |
-| **Communication Hub** | GoHighLevel (SMS, Email, WhatsApp, Messenger, Instagram, Social) |
-| **CRM** | GoHighLevel (Contacts, Pipelines, Opportunities, Workflows) |
-| **Social Media** | GoHighLevel Social Planner (FB, IG, LinkedIn, TikTok, Twitter) |
-| **Calendar** | GoHighLevel Calendars (Booking, Appointments) |
-| **Emotion Detection** | Deepgram prosody (voice), face-api.js (face), sentiment.js (text) |
-| **AI Tier 1** | Gemini 1.5 Flash (routing) |
-| **AI Tier 2** | Claude 3.5 Haiku (domain agents) |
-| **AI Tier 3** | Kimi K2.5 (100-agent swarm, 256K context) |
-| **AI Tier 4** | Claude Opus 4.5 (meta-coordinator) |
-| **Fallback SMS** | Twilio (when GHL not connected) |
-| **Telegram** | grammY (Bot API) |
-| **MCP Skills** | 100+ integrations  |
-| **Hosting** | Vercel (frontend), Supabase (backend), Docker |
+| Layer | Technology | Status |
+|-------|-----------|--------|
+| **Frontend** | Next.js 14 (App Router), React, TypeScript, Tailwind, shadcn/ui | ✅ Live |
+| **Backend** | Next.js API Routes (94 endpoints), Vercel Serverless | ✅ Live |
+| **Database** | Supabase (PostgreSQL 15+ with pgvector, 75+ tables, RLS) | ✅ Live |
+| **Auth** | Supabase Auth (cookie SSR, middleware guards) | ✅ Live |
+| **Data Lake** | R2 Parquet (Bronze) → Postgres (Silver) → Mat. Views (Gold) | ✅ Live |
+| **Voice (Telephony)** | Twilio (+48732143210, +48732144112) | ✅ Live |
+| **Voice (TTS)** | ElevenLabs eleven_turbo_v2_5 (Piotr Pro PL) | ✅ Live |
+| **Voice (STT)** | ElevenLabs STT + Deepgram fallback | ✅ Live |
+| **Voice (LLM)** | Claude Sonnet 4 (17 tools, conversation handler) | ✅ Live |
+| **Memory** | Daily summaries + keyword search + unified thread (50+ msg context) | ✅ Live |
+| **Email** | Resend | ✅ Live |
+| **SMS** | Twilio | ✅ Live |
+| **CRON** | Vercel CRON (15 scheduled jobs, timezone-aware) | ✅ Live |
+| **Admin** | 9 admin pages, 13 API endpoints, self-optimization engine | ✅ Live |
+| **AI Tier 1** | Gemini 1.5 Flash (routing, classification) | ✅ Live |
+| **AI Tier 2** | Claude Haiku (domain agents) | ✅ Live |
+| **AI Tier 3** | Kimi K2.5 (256K context, swarm planned) | ⏳ Partial |
+| **AI Tier 4** | Claude Opus 4.5 (meta-coordinator) | ✅ Live |
+| **Mod System** | task-manager, mood-tracker, habit-tracker, sleep, activity | ✅ Live |
+| **Rig System** | Oura, Google Fit, Google Workspace, MS 365, Notion, Todoist | ✅ Live |
+| **Knowledge** | Tyrolka (Loops→Campaigns→Quests→Ops→Notes), file upload, embeddings | ✅ Live |
+| **Autonomy** | MAPE-K loop, guardian system, intervention executor | ⏳ Partial |
+| **Communication Hub** | GoHighLevel (planned), WhatsApp/Messenger (placeholder) | ⏳ Planned |
+| **Emotion Detection** | Deepgram prosody (voice), face-api.js (face), sentiment.js (text) | ⏳ Planned |
+| **Hosting** | Vercel (frontend + API), Supabase (DB), Cloudflare R2 (storage) | ✅ Live |
 
 ---
 
 # GHL INTEGRATION ARCHITECTURE
 
-## Why GHL + VAPI Hybrid
+## Communication Architecture
 
-**GoHighLevel is the central communication hub for ALL text-based communication and CRM.**
+**Current: Twilio-first pipeline. GHL integration planned for CRM/multichannel.**
 
-| Capability | Provider | Reason |
+| Capability | Provider | Status |
 |------------|----------|--------|
-| **Voice AI Conversations** | VAPI | Real-time AI conversations, function calling, ElevenLabs voice clone |
-| **SMS** | GHL (Twilio fallback) | CRM integration, workflow triggers, conversation threading |
+| **Voice AI Conversations** | Custom: Twilio + ElevenLabs + Claude Sonnet 4 | ✅ Live |
+| **SMS** | Twilio (direct) | ✅ Live |
 | **Email** | GHL | Templates, tracking, automation, CRM sync |
 | **WhatsApp** | GHL | Official API, CRM integration, message templates |
 | **Facebook Messenger** | GHL | Page integration, CRM sync, automation |
@@ -2955,33 +3016,32 @@ Guardrails = {
 | **Calendar** | GHL | Booking, appointments, availability |
 | **Workflows** | GHL | Automation, triggers, campaigns |
 
-## Data Flow
+## Data Flow (Current — Twilio-first)
 
 ```
-OUTBOUND (ExoSkull → User):
+OUTBOUND (ExoSkull → User):                          ✅ LIVE
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  ExoSkull   │────▶│  GHL API    │────▶│    User     │
-│  Decision   │     │  (unified)  │     │  (any ch.)  │
+│  ExoSkull   │────▶│   Twilio    │────▶│    User     │
+│  Decision   │     │  (voice/SMS)│     │             │
 └─────────────┘     └─────────────┘     └─────────────┘
-                           │
-                    ┌──────┴──────┐
-                    ▼             ▼
-              ┌─────────┐   ┌─────────┐
-              │  Voice  │   │ Fallback│
-              │  (VAPI) │   │ (Twilio)│
-              └─────────┘   └─────────┘
+        │
+        ├──▶ Twilio Voice (outbound call)              ✅
+        ├──▶ Twilio SMS                                ✅
+        ├──▶ Resend Email                              ✅
+        ├──▶ WhatsApp (planned via GHL)                🔴
+        └──▶ Messenger (planned via GHL)               🔴
 
-INBOUND (User → ExoSkull):
+INBOUND (User → ExoSkull):                            ✅ LIVE
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│    User     │────▶│ GHL Webhook │────▶│  ExoSkull   │
-│  (any ch.)  │     │  /webhooks  │     │     AI      │
+│    User     │────▶│   Twilio    │────▶│  ExoSkull   │
+│  (call/SMS) │     │  Webhook    │     │  Claude AI  │
 └─────────────┘     └─────────────┘     └─────────────┘
                            │
                     ┌──────┴──────┐
                     ▼             ▼
               ┌─────────┐   ┌─────────┐
-              │ Process │   │   Log   │
-              │  & Reply│   │   DB    │
+              │ Process │   │ Unified │
+              │ & Reply │   │ Thread  │
               └─────────┘   └─────────┘
 ```
 
@@ -3074,57 +3134,80 @@ TWILIO_PHONE_NUMBER=+1xxx
 
 # ROADMAP
 
-### Phase 1: Foundation (Months 1-3)
+### Phase 1: Foundation (Months 1-3) — ✅ COMPLETE
 
-**Database & Data Lake (Week 1-2):**
-- [ ] Supabase project setup (Postgres + Auth + Storage)
-- [ ] Core schema: tenants, users, workspaces, conversations, memories
-- [ ] RLS policies for multi-tenant isolation
-- [ ] **Data Lake: Cloudflare R2 setup (Bronze layer)**
-- [ ] **Parquet ingestion pipeline (Edge Function → R2)**
-- [ ] **DuckDB query engine integration**
+**Database & Data Lake (Week 1-2):** ✅
+- [x] Supabase project setup (Postgres 15+ with pgvector, Auth, Storage)
+- [x] Core schema: 75+ tables (tenants, conversations, memories, voice, mods, rigs, admin)
+- [x] RLS policies for multi-tenant isolation
+- [x] **Data Lake: Cloudflare R2 setup (Bronze layer)**
+- [x] **Parquet ingestion pipeline (CRON → R2 at 01:00 UTC)**
+- [ ] **DuckDB query engine integration** (client exists, not fully operational)
 
-**Gateway & SaaS (Week 3-4):**
-- [ ] Gateway implementation (Node.js + WebSocket)
-- [ ] Session management + workspace isolation
-- [ ] Stripe billing integration (Free/Pro/Business tiers)
-- [ ] Usage tracking (TimescaleDB or Supabase)
+**Gateway & SaaS (Week 3-4):** ✅
+- [x] Next.js API Routes (94 endpoints) — replaced Node.js Gateway
+- [x] Session management (Supabase Auth + cookie SSR middleware)
+- [x] Subscription tables (exo_subscriptions, exo_payments)
+- [x] Usage tracking (exo_ai_usage, admin daily snapshots)
 
-**Voice & Discovery (Week 5-8):**
-- [ ] VAPI integration (voice calls)
-- [ ] Discovery conversation system (Layer 7)
-- [ ] Basic MCP Skills (Supabase, Twilio)
+**Voice & Discovery (Week 5-8):** ✅
+- [x] Custom voice pipeline: Twilio → ElevenLabs STT → Claude Sonnet 4 → ElevenLabs TTS
+- [x] 17 voice tools (tasks, mods, calls, SMS, email, memory, autonomy)
+- [x] Outbound calling + delegate calling (call third parties on user behalf)
+- [x] Discovery/onboarding conversation system (~60 topics)
 
-**First Apps (Week 9-12):**
-- [ ] Meta-Coordinator with multi-model routing
-- [ ] First custom app builder flow
-- [ ] Silver + Gold layers (aggregation jobs)
+**First Apps (Week 9-12):** ✅
+- [x] Multi-model AI router (4 tiers: Flash → Haiku → Kimi → Opus)
+- [x] Mod system: task-manager, mood-tracker, habit-tracker, sleep, activity
+- [x] Silver ETL (R2 → Postgres at 02:00 UTC) + Gold ETL (Mat. Views at 04:00 UTC)
 
-### Phase 2: Intelligence (Months 4-6)
+**Memory System (Feb 5):** ✅
+- [x] Daily summaries with AI generation + user corrections
+- [x] Memory search (keyword, semantic, timeline, last mention)
+- [x] Unified thread (cross-channel: voice + SMS + email + web chat)
+- [x] Context window: 50 recent messages + summaries + highlights
+- [x] CRON at 21:00 PL for daily summary generation
+
+**Admin Panel (Feb 4):** ✅
+- [x] 9 admin pages (overview, CRON, AI, business, users, autonomy, pipeline, insights, logs)
+- [x] Self-optimization engine (10 analysis categories)
+- [x] CRON health monitoring with 30s polling
+
+**Knowledge Layer (Feb 3):** ✅
+- [x] Tyrolka framework (Loops → Campaigns → Quests → Ops → Notes)
+- [x] File upload (PDF, DOCX, images, video up to 1GB)
+- [x] Document chunking with pgvector embeddings for semantic search
+
+### Phase 2: Intelligence (Months 4-6) — ⏳ IN PROGRESS
+
 - [ ] Full Kimi K2.5 Swarm integration (100-agent parallel)
-- [ ] Gap detection system (Layer 8)
-- [ ] MAPE-K optimization loop (Layer 10)
-- [ ] **Emotion Intelligence Layer (Layer 11) - from IORS**
+- [x] Guardian system + MAPE-K tables + intervention executor (partial)
+- [ ] Full gap detection system (Layer 8)
+- [ ] **Emotion Intelligence Layer (Layer 11)**
   - [ ] Multi-modal fusion engine (voice + text + face)
   - [ ] Crisis detection & escalation protocols
   - [ ] Emotion-adaptive response system
   - [ ] Behavioral monitoring (IAT, screen activity)
 - [ ] Skill Memory (Layer 14)
-- [ ] Pattern detection on Data Lake
+- [ ] Pattern detection on Data Lake (DuckDB queries on Bronze)
 
-### Phase 3: Expansion (Months 7-12)
-- [ ] 50+ MCP Skills (health, finance, productivity)
-- [ ] Device integrations (Oura, Apple Watch, Garmin)
+### Phase 3: Expansion (Months 7-12) — ⏳ PLANNED
+
+- [ ] More Mod executors (exercise, food, water, finance, social, journal, weekly-review)
+- [ ] More Rig clients (Fitbit, Apple Health, Plaid, Home Assistant, Philips Hue)
+- [x] Device integrations: Oura Ring, Google Fit (partial)
+- [ ] Full multi-channel: WhatsApp (placeholder), Messenger (placeholder)
+- [ ] GoHighLevel integration (CRM, social media, calendar)
 - [ ] Smartglasses integration (Meta Ray-Ban)
-- [ ] Voice cloning (ElevenLabs)
+- [ ] Voice cloning (ElevenLabs - custom voice)
 - [ ] Mobile app (React Native)
 
 ---
 
-**Version:** 3.1
-**Status:** Architecture Complete
+**Version:** 4.0
+**Status:** MVP Live — Active Development
 **Created:** 2026-02-01
-**Updated:** 2026-02-02
+**Updated:** 2026-02-05
 
 ---
 
