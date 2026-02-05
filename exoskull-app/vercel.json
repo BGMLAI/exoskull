@@ -15,6 +15,9 @@
     },
     "app/api/cron/**/*.ts": {
       "maxDuration": 60
+    },
+    "app/api/skills/generate/**/*.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [
@@ -81,6 +84,10 @@
     {
       "path": "/api/cron/daily-summary",
       "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/skill-lifecycle",
+      "schedule": "0 3 * * *"
     }
   ]
 }

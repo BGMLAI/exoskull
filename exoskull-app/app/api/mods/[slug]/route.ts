@@ -34,9 +34,11 @@ export async function GET(
       return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
     }
 
-    // Check mod exists
+    // Check mod exists (static definition or dynamic skill)
     const modDef = getModDefinition(slug);
-    if (!modDef) {
+    const isDynamicSkill = slug.startsWith("custom-");
+
+    if (!modDef && !isDynamicSkill) {
       return NextResponse.json({ error: "Mod not found" }, { status: 404 });
     }
 
@@ -51,15 +53,15 @@ export async function GET(
     // Allow access even without installation for now (development)
     // In production, you'd want to enforce installation check
 
-    // Check executor exists
-    if (!hasModExecutor(slug as ModSlug)) {
+    // Check executor exists (static or dynamic)
+    if (!(await hasModExecutor(slug as ModSlug, tenantId))) {
       return NextResponse.json(
         { error: "Mod executor not implemented", definition: modDef },
         { status: 501 },
       );
     }
 
-    const executor = getModExecutor(slug as ModSlug)!;
+    const executor = (await getModExecutor(slug as ModSlug, tenantId))!;
 
     // Get data and insights in parallel
     const [data, insights, actions] = await Promise.all([
@@ -112,15 +114,15 @@ export async function POST(
       return NextResponse.json({ error: "Missing action" }, { status: 400 });
     }
 
-    // Check executor exists
-    if (!hasModExecutor(slug as ModSlug)) {
+    // Check executor exists (static or dynamic)
+    if (!(await hasModExecutor(slug as ModSlug, tenantId))) {
       return NextResponse.json(
         { error: "Mod executor not implemented" },
         { status: 501 },
       );
     }
 
-    const executor = getModExecutor(slug as ModSlug)!;
+    const executor = (await getModExecutor(slug as ModSlug, tenantId))!;
 
     // Verify action exists
     const availableActions = executor.getActions();

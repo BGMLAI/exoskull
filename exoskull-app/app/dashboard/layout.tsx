@@ -12,6 +12,7 @@ import {
   Menu,
   Heart,
   TrendingUp,
+  Sparkles,
 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -32,6 +33,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/knowledge", label: "Wiedza", icon: FileText },
   { href: "/dashboard/health", label: "Zdrowie", icon: Heart },
   { href: "/dashboard/business", label: "Biznes", icon: TrendingUp },
+  { href: "/dashboard/skills", label: "Skille", icon: Sparkles },
 ];
 
 // Subset for mobile bottom tab bar (5 max for usability)

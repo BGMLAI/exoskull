@@ -2,18 +2,21 @@
 // MODS - User-facing Abilities & Extensions
 // =====================================================
 
-export type ModCategory = 'health' | 'productivity' | 'finance' | 'wellbeing';
+export type ModCategory = "health" | "productivity" | "finance" | "wellbeing";
 
-export type ModSlug =
-  | 'sleep-tracker'
-  | 'energy-monitor'
-  | 'hrv-tracker'
-  | 'focus-mode'
-  | 'task-manager'
-  | 'calendar-assistant'
-  | 'mood-tracker'
-  | 'habit-tracker'
-  | 'spending-tracker';
+export type BuiltinModSlug =
+  | "sleep-tracker"
+  | "energy-monitor"
+  | "hrv-tracker"
+  | "focus-mode"
+  | "task-manager"
+  | "calendar-assistant"
+  | "mood-tracker"
+  | "habit-tracker"
+  | "spending-tracker";
+
+// Dynamic skills use custom-* prefix (e.g., "custom-water-tracker")
+export type ModSlug = BuiltinModSlug | `custom-${string}`;
 
 export interface ModDefinition {
   slug: ModSlug;
@@ -30,10 +33,10 @@ export interface ModDefinition {
 
   // Capabilities
   capabilities: {
-    insights: boolean;      // Can generate insights
+    insights: boolean; // Can generate insights
     notifications: boolean; // Can send notifications
-    actions: boolean;       // Can take actions
-    voice: boolean;         // Has voice interface
+    actions: boolean; // Can take actions
+    voice: boolean; // Has voice interface
   };
 }
 
@@ -48,13 +51,13 @@ export interface ModInstallation {
 }
 
 export interface ModInsight {
-  type: 'info' | 'warning' | 'success' | 'alert';
+  type: "info" | "warning" | "success" | "alert";
   title: string;
   message: string;
   data?: Record<string, unknown>;
   action?: {
     label: string;
-    type: 'link' | 'button';
+    type: "link" | "button";
     href?: string;
     onClick?: string;
   };
@@ -82,7 +85,7 @@ export interface IModExecutor {
   executeAction(
     tenant_id: string,
     action: string,
-    params: Record<string, unknown>
+    params: Record<string, unknown>,
   ): Promise<{ success: boolean; result?: unknown; error?: string }>;
 
   // Get available actions
@@ -91,11 +94,11 @@ export interface IModExecutor {
 
 // Quest types (extends Mod)
 export type QuestSlug =
-  | '7-day-sleep'
-  | 'digital-detox'
-  | 'morning-routine'
-  | 'mindfulness-week'
-  | 'fitness-kickstart';
+  | "7-day-sleep"
+  | "digital-detox"
+  | "morning-routine"
+  | "mindfulness-week"
+  | "fitness-kickstart";
 
 export interface QuestProgress {
   day: number;
