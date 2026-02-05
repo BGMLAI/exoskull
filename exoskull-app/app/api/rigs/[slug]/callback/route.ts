@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getOAuthConfig, exchangeCodeForTokens } from "@/lib/rigs/oauth";
 
 export const dynamic = "force-dynamic";
@@ -163,6 +164,17 @@ export async function GET(
 
     console.log(`[OAuth] ${slug} connected successfully for user ${user.id}`);
 
+    // Facebook-specific: auto-fetch page tokens and store in exo_meta_pages
+    if (slug === "facebook" && tokens.access_token) {
+      try {
+        await syncFacebookPages(user.id, tokens.access_token);
+      } catch (fbError) {
+        console.error("[OAuth] Facebook page sync failed (non-blocking):", {
+          error: fbError instanceof Error ? fbError.message : "Unknown",
+        });
+      }
+    }
+
     // Redirect to success page
     return NextResponse.redirect(
       new URL(`/dashboard/settings?rig=${slug}&connected=true`, request.url),
@@ -177,4 +189,101 @@ export async function GET(
       ),
     );
   }
+}
+
+// =====================================================
+// FACEBOOK: Auto-fetch page tokens after OAuth
+// =====================================================
+
+async function syncFacebookPages(
+  tenantId: string,
+  userAccessToken: string,
+): Promise<void> {
+  const GRAPH_API = "https://graph.facebook.com/v21.0";
+
+  // Fetch all pages the user manages
+  const res = await fetch(
+    `${GRAPH_API}/me/accounts?access_token=${encodeURIComponent(userAccessToken)}&fields=id,name,category,access_token,fan_count,picture`,
+  );
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(`Graph API error: ${err.error?.message || res.status}`);
+  }
+
+  const data = await res.json();
+  const pages: Array<{
+    id: string;
+    name: string;
+    category: string;
+    access_token: string;
+    fan_count?: number;
+    picture?: { data?: { url?: string } };
+  }> = data.data || [];
+
+  if (pages.length === 0) {
+    console.log("[OAuth/FB] No pages found for user");
+    return;
+  }
+
+  // Use service role client to bypass RLS (callback runs as server)
+  const supabase = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+
+  let connected = 0;
+  for (const page of pages) {
+    // Subscribe page to our app's webhook
+    try {
+      const subRes = await fetch(
+        `${GRAPH_API}/${page.id}/subscribed_apps?access_token=${encodeURIComponent(page.access_token)}&subscribed_fields=messages,messaging_postbacks,message_deliveries,message_reads`,
+        { method: "POST" },
+      );
+      const subData = await subRes.json();
+      if (!subData.success) {
+        console.error("[OAuth/FB] Failed to subscribe page:", {
+          pageId: page.id,
+          error: subData.error?.message,
+        });
+      }
+    } catch (subError) {
+      console.error("[OAuth/FB] Webhook subscribe failed:", {
+        pageId: page.id,
+        error: subError instanceof Error ? subError.message : "Unknown",
+      });
+    }
+
+    // Upsert page token
+    const { error } = await supabase.from("exo_meta_pages").upsert(
+      {
+        tenant_id: tenantId,
+        page_type: "messenger",
+        page_id: page.id,
+        page_name: page.name,
+        page_access_token: page.access_token,
+        is_active: true,
+        metadata: {
+          category: page.category,
+          fan_count: page.fan_count,
+          profile_pic: page.picture?.data?.url,
+        },
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "page_type,page_id" },
+    );
+
+    if (error) {
+      console.error("[OAuth/FB] Page upsert failed:", {
+        pageId: page.id,
+        error: error.message,
+      });
+    } else {
+      connected++;
+    }
+  }
+
+  console.log(
+    `[OAuth/FB] Synced ${connected}/${pages.length} pages for tenant ${tenantId}`,
+  );
 }

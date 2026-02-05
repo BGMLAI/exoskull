@@ -1,14 +1,19 @@
 /**
- * Messenger Webhook Handler
+ * Messenger Webhook Handler (Multi-Page)
  *
  * GET  - Webhook verification (Meta sends hub.mode, hub.verify_token, hub.challenge)
  * POST - Incoming messages from Facebook Messenger
+ *
+ * Supports multiple Facebook Pages: looks up page token from exo_meta_pages
+ * table by incoming page_id, falls back to MESSENGER_PAGE_ACCESS_TOKEN env var.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
+  MessengerClient,
   getMessengerClient,
+  createMessengerClientForPage,
   extractMessagingEvent,
   type MessengerWebhookPayload,
 } from "@/lib/channels/messenger/client";
@@ -61,6 +66,47 @@ export async function GET(req: NextRequest) {
 }
 
 // =====================================================
+// RESOLVE CLIENT: DB page token → env var fallback
+// =====================================================
+
+async function resolveMessengerClient(
+  supabase: ReturnType<typeof getSupabase>,
+  pageId: string,
+): Promise<{ client: MessengerClient | null; tenantId: string | null }> {
+  // Try DB lookup first (multi-page)
+  const { data: page, error } = await supabase
+    .from("exo_meta_pages")
+    .select("tenant_id, page_access_token, page_name")
+    .eq("page_type", "messenger")
+    .eq("page_id", pageId)
+    .eq("is_active", true)
+    .single();
+
+  if (page?.page_access_token) {
+    console.log("[Messenger] Using DB token for page:", {
+      pageId,
+      pageName: page.page_name,
+      tenantId: page.tenant_id,
+    });
+    return {
+      client: createMessengerClientForPage(page.page_access_token),
+      tenantId: page.tenant_id,
+    };
+  }
+
+  if (error && error.code !== "PGRST116") {
+    // PGRST116 = no rows found (expected for pages not in DB)
+    console.error("[Messenger] DB lookup error:", {
+      pageId,
+      error: error.message,
+    });
+  }
+
+  // Fallback to env var singleton
+  return { client: getMessengerClient(), tenantId: null };
+}
+
+// =====================================================
 // POST - INCOMING MESSAGES
 // =====================================================
 
@@ -80,15 +126,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    const { senderPsid, text, messageId } = incoming;
+    const { senderPsid, text, messageId, pageId } = incoming;
 
     console.log("[Messenger] Incoming message:", {
       senderPsid,
+      pageId,
       messageId,
       textLength: text.length,
     });
 
-    const client = getMessengerClient();
+    const supabase = getSupabase();
+
+    // Resolve client from DB or env var
+    const { client, tenantId: pageTenantId } = await resolveMessengerClient(
+      supabase,
+      pageId,
+    );
 
     // Send typing indicator for better UX
     if (client) {
@@ -117,17 +170,30 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Resolve tenant by messenger PSID stored in metadata
-    const supabase = getSupabase();
-    const { data: tenant } = await supabase
-      .from("exo_tenants")
-      .select("id, display_name, language")
-      .contains("metadata", { messenger_psid: senderPsid })
-      .single();
+    // Resolve tenant: prefer page owner from DB, fallback to PSID lookup
+    let tenantId = pageTenantId;
 
-    const tenantId = tenant?.id || null;
-    if (tenant?.display_name) userName = tenant.display_name;
-    if (tenant?.language) language = tenant.language;
+    if (!tenantId) {
+      const { data: tenant } = await supabase
+        .from("exo_tenants")
+        .select("id, display_name, language")
+        .contains("metadata", { messenger_psid: senderPsid })
+        .single();
+
+      tenantId = tenant?.id || null;
+      if (tenant?.display_name) userName = tenant.display_name;
+      if (tenant?.language) language = tenant.language;
+    } else {
+      // Load tenant details for known page owner
+      const { data: tenant } = await supabase
+        .from("exo_tenants")
+        .select("display_name, language")
+        .eq("id", tenantId)
+        .single();
+
+      if (tenant?.display_name) userName = tenant.display_name;
+      if (tenant?.language) language = tenant.language;
+    }
 
     // Create conversation record
     const { data: conversation } = await supabase
@@ -136,6 +202,7 @@ export async function POST(req: NextRequest) {
         tenant_id: tenantId,
         context: {
           channel: "messenger",
+          page_id: pageId,
           sender_psid: senderPsid,
           sender_name: userName,
           messenger_message_id: messageId,
@@ -181,6 +248,7 @@ export async function POST(req: NextRequest) {
 
       console.log("[Messenger] Reply sent:", {
         to: senderPsid,
+        pageId,
         conversationId: conversation?.id,
         responseLength: response.content.length,
       });
@@ -188,6 +256,7 @@ export async function POST(req: NextRequest) {
       console.error("[Messenger] AI routing failed:", {
         error: error instanceof Error ? error.message : "Unknown error",
         senderPsid,
+        pageId,
         tenantId,
         stack: error instanceof Error ? error.stack : undefined,
       });

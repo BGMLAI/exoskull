@@ -1,14 +1,19 @@
 /**
- * WhatsApp Webhook Handler
+ * WhatsApp Webhook Handler (Multi-Account)
  *
  * GET  - Webhook verification (Meta sends hub.mode, hub.verify_token, hub.challenge)
  * POST - Incoming messages from WhatsApp Cloud API
+ *
+ * Supports multiple WhatsApp Business accounts: looks up account token from
+ * exo_meta_pages table by phone_number_id, falls back to env vars.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
+  WhatsAppClient,
   getWhatsAppClient,
+  createWhatsAppClientForAccount,
   extractIncomingMessage,
   type WhatsAppWebhookPayload,
 } from "@/lib/channels/whatsapp/client";
@@ -61,6 +66,49 @@ export async function GET(req: NextRequest) {
 }
 
 // =====================================================
+// RESOLVE CLIENT: DB account token → env var fallback
+// =====================================================
+
+async function resolveWhatsAppClient(
+  supabase: ReturnType<typeof getSupabase>,
+  phoneNumberId: string,
+): Promise<{ client: WhatsAppClient | null; tenantId: string | null }> {
+  // Try DB lookup first (multi-account)
+  const { data: account, error } = await supabase
+    .from("exo_meta_pages")
+    .select("tenant_id, page_access_token, page_name, phone_number_id")
+    .eq("page_type", "whatsapp")
+    .eq("phone_number_id", phoneNumberId)
+    .eq("is_active", true)
+    .single();
+
+  if (account?.page_access_token && account?.phone_number_id) {
+    console.log("[WhatsApp] Using DB token for account:", {
+      phoneNumberId,
+      pageName: account.page_name,
+      tenantId: account.tenant_id,
+    });
+    return {
+      client: createWhatsAppClientForAccount(
+        account.page_access_token,
+        account.phone_number_id,
+      ),
+      tenantId: account.tenant_id,
+    };
+  }
+
+  if (error && error.code !== "PGRST116") {
+    console.error("[WhatsApp] DB lookup error:", {
+      phoneNumberId,
+      error: error.message,
+    });
+  }
+
+  // Fallback to env var singleton
+  return { client: getWhatsAppClient(), tenantId: null };
+}
+
+// =====================================================
 // POST - INCOMING MESSAGES
 // =====================================================
 
@@ -80,17 +128,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    const { from, text, messageId, senderName } = incoming;
+    const { from, text, messageId, senderName, phoneNumberId } = incoming;
 
     console.log("[WhatsApp] Incoming message:", {
       from,
       senderName,
+      phoneNumberId,
       messageId,
       textLength: text.length,
     });
 
+    const supabase = getSupabase();
+
+    // Resolve client from DB or env var
+    const { client, tenantId: accountTenantId } = await resolveWhatsAppClient(
+      supabase,
+      phoneNumberId,
+    );
+
     // Mark message as read immediately
-    const client = getWhatsAppClient();
     if (client) {
       try {
         await client.markAsRead(messageId);
@@ -102,17 +158,31 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Resolve tenant by phone number
-    const supabase = getSupabase();
-    const { data: tenant } = await supabase
-      .from("exo_tenants")
-      .select("id, display_name, language")
-      .eq("phone", from)
-      .single();
+    // Resolve tenant: prefer account owner from DB, fallback to phone lookup
+    let tenantId = accountTenantId;
+    let language = "en";
+    let userName = senderName;
 
-    const tenantId = tenant?.id || null;
-    const language = tenant?.language || "en";
-    const userName = tenant?.display_name || senderName;
+    if (!tenantId) {
+      const { data: tenant } = await supabase
+        .from("exo_tenants")
+        .select("id, display_name, language")
+        .eq("phone", from)
+        .single();
+
+      tenantId = tenant?.id || null;
+      language = tenant?.language || "en";
+      userName = tenant?.display_name || senderName;
+    } else {
+      const { data: tenant } = await supabase
+        .from("exo_tenants")
+        .select("display_name, language")
+        .eq("id", tenantId)
+        .single();
+
+      if (tenant?.display_name) userName = tenant.display_name;
+      if (tenant?.language) language = tenant.language;
+    }
 
     // Create conversation record
     const { data: conversation } = await supabase
@@ -121,6 +191,7 @@ export async function POST(req: NextRequest) {
         tenant_id: tenantId,
         context: {
           channel: "whatsapp",
+          phone_number_id: phoneNumberId,
           sender_phone: from,
           sender_name: senderName,
           whatsapp_message_id: messageId,
@@ -166,6 +237,7 @@ export async function POST(req: NextRequest) {
 
       console.log("[WhatsApp] Reply sent:", {
         to: from,
+        phoneNumberId,
         conversationId: conversation?.id,
         responseLength: response.content.length,
       });
@@ -173,6 +245,7 @@ export async function POST(req: NextRequest) {
       console.error("[WhatsApp] AI routing failed:", {
         error: error instanceof Error ? error.message : "Unknown error",
         from,
+        phoneNumberId,
         tenantId,
         stack: error instanceof Error ? error.stack : undefined,
       });

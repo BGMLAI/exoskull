@@ -356,12 +356,14 @@ export class MessengerClient {
 // =====================================================
 
 /**
- * Extract the first text message from a Messenger webhook event
+ * Extract the first text message from a Messenger webhook event.
+ * Returns pageId (entry.id) for multi-page token lookup.
  */
 export function extractMessagingEvent(payload: MessengerWebhookPayload): {
   senderPsid: string;
   text: string;
   messageId: string;
+  pageId: string;
 } | null {
   try {
     const entry = payload.entry?.[0];
@@ -375,6 +377,7 @@ export function extractMessagingEvent(payload: MessengerWebhookPayload): {
       senderPsid: event.sender.id,
       text: event.message.text,
       messageId: event.message.mid,
+      pageId: entry.id,
     };
   } catch (error) {
     console.error("[Messenger] Failed to extract messaging event:", {
@@ -385,13 +388,13 @@ export function extractMessagingEvent(payload: MessengerWebhookPayload): {
 }
 
 // =====================================================
-// FACTORY (SINGLETON)
+// FACTORY
 // =====================================================
 
 let _messengerClient: MessengerClient | null = null;
 
 /**
- * Get or create singleton Messenger client from env vars
+ * Get or create singleton Messenger client from env vars (fallback).
  */
 export function getMessengerClient(): MessengerClient | null {
   if (_messengerClient) return _messengerClient;
@@ -405,4 +408,13 @@ export function getMessengerClient(): MessengerClient | null {
 
   _messengerClient = new MessengerClient(pageAccessToken);
   return _messengerClient;
+}
+
+/**
+ * Create a Messenger client for a specific page token (multi-page support).
+ */
+export function createMessengerClientForPage(
+  pageAccessToken: string,
+): MessengerClient {
+  return new MessengerClient(pageAccessToken);
 }

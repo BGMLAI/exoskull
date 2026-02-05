@@ -577,3 +577,13 @@ export function getWhatsAppClient(): WhatsAppClient | null {
   _whatsappClient = new WhatsAppClient(token, phoneNumberId);
   return _whatsappClient;
 }
+
+/**
+ * Create a WhatsApp client for a specific account (multi-page support).
+ */
+export function createWhatsAppClientForAccount(
+  token: string,
+  phoneNumberId: string,
+): WhatsAppClient {
+  return new WhatsAppClient(token, phoneNumberId);
+}
