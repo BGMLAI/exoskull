@@ -6,6 +6,37 @@ All notable changes to ExoSkull are documented here.
 
 ## 2026-02-05
 
+### Fix: Skill Generation Pipeline - Sonnet 4.5 + Model Fallback
+
+Skill generation ("Generuj nowy Skill") failowalo z "All models failed after 1 tier escalations".
+
+#### What was done
+- **Root cause:** `skill-generator.ts` wymuszal `forceTier: 4` (Claude Opus 4.5 only). Gdy Opus niedostepny, brak fallbacku (Tier 4 to max, nie moze eskalowac)
+- **Added Claude Sonnet 4.5** do model routera jako Tier 3 primary + Tier 4 fallback
+- **De-eskalacja w routerze:** gdy najwyzszy tier failuje, probuje nizsze tiery (Tier 4 -> 3 -> 2 -> 1)
+- **Skill generator uzywa `taskCategory: code_generation`** (routes to Sonnet 4.5) zamiast `forceTier: 4`
+- **maxTokens: 8192** dla code generation (wczesniej domyslne 1024)
+
+#### Files changed
+- `lib/ai/types.ts` - dodano `claude-sonnet-4-5` ModelId, `code_generation` TaskCategory
+- `lib/ai/config.ts` - Sonnet 4.5 config, TIER_MODELS update, code_generation mapping
+- `lib/ai/providers/anthropic-provider.ts` - Sonnet 4.5 w MODEL_MAP
+- `lib/ai/model-router.ts` - de-eskalacja logika
+- `lib/ai/task-classifier.ts` - code_generation complexity
+- `lib/skills/generator/skill-generator.ts` - taskCategory zamiast forceTier
+
+#### How to verify
+- Dashboard > Skills > "Generuj Skill" > wpisz opis > Generuj
+- Powinno uzyc Sonnet 4.5, a jesli fail -> fallback do Haiku
+
+#### Notes for future agents
+- Kimi K2.5 to placeholder (brak KIMI_API_KEY)
+- Opus 4.5 moze nie byc dostepny na kazdym API key
+- Sonnet 4.5 jest primary model dla code generation (Tier 3)
+- Router teraz ma pelny fallback chain: Tier 4 -> 3 -> 2 -> 1
+
+---
+
 ### Best Memory on Market - Daily Summaries + Search + Interactive Review
 
 System pamięci "najlepsza pamięć na rynku" - daily summaries z interaktywnym przeglądem + wyszukiwanie w historii.

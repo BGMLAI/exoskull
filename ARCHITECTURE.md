@@ -3,7 +3,7 @@
 
 **Version:** 4.0
 **Created:** 2026-02-01
-**Updated:** 2026-02-05
+**Updated:** 2026-02-06
 **Status:** 🟡 Active Development — MVP Live (exoskull.xyz)
 
 ---
@@ -52,6 +52,7 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 | **Frontend** | ✅ Live | Dashboard, chat, tasks, knowledge, schedule, health, settings |
 | **Auth** | ✅ Live | Supabase SSR, RLS, middleware guards |
 | **Outbound Calls** | ✅ Live | Call user + call third parties (delegate system) |
+| **Dynamic Skills** | 🟡 DB Ready | Migration ready (4 tables, RLS, functions). Code pipeline planned. See [docs/DYNAMIC_SKILLS_ARCHITECTURE.md](./exoskull-app/docs/DYNAMIC_SKILLS_ARCHITECTURE.md) |
 | **Emotion Intel** | 🔴 Planned | Voice biomarkers, facial analysis, crisis detection |
 | **Gap Detection** | 🔴 Planned | Proactive blind spot identification |
 | **WhatsApp/Messenger** | 🔴 Planned | Placeholder endpoints exist |
@@ -280,12 +281,12 @@ exoskull inventory           # Show installed Mods/Rigs/active Quests
 │ TIER 4: MEMORY & DATA LAYER                          ✅ LIVE │
 │   Layer 12: Total Recall Memory (50+ msg context)     ✅    │
 │   Layer 13: Data Lake (Bronze/Silver/Gold ETL)        ✅    │
-│   Layer 14: Skill Memory & Cross-Task Reuse           ⏳    │
+│   Layer 14: Skill Memory & Dynamic Generation         ⏳    │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ TIER 5: EXECUTION LAYER                              ⏳ WIP │
-│   Layer 15: Custom App Builder (Mod system)           ✅    │
+│   Layer 15: Custom App Builder (Mods + Dynamic Skills)✅    │
 │   Layer 16: Autonomous Actions Framework              ⏳    │
 │   Layer 17: Device Integration (Oura, Google Fit)     ⏳    │
 │   Layer 18: Android-First Integration                 🔴    │
@@ -999,7 +1000,7 @@ Agent_Swarm = {
     name: "Core Agent",
     tools: ["Read", "Write", "Edit", "Bash"],
     principle: "Minimal core, maximum extensibility",
-    self_extending: "Agent can write its own extensions"
+    self_extending: "Agent generates new skills via Dynamic Skills pipeline (Layer 14)"
   },
 
   // Kimi K2.5 PARL (Parallel-Agent Reinforcement Learning)
@@ -1321,6 +1322,20 @@ MCP_Skills_Registry = {
       creation: "System detects need → builds skill in 2h",
       sharing: "User can publish to community (optional)",
       verification: "Code review + test suite + 10+ users"
+    },
+
+    // AI-Generated (Dynamic Skills pipeline)
+    // Skills generated at runtime by AI based on user needs.
+    // Full spec: docs/DYNAMIC_SKILLS_ARCHITECTURE.md
+    ai_generated: {
+      detection: "Gap Detection (Layer 8) + user requests + pattern matching",
+      generation: "Claude Opus 4.5 / GPT-4 Codex generates IModExecutor code",
+      validation: "Static analysis (blocked patterns) + AST security audit",
+      sandbox: "isolated-vm (128MB, 5s timeout, API allowlist)",
+      approval: "2FA dual-channel confirmation before deployment",
+      deployment: "Register in exo_generated_skills, version-tagged, rollback support",
+      lifecycle: "Auto-archive after 30 days unused, usage tracking",
+      mod_integration: "ModSlug extended: BuiltinModSlug | `custom-${string}`"
     }
   },
 
@@ -1352,7 +1367,7 @@ MCP_Skills_Registry = {
 
   // Security
   security: {
-    sandboxing: "Skills run in isolated containers",
+    sandboxing: "MCP skills in isolated containers; AI-generated skills in isolated-vm sandbox (128MB, 5s)",
     permissions: "Granular OAuth scopes per skill",
     audit: "All skill actions logged",
     revoke: "Instant token revocation",
@@ -2094,8 +2109,8 @@ Emotion_Intelligence = {
 | L11: Emotion Intelligence | Architecture designed, not implemented | 🔴 Planned |
 | L12: Total Recall Memory | Daily summaries, search, 50+ msg context | ✅ Live |
 | L13: Data Lake | Bronze/Silver/Gold ETL pipeline | ✅ Live |
-| L14: Skill Memory | Planned | 🔴 Planned |
-| L15: Custom App Builder | Mod system (5 mods), Rig system (6 rigs) | ✅ Live |
+| L14: Skill Memory & Dynamic Generation | DB migration ready, code pipeline planned | 🟡 DB Ready |
+| L15: Custom App Builder | Mod system (5 mods), Rig system (6 rigs), Dynamic Skills pipeline designed | ✅ Live |
 | L16: Autonomous Actions | Intervention executor, voice tools | ⏳ Partial |
 | L17: Device Integration | Oura + Google Fit live | ⏳ Partial |
 | L18: Android Integration | Zero-install SMS/Voice. APK planned | 🔴 Planned |
@@ -2457,9 +2472,9 @@ Data_Lake = {
 
 ---
 
-## Layer 14: Mod Memory & Cross-Task Reuse — ⏳ PLANNED
+## Layer 14: Skill Memory & Dynamic Generation — ⏳ PLANNED (DB Migration Ready)
 
-**Persistent mod memory - AI learns and improves over time.**
+**Persistent skill memory + AI-generated dynamic skills at runtime.**
 
 ```javascript
 Mod_Memory = {
@@ -2540,6 +2555,51 @@ Mod_Memory = {
 }
 ```
 
+### Dynamic Skill Generation Pipeline
+
+**Layer 14 bridges memory (what the system has learned) with generation (creating new capabilities).**
+
+The Skill Memory stores patterns of what works. The Dynamic Skills pipeline uses those patterns
+to generate new IModExecutor implementations at runtime. This is the "self-extending" capability
+referenced in Layer 15 — now with a concrete implementation.
+
+> **Detailed spec:** [DYNAMIC_SKILLS_ARCHITECTURE.md](./exoskull-app/docs/DYNAMIC_SKILLS_ARCHITECTURE.md)
+
+```
+6-Stage Pipeline:
+
+ Need Detection          AI Generation        Security Validation
+ ┌──────────────┐       ┌──────────────┐      ┌──────────────┐
+ │ Gap Detection │──────▶│ Claude/Codex │─────▶│ Static AST   │
+ │ User Request  │       │ generates    │      │ Blocked      │
+ │ Pattern Match │       │ IModExecutor │      │ patterns     │
+ └──────────────┘       └──────────────┘      └──────┬───────┘
+                                                      ▼
+ Deployment             2FA Approval          Sandbox Test
+ ┌──────────────┐       ┌──────────────┐      ┌──────────────┐
+ │ Register in  │◀──────│ Dual-channel │◀─────│ isolated-vm  │
+ │ exo_generated│       │ confirmation │      │ 128MB / 5s   │
+ │ _skills      │       │ (SMS+email)  │      │ API allowlist│
+ └──────────────┘       └──────────────┘      └──────────────┘
+```
+
+**Database (Migration Ready):**
+
+| Table | Purpose | Status |
+|-------|---------|--------|
+| `exo_generated_skills` | Skill registry (code, capabilities, approval status, versioning) | ✅ Migration ready |
+| `exo_skill_versions` | Version history for rollback support | ✅ Migration ready |
+| `exo_skill_execution_log` | Audit trail (action, params, result, timing, memory) | ✅ Migration ready |
+| `exo_skill_approval_requests` | 2FA approval flow (dual-channel, 24h expiry) | ✅ Migration ready |
+
+**Helper Functions:** `generate_skill_confirmation_code()`, `get_active_skills()`, `archive_unused_skills()`, `increment_skill_usage()`
+
+**Connection to Skill Memory:**
+- Skill Memory patterns (above) inform the AI generator about what approaches work
+- Generated skills that succeed → encoded as new skill_definitions in memory
+- Failed generations → stored as failure patterns to avoid repeating mistakes
+- Cross-task transfer patterns help the generator create better skills for new domains
+
 ---
 
 # TIER 5: EXECUTION LAYER
@@ -2607,17 +2667,27 @@ App_Builder = {
   },
 
   self_extending: {
-    capability: "Agent can write its own extensions",
-    process: [
-      "Detect capability gap",
-      "Design new skill",
-      "Implement and test",
-      "Add to skill registry",
-      "Share to community (optional)"
-    ]
+    capability: "Agent generates new IModExecutor implementations at runtime",
+    pipeline: "Dynamic Skills (Layer 14) — 6-stage secure generation",
+    stages: [
+      "1. Detect need (Gap Detection / user request / pattern match)",
+      "2. Generate code (Claude Opus / GPT-4 Codex → IModExecutor TypeScript)",
+      "3. Validate (static AST analysis, blocked patterns, capability extraction)",
+      "4. Sandbox test (isolated-vm: 128MB, 5s, API allowlist)",
+      "5. Approve (2FA dual-channel confirmation)",
+      "6. Deploy (register in exo_generated_skills, version-tagged)"
+    ],
+    mod_integration: "ModSlug = BuiltinModSlug | `custom-${string}`",
+    spec: "docs/DYNAMIC_SKILLS_ARCHITECTURE.md",
+    code: "lib/skills/ (detector, generator, validator, sandbox, approval, registry)"
   }
 }
 ```
+
+> **Dynamic Skills Implementation:** The `self_extending` capability is now formalized as the
+> Dynamic Skills pipeline. Database migration is ready (`20260206000001_dynamic_skills.sql`).
+> Application code (`lib/skills/`) is the next implementation target.
+> See [DYNAMIC_SKILLS_ARCHITECTURE.md](./exoskull-app/docs/DYNAMIC_SKILLS_ARCHITECTURE.md) for full spec.
 
 ---
 
@@ -2923,6 +2993,7 @@ Guardrails = {
 │  2. BUILD (Week 2-3)                                 │
 │     • Meta-Coordinator designs apps (Layer 4)       │
 │     • Builder Team writes code (Layer 15)           │
+│     • Dynamic Skills generate new mods (Layer 14)   │
 │     • Deploy via MCP Skills (Layer 6)               │
 │     • Integrate devices (Layer 17-18)               │
 └──────────────────┬──────────────────────────────────┘
@@ -2954,6 +3025,7 @@ Guardrails = {
 │  6. EVOLVE (Continuous)                              │
 │     • Refine metrics                                 │
 │     • Build new apps as needs emerge                │
+│     • Dynamic Skills auto-generate new abilities    │
 │     • Self-modify based on what works               │
 │     • Update Skill Memory (Layer 14)                │
 └──────────────────┬──────────────────────────────────┘
@@ -2988,6 +3060,7 @@ Guardrails = {
 | **AI Tier 3** | Kimi K2.5 (256K context, swarm planned) | ⏳ Partial |
 | **AI Tier 4** | Claude Opus 4.5 (meta-coordinator) | ✅ Live |
 | **Mod System** | task-manager, mood-tracker, habit-tracker, sleep, activity | ✅ Live |
+| **Dynamic Skills** | lib/skills/ pipeline (isolated-vm sandbox, 2FA approval, versioned deploy) | 🟡 DB Ready |
 | **Rig System** | Oura, Google Fit, Google Workspace, MS 365, Notion, Todoist | ✅ Live |
 | **Knowledge** | Tyrolka (Loops→Campaigns→Quests→Ops→Notes), file upload, embeddings | ✅ Live |
 | **Autonomy** | MAPE-K loop, guardian system, intervention executor | ⏳ Partial |
@@ -3188,12 +3261,24 @@ TWILIO_PHONE_NUMBER=+1xxx
   - [ ] Crisis detection & escalation protocols
   - [ ] Emotion-adaptive response system
   - [ ] Behavioral monitoring (IAT, screen activity)
-- [ ] Skill Memory (Layer 14)
+- [ ] Skill Memory & Dynamic Generation (Layer 14)
+  - [x] Database migration (4 tables: exo_generated_skills, exo_skill_versions, exo_skill_execution_log, exo_skill_approval_requests)
+  - [x] RLS policies + helper functions (get_active_skills, archive_unused_skills, etc.)
+  - [x] Architecture spec (docs/DYNAMIC_SKILLS_ARCHITECTURE.md)
+  - [ ] Dynamic Skill Generator (lib/skills/generator/)
+  - [ ] Static analyzer + security auditor (lib/skills/validator/)
+  - [ ] Sandbox runtime with isolated-vm (lib/skills/sandbox/)
+  - [ ] 2FA approval gateway (lib/skills/approval/)
+  - [ ] Dynamic registry + mod integration (lib/skills/registry/)
+  - [ ] Skill need detection (lib/skills/detector/) — integrates with Gap Detection (Layer 8)
+  - [ ] API routes (app/api/skills/*)
 - [ ] Pattern detection on Data Lake (DuckDB queries on Bronze)
 
 ### Phase 3: Expansion (Months 7-12) — ⏳ PLANNED
 
-- [ ] More Mod executors (exercise, food, water, finance, social, journal, weekly-review)
+- [ ] More Mod executors — can now be AI-generated via Dynamic Skills pipeline
+  - [ ] exercise, food, water, finance, social, journal, weekly-review (static or generated)
+  - [ ] Community skills marketplace (Exoskulleton: community-contributed, verified dynamic skills)
 - [ ] More Rig clients (Fitbit, Apple Health, Plaid, Home Assistant, Philips Hue)
 - [x] Device integrations: Oura Ring, Google Fit (partial)
 - [ ] Full multi-channel: WhatsApp (placeholder), Messenger (placeholder)
@@ -3207,7 +3292,7 @@ TWILIO_PHONE_NUMBER=+1xxx
 **Version:** 4.0
 **Status:** MVP Live — Active Development
 **Created:** 2026-02-01
-**Updated:** 2026-02-05
+**Updated:** 2026-02-06
 
 ---
 
