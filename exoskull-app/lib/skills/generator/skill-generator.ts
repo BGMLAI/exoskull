@@ -114,7 +114,7 @@ export async function generateSkill(
           allowed_tools: buildAllowedTools(capabilities),
           risk_level: riskLevel,
           generation_prompt: description,
-          generated_by: "claude-opus-4-5",
+          generated_by: "claude-sonnet-4-5",
           approval_status: "pending",
           security_audit: securityAudit,
           last_audit_at: new Date().toISOString(),
@@ -171,7 +171,10 @@ async function generateCode(
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    { forceTier: 4 }, // Claude Opus for code generation
+    {
+      taskCategory: "code_generation",
+      maxTokens: 8192,
+    },
   );
 
   // Clean up the response - remove markdown code blocks if present
