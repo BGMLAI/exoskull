@@ -312,6 +312,11 @@ async function dispatchAction(
       return await handleCreateTask(intervention);
     case "proactive_message":
       return await handleProactiveMessage(intervention);
+    case "run_automation":
+    case "automation_trigger":
+      return await handleRunAutomationFromIntervention(intervention);
+    case "custom":
+      return await handleCustomActionFromIntervention(intervention);
     default:
       return { success: false, message: `Unknown action type: ${actionType}` };
   }
@@ -528,6 +533,69 @@ async function handleProactiveMessage(
   }
 
   return { success: false, message: "No contact method available for tenant" };
+}
+
+async function handleRunAutomationFromIntervention(
+  intervention: Intervention,
+): Promise<ExecutionResult> {
+  const { automationId, params } = intervention.action_payload as {
+    automationId?: string;
+    params?: Record<string, unknown>;
+  };
+
+  if (!automationId) {
+    return {
+      success: false,
+      message: "Missing automationId in action_payload",
+    };
+  }
+
+  // Delegate to ActionExecutor (single source of truth)
+  const { getActionExecutor } = await import("./action-executor");
+  const executor = getActionExecutor();
+  const result = await executor.execute({
+    type: "run_automation",
+    tenantId: intervention.tenant_id,
+    params: { automationId, params },
+    interventionId: intervention.id,
+    skipPermissionCheck: true, // Already approved via intervention flow
+  });
+
+  return {
+    success: result.success,
+    message: result.success
+      ? `Automation executed: ${(result.data as Record<string, unknown>)?.automationName || automationId}`
+      : `Automation failed: ${result.error}`,
+  };
+}
+
+async function handleCustomActionFromIntervention(
+  intervention: Intervention,
+): Promise<ExecutionResult> {
+  const payload = intervention.action_payload as Record<string, unknown>;
+  const actionName =
+    (payload.actionName as string) || (payload.action as string);
+
+  if (!actionName || actionName === "custom") {
+    return { success: false, message: "Missing actionName in action_payload" };
+  }
+
+  const { getActionExecutor } = await import("./action-executor");
+  const executor = getActionExecutor();
+  const result = await executor.execute({
+    type: "custom",
+    tenantId: intervention.tenant_id,
+    params: { actionName, params: payload.params || {} },
+    interventionId: intervention.id,
+    skipPermissionCheck: true,
+  });
+
+  return {
+    success: result.success,
+    message: result.success
+      ? `Custom action "${actionName}" executed`
+      : `Custom action "${actionName}" failed: ${result.error}`,
+  };
 }
 
 // ============================================================================

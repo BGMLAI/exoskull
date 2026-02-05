@@ -4,6 +4,51 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-05] Autonomous Actions — run_automation + custom action registry
+
+### Implemented
+
+- `handleRunAutomation()` in action-executor.ts — loads automation from `exo_custom_scheduled_jobs`, verifies tenant ownership, dispatches via SMS (Twilio API) or voice (`makeOutboundCall`), logs to `exo_custom_job_logs`
+- `handleCustomAction()` with registry pattern — 5 initial actions: `toggle_automation`, `adjust_schedule`, `set_quiet_hours`, `update_preference`, `archive_completed_tasks`
+- executor.ts `dispatchAction()` — added `run_automation`, `automation_trigger`, and `custom` cases delegating to ActionExecutor
+
+### Files changed
+
+- `lib/autonomy/action-executor.ts` — +import, replaced 2 stubs, added registry
+- `lib/autonomy/executor.ts` — +3 switch cases, +2 delegation handlers
+
+---
+
+## [2026-02-05] Gap Detection CRON + Suggestion Expiry
+
+### Added
+
+- `/api/cron/gap-detection` - Weekly CRON (Sundays 09:00 UTC)
+  - Runs `detectGaps()` for all active tenants with `forceRun=true`
+  - Creates interventions in `exo_interventions` → feeds Skill Need Detector's Gap Bridge
+- `expireOldSuggestions()` in lifecycle-manager
+  - Calls `expire_old_skill_suggestions()` DB function
+  - Integrated into existing `skill-lifecycle` daily CRON (03:00 UTC)
+
+### Modified
+
+- `vercel.json` - Added gap-detection to crons array
+- `skill-lifecycle/route.ts` - Now also expires pending suggestions >14 days
+- `lifecycle-manager.ts` - New `expireOldSuggestions()` export
+
+### Flow
+
+```
+Sunday 08:00 → guardian-values (drift detection)
+Sunday 09:00 → gap-detection (blind spot analysis for all tenants)
+              → creates exo_interventions (type: gap_detection)
+              → next post-conversation CRON reads these via Gap Bridge
+              → generates skill suggestions
+Daily  03:00 → skill-lifecycle (archive unused skills + expire old suggestions)
+```
+
+---
+
 ## [2026-02-05] Memory System - "Najlepsza pamięć na rynku"
 
 ### Added - Complete Memory System (Daily Summaries + Search + Interactive Review)
