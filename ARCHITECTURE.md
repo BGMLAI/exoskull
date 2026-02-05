@@ -52,7 +52,7 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 | **Frontend** | ✅ Live | Dashboard, chat, tasks, knowledge, schedule, health, settings |
 | **Auth** | ✅ Live | Supabase SSR, RLS, middleware guards |
 | **Outbound Calls** | ✅ Live | Call user + call third parties (delegate system) |
-| **Dynamic Skills** | 🟡 DB Ready | Migration ready (4 tables, RLS, functions). Code pipeline planned. See [docs/DYNAMIC_SKILLS_ARCHITECTURE.md](./exoskull-app/docs/DYNAMIC_SKILLS_ARCHITECTURE.md) |
+| **Dynamic Skills** | ✅ Live | Full 6-stage pipeline: detector → generator → validator → sandbox → approval → registry. Dashboard UI, suggestions widget, circuit breaker. See [docs/DYNAMIC_SKILLS_ARCHITECTURE.md](./exoskull-app/docs/DYNAMIC_SKILLS_ARCHITECTURE.md) |
 | **Emotion Intel** | 🔴 Planned | Voice biomarkers, facial analysis, crisis detection |
 | **Gap Detection** | 🔴 Planned | Proactive blind spot identification |
 | **WhatsApp/Messenger** | 🔴 Planned | Placeholder endpoints exist |
@@ -281,7 +281,7 @@ exoskull inventory           # Show installed Mods/Rigs/active Quests
 │ TIER 4: MEMORY & DATA LAYER                          ✅ LIVE │
 │   Layer 12: Total Recall Memory (50+ msg context)     ✅    │
 │   Layer 13: Data Lake (Bronze/Silver/Gold ETL)        ✅    │
-│   Layer 14: Skill Memory & Dynamic Generation         ⏳    │
+│   Layer 14: Skill Memory & Dynamic Generation         ✅    │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
@@ -2109,7 +2109,7 @@ Emotion_Intelligence = {
 | L11: Emotion Intelligence | Architecture designed, not implemented | 🔴 Planned |
 | L12: Total Recall Memory | Daily summaries, search, 50+ msg context | ✅ Live |
 | L13: Data Lake | Bronze/Silver/Gold ETL pipeline | ✅ Live |
-| L14: Skill Memory & Dynamic Generation | DB migration ready, code pipeline planned | 🟡 DB Ready |
+| L14: Skill Memory & Dynamic Generation | Full pipeline live (6 stages, dashboard, suggestions, circuit breaker) | ✅ Live |
 | L15: Custom App Builder | Mod system (5 mods), Rig system (6 rigs), Dynamic Skills pipeline designed | ✅ Live |
 | L16: Autonomous Actions | Intervention executor, voice tools | ⏳ Partial |
 | L17: Device Integration | Oura + Google Fit live | ⏳ Partial |
@@ -2472,9 +2472,11 @@ Data_Lake = {
 
 ---
 
-## Layer 14: Skill Memory & Dynamic Generation — ⏳ PLANNED (DB Migration Ready)
+## Layer 14: Skill Memory & Dynamic Generation — ✅ IMPLEMENTED
 
 **Persistent skill memory + AI-generated dynamic skills at runtime.**
+
+> **Implementation (Feb 5, 2026):** Full 6-stage pipeline live — Detector (request parser + pattern matcher + gap bridge), Generator (Sonnet 4.5), Validator (AST + security), Sandbox (Function() + frozen scope + 5s timeout), 2FA Approval (SMS + email), Registry (lifecycle manager). Dashboard with list/detail pages, suggestions widget, pre-approval sandbox testing, circuit breaker auto-revoke. 8 API routes, 5 DB tables, daily CRON lifecycle.
 
 ```javascript
 Mod_Memory = {
@@ -3060,7 +3062,7 @@ Guardrails = {
 | **AI Tier 3** | Kimi K2.5 (256K context, swarm planned) | ⏳ Partial |
 | **AI Tier 4** | Claude Opus 4.5 (meta-coordinator) | ✅ Live |
 | **Mod System** | task-manager, mood-tracker, habit-tracker, sleep, activity | ✅ Live |
-| **Dynamic Skills** | lib/skills/ pipeline (isolated-vm sandbox, 2FA approval, versioned deploy) | 🟡 DB Ready |
+| **Dynamic Skills** | lib/skills/ pipeline (sandbox, 2FA approval, versioned deploy, circuit breaker, suggestions) | ✅ Live |
 | **Rig System** | Oura, Google Fit, Google Workspace, MS 365, Notion, Todoist | ✅ Live |
 | **Knowledge** | Tyrolka (Loops→Campaigns→Quests→Ops→Notes), file upload, embeddings | ✅ Live |
 | **Autonomy** | MAPE-K loop, guardian system, intervention executor | ⏳ Partial |
@@ -3261,17 +3263,19 @@ TWILIO_PHONE_NUMBER=+1xxx
   - [ ] Crisis detection & escalation protocols
   - [ ] Emotion-adaptive response system
   - [ ] Behavioral monitoring (IAT, screen activity)
-- [ ] Skill Memory & Dynamic Generation (Layer 14)
-  - [x] Database migration (4 tables: exo_generated_skills, exo_skill_versions, exo_skill_execution_log, exo_skill_approval_requests)
+- [x] Skill Memory & Dynamic Generation (Layer 14)
+  - [x] Database migration (5 tables: exo_generated_skills, exo_skill_versions, exo_skill_execution_log, exo_skill_approval_requests, exo_skill_suggestions)
   - [x] RLS policies + helper functions (get_active_skills, archive_unused_skills, etc.)
   - [x] Architecture spec (docs/DYNAMIC_SKILLS_ARCHITECTURE.md)
-  - [ ] Dynamic Skill Generator (lib/skills/generator/)
-  - [ ] Static analyzer + security auditor (lib/skills/validator/)
-  - [ ] Sandbox runtime with isolated-vm (lib/skills/sandbox/)
-  - [ ] 2FA approval gateway (lib/skills/approval/)
-  - [ ] Dynamic registry + mod integration (lib/skills/registry/)
-  - [ ] Skill need detection (lib/skills/detector/) — integrates with Gap Detection (Layer 8)
-  - [ ] API routes (app/api/skills/*)
+  - [x] Dynamic Skill Generator (lib/skills/generator/)
+  - [x] Static analyzer + security auditor (lib/skills/validator/)
+  - [x] Sandbox runtime (lib/skills/sandbox/) + circuit breaker
+  - [x] 2FA approval gateway (lib/skills/approval/)
+  - [x] Dynamic registry + mod integration (lib/skills/registry/)
+  - [x] Skill need detection (lib/skills/detector/) — integrates with Gap Detection (Layer 8)
+  - [x] API routes (app/api/skills/*) — generate, execute, approve, rollback, suggestions
+  - [x] Dashboard UI — list page, detail page with code viewer, suggestions widget
+  - [x] Pre-approval sandbox testing + circuit breaker auto-revoke
 - [ ] Pattern detection on Data Lake (DuckDB queries on Bronze)
 
 ### Phase 3: Expansion (Months 7-12) — ⏳ PLANNED
