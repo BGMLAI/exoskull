@@ -17,6 +17,7 @@ import {
   UserHighlight,
 } from "../memory/highlights";
 import { SelfUpdateResult, LearningEvent } from "../agents/types";
+import { detectSkillNeeds } from "../skills/detector";
 
 // ============================================================================
 // CONFIGURATION
@@ -85,11 +86,70 @@ export class SelfUpdater {
       );
 
       // 2. Process each conversation
+      const processedConvs: Array<{
+        tenant_id: string;
+        transcript: string;
+        conversation_id: string;
+      }> = [];
+
       for (const conv of conversations) {
         const result = await this.processConversation(conv);
         highlightsAdded += result.added;
         highlightsBoosted += result.boosted;
         conversationsProcessed++;
+
+        // Collect transcript for skill need detection
+        const transcript = this.extractTranscript(conv.context);
+        if (transcript && transcript.length >= 50) {
+          processedConvs.push({
+            tenant_id: conv.tenant_id,
+            transcript,
+            conversation_id: conv.id,
+          });
+        }
+      }
+
+      // 2b. Run skill need detection on processed conversations
+      const tenantTranscripts = new Map<
+        string,
+        { transcripts: string[]; conversationIds: string[] }
+      >();
+      for (const pc of processedConvs) {
+        const existing = tenantTranscripts.get(pc.tenant_id) || {
+          transcripts: [],
+          conversationIds: [],
+        };
+        existing.transcripts.push(pc.transcript);
+        existing.conversationIds.push(pc.conversation_id);
+        tenantTranscripts.set(pc.tenant_id, existing);
+      }
+
+      for (const [tenantId, data] of tenantTranscripts) {
+        try {
+          const combined = data.transcripts.join("\n---\n");
+          const lastConvId =
+            data.conversationIds[data.conversationIds.length - 1];
+          const detection = await detectSkillNeeds(
+            tenantId,
+            combined,
+            lastConvId,
+          );
+          if (detection.suggestions.length > 0) {
+            console.log(
+              `[SelfUpdater] Skill needs detected for ${tenantId}: ${detection.suggestions.length} suggestions`,
+            );
+            patternsDetected.push(
+              ...detection.suggestions.map(
+                (s) => `skill_need:${s.suggested_slug || s.description}`,
+              ),
+            );
+          }
+        } catch (error) {
+          console.error(
+            `[SelfUpdater] Skill detection failed for ${tenantId}:`,
+            error instanceof Error ? error.message : error,
+          );
+        }
       }
 
       // 3. Log summary event

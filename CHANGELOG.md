@@ -6,6 +6,86 @@ All notable changes to ExoSkull are documented here.
 
 ## 2026-02-05
 
+### Skill Need Detector (Layer 14 Completion)
+
+Proaktywny system wykrywania potrzeb użytkownika z konwersacji → automatyczne sugestie nowych skilli.
+
+#### What was done
+- **Request Parser** — rozpoznaje "chcę śledzić X", "potrzebuję trackera do Y" (PL + EN, 12 wzorców regex)
+- **Pattern Matcher** — analizuje 7 dni konwersacji, wyciąga tematy przez Gemini Flash, porównuje z zainstalowanymi modami
+- **Gap Bridge** — łączy MAPE-K gap detection (blind spots w 7 obszarach życia) z sugestiami skilli
+- **Main Detector** — orkiestruje 3 źródła, deduplikuje, rankuje po confidence, zapisuje do DB
+- **DB Migration** — tabela `exo_skill_suggestions` z RLS, auto-expire (14 dni), helper functions
+- **Self-Updater Hook** — post-conversation CRON uruchamia detection co 15 min
+- **Conversation Handler** — pending suggestions w kontekście IORS + 2 nowe voice tools (accept/dismiss)
+
+#### Flow
+```
+Rozmowa → (15 min) Post-Conv CRON → Self-Updater → Skill Need Detector
+  → Request Parser: "chcę śledzić wodę" → confidence: 0.85
+  → Pattern Matcher: "coffee mentioned 8x" → confidence: 0.6
+  → Gap Bridge: "no health data 14d" → confidence: 0.8
+  → exo_skill_suggestions (max 5 per run)
+  → Następna rozmowa: "Zauważyłem że dużo mówisz o kawie. Chcesz tracker?"
+  → User: "Tak" → accept_skill_suggestion → generateSkill() → 2FA → Deploy
+```
+
+#### Files created
+- `exoskull-app/lib/skills/detector/types.ts`
+- `exoskull-app/lib/skills/detector/request-parser.ts`
+- `exoskull-app/lib/skills/detector/pattern-matcher.ts`
+- `exoskull-app/lib/skills/detector/gap-bridge.ts`
+- `exoskull-app/lib/skills/detector/index.ts`
+- `exoskull-app/supabase/migrations/20260206000002_skill_suggestions.sql`
+
+#### Files modified
+- `exoskull-app/lib/learning/self-updater.ts` (skill detection after highlight extraction)
+- `exoskull-app/lib/voice/conversation-handler.ts` (pending suggestions context + 2 voice tools)
+
+#### How to verify
+- Post-conversation CRON: `/api/cron/post-conversation` → check logs for "Skill needs detected"
+- Dashboard: `/dashboard/skills` → pending suggestions should appear
+- Voice: Say "chcę śledzić ile piję wody" → IORS triggers skill generation
+- DB: `SELECT * FROM exo_skill_suggestions WHERE status='pending'`
+
+#### Notes for future agents
+- Pattern Matcher uses Gemini Flash (Tier 1) for topic extraction — cheap
+- Request Parser is regex-only (no AI cost) — instant detection
+- Gap Bridge reads from `exo_interventions` where `intervention_type='gap_detection'`
+- Suggestions auto-expire after 14 days (`expire_old_skill_suggestions()`)
+- Voice tools: `accept_skill_suggestion` triggers full generation pipeline + 2FA approval
+
+---
+
+### Quick Wins: MAPE-K Context + 2FA Approval + Agent Quotas
+
+Three system-level improvements to wire placeholder/hardcoded values to real data.
+
+#### What was done
+- **MAPE-K Loop:** Connected `currentMood` and `energyLevel` from `exo_mood_entries` table; `upcomingEvents24h` from pending tasks as calendar proxy
+- **2FA Approval Gateway:** After channel 1 confirmation, now sends notification via channel 2 (SMS or email queued to `exo_notifications`)
+- **Agent Base:** Replaced hardcoded `patterns: 0` with query to `user_patterns`; `activeModules: []` reads from `exo_tenants.settings` JSONB; `aiCallsRemaining: 1000` now counts today's `agent_executions`; `upcomingEvents` and `calendarBusy` wired to task due dates
+- **Fix:** Created missing `lib/supabase/service-client.ts` (unblocked skills/detector build)
+
+#### Files changed
+- `exoskull-app/lib/autonomy/mape-k-loop.ts`
+- `exoskull-app/lib/skills/approval/approval-gateway.ts`
+- `exoskull-app/lib/agents/core/base-agent.ts`
+- `exoskull-app/lib/supabase/service-client.ts` (new)
+
+#### How to verify
+- MAPE-K: Check `/api/cron/mape-k` response includes real mood/energy values
+- 2FA: Generate high-risk skill > confirm channel 1 > verify channel 2 notification sent
+- Agents: Check agent execution logs show real pattern/quota data
+
+#### Notes for future agents
+- Calendar events use tasks as proxy (no direct Google Calendar query in MAPE-K yet — requires OAuth per tenant)
+- `freeTimeBlocks` simplified as `8 - upcomingEvents` (placeholder formula)
+- `activeModules` defaults to `['task-manager', 'mood-tracker', 'habit-tracker']` when tenant has no settings
+- `storageUsedMb` still 0 (needs R2 usage query — future work)
+
+---
+
 ### Fix: Skill Generation Pipeline - Sonnet 4.5 + Model Fallback
 
 Skill generation ("Generuj nowy Skill") failowalo z "All models failed after 1 tier escalations".

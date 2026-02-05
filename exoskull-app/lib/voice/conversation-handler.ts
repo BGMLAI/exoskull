@@ -26,6 +26,10 @@ import {
   findLastMention,
   formatSearchResultsForResponse,
 } from "../memory/search";
+import {
+  getPendingSuggestions,
+  updateSuggestionStatus,
+} from "../skills/detector";
 
 // ============================================================================
 // CONFIGURATION
@@ -422,6 +426,36 @@ const IORS_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["query"],
+    },
+  },
+  {
+    name: "accept_skill_suggestion",
+    description:
+      'Zaakceptuj sugestię nowego skilla. Użyj gdy użytkownik zgadza się na propozycję nowej umiejętności, np. "tak, chcę to", "zbuduj to", "dobry pomysł".',
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        suggestion_id: {
+          type: "string",
+          description: "ID sugestii z kontekstu SUGESTIE NOWYCH UMIEJĘTNOŚCI",
+        },
+      },
+      required: ["suggestion_id"],
+    },
+  },
+  {
+    name: "dismiss_skill_suggestion",
+    description:
+      'Odrzuć sugestię skilla. Użyj gdy użytkownik nie chce propozycji, np. "nie", "nie potrzebuję", "może później".',
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        suggestion_id: {
+          type: "string",
+          description: "ID sugestii do odrzucenia",
+        },
+      },
+      required: ["suggestion_id"],
     },
   },
 ];
@@ -1161,6 +1195,78 @@ async function executeTool(
       }
     }
 
+    if (toolName === "accept_skill_suggestion") {
+      const suggestionId = toolInput.suggestion_id;
+
+      console.log("[ConversationHandler] accept_skill_suggestion:", {
+        suggestionId,
+        tenantId,
+      });
+
+      try {
+        // Mark suggestion as accepted
+        await updateSuggestionStatus(suggestionId, "accepted");
+
+        // Load suggestion to get description
+        const supabase = getSupabase();
+        const { data: suggestion } = await supabase
+          .from("exo_skill_suggestions")
+          .select("description, suggested_slug")
+          .eq("id", suggestionId)
+          .single();
+
+        if (!suggestion) {
+          return "Nie znaleziono sugestii o podanym ID.";
+        }
+
+        // Trigger skill generation
+        const { generateSkill } =
+          await import("../skills/generator/skill-generator");
+        const result = await generateSkill({
+          tenant_id: tenantId,
+          description: suggestion.description,
+          source: "user_request",
+        });
+
+        if (result.success && result.skill) {
+          await updateSuggestionStatus(
+            suggestionId,
+            "generated",
+            result.skill.id,
+          );
+          return `Skill "${suggestion.description}" został wygenerowany! Status: oczekuje na zatwierdzenie. Dostaniesz SMS z kodem potwierdzającym.`;
+        } else {
+          return `Nie udało się wygenerować skilla: ${result.error || "nieznany błąd"}. Spróbuję ponownie później.`;
+        }
+      } catch (error) {
+        console.error(
+          "[ConversationHandler] accept_skill_suggestion error:",
+          error,
+        );
+        return "Nie udało się zaakceptować sugestii. Spróbuj ponownie.";
+      }
+    }
+
+    if (toolName === "dismiss_skill_suggestion") {
+      const suggestionId = toolInput.suggestion_id;
+
+      console.log("[ConversationHandler] dismiss_skill_suggestion:", {
+        suggestionId,
+        tenantId,
+      });
+
+      try {
+        await updateSuggestionStatus(suggestionId, "rejected");
+        return "Sugestia odrzucona. Nie będę więcej proponować tego skilla.";
+      } catch (error) {
+        console.error(
+          "[ConversationHandler] dismiss_skill_suggestion error:",
+          error,
+        );
+        return "Nie udało się odrzucić sugestii.";
+      }
+    }
+
     return "Nieznane narzędzie";
   } catch (error) {
     console.error("[ConversationHandler] Tool execution error:", error);
@@ -1247,6 +1353,22 @@ async function buildDynamicContext(tenantId: string): Promise<string> {
     }
   } catch {
     // Non-blocking: context works without thread summary
+  }
+
+  // Pending skill suggestions (from Need Detector)
+  try {
+    const suggestions = await getPendingSuggestions(tenantId, 3);
+    if (suggestions.length > 0) {
+      context += `\n## SUGESTIE NOWYCH UMIEJĘTNOŚCI\n`;
+      context += `System wykrył potrzeby użytkownika. Naturalnie zaproponuj te skille gdy pasuje do rozmowy:\n`;
+      for (const s of suggestions) {
+        context += `- [${s.source}] ${s.description} (pewność: ${Math.round(s.confidence * 100)}%) | ID: ${s.id}\n`;
+      }
+      context += `Gdy użytkownik się zgodzi, użyj narzędzia "accept_skill_suggestion" z ID sugestii.\n`;
+      context += `Gdy odmówi, użyj "dismiss_skill_suggestion". NIE naciskaj - zaproponuj raz, naturalnie.\n`;
+    }
+  } catch {
+    // Non-blocking
   }
 
   return context;
