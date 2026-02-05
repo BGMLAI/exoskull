@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { DashboardInboxView } from "@/components/dashboard/DashboardInboxView";
+import { DashboardStatsSection } from "@/components/dashboard/DashboardStatsSection";
+import { WellbeingHero } from "@/components/dashboard/WellbeingHero";
+import { DailyReadinessCard } from "@/components/dashboard/DailyReadinessCard";
 
 export const dynamic = "force-dynamic";
 
@@ -34,8 +37,18 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="h-full">
-      <DashboardInboxView tenantId={user.id} assistantName={assistantName} />
+    <div className="h-full flex flex-col">
+      {/* Wellbeing First — scrollable content above inbox */}
+      <div className="space-y-4 p-4 pb-0">
+        <WellbeingHero />
+        <DailyReadinessCard />
+        <DashboardStatsSection tenantId={user.id} />
+      </div>
+
+      {/* Inbox — takes remaining space */}
+      <div className="flex-1 min-h-0 mt-4">
+        <DashboardInboxView tenantId={user.id} assistantName={assistantName} />
+      </div>
     </div>
   );
 }

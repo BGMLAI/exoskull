@@ -4,6 +4,42 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-05] feat: L10 Self-Optimization — MAPE-K Completion
+
+### What was done
+- Created `lib/optimization/system-metrics.ts` — Collects MAPE-K cycle stats, skill health, intervention effectiveness, AI usage, and learning events from existing tables (all queries in parallel)
+- Enhanced MAPE-K **Analyze** phase — Emotion trend detection (L11 exo_emotion_log), goal progress checks (L9 exo_user_goals trajectory), productivity drop detection (low tasks + low energy + low conversations), system health monitoring (skill error rate, intervention approval rate)
+- Enhanced MAPE-K **Plan** phase — New intervention handlers for `missed_goal` (goal review check-in), `productivity_drop` (encouraging notification), `social_isolation` (social check-in)
+- Enhanced MAPE-K **Execute** phase — Cycle logging to `system_optimizations` table with before/after state tracking
+- Enhanced MAPE-K **Knowledge** phase — Cross-domain correlation detection: sleep+productivity, isolation+mood, goals+task overload patterns logged to `learning_events`
+- Created `app/api/cron/self-optimization/route.ts` — CRON (every 6h): auto-triggers MAPE-K for all active tenants with 30s timeout per tenant
+- Added `self-optimization` + `outbound-monitor` to `vercel.json` cron schedule
+- ARCHITECTURE.md: L10 status updated to ✅ Live
+
+### Why
+- MAPE-K loop existed (940 lines) but was NEVER auto-triggered — no CRON called `runAutonomyCycle()`
+- Analyze phase only checked sleep/tasks/activity — missed emotions, goals, productivity, system health
+- Plan phase only handled 3 issue types — couldn't intervene for missed goals or social isolation
+- Knowledge phase didn't detect cross-domain patterns
+- System had no self-awareness of its own performance metrics
+
+### Files changed
+- `lib/optimization/system-metrics.ts` (NEW)
+- `app/api/cron/self-optimization/route.ts` (NEW)
+- `lib/autonomy/mape-k-loop.ts` (enhanced all 5 phases)
+- `lib/autonomy/types.ts` (SystemMetrics interface)
+- `vercel.json` (2 new CRONs)
+- `ARCHITECTURE.md` (L10 status)
+
+### Notes for future agents
+- MAPE-K auto-runs every 6h via CRON, self-optimizer agent runs weekly (Sundays)
+- SystemMetrics is optional on MonitorData — graceful fallback if collection fails
+- Cross-domain patterns detected from last 5 completed cycles
+- Max 3 interventions per MAPE-K cycle (priority-sorted)
+- 30s timeout per tenant in CRON to prevent runaway cycles
+
+---
+
 ## [2026-02-05] feat: Autonomous Outbound Engine (Layer 16)
 
 ### What was done

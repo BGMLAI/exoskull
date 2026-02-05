@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -22,7 +23,26 @@ import {
 import { IntegrationsWidget } from "@/components/widgets/IntegrationsWidget";
 import { EmailInboxWidget } from "@/components/widgets/EmailInboxWidget";
 import { COMMUNICATION_STYLE_LABELS, CHANNEL_LABELS } from "@/lib/types/user";
-import { Settings, User, Bell, Plug } from "lucide-react";
+import {
+  Settings,
+  User,
+  Bell,
+  Plug,
+  Shield,
+  CreditCard,
+  Trash2,
+  Download,
+  AlertTriangle,
+} from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface ProfileFormState {
   preferred_name: string;
@@ -82,6 +102,8 @@ export default function SettingsPage() {
   const [savingNotifications, setSavingNotifications] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [notificationsSaved, setNotificationsSaved] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [exportingData, setExportingData] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -595,6 +617,151 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <IntegrationsWidget connections={connections} tenantId={tenantId} />
+        </CardContent>
+      </Card>
+
+      {/* Privacy & Data */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Prywatnosc i dane
+          </CardTitle>
+          <CardDescription>
+            Eksport danych, retencja i uprawnienia
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+            <div>
+              <p className="font-medium text-sm">Eksport danych (GDPR)</p>
+              <p className="text-xs text-muted-foreground">
+                Pobierz kopie wszystkich Twoich danych w formacie JSON
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={exportingData}
+              onClick={async () => {
+                setExportingData(true);
+                try {
+                  const res = await fetch("/api/user/export");
+                  if (res.ok) {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `exoskull-data-${new Date().toISOString().split("T")[0]}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } else {
+                    console.error("[Settings] Export error:", await res.text());
+                  }
+                } catch (err) {
+                  console.error("[Settings] Export error:", err);
+                } finally {
+                  setExportingData(false);
+                }
+              }}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              {exportingData ? "Eksportowanie..." : "Eksportuj dane"}
+            </Button>
+          </div>
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <p className="font-medium text-sm">Retencja danych</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Nagrania glosowe: 90 dni (potem auto-usuwane) <br />
+              Wiadomosci: przechowywane bezterminowo <br />
+              Dane zdrowotne: przechowywane bezterminowo <br />
+              Dane finansowe: szyfrowane AES-256
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Billing */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Rozliczenia
+          </CardTitle>
+          <CardDescription>Plan i platnosci</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+            <div>
+              <p className="font-medium">Plan: Free</p>
+              <p className="text-xs text-muted-foreground">
+                Podstawowe funkcje ExoSkull
+              </p>
+            </div>
+            <Badge variant="secondary">Aktywny</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Plany premium beda dostepne wkrotce. Powiadomimy Cie gdy ruszy
+            subskrypcja.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Account */}
+      <Card className="border-red-200 dark:border-red-900">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+            <AlertTriangle className="h-5 w-5" />
+            Konto
+          </CardTitle>
+          <CardDescription>Niebezpieczne operacje</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-950/30 rounded-lg">
+            <div>
+              <p className="font-medium text-sm">Usun konto</p>
+              <p className="text-xs text-muted-foreground">
+                Trwale usunie wszystkie Twoje dane. Tej operacji nie mozna
+                cofnac.
+              </p>
+            </div>
+            <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+              <DialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Usun konto
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Czy na pewno chcesz usunac konto?</DialogTitle>
+                  <DialogDescription>
+                    Ta operacja jest nieodwracalna. Wszystkie Twoje dane,
+                    rozmowy, zadania i ustawienia zostana trwale usuniete.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowDeleteDialog(false)}
+                  >
+                    Anuluj
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      // Account deletion requires backend support
+                      // For now, close dialog and show message
+                      setShowDeleteDialog(false);
+                      setError("Aby usunac konto, skontaktuj sie z supportem.");
+                    }}
+                  >
+                    Tak, usun moje konto
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardContent>
       </Card>
 
