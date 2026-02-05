@@ -6,6 +6,49 @@ All notable changes to ExoSkull are documented here.
 
 ## 2026-02-05
 
+### Best Memory on Market - Daily Summaries + Search + Interactive Review
+
+System pamięci "najlepsza pamięć na rynku" - daily summaries z interaktywnym przeglądem + wyszukiwanie w historii.
+
+#### What was done
+- **Daily Summaries (CRON 21:00):**
+  - Automatyczne generowanie podsumowania dnia z AI
+  - Analiza nastróju, energii, kluczowych wydarzeń, tematów
+  - SMS z podsumowaniem + możliwość korekty
+  - Interactive review - user może poprawiać/uzupełniać
+
+- **Memory Search:**
+  - Keyword search po wiadomościach, podsumowaniach, highlightach
+  - `findLastMention()` - kiedy ostatnio mówiłem o X
+  - `getMemoryTimeline()` - timeline podsumowań dla UI
+
+- **Voice Tools:**
+  - `get_daily_summary` - pobierz podsumowanie dnia
+  - `correct_daily_summary` - dodaj korektę (correction/addition/removal)
+  - `search_memory` - przeszukaj pamięć
+
+- **Database Schema:**
+  - `exo_daily_summaries` - codzienne podsumowania + korekty użytkownika
+  - `exo_memory_digests` - weekly/monthly/yearly kompresja pamięci
+  - Funkcja `get_memory_context()` - smart context window
+
+#### Why
+- User chciał "najlepszą pamięć na rynku"
+- 50+ wiadomości + insighty + podsumowania tygodni/miesięcy
+- Codzienne podsumowanie o 21:00 z możliwością korekty
+
+#### Files created
+- `lib/memory/daily-summary.ts` - AI daily summaries + corrections
+- `lib/memory/search.ts` - keyword search across memory
+- `app/api/cron/daily-summary/route.ts` - CRON endpoint
+- `supabase/migrations/20260205000004_memory_digests_system.sql`
+
+#### Files modified
+- `lib/voice/conversation-handler.ts` - dodane 3 voice tools
+- `vercel.json` - dodany CRON daily-summary 19:00 UTC
+
+---
+
 ### GHL-Style 3-Column Dashboard + Message-to-Task Conversion
 
 Przebudowa dashboardu na layout 3-kolumnowy inspirowany GHL Conversations + funkcja konwersji wiadomosci na taski.
