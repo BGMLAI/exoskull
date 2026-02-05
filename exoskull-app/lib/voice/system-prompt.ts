@@ -45,12 +45,14 @@ export const PSYCODE_PROMPT = `## PSYCODE - Kim Jestes
 ### Vibe
 Badz asystentem z ktorym SAM chcialbys rozmawiac. Zwiezly gdy trzeba, dokladny gdy ma znaczenie. Nie korporacyjny. Nie lizus. Po prostu dobry.
 
-`
+`;
 
 // ============================================================================
 // STATIC PROMPT (CACHED ~2500 tokens)
 // ============================================================================
-export const STATIC_SYSTEM_PROMPT = PSYCODE_PROMPT + `Jestes IORS - osobisty asystent zyciowy w ramach ExoSkull. Rozmawiasz z uzytkownikiem przez telefon.
+export const STATIC_SYSTEM_PROMPT =
+  PSYCODE_PROMPT +
+  `Jestes IORS - osobisty asystent zyciowy w ramach ExoSkull. Rozmawiasz z uzytkownikiem przez telefon.
 
 ## STYL ROZMOWY
 
@@ -66,6 +68,7 @@ Mowisz jak normalny czlowiek, nie jak robot. Krotko, naturalnie, po polsku.
 ## CO UMIESZ
 
 Zadania: add_task, list_tasks, complete_task
+Cele: define_goal, log_goal_progress, check_goals
 Mody (trackery): log_mod_data, get_mod_data, install_mod
 Dzwonienie: make_call - dzwonisz do DOWOLNEJ osoby/firmy w imieniu usera
 SMS: send_sms - wysylasz SMS na dowolny numer
@@ -125,6 +128,9 @@ Uzywaj narzedzi BEZ pytania. Nie mow "czy mam dodac?" - po prostu dodaj.
 - "Dodaj zadanie X" -> [add_task] "Zapisane."
 - "Co mam dzis?" -> [list_tasks] odpowiedz krotko
 - "Spalem 7h" -> [log_mod_data] "Mam."
+- "Chce biegac 3x w tygodniu" -> [define_goal] "Cel zapisany."
+- "Dzis przebieglem 5km" -> [log_goal_progress] "Zalogowane."
+- "Jak ida moje cele?" -> [check_goals] odpowiedz krotko
 - "Wyslij SMS do X" -> [send_sms] "Wyslane."
 - "Przypomni mi o 15" -> [plan_action] "Zaplanowano."
 
@@ -134,149 +140,158 @@ Rozmawiasz przez telefon, SMS, WhatsApp, email lub chat. Uzytkownik moze kontakt
 
 Kryzys: samobojstwo -> "Zadzwon na 116 123". Przemoc -> "Czy jestes bezpieczny?"`;
 
-
 // ============================================================================
 // DYNAMIC CONTEXT BUILDER
 // ============================================================================
 export interface UserProfile {
-  preferred_name?: string
-  communication_style?: 'direct' | 'warm' | 'coaching'
-  language_level?: 'casual' | 'formal'
-  domains_active?: string[]
+  preferred_name?: string;
+  communication_style?: "direct" | "warm" | "coaching";
+  language_level?: "casual" | "formal";
+  domains_active?: string[];
 }
 
 export interface ActiveRole {
-  name: string
-  instructions: string  // Loaded from DB or marketplace
+  name: string;
+  instructions: string; // Loaded from DB or marketplace
 }
 
 export interface UserHighlightSummary {
-  preferences: string[]
-  patterns: string[]
-  goals: string[]
-  insights: string[]
+  preferences: string[];
+  patterns: string[];
+  goals: string[];
+  insights: string[];
 }
 
 export interface DynamicContext {
   // Time
-  hour: number
-  dayOfWeek: number
+  hour: number;
+  dayOfWeek: number;
 
   // User profile
-  profile?: UserProfile
-  activeRole?: ActiveRole  // Loaded from user's profile or marketplace
+  profile?: UserProfile;
+  activeRole?: ActiveRole; // Loaded from user's profile or marketplace
 
   // Memory highlights (auto-learned from conversations)
-  highlights?: UserHighlightSummary
+  highlights?: UserHighlightSummary;
 
   // MITs (Most Important Things)
-  mits?: Array<{ rank: number; objective: string }>
+  mits?: Array<{ rank: number; objective: string }>;
 
   // State
-  recentTasksCount?: number
-  overdueTasksCount?: number
-  userMood?: 'energetic' | 'tired' | 'stressed' | 'neutral'
+  recentTasksCount?: number;
+  overdueTasksCount?: number;
+  userMood?: "energetic" | "tired" | "stressed" | "neutral";
 
   // Patterns (for proactive behavior)
-  sleepDebtHours?: number
-  daysSinceLastSocial?: number
+  sleepDebtHours?: number;
+  daysSinceLastSocial?: number;
 
   // Conversation
-  lastConversationTopic?: string
-  conversationCount?: number
+  lastConversationTopic?: string;
+  conversationCount?: number;
 }
 
 export function buildDynamicContext(ctx: DynamicContext): string {
-  const parts: string[] = ['\n\n## AKTUALNY KONTEKST\n']
+  const parts: string[] = ["\n\n## AKTUALNY KONTEKST\n"];
 
   // Time
-  const timeOfDay = getTimeOfDay(ctx.hour)
-  const dayName = getDayName(ctx.dayOfWeek)
-  parts.push(`Pora: ${timeOfDay} (${ctx.hour}:00), ${dayName}`)
+  const timeOfDay = getTimeOfDay(ctx.hour);
+  const dayName = getDayName(ctx.dayOfWeek);
+  parts.push(`Pora: ${timeOfDay} (${ctx.hour}:00), ${dayName}`);
 
   // User profile
   if (ctx.profile?.preferred_name) {
-    parts.push(`User: ${ctx.profile.preferred_name}`)
+    parts.push(`User: ${ctx.profile.preferred_name}`);
   }
   if (ctx.profile?.communication_style) {
     const styleHints: Record<string, string> = {
-      'direct': 'Styl: bezposredni, konkretny',
-      'warm': 'Styl: cieplejszy, empatyczny',
-      'coaching': 'Styl: pytania, refleksja'
-    }
-    parts.push(styleHints[ctx.profile.communication_style])
+      direct: "Styl: bezposredni, konkretny",
+      warm: "Styl: cieplejszy, empatyczny",
+      coaching: "Styl: pytania, refleksja",
+    };
+    parts.push(styleHints[ctx.profile.communication_style]);
   }
 
   // Active role (loaded from DB/marketplace)
   if (ctx.activeRole) {
-    parts.push(`\n### AKTYWNA ROLA: ${ctx.activeRole.name}`)
-    parts.push(ctx.activeRole.instructions)
+    parts.push(`\n### AKTYWNA ROLA: ${ctx.activeRole.name}`);
+    parts.push(ctx.activeRole.instructions);
   }
 
   // Tasks
   if (ctx.recentTasksCount !== undefined) {
-    let taskInfo = `Zadania: ${ctx.recentTasksCount} aktywnych`
+    let taskInfo = `Zadania: ${ctx.recentTasksCount} aktywnych`;
     if (ctx.overdueTasksCount && ctx.overdueTasksCount > 0) {
-      taskInfo += `, ${ctx.overdueTasksCount} przeterminowanych`
+      taskInfo += `, ${ctx.overdueTasksCount} przeterminowanych`;
     }
-    parts.push(taskInfo)
+    parts.push(taskInfo);
   }
 
   // Mood
-  if (ctx.userMood && ctx.userMood !== 'neutral') {
+  if (ctx.userMood && ctx.userMood !== "neutral") {
     const moodHints: Record<string, string> = {
-      'energetic': 'Nastroj: energiczny - mozesz byc dynamiczny',
-      'tired': 'Nastroj: zmeczony - badz cieplejszy, nie przytlaczaj',
-      'stressed': 'Nastroj: stres - spokojnie, bez presji'
-    }
-    parts.push(moodHints[ctx.userMood])
+      energetic: "Nastroj: energiczny - mozesz byc dynamiczny",
+      tired: "Nastroj: zmeczony - badz cieplejszy, nie przytlaczaj",
+      stressed: "Nastroj: stres - spokojnie, bez presji",
+    };
+    parts.push(moodHints[ctx.userMood]);
   }
 
   // Proactive patterns
   if (ctx.sleepDebtHours && ctx.sleepDebtHours > 4) {
-    parts.push(`Sleep debt: ${ctx.sleepDebtHours}h - rozważ wspomnienie`)
+    parts.push(`Sleep debt: ${ctx.sleepDebtHours}h - rozważ wspomnienie`);
   }
   if (ctx.daysSinceLastSocial && ctx.daysSinceLastSocial > 14) {
-    parts.push(`Izolacja: ${ctx.daysSinceLastSocial} dni bez kontaktu - rozważ wspomnienie`)
+    parts.push(
+      `Izolacja: ${ctx.daysSinceLastSocial} dni bez kontaktu - rozważ wspomnienie`,
+    );
   }
 
   // Last topic
   if (ctx.lastConversationTopic) {
-    parts.push(`Ostatni temat: ${ctx.lastConversationTopic}`)
+    parts.push(`Ostatni temat: ${ctx.lastConversationTopic}`);
   }
 
   // Memory highlights (auto-learned from conversations)
   if (ctx.highlights) {
-    const highlightParts: string[] = []
+    const highlightParts: string[] = [];
 
     if (ctx.highlights.preferences.length > 0) {
-      highlightParts.push(`Preferencje: ${ctx.highlights.preferences.slice(0, 5).join('; ')}`)
+      highlightParts.push(
+        `Preferencje: ${ctx.highlights.preferences.slice(0, 5).join("; ")}`,
+      );
     }
     if (ctx.highlights.goals.length > 0) {
-      highlightParts.push(`Cele: ${ctx.highlights.goals.slice(0, 3).join('; ')}`)
+      highlightParts.push(
+        `Cele: ${ctx.highlights.goals.slice(0, 3).join("; ")}`,
+      );
     }
     if (ctx.highlights.patterns.length > 0) {
-      highlightParts.push(`Wzorce: ${ctx.highlights.patterns.slice(0, 3).join('; ')}`)
+      highlightParts.push(
+        `Wzorce: ${ctx.highlights.patterns.slice(0, 3).join("; ")}`,
+      );
     }
     if (ctx.highlights.insights.length > 0) {
-      highlightParts.push(`Insights: ${ctx.highlights.insights.slice(0, 3).join('; ')}`)
+      highlightParts.push(
+        `Insights: ${ctx.highlights.insights.slice(0, 3).join("; ")}`,
+      );
     }
 
     if (highlightParts.length > 0) {
-      parts.push('\n### PAMIEC O UZYTKOWNIKU')
-      parts.push(highlightParts.join('\n'))
+      parts.push("\n### PAMIEC O UZYTKOWNIKU");
+      parts.push(highlightParts.join("\n"));
     }
   }
 
   // MITs (Most Important Things - top 3 objectives)
   if (ctx.mits && ctx.mits.length > 0) {
-    parts.push('\n### NAJWAZNIEJSZE CELE (MITs)')
-    ctx.mits.forEach(mit => {
-      parts.push(`${mit.rank}. ${mit.objective}`)
-    })
+    parts.push("\n### NAJWAZNIEJSZE CELE (MITs)");
+    ctx.mits.forEach((mit) => {
+      parts.push(`${mit.rank}. ${mit.objective}`);
+    });
   }
 
-  return parts.join('\n')
+  return parts.join("\n");
 }
 
 // ============================================================================
@@ -284,18 +299,26 @@ export function buildDynamicContext(ctx: DynamicContext): string {
 // ============================================================================
 
 function getTimeOfDay(hour: number): string {
-  if (hour >= 5 && hour < 9) return 'wczesny ranek'
-  if (hour >= 9 && hour < 12) return 'przedpoludnie'
-  if (hour >= 12 && hour < 14) return 'poludnie'
-  if (hour >= 14 && hour < 17) return 'popoludnie'
-  if (hour >= 17 && hour < 20) return 'wieczor'
-  if (hour >= 20 && hour < 23) return 'pozny wieczor'
-  return 'noc'
+  if (hour >= 5 && hour < 9) return "wczesny ranek";
+  if (hour >= 9 && hour < 12) return "przedpoludnie";
+  if (hour >= 12 && hour < 14) return "poludnie";
+  if (hour >= 14 && hour < 17) return "popoludnie";
+  if (hour >= 17 && hour < 20) return "wieczor";
+  if (hour >= 20 && hour < 23) return "pozny wieczor";
+  return "noc";
 }
 
 function getDayName(dayOfWeek: number): string {
-  const days = ['niedziela', 'poniedzialek', 'wtorek', 'sroda', 'czwartek', 'piatek', 'sobota']
-  return days[dayOfWeek] || 'nieznany'
+  const days = [
+    "niedziela",
+    "poniedzialek",
+    "wtorek",
+    "sroda",
+    "czwartek",
+    "piatek",
+    "sobota",
+  ];
+  return days[dayOfWeek] || "nieznany";
 }
 
 // ============================================================================
@@ -303,9 +326,9 @@ function getDayName(dayOfWeek: number): string {
 // ============================================================================
 export function buildFullSystemPrompt(dynamicCtx?: DynamicContext): string {
   if (!dynamicCtx) {
-    return STATIC_SYSTEM_PROMPT
+    return STATIC_SYSTEM_PROMPT;
   }
-  return STATIC_SYSTEM_PROMPT + buildDynamicContext(dynamicCtx)
+  return STATIC_SYSTEM_PROMPT + buildDynamicContext(dynamicCtx);
 }
 
 // ============================================================================
@@ -314,32 +337,32 @@ export function buildFullSystemPrompt(dynamicCtx?: DynamicContext): string {
 // ============================================================================
 export const CACHED_RESPONSES = {
   // Tasks
-  task_added: 'Dodane.',
-  task_completed: 'Odhaczylem.',
-  no_tasks: 'Lista pusta.',
+  task_added: "Dodane.",
+  task_completed: "Odhaczylem.",
+  no_tasks: "Lista pusta.",
 
   // Confirmations
-  understood: 'Jasne.',
-  ok: 'Ok.',
-  got_it: 'Mam.',
+  understood: "Jasne.",
+  ok: "Ok.",
+  got_it: "Mam.",
 
   // Messages
-  message_sent: 'Wyslane.',
-  appointment_booked: 'Umowione.',
+  message_sent: "Wyslane.",
+  appointment_booked: "Umowione.",
 
   // Farewells
-  goodbye: 'Do uslyszenia.',
-  bye_short: 'Pa.',
-  take_care: 'Trzymaj sie.',
-  good_night: 'Dobranoc.',
+  goodbye: "Do uslyszenia.",
+  bye_short: "Pa.",
+  take_care: "Trzymaj sie.",
+  good_night: "Dobranoc.",
 
   // Errors
-  error_generic: 'Cos poszlo nie tak. Sprobuj jeszcze raz.',
-  not_found: 'Nie znalazlem.',
-  no_data: 'Nie mam tej informacji.',
-} as const
+  error_generic: "Cos poszlo nie tak. Sprobuj jeszcze raz.",
+  not_found: "Nie znalazlem.",
+  no_data: "Nie mam tej informacji.",
+} as const;
 
-export type CachedResponseKey = keyof typeof CACHED_RESPONSES
+export type CachedResponseKey = keyof typeof CACHED_RESPONSES;
 
 // ============================================================================
 // ROLE LOADING (placeholder - roles loaded from DB/marketplace)

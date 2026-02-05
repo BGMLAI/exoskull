@@ -92,6 +92,10 @@
     {
       "path": "/api/cron/skill-lifecycle",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/goal-progress",
+      "schedule": "0 20 * * *"
     }
   ]
 }

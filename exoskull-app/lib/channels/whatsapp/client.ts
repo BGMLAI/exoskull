@@ -83,6 +83,14 @@ export interface WhatsAppIncomingMessage {
   text?: { body: string };
   image?: { id: string; mime_type: string; sha256: string; caption?: string };
   audio?: { id: string; mime_type: string };
+  video?: { id: string; mime_type: string; sha256?: string; caption?: string };
+  document?: {
+    id: string;
+    mime_type: string;
+    sha256?: string;
+    filename?: string;
+    caption?: string;
+  };
   location?: {
     latitude: number;
     longitude: number;
@@ -238,6 +246,234 @@ export class WhatsAppClient {
       message_id: messageId,
     });
   }
+
+  // =====================================================
+  // INTERACTIVE MESSAGES
+  // =====================================================
+
+  /**
+   * Send interactive message with reply buttons (max 3)
+   */
+  async sendButtons(
+    to: string,
+    bodyText: string,
+    buttons: Array<{ id: string; title: string }>,
+    headerText?: string,
+    footerText?: string,
+  ): Promise<WhatsAppMessageResponse> {
+    return this.request<WhatsAppMessageResponse>(
+      `${this.phoneNumberId}/messages`,
+      "POST",
+      {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          ...(headerText ? { header: { type: "text", text: headerText } } : {}),
+          body: { text: bodyText },
+          ...(footerText ? { footer: { text: footerText } } : {}),
+          action: {
+            buttons: buttons.slice(0, 3).map((b) => ({
+              type: "reply",
+              reply: { id: b.id, title: b.title },
+            })),
+          },
+        },
+      },
+    );
+  }
+
+  /**
+   * Send interactive list message (max 10 rows per section, max 10 sections)
+   */
+  async sendList(
+    to: string,
+    bodyText: string,
+    buttonLabel: string,
+    sections: Array<{
+      title: string;
+      rows: Array<{ id: string; title: string; description?: string }>;
+    }>,
+    headerText?: string,
+    footerText?: string,
+  ): Promise<WhatsAppMessageResponse> {
+    return this.request<WhatsAppMessageResponse>(
+      `${this.phoneNumberId}/messages`,
+      "POST",
+      {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "list",
+          ...(headerText ? { header: { type: "text", text: headerText } } : {}),
+          body: { text: bodyText },
+          ...(footerText ? { footer: { text: footerText } } : {}),
+          action: {
+            button: buttonLabel,
+            sections,
+          },
+        },
+      },
+    );
+  }
+
+  // =====================================================
+  // MEDIA MESSAGES
+  // =====================================================
+
+  /**
+   * Send image message by URL
+   */
+  async sendImage(
+    to: string,
+    imageUrl: string,
+    caption?: string,
+  ): Promise<WhatsAppMessageResponse> {
+    return this.request<WhatsAppMessageResponse>(
+      `${this.phoneNumberId}/messages`,
+      "POST",
+      {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "image",
+        image: { link: imageUrl, caption },
+      },
+    );
+  }
+
+  /**
+   * Send document message by URL
+   */
+  async sendDocument(
+    to: string,
+    documentUrl: string,
+    filename: string,
+    caption?: string,
+  ): Promise<WhatsAppMessageResponse> {
+    return this.request<WhatsAppMessageResponse>(
+      `${this.phoneNumberId}/messages`,
+      "POST",
+      {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "document",
+        document: { link: documentUrl, filename, caption },
+      },
+    );
+  }
+
+  /**
+   * Send audio message by URL
+   */
+  async sendAudio(
+    to: string,
+    audioUrl: string,
+  ): Promise<WhatsAppMessageResponse> {
+    return this.request<WhatsAppMessageResponse>(
+      `${this.phoneNumberId}/messages`,
+      "POST",
+      {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "audio",
+        audio: { link: audioUrl },
+      },
+    );
+  }
+
+  /**
+   * Send video message by URL
+   */
+  async sendVideo(
+    to: string,
+    videoUrl: string,
+    caption?: string,
+  ): Promise<WhatsAppMessageResponse> {
+    return this.request<WhatsAppMessageResponse>(
+      `${this.phoneNumberId}/messages`,
+      "POST",
+      {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "video",
+        video: { link: videoUrl, caption },
+      },
+    );
+  }
+
+  /**
+   * Send location message
+   */
+  async sendLocation(
+    to: string,
+    latitude: number,
+    longitude: number,
+    name?: string,
+    address?: string,
+  ): Promise<WhatsAppMessageResponse> {
+    return this.request<WhatsAppMessageResponse>(
+      `${this.phoneNumberId}/messages`,
+      "POST",
+      {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "location",
+        location: { latitude, longitude, name, address },
+      },
+    );
+  }
+
+  // =====================================================
+  // MEDIA RETRIEVAL
+  // =====================================================
+
+  /**
+   * Get media URL by media ID (for downloading incoming attachments)
+   */
+  async getMediaUrl(mediaId: string): Promise<string> {
+    const response = await this.request<{ url: string }>(mediaId, "GET");
+    return response.url;
+  }
+
+  // =====================================================
+  // BUSINESS PROFILE
+  // =====================================================
+
+  /**
+   * Get WhatsApp Business Profile
+   */
+  async getBusinessProfile(): Promise<{
+    about?: string;
+    address?: string;
+    description?: string;
+    email?: string;
+    profile_picture_url?: string;
+    websites?: string[];
+  }> {
+    const response = await this.request<{
+      data: Array<Record<string, unknown>>;
+    }>(
+      `${this.phoneNumberId}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites`,
+      "GET",
+    );
+    return (response.data?.[0] || {}) as {
+      about?: string;
+      address?: string;
+      description?: string;
+      email?: string;
+      profile_picture_url?: string;
+      websites?: string[];
+    };
+  }
 }
 
 // =====================================================
@@ -253,6 +489,8 @@ export function extractIncomingMessage(payload: WhatsAppWebhookPayload): {
   messageId: string;
   senderName: string;
   phoneNumberId: string;
+  messageType: WhatsAppIncomingMessage["type"];
+  raw: WhatsAppIncomingMessage;
 } | null {
   try {
     const entry = payload.entry?.[0];
@@ -260,16 +498,50 @@ export function extractIncomingMessage(payload: WhatsAppWebhookPayload): {
     const value = change?.value;
     const message = value?.messages?.[0];
 
-    if (!message || message.type !== "text" || !message.text?.body) {
-      return null;
+    if (!message) return null;
+
+    // Extract text based on message type
+    let text = "";
+    switch (message.type) {
+      case "text":
+        text = message.text?.body || "";
+        break;
+      case "interactive":
+        text = "[Interakcja]";
+        break;
+      case "image":
+        text = message.image?.caption || "[Zdjecie]";
+        break;
+      case "video":
+        text = message.video?.caption || "[Wideo]";
+        break;
+      case "audio":
+        text = "[Wiadomosc glosowa]";
+        break;
+      case "document":
+        text = message.document?.caption || "[Dokument]";
+        break;
+      case "location":
+        text =
+          `[Lokalizacja: ${message.location?.name || ""} ${message.location?.address || ""}]`.trim();
+        break;
+      case "reaction":
+        text = "";
+        break;
+      default:
+        text = `[${message.type}]`;
     }
+
+    if (!text) return null;
 
     return {
       from: message.from,
-      text: message.text.body,
+      text,
       messageId: message.id,
       senderName: value.contacts?.[0]?.profile?.name || message.from,
       phoneNumberId: value.metadata?.phone_number_id || "",
+      messageType: message.type,
+      raw: message,
     };
   } catch (error) {
     console.error("[WhatsApp] Failed to extract message:", {

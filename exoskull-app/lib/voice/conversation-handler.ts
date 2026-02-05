@@ -30,6 +30,12 @@ import {
   getPendingSuggestions,
   updateSuggestionStatus,
 } from "../skills/detector";
+import {
+  defineGoal,
+  logProgress,
+  logProgressByName,
+  getGoalsForVoice,
+} from "../goals/engine";
 
 // ============================================================================
 // CONFIGURATION
@@ -456,6 +462,63 @@ const IORS_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["suggestion_id"],
+    },
+  },
+  {
+    name: "define_goal",
+    description:
+      'Zdefiniuj nowy cel użytkownika. Użyj gdy mówi "chcę...", "mój cel to...", "planuję...", np. "Chcę biegać 3 razy w tygodniu", "Chcę schudnąć 5kg do lata", "Chcę czytać 30 minut dziennie".',
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: {
+          type: "string",
+          description: "Cel w słowach użytkownika, np. 'Biegać 3x w tygodniu'",
+        },
+        target_value: {
+          type: "number",
+          description: "Wartość docelowa, np. 3 (razy), 5 (kg), 30 (minut)",
+        },
+        target_unit: {
+          type: "string",
+          description:
+            "Jednostka: razy, kg, minut, kroków, złotych, stron, itp.",
+        },
+        target_date: {
+          type: "string",
+          description: "Termin w formacie YYYY-MM-DD (opcjonalne)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "log_goal_progress",
+    description:
+      'Zapisz postęp w celu. Użyj gdy user raportuje osiągnięcia, np. "Dziś przebiegłem 5km", "Ważę 83kg", "Przeczytałem 40 stron", "Wydałem 50 zł".',
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        goal_name: {
+          type: "string",
+          description:
+            "Nazwa lub fragment nazwy celu (system dopasuje automatycznie)",
+        },
+        value: {
+          type: "number",
+          description: "Wartość do zapisania, np. 5, 83, 40",
+        },
+      },
+      required: ["goal_name", "value"],
+    },
+  },
+  {
+    name: "check_goals",
+    description:
+      'Pokaż cele użytkownika i ich postęp. Użyj gdy pyta "jak idą moje cele?", "jaki mam postęp?", "ile mi brakuje?".',
+    input_schema: {
+      type: "object" as const,
+      properties: {},
     },
   },
 ];
@@ -1267,6 +1330,79 @@ async function executeTool(
       }
     }
 
+    // ---- Goal tools ----
+
+    if (toolName === "define_goal") {
+      console.log("[ConversationHandler] define_goal:", {
+        tenantId,
+        input: toolInput,
+      });
+
+      try {
+        const goal = await defineGoal(tenantId, {
+          name: toolInput.name,
+          target_value: toolInput.target_value,
+          target_unit: toolInput.target_unit,
+          target_date: toolInput.target_date,
+        });
+
+        const deadline = goal.target_date
+          ? ` Termin: ${goal.target_date}.`
+          : "";
+        return `Cel utworzony: "${goal.name}" (${goal.category}).${deadline} Będę śledzić Twój postęp i informować Cię regularnie.`;
+      } catch (error) {
+        console.error("[ConversationHandler] define_goal error:", error);
+        return "Nie udało się utworzyć celu. Spróbuj powiedzieć inaczej.";
+      }
+    }
+
+    if (toolName === "log_goal_progress") {
+      console.log("[ConversationHandler] log_goal_progress:", {
+        tenantId,
+        goalName: toolInput.goal_name,
+        value: toolInput.value,
+      });
+
+      try {
+        const checkpoint = await logProgressByName(
+          tenantId,
+          toolInput.goal_name,
+          toolInput.value,
+          "voice",
+        );
+
+        if (!checkpoint) {
+          return `Nie znalazłem pasującego celu do "${toolInput.goal_name}". Sprawdź swoje cele mówiąc "jakie mam cele".`;
+        }
+
+        const progressText =
+          checkpoint.progress_percent != null
+            ? ` Postęp: ${Math.round(checkpoint.progress_percent)}%.`
+            : "";
+        const momentumText =
+          checkpoint.momentum === "up"
+            ? " Trend wzrostowy!"
+            : checkpoint.momentum === "down"
+              ? " Uwaga, trend spadkowy."
+              : "";
+        return `Zapisano: ${toolInput.value}.${progressText}${momentumText}`;
+      } catch (error) {
+        console.error("[ConversationHandler] log_goal_progress error:", error);
+        return "Nie udało się zapisać postępu.";
+      }
+    }
+
+    if (toolName === "check_goals") {
+      console.log("[ConversationHandler] check_goals:", { tenantId });
+
+      try {
+        return await getGoalsForVoice(tenantId);
+      } catch (error) {
+        console.error("[ConversationHandler] check_goals error:", error);
+        return "Nie udało się pobrać celów.";
+      }
+    }
+
     return "Nieznane narzędzie";
   } catch (error) {
     console.error("[ConversationHandler] Tool execution error:", error);
@@ -1353,6 +1489,31 @@ async function buildDynamicContext(tenantId: string): Promise<string> {
     }
   } catch {
     // Non-blocking: context works without thread summary
+  }
+
+  // Active goals status
+  try {
+    const { getGoalStatus } = await import("../goals/engine");
+    const goalStatuses = await getGoalStatus(tenantId);
+    if (goalStatuses.length > 0) {
+      context += `\n## CELE UŻYTKOWNIKA\n`;
+      for (const s of goalStatuses) {
+        const status =
+          s.trajectory === "on_track"
+            ? "na dobrej drodze"
+            : s.trajectory === "at_risk"
+              ? "ZAGROŻONY"
+              : s.trajectory === "completed"
+                ? "OSIĄGNIĘTY"
+                : "WYMAGA UWAGI";
+        const days =
+          s.days_remaining !== null ? `, ${s.days_remaining} dni` : "";
+        context += `- ${s.goal.name}: ${Math.round(s.progress_percent)}% [${status}]${days}\n`;
+      }
+      context += `Gdy user pyta o cele, użyj "check_goals". Gdy raportuje postęp, użyj "log_goal_progress".\n`;
+    }
+  } catch {
+    // Non-blocking
   }
 
   // Pending skill suggestions (from Need Detector)
