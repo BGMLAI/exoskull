@@ -6,6 +6,41 @@ All notable changes to ExoSkull are documented here.
 
 ## 2026-02-05
 
+### Layer 9: Self-Defining Success Metrics (Goals System)
+
+Użytkownicy mogą definiować cele w naturalnym języku ("Chcę schudnąć 5kg do lata") — system automatycznie trackuje postęp z istniejących danych.
+
+#### What was done
+- **DB Migration** (`20260206000003_success_metrics.sql`) — `exo_user_goals` + `exo_goal_checkpoints` tables, RLS, triggers, helper functions
+- **Goal Engine** (`lib/goals/engine.ts`) — AI-assisted goal extraction (Gemini Flash Tier 1), progress tracking, momentum detection (14-day trend), trajectory forecasting, streak calculation
+- **Voice Tools** — `define_goal`, `log_goal_progress`, `check_goals` added to conversation-handler.ts with dynamic goal context in IORS prompt
+- **CRON** (`/api/cron/goal-progress`) — Daily 20:00 UTC auto-collection from sleep/activity/mood/tasks/transactions, milestone detection (25/50/75/100%), MAPE-K intervention for off-track goals
+- **Dashboard** (`/dashboard/goals`) — Progress bars (color-coded by trajectory), momentum arrows, streak flames, days remaining, new goal form, manual progress logging
+- **Navigation** — "Cele" (Target icon) added to sidebar + system prompt updated with goal tools
+- **Bug fix** — WhatsApp interface missing video/document properties (pre-existing build issue)
+
+#### Files changed
+- `lib/goals/types.ts` (NEW)
+- `lib/goals/engine.ts` (NEW)
+- `supabase/migrations/20260206000003_success_metrics.sql` (NEW)
+- `app/api/cron/goal-progress/route.ts` (NEW)
+- `app/dashboard/goals/page.tsx` (NEW)
+- `app/dashboard/layout.tsx` (sidebar nav)
+- `lib/voice/conversation-handler.ts` (3 voice tools + handlers + dynamic context)
+- `lib/voice/system-prompt.ts` (goal capabilities)
+- `vercel.json` (goal-progress CRON)
+- `lib/channels/whatsapp/client.ts` (type fix)
+
+#### How to verify
+1. `npx supabase db push` — apply migration
+2. Voice: "Chcę czytać 30 minut dziennie" → goal created
+3. Voice: "Dziś czytałem 45 minut" → checkpoint logged
+4. Voice: "Jak idą moje cele?" → formatted response
+5. Dashboard: `/dashboard/goals` → goals with progress bars
+6. CRON: POST `/api/cron/goal-progress` → auto-checkpoints
+
+---
+
 ### Skill Need Detector (Layer 14 Completion)
 
 Proaktywny system wykrywania potrzeb użytkownika z konwersacji → automatyczne sugestie nowych skilli.
