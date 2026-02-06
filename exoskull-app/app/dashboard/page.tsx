@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { DashboardInboxView } from "@/components/dashboard/DashboardInboxView";
 import { VoiceHero } from "@/components/dashboard/VoiceHero";
+import { HomeChat } from "@/components/dashboard/HomeChat";
 
 export const dynamic = "force-dynamic";
 
@@ -35,13 +35,15 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Voice-first hero — primary interaction */}
+    <div className="h-full overflow-auto">
+      {/* Voice-first hero — takes priority, bigger */}
       <VoiceHero tenantId={user.id} assistantName={assistantName} />
 
-      {/* Chat/Inbox — takes remaining space */}
-      <div className="flex-1 min-h-0">
-        <DashboardInboxView tenantId={user.id} assistantName={assistantName} />
+      {/* Chat — simple, useful, shows history + incoming messages */}
+      <div className="px-4 pb-4">
+        <div className="h-[350px]">
+          <HomeChat tenantId={user.id} assistantName={assistantName} />
+        </div>
       </div>
     </div>
   );

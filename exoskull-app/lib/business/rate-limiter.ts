@@ -32,6 +32,11 @@ const RESOURCE_TO_LIMIT: Record<string, keyof (typeof TIER_LIMITS)["free"]> = {
   voice_minutes: "voice_minutes_daily",
 };
 
+// Admin bypass - set ADMIN_TENANT_IDS in .env (comma-separated)
+const ADMIN_IDS = (process.env.ADMIN_TENANT_IDS || "")
+  .split(",")
+  .filter(Boolean);
+
 /**
  * Check if a tenant can use a resource based on their tier limits.
  */
@@ -39,7 +44,35 @@ export async function checkRateLimit(
   tenantId: string,
   resource: string,
 ): Promise<RateLimitResult> {
+  // Admin bypass - unlimited access
+  if (ADMIN_IDS.includes(tenantId)) {
+    return {
+      allowed: true,
+      resource,
+      current: 0,
+      limit: -1,
+      tier: "enterprise",
+    };
+  }
+
   const supabase = getServiceClient();
+
+  // Check admin_users table for admin bypass
+  const { data: adminUser } = await supabase
+    .from("admin_users")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (adminUser) {
+    return {
+      allowed: true,
+      resource,
+      current: 0,
+      limit: -1,
+      tier: "enterprise",
+    };
+  }
 
   // Get tenant tier
   const { data: tenant, error: tenantError } = await supabase

@@ -4,6 +4,41 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-06] research: OpenClaw vs ExoSkull Competitive Analysis + Transformation Plan
+
+### What was done
+- Deep research of OpenClaw (formerly ClawdBot/MoltBot) — architecture, features, UX, costs, limitations
+- Analyzed 10+ sources: MacStories, ChatPRD (24h test), Shelly Palmer (hype vs reality), IBM Think, dev.to setup guide, CNBC, Wikipedia, GitHub, nxcode.io, CreatorEconomy
+- Full inventory of ExoSkull current capabilities (28k lines, 116 API routes, 19 CRONs, 15+ rigs)
+- Side-by-side comparison: ExoSkull wins on backend (data lake, Guardian, emotion intelligence, dynamic skills, multi-model routing), OpenClaw wins on UX (50+ channels, zero-install, async messaging)
+- 6-phase transformation plan with 16 prioritized changes
+
+### Key Findings
+- ExoSkull is already 10x more advanced technically than OpenClaw
+- OpenClaw's killer advantage: **presence in user's existing messaging channels** (WhatsApp, Telegram, Slack, Discord)
+- OpenClaw costs $10-25/day for power users; ExoSkull's multi-model routing could be 5-10x cheaper
+- OpenClaw has critical security issues (Shodan exposure, no auth by default)
+- OpenClaw memory = Markdown files; ExoSkull memory = 3-layer data lake with pgvector
+
+### Plan: 6 Phases
+1. Unified Message Gateway + Telegram/Slack/Discord adapters (2 weeks)
+2. Async Task Queue — "send and forget" UX (1 week)
+3. Conversation-First Identity — personality engine (1 week)
+4. Zero-Friction Onboarding — signup via WhatsApp message (1 week)
+5. Contextual Intelligence Push — reports/insights sent TO user (3 weeks)
+6. Agent-to-Agent Network — collaborative tasks, family mode (4 weeks)
+
+### Files
+- `~/.claude/plans/cryptic-wondering-music.md` — Full analysis + plan (detailed)
+
+### Notes for future agents
+- OpenClaw architecture: Gateway → Agent → Skills → Memory (4 components)
+- OpenClaw 50+ channels via npm adapters; ExoSkull needs Unified Message Gateway pattern
+- Key competitive moat for ExoSkull: emotion intelligence + Guardian + proactive interventions — things OpenClaw cannot do
+- OpenClaw's "MoltBook" (bot-to-bot social network) is entertainment; ExoSkull's agent-to-agent should be utility
+
+---
+
 ## [2026-02-05] feat: L16 Autonomy Control Center — Full UI Rebuild
 
 ### What was done
@@ -1305,3 +1340,28 @@ npx tsx scripts/test-all-routes.ts  # in another
 - Audio caching system
 
 See SESSION_LOG.md for detailed task history.
+
+## [2026-02-05] Fix: Google OAuth middleware + scope reduction
+
+### What was done
+- Added /api/rigs/* and /api/meta/* to public API routes in middleware
+- Reduced Google OAuth scopes from COMPREHENSIVE (36+) to CORE (Gmail+Calendar)
+- Added include_granted_scopes: true for incremental authorization
+- Added detailed logging to OAuth connect route
+
+### Why
+- User reported Google OAuth NIE DZIALA - middleware was returning 401 for /api/rigs/* endpoints
+- Too many sensitive scopes can cause issues with unverified Google apps
+
+### Files changed
+- exoskull-app/lib/supabase/middleware.ts
+- exoskull-app/lib/rigs/oauth.ts
+- exoskull-app/app/api/rigs/[slug]/connect/route.ts
+
+### How to verify
+- Navigate to /api/rigs/google/connect while logged in - should redirect to Google OAuth
+
+### Notes for future agents
+- Google Cloud Console must have redirect URI: https://exoskull.xyz/api/rigs/google/callback
+- Gmail API and Google Calendar API must be enabled in GCP
+- OAuth consent screen must list exoskull.xyz as authorized domain

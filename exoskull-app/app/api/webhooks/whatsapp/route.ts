@@ -1,11 +1,15 @@
 /**
- * WhatsApp Webhook Handler (Multi-Account)
+ * WhatsApp Webhook Handler (Multi-Account) — Gateway-Integrated
  *
  * GET  - Webhook verification (Meta sends hub.mode, hub.verify_token, hub.challenge)
  * POST - Incoming messages from WhatsApp Cloud API
  *
  * Supports multiple WhatsApp Business accounts: looks up account token from
  * exo_meta_pages table by phone_number_id, falls back to env vars.
+ *
+ * Now routes through Unified Message Gateway for FULL AI pipeline (28 tools)
+ * instead of simplified aiChat(). This gives WhatsApp users the same
+ * capabilities as Voice and Dashboard users.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -17,7 +21,8 @@ import {
   extractIncomingMessage,
   type WhatsAppWebhookPayload,
 } from "@/lib/channels/whatsapp/client";
-import { aiChat } from "@/lib/ai";
+import { handleInboundMessage } from "@/lib/gateway/gateway";
+import type { GatewayMessage } from "@/lib/gateway/types";
 
 export const dynamic = "force-dynamic";
 
@@ -203,24 +208,26 @@ export async function POST(req: NextRequest) {
       .select("id")
       .single();
 
-    // Route to AI for response
+    // Route through Unified Message Gateway (FULL AI pipeline with 28 tools)
     try {
-      const systemPrompt =
-        language === "pl"
-          ? `Jestes ExoSkull - drugi mozg uzytkownika ${userName}. Odpowiadasz przez WhatsApp. Badz krotki, konkretny, pomocny. Uzywaj jezyka polskiego.`
-          : `You are ExoSkull - ${userName}'s second brain. You're replying via WhatsApp. Be brief, specific, helpful.`;
+      const gatewayMsg: GatewayMessage = {
+        channel: "whatsapp",
+        tenantId: tenantId || "unknown",
+        from,
+        senderName: userName || senderName,
+        text,
+        metadata: {
+          whatsapp_message_id: messageId,
+          phone_number_id: phoneNumberId,
+          language,
+        },
+      };
 
-      const response = await aiChat(
-        [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: text },
-        ],
-        { taskCategory: "simple_response" },
-      );
+      const response = await handleInboundMessage(gatewayMsg);
 
-      // Send reply via WhatsApp
+      // Send reply via WhatsApp (using resolved client for multi-account)
       if (client) {
-        await client.sendTextMessage(from, response.content);
+        await client.sendTextMessage(from, response.text);
 
         // Update conversation with agent response
         if (conversation?.id) {
@@ -230,19 +237,28 @@ export async function POST(req: NextRequest) {
               message_count: 2,
               agent_messages: 1,
               summary: `WhatsApp: ${text.substring(0, 100)}`,
+              context: {
+                channel: "whatsapp",
+                phone_number_id: phoneNumberId,
+                sender_phone: from,
+                sender_name: senderName,
+                whatsapp_message_id: messageId,
+                tools_used: response.toolsUsed,
+              },
             })
             .eq("id", conversation.id);
         }
       }
 
-      console.log("[WhatsApp] Reply sent:", {
+      console.log("[WhatsApp] Reply sent via gateway:", {
         to: from,
         phoneNumberId,
         conversationId: conversation?.id,
-        responseLength: response.content.length,
+        toolsUsed: response.toolsUsed,
+        responseLength: response.text.length,
       });
     } catch (error) {
-      console.error("[WhatsApp] AI routing failed:", {
+      console.error("[WhatsApp] Gateway processing failed:", {
         error: error instanceof Error ? error.message : "Unknown error",
         from,
         phoneNumberId,

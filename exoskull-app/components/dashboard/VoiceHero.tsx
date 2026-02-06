@@ -3,12 +3,12 @@
 /**
  * VoiceHero — Voice-first hero section for the dashboard.
  *
- * Shows a prominent voice button + quick status bar.
+ * Shows a LARGE prominent voice button + quick status bar.
  * This is the PRIMARY interaction point — voice is the main interface.
  */
 
 import { useState, useEffect } from "react";
-import { Mic, Zap, Brain, CheckSquare } from "lucide-react";
+import { Mic, Zap, Brain, CheckSquare, Phone } from "lucide-react";
 import { VoiceInterface } from "@/components/voice/VoiceInterface";
 
 interface VoiceHeroProps {
@@ -52,18 +52,26 @@ export function VoiceHero({ tenantId, assistantName }: VoiceHeroProps) {
   }, []);
 
   return (
-    <div className="p-4 pb-0 space-y-3">
-      {/* Voice Hero — the primary CTA */}
-      <div className="bg-gradient-to-br from-blue-600/10 to-purple-600/10 dark:from-blue-600/20 dark:to-purple-600/20 rounded-2xl p-6 flex flex-col items-center text-center border border-blue-200/30 dark:border-blue-800/30">
-        <p className="text-sm text-muted-foreground mb-1">
+    <div className="p-4 space-y-4">
+      {/* Voice Hero — the PRIMARY CTA, big and prominent */}
+      <div className="bg-gradient-to-br from-blue-600/10 to-purple-600/10 dark:from-blue-600/20 dark:to-purple-600/20 rounded-2xl p-8 flex flex-col items-center text-center border border-blue-200/30 dark:border-blue-800/30">
+        <h2 className="text-lg font-semibold mb-1">
           Porozmawiaj z {assistantName}
-        </p>
-        <p className="text-xs text-muted-foreground/60 mb-4">
+        </h2>
+        <p className="text-sm text-muted-foreground mb-6">
           Dodaj task, sprawdz cele, zaplanuj dzien — glosem
         </p>
 
-        {/* Voice interface — inline, not fixed */}
-        <VoiceInterface tenantId={tenantId} position="inline" />
+        {/* Voice interface — inline, bigger */}
+        <div className="scale-125 mb-4">
+          <VoiceInterface tenantId={tenantId} position="inline" />
+        </div>
+
+        {/* Alternative: phone call */}
+        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+          <Phone className="w-3 h-3" />
+          lub zadzwon: +48 732 144 112
+        </p>
       </div>
 
       {/* Quick Status Bar */}
