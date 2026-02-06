@@ -4,6 +4,171 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-07] feat: Predictive health engine — illness/burnout/productivity forecasting
+
+### What was done
+- 4 statistical prediction models (threshold-based heuristics, no ML training):
+  - **Illness Risk**: HRV drop >15% over 5 days vs personal baseline → infection signal
+  - **Productivity Impact**: Accumulated sleep debt over 7 days → estimated % drop
+  - **Burnout Risk**: Compound score from HRV decline + elevated resting HR + poor sleep + low activity
+  - **Fitness Trajectory**: 14-day step trend (improving/declining) vs personal baseline
+- CRON job at 06:00 UTC daily processes all tenants with health data
+- High-confidence predictions (>0.75) auto-create autonomy interventions
+- `exo_predictions` table with RLS + intervention linkage
+- New `health_prediction` intervention type added to autonomy system
+- Bilingual messages (PL/EN) with detailed metadata (sub-scores, percentages, factors)
+- Configurable thresholds as constants (HRV_DROP_THRESHOLD, SLEEP_DEBT thresholds, etc.)
+
+### Why
+ExoSkull collects health data but didn't predict outcomes. Correlations are past-looking; predictions are forward-looking. This enables "Your HRV dropped 20% — illness likely in 2-3 days" interventions.
+
+### Files changed
+- `exoskull-app/lib/predictions/prediction-engine.ts` (new — 190 lines)
+- `exoskull-app/lib/predictions/health-models.ts` (new — 490 lines)
+- `exoskull-app/app/api/cron/predictions/route.ts` (new — 135 lines)
+- `exoskull-app/supabase/migrations/20260207000002_predictions.sql` (new — 84 lines)
+- `exoskull-app/lib/autonomy/types.ts` (modified — added health_prediction type)
+
+### How to verify
+1. `cd exoskull-app && npm run build` — zero errors
+2. CRON: `curl /api/cron/predictions` with CRON_SECRET header
+3. Check `exo_predictions` table for generated predictions
+4. High-confidence predictions create entries in `exo_autonomy_interventions`
+
+### Notes for future agents
+- Models use `gold_daily_health_summary` view (not raw metrics) — ensure ETL runs first
+- `exo_sleep_entries` provides resting HR and quality scores as enrichment
+- `propose_intervention` RPC is used for intervention creation (not direct INSERT)
+- Predictions expire after 48h — stale predictions are not re-delivered
+- All thresholds in `health-models.ts` constants section — easy to tune
+
+---
+
+## [2026-02-07] feat: Cross-domain insight push — proactive correlation delivery
+
+### What was done
+- Daily CRON job `/api/cron/insight-push` runs at 10:00 UTC
+- Queries 3 DB sources: `exo_interventions` (patterns/gaps/goals), `user_memory_highlights` (high-importance insights), `learning_events` (detected patterns)
+- AI formats top 1-3 insights via ModelRouter Tier 1 (Gemini Flash), bilingual PL/EN
+- Dispatches to tenant's preferred channel via `dispatchReport()` with full fallback chain
+- New `exo_insight_deliveries` tracking table with UNIQUE constraint prevents duplicate pushes
+- Extended `ReportType` to `"weekly" | "monthly" | "insight"` with insight-specific email subjects
+- 48h lookback window, max 3 insights per push, silent skip if no new insights
+- Raw text fallback if AI formatting fails
+
+### Why
+Cross-domain correlations were detected by MAPE-K but never pushed to users. This is ExoSkull's "sees more than you" differentiator — proactive daily insights delivered to the user's preferred channel.
+
+### Files changed
+- `exoskull-app/lib/insights/insight-pusher.ts` (new — 270 lines)
+- `exoskull-app/app/api/cron/insight-push/route.ts` (new — 106 lines)
+- `exoskull-app/supabase/migrations/20260207000003_insight_deliveries.sql` (new)
+- `exoskull-app/lib/reports/report-dispatcher.ts` (modified — ReportType extended)
+- `exoskull-app/vercel.json` (modified — added insight-push CRON)
+
+### How to verify
+1. `cd exoskull-app && npx tsc --noEmit` — zero errors
+2. `cd exoskull-app && npm run build` — zero errors
+3. Deploy → verify CRON appears in Vercel dashboard
+4. Manual test: `curl /api/cron/insight-push` with CRON_SECRET header
+
+### Notes for future agents
+- `user_memory_highlights` uses `user_id` (not `tenant_id`) — pass tenantId as userId
+- `dispatchReport()` now accepts `"insight"` as reportType
+- Delivery tracking is idempotent via UNIQUE(tenant_id, source_table, source_id)
+
+---
+
+## [2026-02-07] feat: Signal + iMessage adapters — privacy-focused messaging channels
+
+### What was done
+- Signal adapter via signal-cli REST API (Docker bridge): parseInbound + sendResponse
+- iMessage adapter via BlueBubbles Server API (macOS bridge): parseInbound + sendResponse
+- Webhook routes: `/api/gateway/signal`, `/api/gateway/imessage`
+- DB migration: `signal_phone` + `imessage_address` columns on `exo_tenants`
+- Gateway router: channelColumn mapping for both channels + Signal added to phone-based fallback lookup
+- CRON dispatcher: `dispatchSignal()` + `dispatchImessage()` functions + updated priority chain
+- Async task delivery: Signal + iMessage cases in deliverResult switch
+- Unified thread: "Signal" + "iMessage" channel labels
+- GatewayChannel expanded: 10 → 12 channels (+ signal, imessage)
+
+### Why
+Signal and iMessage are privacy-focused messaging platforms. Adding them expands ExoSkull's Unified Message Gateway to 12 channels, covering users who prefer end-to-end encrypted communication.
+
+### Files changed
+- `exoskull-app/lib/gateway/adapters/signal.ts` (new — 130 lines)
+- `exoskull-app/lib/gateway/adapters/imessage.ts` (new — 140 lines)
+- `exoskull-app/app/api/gateway/signal/route.ts` (new — 75 lines)
+- `exoskull-app/app/api/gateway/imessage/route.ts` (new — 90 lines)
+- `exoskull-app/supabase/migrations/20260207000002_signal_imessage_channels.sql` (new)
+- `exoskull-app/lib/gateway/types.ts` (modified — GatewayChannel + TenantChannelIds)
+- `exoskull-app/lib/gateway/gateway.ts` (modified — channelColumn maps + phone fallback)
+- `exoskull-app/lib/unified-thread.ts` (modified — UnifiedChannel + channelLabel)
+- `exoskull-app/lib/cron/dispatcher.ts` (modified — dispatch functions + priority chain)
+- `exoskull-app/app/api/cron/async-tasks/route.ts` (modified — delivery cases)
+
+### How to verify
+1. `cd exoskull-app && npx tsc --noEmit` — zero errors
+2. `cd exoskull-app && npm run build` — zero errors
+3. GET `/api/gateway/signal` → health check with `hasApiUrl`, `hasSenderNumber`
+4. GET `/api/gateway/imessage` → health check with `hasUrl`, `hasPassword`
+
+### Notes for future agents
+- Signal uses phone numbers → shares phone-based fallback with WhatsApp/SMS
+- iMessage addresses can be phone OR email → uses own `imessage_address` column
+- `lib/reports/report-dispatcher.ts` NOT updated (owned by Agent 3) — needs Signal/iMessage cases added separately
+- Signal: skip `syncMessage` (echo), skip `groupInfo` (groups)
+- iMessage: skip `isFromMe`, chatGuid format: `iMessage;-;{address}`
+- Env vars needed: `SIGNAL_API_URL`, `SIGNAL_SENDER_NUMBER`, `BLUEBUBBLES_URL`, `BLUEBUBBLES_PASSWORD`
+
+---
+
+## [2026-02-07] feat: In-chat onboarding + integration wizard — zero-friction UX
+
+### What was done
+
+**Faza 2A: In-Chat Onboarding**
+- New `onboarding-handler.ts` — routes messaging users through discovery conversation
+- Gateway routing: checks `onboarding_status` before running normal 28-tool pipeline
+- Reuses existing DISCOVERY_SYSTEM_PROMPT (60-topic IORS personality + projective techniques)
+- After ~10 exchanges: profile JSON extracted, Mods auto-installed, check-in scheduled
+- Dashboard users (web_chat) and voice users unaffected
+
+**Faza 2B: In-Chat Integration Wizard**
+- New `connect_rig` + `list_integrations` tools (28→30 tools total)
+- Magic-link OAuth: generates 15-min one-time token link for in-chat setup
+- New `magic-connect` route: validates token, redirects to provider OAuth
+- Updated `callback` route: supports both dashboard (auth session) and magic-link (token) flows
+- Success HTML page shown after OAuth with "return to chat" message
+
+### Why
+New messaging users (WhatsApp, Telegram, etc.) were auto-registered but dropped into the full 28-tool pipeline with no introduction. Now they get a natural discovery conversation first. Integration setup required dashboard access — SMS/Telegram users can now connect Google Calendar, Oura, etc. from chat.
+
+### Files changed
+- `exoskull-app/lib/gateway/onboarding-handler.ts` (new — 230 lines)
+- `exoskull-app/lib/rigs/in-chat-connector.ts` (new — 170 lines)
+- `exoskull-app/app/api/rigs/[slug]/magic-connect/route.ts` (new — 75 lines)
+- `exoskull-app/app/api/rigs/[slug]/callback/route.ts` (modified — magic-link support)
+- `exoskull-app/lib/voice/conversation-handler.ts` (modified — +2 tools)
+
+### How to verify
+- `cd exoskull-app && npm run build` → zero errors (161 routes)
+- New WhatsApp user sends "Cześć" → gets IORS discovery greeting
+- After 10 exchanges → profile extracted, onboarding completed, Mods installed
+- Next message → normal 28-tool pipeline
+- User says "Połącz Google Calendar" → gets magic-link URL
+- Opens link → OAuth → success page → can use calendar tools
+
+### Notes for future agents
+- `handleOnboardingMessage()` uses Claude Sonnet 4 with `DISCOVERY_SYSTEM_PROMPT`
+- Onboarding check SKIPS `web_chat` and `voice` channels (have own flows)
+- Magic token format in state: `magic:{tenantId}:{token}` — parsed in callback
+- `validateMagicToken()` searches across all connections for matching token
+- `clearMagicToken()` after successful OAuth (one-time use)
+- `autoInstallMods()` from proactive-engine.ts runs fire-and-forget
+
+---
+
 ## [2026-02-07] feat: Async Task Queue — background processing for complex messages
 
 ### What was done
