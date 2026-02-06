@@ -17,6 +17,12 @@ import {
   findTenantByPhone,
 } from "../voice/conversation-handler";
 import { appendMessage } from "../unified-thread";
+import {
+  getOnboardingStatus,
+  handleOnboardingMessage,
+} from "./onboarding-handler";
+import { classifyMessage } from "../async-tasks/classifier";
+import { createTask, getLatestPendingTask } from "../async-tasks/queue";
 import type { GatewayChannel, GatewayMessage, GatewayResponse } from "./types";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -144,9 +150,14 @@ async function autoRegisterTenant(
  * Flow:
  * 1. Resolve or auto-register tenant
  * 2. Append inbound message to unified thread
- * 3. Get/create session + run processUserMessage (full AI pipeline)
- * 4. Append assistant response to unified thread
- * 5. Return response for adapter to send back
+ * 3. Onboarding check (new users → discovery conversation)
+ * 4. Status check (if user asks about pending async task)
+ * 5. Classify: sync or async?
+ *    - Async → queue task, return ack, CRON processes later
+ *    - Sync → processUserMessage with 40s timeout safety net
+ *      - If timeout → escalate to async queue
+ * 6. Update session + append outbound to unified thread
+ * 7. Return response for adapter to send back
  */
 export async function handleInboundMessage(
   msg: GatewayMessage,
@@ -186,12 +197,151 @@ export async function handleInboundMessage(
       },
     });
 
-    // 3. Get or create session + process with full AI pipeline
-    const sessionId = `${msg.channel}-${tenantId}-${new Date().toISOString().slice(0, 10)}`;
-    const session = await getOrCreateSession(sessionId, tenantId);
-    const result = await processUserMessage(session, msg.text);
+    // 3. Check onboarding status — route new users to discovery conversation
+    // Skip for web_chat (dashboard has its own onboarding UI) and voice (synchronous)
+    if (msg.channel !== "web_chat" && msg.channel !== "voice") {
+      const onboardingStatus = await getOnboardingStatus(tenantId);
+      if (
+        onboardingStatus === "pending" ||
+        onboardingStatus === "in_progress"
+      ) {
+        const onboardingResult = await handleOnboardingMessage(
+          tenantId,
+          msg.text,
+          msg.channel,
+        );
 
-    // 4. Update session + append outbound to unified thread
+        // Append assistant response to unified thread
+        await appendMessage(tenantId, {
+          role: "assistant",
+          content: onboardingResult.text,
+          channel: unifiedChannel,
+          direction: "outbound",
+          metadata: {
+            gateway_channel: msg.channel,
+            onboarding: true,
+          },
+        });
+
+        const durationMs = Date.now() - startTime;
+        console.log("[Gateway] Onboarding message processed:", {
+          channel: msg.channel,
+          tenantId,
+          durationMs,
+        });
+
+        return onboardingResult;
+      }
+    }
+
+    // 4. Check for pending async task status queries
+    const STATUS_CHECK =
+      /\b(status|jak idzie|gotowe|juz|już|finished|done\??)\b/i;
+    if (STATUS_CHECK.test(msg.text)) {
+      const pendingTask = await getLatestPendingTask(tenantId);
+      if (pendingTask) {
+        const snippet =
+          pendingTask.prompt.length > 50
+            ? pendingTask.prompt.substring(0, 50) + "..."
+            : pendingTask.prompt;
+        const statusText =
+          pendingTask.status === "processing"
+            ? `Jeszcze pracuję nad: "${snippet}". Dam znać jak skończę.`
+            : `Twoje zapytanie "${snippet}" czeka w kolejce. Zaraz się tym zajmę.`;
+        return {
+          text: statusText,
+          toolsUsed: ["async_status_check"],
+          channel: msg.channel,
+        };
+      }
+    }
+
+    // 5. Classify: sync or async?
+    const sessionId = `${msg.channel}-${tenantId}-${new Date().toISOString().slice(0, 10)}`;
+    const classification = classifyMessage(msg.text);
+
+    if (classification.mode === "async") {
+      // Queue for background processing
+      const taskId = await createTask({
+        tenantId,
+        channel: msg.channel,
+        channelMetadata: msg.metadata,
+        replyTo: msg.from,
+        prompt: msg.text,
+        sessionId,
+      });
+
+      console.log("[Gateway] Queued async task:", {
+        taskId,
+        channel: msg.channel,
+        reason: classification.reason,
+      });
+
+      // Fire-and-forget wakeup call to CRON worker for immediate processing
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL;
+      if (appUrl && process.env.CRON_SECRET) {
+        fetch(
+          `${appUrl.startsWith("http") ? appUrl : `https://${appUrl}`}/api/cron/async-tasks`,
+          {
+            headers: { "x-cron-secret": process.env.CRON_SECRET },
+          },
+        ).catch(() => {});
+      }
+
+      return {
+        text: "Przyjęto, dam znać jak skończę. Może to chwilę zająć.",
+        toolsUsed: ["async_queue"],
+        channel: msg.channel,
+      };
+    }
+
+    // 6. Sync path: process with timeout safety net
+    const session = await getOrCreateSession(sessionId, tenantId);
+
+    const SYNC_TIMEOUT_MS = 40_000; // 40s — leaves 20s buffer before Vercel's 60s
+    const result = await Promise.race([
+      processUserMessage(session, msg.text),
+      new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), SYNC_TIMEOUT_MS),
+      ),
+    ]);
+
+    // Timeout — escalate to async queue
+    if (result === null) {
+      const taskId = await createTask({
+        tenantId,
+        channel: msg.channel,
+        channelMetadata: msg.metadata,
+        replyTo: msg.from,
+        prompt: msg.text,
+        sessionId,
+      });
+
+      console.log("[Gateway] Sync timed out, escalated to async:", {
+        taskId,
+        channel: msg.channel,
+        elapsed: Date.now() - startTime,
+      });
+
+      // Wakeup CRON
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL;
+      if (appUrl && process.env.CRON_SECRET) {
+        fetch(
+          `${appUrl.startsWith("http") ? appUrl : `https://${appUrl}`}/api/cron/async-tasks`,
+          {
+            headers: { "x-cron-secret": process.env.CRON_SECRET },
+          },
+        ).catch(() => {});
+      }
+
+      return {
+        text: "To zajmie więcej czasu niż myślałem. Przetwarzam w tle — dam znać jak skończę.",
+        toolsUsed: ["async_queue_timeout"],
+        channel: msg.channel,
+      };
+    }
+
+    // 7. Update session + append outbound to unified thread
     // updateSession only accepts "voice" | "web_chat", map other channels to "web_chat"
     const sessionChannel: "voice" | "web_chat" =
       msg.channel === "voice" ? "voice" : "web_chat";

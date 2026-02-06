@@ -18,6 +18,9 @@
     },
     "app/api/skills/generate/**/*.ts": {
       "maxDuration": 60
+    },
+    "app/api/gateway/**/*.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [
@@ -112,6 +115,10 @@
     {
       "path": "/api/cron/monthly-summary",
       "schedule": "0 9 1 * *"
+    },
+    {
+      "path": "/api/cron/async-tasks",
+      "schedule": "* * * * *"
     }
   ]
 }

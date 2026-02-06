@@ -4,6 +4,42 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-07] feat: Async Task Queue — background processing for complex messages
+
+### What was done
+- **DB Migration** (`20260207000001_async_task_queue.sql`) — `exo_async_tasks` table with distributed locking, retry logic, and `claim_async_task()` Postgres function using `FOR UPDATE SKIP LOCKED`
+- **Queue CRUD** (`lib/async-tasks/queue.ts`) — createTask, claimNextTask, completeTask, failTask, releaseExpiredLocks, getLatestPendingTask
+- **Message Classifier** (`lib/async-tasks/classifier.ts`) — fast regex heuristic (<1ms) to classify sync vs async messages; no API call needed
+- **CRON Worker** (`app/api/cron/async-tasks/route.ts`) — runs every 1 minute, processes one task per invocation, delivers result back on originating channel
+- **Gateway Integration** (`lib/gateway/gateway.ts`) — added async classification, status check for pending tasks, 40s timeout safety net with auto-escalation to async queue, fire-and-forget CRON wakeup
+- **vercel.json** — added CRON schedule + gateway function timeout config
+
+### Why
+Complex requests (research, planning, content generation) take 30-60+ seconds, causing timeouts on messaging channels (Telegram, Slack, Discord). Users now get immediate acknowledgement and results delivered asynchronously.
+
+### Files changed
+- `exoskull-app/supabase/migrations/20260207000001_async_task_queue.sql` (new)
+- `exoskull-app/lib/async-tasks/queue.ts` (new)
+- `exoskull-app/lib/async-tasks/classifier.ts` (new)
+- `exoskull-app/app/api/cron/async-tasks/route.ts` (new)
+- `exoskull-app/lib/gateway/gateway.ts` (modified)
+- `exoskull-app/vercel.json` (modified)
+
+### How to verify
+- `cd exoskull-app && npm run build` → zero errors
+- Send async-pattern message (e.g., "przeanalizuj moje cele") via Telegram → get ack → result delivered after CRON processes
+- Send simple message (e.g., "hej") → processes synchronously as before
+- Ask "jak idzie?" while task is pending → get status update
+
+### Notes for future agents
+- Classifier uses regex heuristics, not AI — extend ASYNC_PATTERNS in classifier.ts for new patterns
+- CRON processes ONE task per invocation (60s Vercel timeout constraint)
+- Fire-and-forget wakeup fetch reduces latency from ~1min to near-immediate
+- `claim_async_task()` uses FOR UPDATE SKIP LOCKED — safe for concurrent workers
+- Retry: max 2 retries, then permanent failure with user notification
+
+---
+
 ## [2026-02-06] feat: Proactive Report Push — weekly + monthly summaries via preferred channel
 
 ### What was done
