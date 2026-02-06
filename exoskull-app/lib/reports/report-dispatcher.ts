@@ -4,7 +4,7 @@
  * Sends generated report text to a tenant via their preferred channel.
  * Falls back through available channels if the primary one fails.
  *
- * Channels: telegram → whatsapp → slack → discord → sms → email
+ * Channels: telegram → whatsapp → slack → discord → signal → imessage → sms → email
  * (voice and web_chat excluded — reports are text-only)
  *
  * Logs every sent report to exo_unified_messages via appendMessage().
@@ -14,6 +14,8 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { telegramAdapter } from "@/lib/gateway/adapters/telegram";
 import { slackAdapter } from "@/lib/gateway/adapters/slack";
 import { discordAdapter } from "@/lib/gateway/adapters/discord";
+import { signalAdapter } from "@/lib/gateway/adapters/signal";
+import { imessageAdapter } from "@/lib/gateway/adapters/imessage";
 import { getWhatsAppClient } from "@/lib/channels/whatsapp/client";
 import { appendMessage, UnifiedChannel } from "@/lib/unified-thread";
 
@@ -37,6 +39,8 @@ interface TenantChannelInfo {
   telegram_chat_id: string | null;
   slack_user_id: string | null;
   discord_user_id: string | null;
+  signal_phone: string | null;
+  imessage_address: string | null;
   language: string;
   name: string | null;
 }
@@ -46,6 +50,8 @@ type TextChannel =
   | "whatsapp"
   | "slack"
   | "discord"
+  | "signal"
+  | "imessage"
   | "sms"
   | "email";
 
@@ -55,6 +61,8 @@ const FALLBACK_CHAIN: TextChannel[] = [
   "whatsapp",
   "slack",
   "discord",
+  "signal",
+  "imessage",
   "sms",
   "email",
 ];
@@ -81,6 +89,10 @@ function canSendVia(channel: TextChannel, tenant: TenantChannelInfo): boolean {
       return !!tenant.slack_user_id;
     case "discord":
       return !!tenant.discord_user_id;
+    case "signal":
+      return !!tenant.signal_phone && !!process.env.SIGNAL_API_URL;
+    case "imessage":
+      return !!tenant.imessage_address && !!process.env.BLUEBUBBLES_URL;
     case "sms":
       return !!tenant.phone && !!process.env.TWILIO_ACCOUNT_SID;
     case "email":
@@ -110,6 +122,14 @@ async function sendViaSlack(userId: string, text: string): Promise<void> {
 
 async function sendViaDiscord(userId: string, text: string): Promise<void> {
   await discordAdapter.sendResponse(userId, text);
+}
+
+async function sendViaSignal(phone: string, text: string): Promise<void> {
+  await signalAdapter.sendResponse(phone, text);
+}
+
+async function sendViaImessage(address: string, text: string): Promise<void> {
+  await imessageAdapter.sendResponse(address, text);
 }
 
 async function sendViaSms(phone: string, text: string): Promise<void> {
@@ -209,6 +229,12 @@ async function sendToChannel(
     case "discord":
       await sendViaDiscord(tenant.discord_user_id!, text);
       break;
+    case "signal":
+      await sendViaSignal(tenant.signal_phone!, text);
+      break;
+    case "imessage":
+      await sendViaImessage(tenant.imessage_address!, text);
+      break;
     case "sms":
       await sendViaSms(tenant.phone!, text);
       break;
@@ -234,7 +260,7 @@ export async function dispatchReport(
   const { data: tenant, error: tenantErr } = await supabase
     .from("exo_tenants")
     .select(
-      "id, phone, email, preferred_channel, telegram_chat_id, slack_user_id, discord_user_id, language, name",
+      "id, phone, email, preferred_channel, telegram_chat_id, slack_user_id, discord_user_id, signal_phone, imessage_address, language, name",
     )
     .eq("id", tenantId)
     .single();
@@ -255,6 +281,8 @@ export async function dispatchReport(
     telegram_chat_id: tenant.telegram_chat_id,
     slack_user_id: tenant.slack_user_id,
     discord_user_id: tenant.discord_user_id,
+    signal_phone: tenant.signal_phone,
+    imessage_address: tenant.imessage_address,
     language: tenant.language || "pl",
     name: tenant.name,
   };

@@ -27,6 +27,8 @@ import {
   User,
   RefreshCw,
   AlertCircle,
+  Shield,
+  Smartphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -291,6 +293,10 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
         return <Gamepad2 className="w-3.5 h-3.5 text-indigo-500" />;
       case "messenger":
         return <MessagesSquare className="w-3.5 h-3.5 text-blue-600" />;
+      case "signal":
+        return <Shield className="w-3.5 h-3.5 text-blue-700" />;
+      case "imessage":
+        return <Smartphone className="w-3.5 h-3.5 text-green-500" />;
       case "web_chat":
         return <Globe className="w-3.5 h-3.5 text-primary" />;
       case "conversation":

@@ -1,0 +1,1 @@
+cd exoskull-app && npx lint-staged

@@ -82,10 +82,11 @@ export async function POST(req: NextRequest) {
     // Build FormData for Groq API
     const groqForm = new FormData();
     groqForm.append("file", audio, "audio.webm");
-    groqForm.append("model", "whisper-large-v3");
+    groqForm.append("model", "whisper-large-v3-turbo");
     groqForm.append("language", "pl");
     groqForm.append("response_format", "verbose_json");
     groqForm.append("temperature", "0.0");
+    groqForm.append("prompt", "Rozmowa po polsku z asystentem AI ExoSkull.");
 
     const response = await fetch(
       "https://api.groq.com/openai/v1/audio/transcriptions",
