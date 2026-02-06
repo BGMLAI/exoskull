@@ -8,46 +8,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { isHallucination } from "@/lib/voice/transcribe-voice-note";
 
 export const dynamic = "force-dynamic";
-
-/**
- * Detect Whisper hallucinations — repetitive patterns on silence/noise.
- * e.g. "Dziękuję. Dziękuję. Dziękuję." or "Napisy tworzone..."
- */
-function isHallucination(text: string): boolean {
-  const t = text.trim();
-  if (!t) return true;
-
-  // Common Whisper hallucination phrases (Polish)
-  const hallucinations = [
-    /^(dziękuję[.\s!]*)+$/i,
-    /^(napisy (stworzone|tworzone|wykonane).*)+$/i,
-    /^(subskrybuj[.\s!]*)+$/i,
-    /^(do zobaczenia[.\s!]*)+$/i,
-    /^(hej[.\s!]*)+$/i,
-    /^(cześć[.\s!]*)+$/i,
-    /^\.+$/,
-  ];
-
-  for (const pattern of hallucinations) {
-    if (pattern.test(t)) return true;
-  }
-
-  // Repetition detection: if >60% of words are the same word
-  const words = t
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 2);
-  if (words.length >= 3) {
-    const freq = new Map<string, number>();
-    for (const w of words) freq.set(w, (freq.get(w) || 0) + 1);
-    const maxFreq = Math.max(...freq.values());
-    if (maxFreq / words.length > 0.6) return true;
-  }
-
-  return false;
-}
 
 export async function POST(req: NextRequest) {
   try {

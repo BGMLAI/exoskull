@@ -252,17 +252,26 @@ export async function DELETE(req: NextRequest) {
 }
 
 /**
- * Queue voice note for transcription
- * In production, this would be a background job
+ * Queue voice note for transcription.
+ * Triggers the CRON worker immediately via fire-and-forget fetch.
+ * Status stays "uploaded" — CRON worker handles the "processing" transition.
  */
 async function queueTranscription(voiceNoteId: string) {
-  // Update status to processing
-  await getSupabase()
-    .from("exo_voice_notes")
-    .update({ status: "processing" })
-    .eq("id", voiceNoteId);
+  console.log(`[VoiceNotes] Queued for transcription: ${voiceNoteId}`);
 
-  // TODO: Implement actual transcription via Deepgram/Whisper
-  // For now, just mark as ready for transcription
-  console.log(`Voice note ${voiceNoteId} queued for transcription`);
+  // Fire-and-forget: wake up the CRON worker for immediate processing
+  const cronSecret = process.env.CRON_SECRET;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL;
+  if (cronSecret && baseUrl) {
+    const url = `${baseUrl.startsWith("http") ? baseUrl : `https://${baseUrl}`}/api/cron/voice-transcription`;
+    fetch(url, {
+      method: "GET",
+      headers: { "x-cron-secret": cronSecret },
+    }).catch((err) => {
+      console.warn(
+        "[VoiceNotes] CRON wakeup failed (non-blocking):",
+        err.message,
+      );
+    });
+  }
 }
