@@ -4,6 +4,43 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-06] fix: Security hardening — deployment readiness audit
+
+### What was done
+- **Next.js 14.1.0 → 14.2.35**: Patched 15 CVEs (including critical SSRF in Server Actions)
+- **eslint-config-next 14.x → 15.0.1**: Fixed `glob` command injection vulnerability
+- **fast-xml-parser**: XXE DoS vulnerability patched
+- **CSP hardened**: Removed `unsafe-eval` from `script-src` in `next.config.js`
+- **CRON_SECRET generated**: 26 CRON endpoints now require auth token
+- **Report dispatcher**: Added Signal + iMessage to fallback delivery chain (8 channels total)
+- **`.env.example` created**: 40+ env vars documented with categories
+- **Husky pre-commit hooks**: Activated (lint-staged + Prettier auto-format)
+
+### Why
+Deployment readiness audit revealed 3 critical security gaps: vulnerable Next.js (15 CVEs), unprotected CRON endpoints, and missing Signal/iMessage in report delivery. All blocking production deployment.
+
+### Files changed
+- `exoskull-app/package.json` (Next.js 14.2.35, eslint-config-next 15.0.1)
+- `exoskull-app/package-lock.json` (dependency tree update)
+- `exoskull-app/next.config.js` (CSP: removed unsafe-eval)
+- `exoskull-app/lib/reports/report-dispatcher.ts` (Signal + iMessage channels)
+- `exoskull-app/.env.example` (new — 40+ env vars documented)
+- `exoskull-app/.husky/pre-commit` (new — lint-staged hook)
+- `exoskull-app/.env.local` (CRON_SECRET set)
+
+### How to verify
+1. `cd exoskull-app && npm run build` — should pass with 0 errors
+2. `npm audit` — should show 0 critical, 3 remaining (low/self-hosted only)
+3. CRON endpoints require `x-cron-secret` header matching CRON_SECRET
+
+### Notes for future agents
+- Remaining 3 vulns require major bumps (Next 16, Supabase SSR 0.8) — acceptable risk for now
+- `unsafe-inline` in CSP must stay until nonce-based CSP middleware is implemented
+- CRON_SECRET must also be set in Vercel env vars before production deploy
+- Signal/iMessage adapters are code-complete but need infrastructure (Docker/macOS)
+
+---
+
 ## [2026-02-07] feat: Predictive health engine — illness/burnout/productivity forecasting
 
 ### What was done
