@@ -293,6 +293,40 @@ const IORS_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "connect_rig",
+    description:
+      "Połącz zewnętrzną usługę (Google Calendar, Oura Ring, Todoist, Notion, Fitbit, Spotify, Microsoft 365). Generuje link do autoryzacji który user otwiera w przeglądarce. Użyj gdy user chce podłączyć integrację lub mówi o urządzeniu/aplikacji.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        rig_slug: {
+          type: "string",
+          enum: [
+            "google",
+            "oura",
+            "fitbit",
+            "todoist",
+            "notion",
+            "spotify",
+            "microsoft-365",
+          ],
+          description:
+            "Slug integracji do połączenia. google = Gmail + Calendar + Drive + Tasks",
+        },
+      },
+      required: ["rig_slug"],
+    },
+  },
+  {
+    name: "list_integrations",
+    description:
+      "Pokaż listę dostępnych integracji które user może podłączyć do ExoSkull. Użyj gdy user pyta 'co mogę podłączyć?' lub 'jakie integracje?'",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
     name: "plan_action",
     description:
       "Zaplanuj akcję do wykonania w przyszłości. Akcja zostanie wykonana automatycznie po upływie timeout (domyślnie 1h) jeżeli user nie wyrazi sprzeciwu. Użyj gdy chcesz coś zrobić ale chcesz dać userowi szansę na anulowanie.",
@@ -1000,6 +1034,36 @@ async function executeTool(
 
     if (toolName === "send_messenger") {
       return "Messenger nie jest jeszcze skonfigurowany.";
+    }
+
+    // ================================================================
+    // INTEGRATION TOOLS
+    // ================================================================
+
+    if (toolName === "connect_rig") {
+      const rigSlug = toolInput.rig_slug as string;
+      try {
+        const { generateMagicConnectLink } =
+          await import("@/lib/rigs/in-chat-connector");
+        const { url, rigName } = await generateMagicConnectLink(
+          tenantId,
+          rigSlug,
+        );
+        return `Otwórz ten link żeby połączyć ${rigName}:\n${url}\n\nLink ważny 15 minut.`;
+      } catch (err) {
+        console.error("[ConversationHandler] connect_rig error:", {
+          rigSlug,
+          error: err instanceof Error ? err.message : err,
+        });
+        return `Nie udało się wygenerować linku do ${rigSlug}. Spróbuj ponownie.`;
+      }
+    }
+
+    if (toolName === "list_integrations") {
+      const { getAvailableRigs } = await import("@/lib/rigs/in-chat-connector");
+      const rigs = getAvailableRigs();
+      const list = rigs.map((r) => `• ${r.name} — ${r.description}`).join("\n");
+      return `Dostępne integracje:\n${list}\n\nPowiedz "połącz [nazwa]" żeby podłączyć.`;
     }
 
     // ================================================================
