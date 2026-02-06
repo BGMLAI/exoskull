@@ -11,13 +11,13 @@ import { createClient } from "@supabase/supabase-js";
 export const dynamic = "force-dynamic";
 
 let cachedStats: { data: any; timestamp: number } | null = null;
-const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour (extended for DoS protection)
 
 export async function GET() {
   // Check cache
   if (cachedStats && Date.now() - cachedStats.timestamp < CACHE_TTL) {
     return NextResponse.json(cachedStats.data, {
-      headers: { "Cache-Control": "public, max-age=900" },
+      headers: { "Cache-Control": "public, max-age=3600, s-maxage=3600" },
     });
   }
 
@@ -48,7 +48,7 @@ export async function GET() {
     cachedStats = { data: stats, timestamp: Date.now() };
 
     return NextResponse.json(stats, {
-      headers: { "Cache-Control": "public, max-age=900" },
+      headers: { "Cache-Control": "public, max-age=3600, s-maxage=3600" },
     });
   } catch (error) {
     console.error("[PublicStats] Error:", {

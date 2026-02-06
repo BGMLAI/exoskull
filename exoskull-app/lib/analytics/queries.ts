@@ -6,18 +6,11 @@
  * Falls back to Silver layer for real-time data.
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 // ============================================================================
 // Supabase Client
 // ============================================================================
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 // ============================================================================
 // Types
@@ -98,7 +91,7 @@ export async function getDailySummary(
   const startTime = Date.now();
 
   try {
-    const { data, error } = await getSupabase()
+    const { data, error } = await getServiceSupabase()
       .from("exo_gold_daily_summary")
       .select("*")
       .eq("tenant_id", tenantId)
@@ -134,7 +127,7 @@ export async function getWeeklySummary(
   const startTime = Date.now();
 
   try {
-    const { data, error } = await getSupabase()
+    const { data, error } = await getServiceSupabase()
       .from("exo_gold_weekly_summary")
       .select("*")
       .eq("tenant_id", tenantId)
@@ -170,7 +163,7 @@ export async function getMonthlySummary(
   const startTime = Date.now();
 
   try {
-    const { data, error } = await getSupabase()
+    const { data, error } = await getServiceSupabase()
       .from("exo_gold_monthly_summary")
       .select("*")
       .eq("tenant_id", tenantId)
@@ -206,7 +199,7 @@ export async function getMessagesDailySummary(
   const startTime = Date.now();
 
   try {
-    const { data, error } = await getSupabase()
+    const { data, error } = await getServiceSupabase()
       .from("exo_gold_messages_daily")
       .select("*")
       .eq("tenant_id", tenantId)
@@ -253,7 +246,7 @@ export async function getRealTimeStats(tenantId: string): Promise<
     const today = new Date().toISOString().split("T")[0];
 
     // Get today's conversations
-    const { data: todayConvos, error: convError } = await getSupabase()
+    const { data: todayConvos, error: convError } = await getServiceSupabase()
       .from("exo_silver_conversations")
       .select("duration_seconds, started_at")
       .eq("tenant_id", tenantId)
@@ -262,7 +255,7 @@ export async function getRealTimeStats(tenantId: string): Promise<
     if (convError) throw convError;
 
     // Get total message count
-    const { count: messageCount, error: msgError } = await getSupabase()
+    const { count: messageCount, error: msgError } = await getServiceSupabase()
       .from("exo_silver_messages")
       .select("*", { count: "exact", head: true })
       .eq("tenant_id", tenantId);
@@ -330,7 +323,7 @@ export async function getRecentConversations(
 
   try {
     // Get recent conversations
-    const { data: conversations, error: convError } = await getSupabase()
+    const { data: conversations, error: convError } = await getServiceSupabase()
       .from("exo_silver_conversations")
       .select("id, channel, started_at, duration_seconds, summary")
       .eq("tenant_id", tenantId)
@@ -352,7 +345,7 @@ export async function getRecentConversations(
     }
 
     // Count messages per conversation
-    const { data: messageCounts, error: msgError } = await getSupabase()
+    const { data: messageCounts, error: msgError } = await getServiceSupabase()
       .from("exo_silver_messages")
       .select("conversation_id")
       .in("conversation_id", conversationIds);
@@ -430,7 +423,7 @@ export async function getConversationInsights(
     );
 
     // Get message count from Silver (Gold doesn't have total messages in weekly)
-    const { count: totalMessages } = await getSupabase()
+    const { count: totalMessages } = await getServiceSupabase()
       .from("exo_silver_messages")
       .select("*", { count: "exact", head: true })
       .eq("tenant_id", tenantId);
@@ -522,14 +515,14 @@ export async function getPeriodComparison(
     );
 
     // Current period conversations
-    const { data: currentConvos } = await getSupabase()
+    const { data: currentConvos } = await getServiceSupabase()
       .from("exo_silver_conversations")
       .select("id, duration_seconds")
       .eq("tenant_id", tenantId)
       .gte("started_at", periodStart.toISOString());
 
     // Previous period conversations
-    const { data: previousConvos } = await getSupabase()
+    const { data: previousConvos } = await getServiceSupabase()
       .from("exo_silver_conversations")
       .select("id, duration_seconds")
       .eq("tenant_id", tenantId)
@@ -537,14 +530,14 @@ export async function getPeriodComparison(
       .lt("started_at", periodStart.toISOString());
 
     // Current period messages
-    const { count: currentMsgs } = await getSupabase()
+    const { count: currentMsgs } = await getServiceSupabase()
       .from("exo_silver_messages")
       .select("*", { count: "exact", head: true })
       .eq("tenant_id", tenantId)
       .gte("timestamp", periodStart.toISOString());
 
     // Previous period messages
-    const { count: previousMsgs } = await getSupabase()
+    const { count: previousMsgs } = await getServiceSupabase()
       .from("exo_silver_messages")
       .select("*", { count: "exact", head: true })
       .eq("tenant_id", tenantId)

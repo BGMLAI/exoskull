@@ -6,17 +6,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 interface CreateTaskRequest {
   title?: string;
@@ -45,7 +38,7 @@ export async function POST(
     const { id: messageId } = await params;
     const body: CreateTaskRequest = await request.json().catch(() => ({}));
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     // Get the message
     const { data: message, error: msgError } = await supabase

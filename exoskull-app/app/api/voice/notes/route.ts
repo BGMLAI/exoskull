@@ -7,15 +7,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(supabaseUrl, supabaseServiceKey);
-}
 
 /**
  * POST /api/voice/notes
@@ -23,7 +17,7 @@ function getSupabase() {
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const formData = await req.formData();
     const audio = formData.get("audio") as File | null;
     const tenantId = formData.get("tenant_id") as string | null;
@@ -128,7 +122,7 @@ export async function POST(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const tenantId = req.nextUrl.searchParams.get("tenant_id");
     const limit = parseInt(req.nextUrl.searchParams.get("limit") || "20");
     const contextType = req.nextUrl.searchParams.get("context_type");
@@ -191,7 +185,7 @@ export async function GET(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const body = await req.json();
     const { tenant_id, voice_note_id } = body;
 
@@ -252,17 +246,26 @@ export async function DELETE(req: NextRequest) {
 }
 
 /**
- * Queue voice note for transcription
- * In production, this would be a background job
+ * Queue voice note for transcription.
+ * Triggers the CRON worker immediately via fire-and-forget fetch.
+ * Status stays "uploaded" — CRON worker handles the "processing" transition.
  */
 async function queueTranscription(voiceNoteId: string) {
-  // Update status to processing
-  await getSupabase()
-    .from("exo_voice_notes")
-    .update({ status: "processing" })
-    .eq("id", voiceNoteId);
+  console.log(`[VoiceNotes] Queued for transcription: ${voiceNoteId}`);
 
-  // TODO: Implement actual transcription via Deepgram/Whisper
-  // For now, just mark as ready for transcription
-  console.log(`Voice note ${voiceNoteId} queued for transcription`);
+  // Fire-and-forget: wake up the CRON worker for immediate processing
+  const cronSecret = process.env.CRON_SECRET;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL;
+  if (cronSecret && baseUrl) {
+    const url = `${baseUrl.startsWith("http") ? baseUrl : `https://${baseUrl}`}/api/cron/voice-transcription`;
+    fetch(url, {
+      method: "GET",
+      headers: { "x-cron-secret": cronSecret },
+    }).catch((err) => {
+      console.warn(
+        "[VoiceNotes] CRON wakeup failed (non-blocking):",
+        err.message,
+      );
+    });
+  }
 }

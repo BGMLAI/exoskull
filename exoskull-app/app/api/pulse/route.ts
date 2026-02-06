@@ -9,17 +9,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { getRigDefinition } from "@/lib/rigs";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 // Check types
 type CheckType = "health" | "tasks" | "calendar" | "social" | "finance";
@@ -44,7 +38,7 @@ interface PulseResult {
 // ============================================================================
 
 export async function GET(request: NextRequest) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const startTime = Date.now();
 
   // Verify CRON secret
@@ -125,28 +119,36 @@ export async function GET(request: NextRequest) {
 // ============================================================================
 
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const startTime = Date.now();
 
   try {
-    const body = await request.json();
-    const { userId, checks } = body;
+    const body = (await request.json().catch(() => ({}))) as {
+      userId?: string;
+      checks?: CheckType[];
+    };
 
-    if (!userId) {
-      return NextResponse.json({ error: "userId required" }, { status: 400 });
-    }
-
-    // Verify auth (service role or user's own request)
+    // Verify auth: service role (internal) or user JWT
     const authHeader = request.headers.get("authorization");
     const isServiceRole =
       authHeader === `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`;
 
-    if (!isServiceRole) {
-      // TODO: Verify user JWT matches userId
-      console.log("[PULSE] User-triggered pulse for:", userId);
+    let userId: string;
+
+    if (isServiceRole) {
+      // Internal call — trust userId from body
+      if (!body.userId) {
+        return NextResponse.json({ error: "userId required" }, { status: 400 });
+      }
+      userId = body.userId;
+    } else {
+      // User call — verify JWT and use authenticated user ID
+      const auth = await verifyTenantAuth(request);
+      if (!auth.ok) return auth.response;
+      userId = auth.tenantId;
     }
 
-    const enabledChecks = checks || ["health", "tasks", "calendar"];
+    const enabledChecks = body.checks || ["health", "tasks", "calendar"];
     const result = await runPulseForUser(userId, enabledChecks);
 
     // Update state
@@ -178,14 +180,14 @@ async function runPulseForUser(
   userId: string,
   enabledChecks: CheckType[],
 ): Promise<PulseResult> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const alerts: PulseAlert[] = [];
   const checksPerformed: CheckType[] = [];
   const startTime = Date.now();
 
   // Get user's connected rigs
   const { data: connections } = await supabase
-    .from("rig_connections")
+    .from("exo_rig_connections")
     .select("rig_slug, status, last_sync_at")
     .eq("tenant_id", userId)
     .eq("status", "active");
@@ -240,7 +242,7 @@ async function runHealthCheck(
   userId: string,
   connectedRigs: string[],
 ): Promise<PulseAlert[]> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const alerts: PulseAlert[] = [];
 
   // Check sleep data from health rigs
@@ -254,9 +256,9 @@ async function runHealthCheck(
 
   // Query recent sleep data
   const { data: sleepData } = await supabase
-    .from("user_health_metrics")
+    .from("exo_health_metrics")
     .select("metric_type, value, recorded_at")
-    .eq("user_id", userId)
+    .eq("tenant_id", userId)
     .eq("metric_type", "sleep_duration")
     .gte(
       "recorded_at",
@@ -284,9 +286,9 @@ async function runHealthCheck(
 
   // Check HRV if available
   const { data: hrvData } = await supabase
-    .from("user_health_metrics")
+    .from("exo_health_metrics")
     .select("value")
-    .eq("user_id", userId)
+    .eq("tenant_id", userId)
     .eq("metric_type", "hrv")
     .gte(
       "recorded_at",
@@ -310,7 +312,7 @@ async function runHealthCheck(
 }
 
 async function runTasksCheck(userId: string): Promise<PulseAlert[]> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const alerts: PulseAlert[] = [];
   const now = new Date();
 
@@ -369,7 +371,7 @@ async function runCalendarCheck(
   userId: string,
   connectedRigs: string[],
 ): Promise<PulseAlert[]> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const alerts: PulseAlert[] = [];
 
   const calendarRigs = connectedRigs.filter((r) =>
@@ -422,7 +424,7 @@ async function runCalendarCheck(
 }
 
 async function runSocialCheck(userId: string): Promise<PulseAlert[]> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const alerts: PulseAlert[] = [];
 
   // Check for contacts not reached out to in 30+ days
@@ -456,7 +458,7 @@ async function runFinanceCheck(
   userId: string,
   connectedRigs: string[],
 ): Promise<PulseAlert[]> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const alerts: PulseAlert[] = [];
 
   const financeRigs = connectedRigs.filter((r) => ["plaid"].includes(r));

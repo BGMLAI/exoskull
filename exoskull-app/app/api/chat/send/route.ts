@@ -55,7 +55,12 @@ export async function POST(request: NextRequest) {
     const result = await processUserMessage(session, message);
 
     // Track usage
-    await incrementUsage(user.id, "conversations").catch(() => {});
+    await incrementUsage(user.id, "conversations").catch((err) => {
+      console.warn(
+        "[ChatSend] Usage tracking failed:",
+        err instanceof Error ? err.message : String(err),
+      );
+    });
 
     // Save to session + unified thread
     await updateSession(session.id, message, result.text, {

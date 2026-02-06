@@ -3,17 +3,11 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { invalidateSkillCache } from "@/lib/skills/registry/dynamic-registry";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 // GET /api/skills/[id]
 export async function GET(
@@ -21,13 +15,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const tenantId = request.headers.get("x-tenant-id");
-    if (!tenantId) {
-      return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { id } = await params;
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     const { data: skill, error } = await supabase
       .from("exo_generated_skills")
@@ -75,14 +68,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const tenantId = request.headers.get("x-tenant-id");
-    if (!tenantId) {
-      return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { id } = await params;
     const body = await request.json();
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     // Only allow updating certain fields
     const allowedUpdates: Record<string, unknown> = {};
@@ -130,13 +122,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const tenantId = request.headers.get("x-tenant-id");
-    if (!tenantId) {
-      return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { id } = await params;
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     const { data: skill, error } = await supabase
       .from("exo_generated_skills")

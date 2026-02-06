@@ -13,6 +13,7 @@ import { verifyCronAuth } from "@/lib/cron/auth";
 import { runAutonomyCycle } from "@/lib/autonomy/mape-k-loop";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 const TENANT_TIMEOUT_MS = 30_000; // 30s max per tenant
 

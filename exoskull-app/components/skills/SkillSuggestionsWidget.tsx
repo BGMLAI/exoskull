@@ -71,9 +71,7 @@ export function SkillSuggestionsWidget({
   async function loadSuggestions() {
     try {
       setLoading(true);
-      const res = await fetch("/api/skills/suggestions", {
-        headers: { "x-tenant-id": userId },
-      });
+      const res = await fetch("/api/skills/suggestions");
       if (res.ok) {
         const data = await res.json();
         setSuggestions(data.suggestions || []);
@@ -92,7 +90,6 @@ export function SkillSuggestionsWidget({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": userId,
         },
         body: JSON.stringify({ id, action }),
       });

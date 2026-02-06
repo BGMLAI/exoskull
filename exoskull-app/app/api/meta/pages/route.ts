@@ -8,20 +8,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
 const GRAPH_API_VERSION = "v21.0";
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-}
 
 // =====================================================
 // GET - List connected pages for tenant
@@ -29,15 +22,11 @@ function getSupabase() {
 
 export async function GET(req: NextRequest) {
   try {
-    const tenantId = req.headers.get("x-tenant-id");
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: "Missing x-tenant-id" },
-        { status: 401 },
-      );
-    }
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const { data: pages, error } = await supabase
       .from("exo_meta_pages")
       .select(
@@ -78,12 +67,16 @@ interface ConnectRequest {
 
 export async function POST(req: NextRequest) {
   try {
-    const body: ConnectRequest = await req.json();
-    const { user_access_token, tenant_id, page_ids } = body;
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenant_id = auth.tenantId;
 
-    if (!user_access_token || !tenant_id) {
+    const body: ConnectRequest = await req.json();
+    const { user_access_token, page_ids } = body;
+
+    if (!user_access_token) {
       return NextResponse.json(
-        { error: "Missing user_access_token or tenant_id" },
+        { error: "Missing user_access_token" },
         { status: 400 },
       );
     }
@@ -127,7 +120,7 @@ export async function POST(req: NextRequest) {
       : allPages;
 
     // 3. Subscribe each page to webhook + store in DB
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const appId = process.env.FACEBOOK_APP_ID;
     const appSecret = process.env.FACEBOOK_APP_SECRET;
     const results: Array<{
@@ -238,18 +231,18 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const { searchParams } = req.nextUrl;
     const pageId = searchParams.get("page_id");
-    const tenantId = req.headers.get("x-tenant-id");
 
-    if (!pageId || !tenantId) {
-      return NextResponse.json(
-        { error: "Missing page_id or x-tenant-id" },
-        { status: 400 },
-      );
+    if (!pageId) {
+      return NextResponse.json({ error: "Missing page_id" }, { status: 400 });
     }
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const { error } = await supabase
       .from("exo_meta_pages")
       .update({ is_active: false, updated_at: new Date().toISOString() })

@@ -2,10 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getOAuthConfig, exchangeCodeForTokens } from "@/lib/rigs/oauth";
+import {
+  validateMagicToken,
+  clearMagicToken,
+} from "@/lib/rigs/in-chat-connector";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/rigs/[slug]/callback - OAuth callback
+function getServiceSupabase() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
+
+// GET /api/rigs/[slug]/callback - OAuth callback (dashboard + magic-link)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
@@ -40,6 +51,12 @@ export async function GET(
       );
     }
 
+    // Check if this is a magic-link callback (format: "magic:{tenantId}:{token}")
+    if (state.startsWith("magic:")) {
+      return handleMagicLinkCallback(request, slug, code, state);
+    }
+
+    // Standard dashboard OAuth callback
     const supabase = await createClient();
 
     // Get current user
@@ -189,6 +206,130 @@ export async function GET(
       ),
     );
   }
+}
+
+/**
+ * Handle magic-link OAuth callback (no auth session needed).
+ * User came from in-chat connect_rig → magic-connect → provider → here.
+ */
+async function handleMagicLinkCallback(
+  request: NextRequest,
+  slug: string,
+  code: string,
+  state: string,
+): Promise<NextResponse> {
+  const parts = state.split(":");
+  if (parts.length !== 3) {
+    return new NextResponse("Invalid state", { status: 400 });
+  }
+
+  const [, tenantId, magicToken] = parts;
+
+  // Validate magic token
+  const validation = await validateMagicToken(slug, magicToken);
+  if (!validation || validation.tenantId !== tenantId) {
+    console.error("[OAuth] Magic token validation failed:", { slug, tenantId });
+    return new NextResponse(
+      `<html><body style="font-family:system-ui;text-align:center;margin:60px auto;max-width:400px">
+        <h1>Link wygasł</h1><p>Poproś o nowy link w czacie.</p>
+      </body></html>`,
+      { status: 403, headers: { "Content-Type": "text/html; charset=utf-8" } },
+    );
+  }
+
+  const supabase = getServiceSupabase();
+
+  // Get OAuth config
+  const config = getOAuthConfig(slug);
+  if (!config) {
+    return new NextResponse("Config not found", { status: 500 });
+  }
+
+  // Exchange code for tokens
+  let tokens;
+  try {
+    tokens = await exchangeCodeForTokens(config, code);
+  } catch (tokenError) {
+    console.error("[OAuth] Magic-link token exchange failed:", tokenError);
+    return new NextResponse(
+      `<html><body style="font-family:system-ui;text-align:center;margin:60px auto;max-width:400px">
+        <h1>Błąd autoryzacji</h1><p>Spróbuj ponownie — poproś o nowy link w czacie.</p>
+      </body></html>`,
+      { status: 500, headers: { "Content-Type": "text/html; charset=utf-8" } },
+    );
+  }
+
+  const expiresAt = tokens.expires_in
+    ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
+    : null;
+
+  // Update connection with tokens
+  await supabase
+    .from("exo_rig_connections")
+    .update({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token || null,
+      token_type: tokens.token_type || "Bearer",
+      expires_at: expiresAt,
+      scopes: tokens.scope ? tokens.scope.split(" ") : config.scopes,
+      sync_status: "success",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", validation.connectionId);
+
+  // Clear magic token (one-time use)
+  await clearMagicToken(validation.connectionId);
+
+  // Auto-install the rig
+  const { data: registry } = await supabase
+    .from("exo_registry")
+    .select("id")
+    .eq("slug", slug)
+    .single();
+
+  if (registry) {
+    await supabase.from("exo_user_installations").upsert(
+      {
+        tenant_id: tenantId,
+        registry_id: registry.id,
+        enabled: true,
+        config: {},
+      },
+      { onConflict: "tenant_id,registry_id" },
+    );
+  }
+
+  // Facebook-specific
+  if (slug === "facebook" && tokens.access_token) {
+    syncFacebookPages(tenantId, tokens.access_token).catch((err) =>
+      console.error("[OAuth] FB sync failed:", err),
+    );
+  }
+
+  console.log(`[OAuth] Magic-link: ${slug} connected for tenant ${tenantId}`);
+
+  const rigNames: Record<string, string> = {
+    google: "Google",
+    oura: "Oura Ring",
+    fitbit: "Fitbit",
+    todoist: "Todoist",
+    notion: "Notion",
+    spotify: "Spotify",
+    "microsoft-365": "Microsoft 365",
+    facebook: "Facebook",
+  };
+
+  return new NextResponse(
+    `<html>
+      <head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+      <body style="font-family:system-ui;max-width:400px;margin:60px auto;text-align:center;padding:20px">
+        <h1 style="color:#10b981">&#10003; Połączono!</h1>
+        <p>${rigNames[slug] || slug} został podłączony do ExoSkull.</p>
+        <p style="color:#6b7280;font-size:14px">Możesz zamknąć tę stronę i wrócić do czatu.</p>
+      </body>
+    </html>`,
+    { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } },
+  );
 }
 
 // =====================================================

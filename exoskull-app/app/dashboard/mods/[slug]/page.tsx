@@ -149,9 +149,7 @@ export default function ModDetailPage() {
 
       // Try fetching insights (may 501 if no executor)
       try {
-        const insightRes = await fetch(`/api/mods/${slug}`, {
-          headers: { "x-tenant-id": user.id },
-        });
+        const insightRes = await fetch(`/api/mods/${slug}`);
         if (insightRes.ok) {
           const insightJson = await insightRes.json();
           setInsights(insightJson.insights || []);

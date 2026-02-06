@@ -1,18 +1,12 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(supabaseUrl, supabaseServiceKey);
-}
 
 // Tool Handlers (legacy VAPI format - kept for backward compatibility)
 // TODO: Migrate callers to use lib/tools/ registry instead
 async function getTasks(tenantId: string) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { data, error } = await supabase
     .from("exo_tasks")
     .select(
@@ -45,7 +39,7 @@ async function createTask(
     energy_required?: number;
   },
 ) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { data, error } = await supabase
     .from("exo_tasks")
     .insert({
@@ -73,7 +67,7 @@ async function createTask(
 }
 
 async function completeTask(tenantId: string, taskId: string) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { data, error } = await supabase
     .from("exo_tasks")
     .update({
@@ -99,7 +93,7 @@ async function completeTask(tenantId: string, taskId: string) {
 
 // Schedule/Check-in handlers
 async function getSchedule(tenantId: string) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   // Get user's custom check-ins
   const { data: customCheckins } = await supabase
     .from("exo_user_checkins")
@@ -166,7 +160,7 @@ async function createCheckin(
     message?: string;
   },
 ) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   // Validate time format
   const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
   if (!timeRegex.test(params.time)) {
@@ -204,7 +198,7 @@ async function toggleCheckin(
   checkinName: string,
   enabled: boolean,
 ) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   // First try custom checkins
   const { data: customCheckin } = await supabase
     .from("exo_user_checkins")
@@ -471,7 +465,8 @@ export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
     headers: {
-      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Origin":
+        process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     },

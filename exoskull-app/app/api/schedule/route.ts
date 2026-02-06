@@ -6,15 +6,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(supabaseUrl, supabaseServiceKey);
-}
 
 /**
  * GET /api/schedule
@@ -22,7 +16,7 @@ function getSupabase() {
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     // Get tenant_id from query params or auth
     const tenantId = req.nextUrl.searchParams.get("tenant_id");
 
@@ -111,7 +105,7 @@ export async function GET(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const body = await req.json();
     const { tenant_id, job_id, preference, global_settings } = body;
 
@@ -193,7 +187,7 @@ export async function PUT(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const body = await req.json();
     const { tenant_id, job_name, channel } = body;
 

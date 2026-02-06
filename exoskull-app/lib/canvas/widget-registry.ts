@@ -1,0 +1,140 @@
+/**
+ * Canvas Widget Registry
+ *
+ * Maps widget_type strings to component metadata.
+ * Used by CanvasGrid to resolve what to render for each widget.
+ *
+ * Components are loaded dynamically in CanvasGrid (not here)
+ * to avoid circular dependencies with React components.
+ */
+
+import type { WidgetMeta } from "./types";
+
+/** Metadata for all built-in widget types */
+export const WIDGET_REGISTRY: Record<string, WidgetMeta> = {
+  voice_hero: {
+    type: "voice_hero",
+    label: "Voice Hero",
+    icon: "Mic",
+    defaultSize: { w: 4, h: 2 },
+    minSize: { w: 4, h: 2 },
+    category: "core",
+  },
+  health: {
+    type: "health",
+    label: "Zdrowie",
+    icon: "Heart",
+    defaultSize: { w: 2, h: 2 },
+    minSize: { w: 1, h: 1 },
+    category: "health",
+  },
+  tasks: {
+    type: "tasks",
+    label: "Zadania",
+    icon: "CheckSquare",
+    defaultSize: { w: 2, h: 2 },
+    minSize: { w: 1, h: 1 },
+    category: "productivity",
+  },
+  calendar: {
+    type: "calendar",
+    label: "Kalendarz",
+    icon: "Calendar",
+    defaultSize: { w: 2, h: 2 },
+    minSize: { w: 1, h: 1 },
+    category: "productivity",
+  },
+  conversations: {
+    type: "conversations",
+    label: "Rozmowy",
+    icon: "MessageSquare",
+    defaultSize: { w: 2, h: 2 },
+    minSize: { w: 1, h: 1 },
+    category: "core",
+  },
+  emotional: {
+    type: "emotional",
+    label: "Nastroj",
+    icon: "Brain",
+    defaultSize: { w: 1, h: 2 },
+    minSize: { w: 1, h: 1 },
+    category: "health",
+  },
+  guardian: {
+    type: "guardian",
+    label: "Guardian",
+    icon: "Shield",
+    defaultSize: { w: 2, h: 2 },
+    minSize: { w: 1, h: 1 },
+    category: "iors",
+  },
+  quick_actions: {
+    type: "quick_actions",
+    label: "Szybkie akcje",
+    icon: "Zap",
+    defaultSize: { w: 1, h: 2 },
+    minSize: { w: 1, h: 1 },
+    category: "core",
+  },
+  integrations: {
+    type: "integrations",
+    label: "Integracje",
+    icon: "Link",
+    defaultSize: { w: 2, h: 2 },
+    minSize: { w: 1, h: 1 },
+    category: "core",
+  },
+  email_inbox: {
+    type: "email_inbox",
+    label: "Email",
+    icon: "Mail",
+    defaultSize: { w: 2, h: 2 },
+    minSize: { w: 1, h: 1 },
+    category: "productivity",
+  },
+  knowledge: {
+    type: "knowledge",
+    label: "Wiedza",
+    icon: "BookOpen",
+    defaultSize: { w: 2, h: 2 },
+    minSize: { w: 1, h: 1 },
+    category: "core",
+  },
+  iors_status: {
+    type: "iors_status",
+    label: "IORS Status",
+    icon: "Bot",
+    defaultSize: { w: 2, h: 2 },
+    minSize: { w: 1, h: 1 },
+    category: "iors",
+  },
+};
+
+/** Get metadata for a widget type. Falls back to a generic entry for dynamic_mod types. */
+export function getWidgetMeta(widgetType: string): WidgetMeta | null {
+  if (WIDGET_REGISTRY[widgetType]) {
+    return WIDGET_REGISTRY[widgetType];
+  }
+
+  // Dynamic mod widget
+  if (widgetType.startsWith("dynamic_mod:")) {
+    const slug = widgetType.replace("dynamic_mod:", "");
+    return {
+      type: widgetType,
+      label: slug.replace(/-/g, " "),
+      icon: "Package",
+      defaultSize: { w: 2, h: 2 },
+      minSize: { w: 1, h: 1 },
+      category: "mod",
+    };
+  }
+
+  return null;
+}
+
+/** Get all available widget types for the widget picker */
+export function getAvailableWidgetTypes(): WidgetMeta[] {
+  return Object.values(WIDGET_REGISTRY).filter(
+    (w) => w.type !== "voice_hero", // voice_hero is auto-added, not user-selectable
+  );
+}

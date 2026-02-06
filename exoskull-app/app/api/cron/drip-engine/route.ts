@@ -10,6 +10,7 @@ import { processDripSequences } from "@/lib/marketing/drip-engine";
 import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 export async function GET(req: NextRequest) {
   if (!verifyCronAuth(req)) {

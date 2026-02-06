@@ -3,16 +3,14 @@
  *
  * POST /api/voice/transcribe - Transcribe audio to text
  *
- * Uses Deepgram for fast, accurate Polish transcription
+ * Uses Groq Whisper for fast, accurate Polish transcription.
+ * Includes hallucination detection (Whisper repeats phrases on silence/noise).
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { isHallucination } from "@/lib/voice/transcribe-voice-note";
 
 export const dynamic = "force-dynamic";
-
-function getDeepgramApiKey() {
-  return process.env.DEEPGRAM_API_KEY;
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,65 +24,87 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if Deepgram API key is configured
-    if (!getDeepgramApiKey()) {
-      console.error("[Transcribe] DEEPGRAM_API_KEY not configured");
+    // Reject too-small files (likely just noise/clicks)
+    if (audio.size < 5000) {
+      console.log("[Transcribe] Audio too small:", audio.size, "bytes");
+      return NextResponse.json({ transcript: "" });
+    }
+
+    const groqKey = process.env.GROQ_API_KEY;
+    if (!groqKey) {
+      console.error("[Transcribe] GROQ_API_KEY not configured");
       return NextResponse.json(
         {
           error:
-            "Transcription service unavailable — DEEPGRAM_API_KEY not configured",
+            "Transcription service unavailable — GROQ_API_KEY not configured",
         },
         { status: 503 },
       );
     }
 
-    // Convert File to ArrayBuffer
-    const audioBuffer = await audio.arrayBuffer();
+    // Build FormData for Groq API
+    const groqForm = new FormData();
+    groqForm.append("file", audio, "audio.webm");
+    groqForm.append("model", "whisper-large-v3-turbo");
+    groqForm.append("language", "pl");
+    groqForm.append("response_format", "verbose_json");
+    groqForm.append("temperature", "0.0");
+    groqForm.append("prompt", "Rozmowa po polsku z asystentem AI ExoSkull.");
 
-    // Call Deepgram API
     const response = await fetch(
-      "https://api.deepgram.com/v1/listen?model=nova-2&language=pl&smart_format=true",
+      "https://api.groq.com/openai/v1/audio/transcriptions",
       {
         method: "POST",
         headers: {
-          Authorization: `Token ${getDeepgramApiKey()}`,
-          "Content-Type": audio.type || "audio/webm",
+          Authorization: `Bearer ${groqKey}`,
         },
-        body: audioBuffer,
+        body: groqForm,
       },
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Deepgram API error:", response.status, errorText);
+      console.error("[Transcribe] Groq API error:", response.status, errorText);
       return NextResponse.json(
-        {
-          error: "Transcription failed",
-          details: errorText,
-        },
+        { error: "Transcription failed", details: errorText },
         { status: 500 },
       );
     }
 
     const result = await response.json();
+    const transcript = (result.text || "").trim();
 
-    // Extract transcript from Deepgram response
-    const transcript =
-      result.results?.channels?.[0]?.alternatives?.[0]?.transcript || "";
-    const confidence =
-      result.results?.channels?.[0]?.alternatives?.[0]?.confidence || 0;
+    console.log(
+      "[Transcribe] Raw result:",
+      JSON.stringify({
+        text: transcript,
+        duration: result.duration,
+        segments: result.segments?.length,
+      }),
+    );
 
-    return NextResponse.json({
-      transcript,
-      confidence,
-      words: result.results?.channels?.[0]?.alternatives?.[0]?.words || [],
-    });
+    // Filter hallucinations
+    if (isHallucination(transcript)) {
+      console.log("[Transcribe] Filtered hallucination:", transcript);
+      return NextResponse.json({ transcript: "" });
+    }
+
+    // Filter segments with high no_speech_prob
+    if (result.segments?.length) {
+      const realSegments = result.segments.filter(
+        (s: { no_speech_prob?: number }) => (s.no_speech_prob || 0) < 0.8,
+      );
+      if (realSegments.length === 0) {
+        console.log("[Transcribe] All segments have high no_speech_prob");
+        return NextResponse.json({ transcript: "" });
+      }
+    }
+
+    return NextResponse.json({ transcript });
   } catch (error) {
-    console.error("POST /api/voice/transcribe error:", error);
+    console.error("[Transcribe] Error:", error);
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
     );
   }

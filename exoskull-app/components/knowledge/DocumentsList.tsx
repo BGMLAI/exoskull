@@ -1,10 +1,10 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,8 +14,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { deleteDocument } from '@/lib/api/knowledge'
+} from "@/components/ui/alert-dialog";
+import { deleteDocument } from "@/lib/api/knowledge";
+import { toast } from "sonner";
 import {
   FileText,
   FileImage,
@@ -26,70 +27,79 @@ import {
   Clock,
   CheckCircle2,
   Loader2,
-} from 'lucide-react'
+} from "lucide-react";
 
 interface Document {
-  id: string
-  filename: string
-  original_name: string
-  file_type: string
-  file_size: number
-  category: string
-  status: string
-  created_at: string
+  id: string;
+  filename: string;
+  original_name: string;
+  file_type: string;
+  file_size: number;
+  category: string;
+  status: string;
+  created_at: string;
 }
 
 interface DocumentsListProps {
-  documents: Document[]
-  loading: boolean
-  tenantId: string
-  onRefresh: () => void
+  documents: Document[];
+  loading: boolean;
+  tenantId: string;
+  onRefresh: () => void;
 }
 
 function getFileIcon(fileType: string) {
   switch (fileType) {
-    case 'pdf':
-    case 'txt':
-    case 'md':
-    case 'doc':
-    case 'docx':
-      return FileText
-    case 'jpg':
-    case 'jpeg':
-    case 'png':
-    case 'webp':
-      return FileImage
-    case 'mp4':
-    case 'webm':
-    case 'mov':
-      return FileVideo
-    case 'xls':
-    case 'xlsx':
-    case 'csv':
-      return FileSpreadsheet
+    case "pdf":
+    case "txt":
+    case "md":
+    case "doc":
+    case "docx":
+      return FileText;
+    case "jpg":
+    case "jpeg":
+    case "png":
+    case "webp":
+      return FileImage;
+    case "mp4":
+    case "webm":
+    case "mov":
+      return FileVideo;
+    case "xls":
+    case "xlsx":
+    case "csv":
+      return FileSpreadsheet;
     default:
-      return File
+      return File;
   }
 }
 
 function getStatusBadge(status: string) {
   switch (status) {
-    case 'uploaded':
-      return { label: 'Oczekuje', variant: 'secondary' as const, icon: Clock }
-    case 'processing':
-      return { label: 'Przetwarzanie', variant: 'default' as const, icon: Loader2 }
-    case 'ready':
-      return { label: 'Gotowy', variant: 'outline' as const, icon: CheckCircle2 }
+    case "uploaded":
+      return { label: "Oczekuje", variant: "secondary" as const, icon: Clock };
+    case "processing":
+      return {
+        label: "Przetwarzanie",
+        variant: "default" as const,
+        icon: Loader2,
+      };
+    case "ready":
+      return {
+        label: "Gotowy",
+        variant: "outline" as const,
+        icon: CheckCircle2,
+      };
     default:
-      return { label: status, variant: 'secondary' as const, icon: Clock }
+      return { label: status, variant: "secondary" as const, icon: Clock };
   }
 }
 
 function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }
 
 function DocumentSkeleton() {
@@ -104,35 +114,44 @@ function DocumentSkeleton() {
         <Skeleton className="h-6 w-20" />
       </div>
     </Card>
-  )
+  );
 }
 
-export function DocumentsList({ documents, loading, tenantId, onRefresh }: DocumentsListProps) {
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null)
-  const [deleting, setDeleting] = useState(false)
+export function DocumentsList({
+  documents,
+  loading,
+  tenantId,
+  onRefresh,
+}: DocumentsListProps) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
 
   const handleDeleteClick = (doc: Document) => {
-    setDocumentToDelete(doc)
-    setDeleteDialogOpen(true)
-  }
+    setDocumentToDelete(doc);
+    setDeleteDialogOpen(true);
+  };
 
   const handleConfirmDelete = async () => {
-    if (!documentToDelete) return
+    if (!documentToDelete) return;
 
-    setDeleting(true)
+    setDeleting(true);
     try {
-      await deleteDocument(tenantId, documentToDelete.id)
-      onRefresh()
+      await deleteDocument(tenantId, documentToDelete.id);
+      onRefresh();
     } catch (err) {
-      console.error('[DocumentsList] Delete error:', err)
-      alert(err instanceof Error ? err.message : 'Blad usuwania dokumentu')
+      console.error("[DocumentsList] Delete error:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Blad usuwania dokumentu",
+      );
     } finally {
-      setDeleting(false)
-      setDeleteDialogOpen(false)
-      setDocumentToDelete(null)
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+      setDocumentToDelete(null);
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -141,7 +160,7 @@ export function DocumentsList({ documents, loading, tenantId, onRefresh }: Docum
           <DocumentSkeleton key={i} />
         ))}
       </div>
-    )
+    );
   }
 
   if (documents.length === 0) {
@@ -153,16 +172,16 @@ export function DocumentsList({ documents, loading, tenantId, onRefresh }: Docum
           Przeciagnij pliki powyzej lub kliknij aby dodac dokumenty
         </p>
       </div>
-    )
+    );
   }
 
   return (
     <>
       <div className="space-y-3">
         {documents.map((doc) => {
-          const FileIcon = getFileIcon(doc.file_type)
-          const statusInfo = getStatusBadge(doc.status)
-          const StatusIcon = statusInfo.icon
+          const FileIcon = getFileIcon(doc.file_type);
+          const statusInfo = getStatusBadge(doc.status);
+          const StatusIcon = statusInfo.icon;
 
           return (
             <Card key={doc.id} className="p-4">
@@ -178,12 +197,16 @@ export function DocumentsList({ documents, loading, tenantId, onRefresh }: Docum
                     <span>•</span>
                     <span>{doc.category}</span>
                     <span>•</span>
-                    <span>{new Date(doc.created_at).toLocaleDateString('pl-PL')}</span>
+                    <span>
+                      {new Date(doc.created_at).toLocaleDateString("pl-PL")}
+                    </span>
                   </div>
                 </div>
 
                 <Badge variant={statusInfo.variant} className="gap-1">
-                  <StatusIcon className={`h-3 w-3 ${doc.status === 'processing' ? 'animate-spin' : ''}`} />
+                  <StatusIcon
+                    className={`h-3 w-3 ${doc.status === "processing" ? "animate-spin" : ""}`}
+                  />
                   {statusInfo.label}
                 </Badge>
 
@@ -197,7 +220,7 @@ export function DocumentsList({ documents, loading, tenantId, onRefresh }: Docum
                 </Button>
               </div>
             </Card>
-          )
+          );
         })}
       </div>
 
@@ -206,7 +229,8 @@ export function DocumentsList({ documents, loading, tenantId, onRefresh }: Docum
           <AlertDialogHeader>
             <AlertDialogTitle>Usunac dokument?</AlertDialogTitle>
             <AlertDialogDescription>
-              Czy na pewno chcesz usunac &quot;{documentToDelete?.original_name}&quot;? Ta operacja jest nieodwracalna.
+              Czy na pewno chcesz usunac &quot;{documentToDelete?.original_name}
+              &quot;? Ta operacja jest nieodwracalna.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -216,11 +240,11 @@ export function DocumentsList({ documents, loading, tenantId, onRefresh }: Docum
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? 'Usuwanie...' : 'Usun'}
+              {deleting ? "Usuwanie..." : "Usun"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }

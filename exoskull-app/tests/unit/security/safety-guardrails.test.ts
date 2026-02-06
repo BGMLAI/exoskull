@@ -105,24 +105,24 @@ describe("maskSensitiveData", () => {
 });
 
 describe("checkRateLimit", () => {
-  it("allows operations within limit", () => {
+  it("allows operations within limit", async () => {
     const userId = "test-user-" + Date.now();
-    expect(checkRateLimit(userId, "test-op", 5, 60000)).toBe(true);
-    expect(checkRateLimit(userId, "test-op", 5, 60000)).toBe(true);
-    expect(checkRateLimit(userId, "test-op", 5, 60000)).toBe(true);
+    expect(await checkRateLimit(userId, "test-op", 5, 60000)).toBe(true);
+    expect(await checkRateLimit(userId, "test-op", 5, 60000)).toBe(true);
+    expect(await checkRateLimit(userId, "test-op", 5, 60000)).toBe(true);
   });
 
-  it("blocks operations over limit", () => {
+  it("blocks operations over limit", async () => {
     const userId = "test-user-limit-" + Date.now();
     for (let i = 0; i < 3; i++) {
-      checkRateLimit(userId, "limited-op", 3, 60000);
+      await checkRateLimit(userId, "limited-op", 3, 60000);
     }
-    expect(checkRateLimit(userId, "limited-op", 3, 60000)).toBe(false);
+    expect(await checkRateLimit(userId, "limited-op", 3, 60000)).toBe(false);
   });
 
-  it("allows different operations independently", () => {
+  it("allows different operations independently", async () => {
     const userId = "test-user-multi-" + Date.now();
-    expect(checkRateLimit(userId, "op-a", 1, 60000)).toBe(true);
-    expect(checkRateLimit(userId, "op-b", 1, 60000)).toBe(true);
+    expect(await checkRateLimit(userId, "op-a", 1, 60000)).toBe(true);
+    expect(await checkRateLimit(userId, "op-b", 1, 60000)).toBe(true);
   });
 });

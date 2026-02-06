@@ -154,8 +154,11 @@ export class MAPEKLoop {
         expected_impact: plan.interventions.length > 0 ? "positive" : "neutral",
         actual_impact: success ? "completed" : "failed",
       });
-    } catch {
-      // Non-blocking — optimization logging failure doesn't affect cycle
+    } catch (err) {
+      console.warn(
+        "[MAPE-K] Optimization logging failed:",
+        err instanceof Error ? err.message : err,
+      );
     }
 
     return {
@@ -328,7 +331,11 @@ export class MAPEKLoop {
     let systemMetrics;
     try {
       systemMetrics = await collectSystemMetrics(tenantId);
-    } catch {
+    } catch (err) {
+      console.warn(
+        "[MAPE-K] System metrics collection failed:",
+        err instanceof Error ? err.message : err,
+      );
       systemMetrics = undefined;
     }
 
@@ -500,8 +507,11 @@ export class MAPEKLoop {
           );
         }
       }
-    } catch {
-      // Non-blocking — emotion data optional
+    } catch (err) {
+      console.warn(
+        "[MAPE-K] Emotion data fetch failed:",
+        err instanceof Error ? err.message : err,
+      );
     }
 
     // 8. Goal progress analysis (L9 data)
@@ -532,8 +542,11 @@ export class MAPEKLoop {
           });
         }
       }
-    } catch {
-      // Non-blocking — goal data optional
+    } catch (err) {
+      console.warn(
+        "[MAPE-K] Goal data fetch failed:",
+        err instanceof Error ? err.message : err,
+      );
     }
 
     // 9. Productivity drop detection
@@ -941,8 +954,11 @@ export class MAPEKLoop {
           patternsDetected++;
         }
       }
-    } catch {
-      // Non-blocking — pattern detection optional
+    } catch (err) {
+      console.warn(
+        "[MAPE-K] Pattern detection failed:",
+        err instanceof Error ? err.message : err,
+      );
     }
 
     // 4. Log learning event

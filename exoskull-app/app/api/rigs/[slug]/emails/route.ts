@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { RigConnection } from "@/lib/rigs/types";
 import { createGoogleClient } from "@/lib/rigs/google/client";
 import { createGoogleWorkspaceClient } from "@/lib/rigs/google-workspace/client";
 import { createMicrosoft365Client } from "@/lib/rigs/microsoft-365/client";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 // GET /api/rigs/[slug]/emails - Fetch recent emails
 export async function GET(
@@ -20,14 +14,13 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
-  const tenantId = request.headers.get("x-tenant-id");
 
-  if (!tenantId) {
-    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(request);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     // Get connection with token
     const { data: connection, error: connError } = await supabase

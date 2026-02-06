@@ -6,16 +6,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(supabaseUrl, supabaseServiceKey);
-}
 
 function getOpenAI() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -23,7 +17,7 @@ function getOpenAI() {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const openai = getOpenAI();
     const contentType = req.headers.get("content-type") || "";
 

@@ -6,17 +6,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 export async function GET() {
   try {
@@ -31,7 +24,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     const { data: projects, error } = await supabase
       .from("exo_projects")
@@ -83,7 +76,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     const { data: project, error } = await supabase
       .from("exo_projects")

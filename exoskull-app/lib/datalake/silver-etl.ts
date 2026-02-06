@@ -9,7 +9,6 @@
  * - Normalize timestamps to UTC
  */
 
-import { createClient } from "@supabase/supabase-js";
 import {
   readBronzeConversations,
   readBronzeMessages,
@@ -24,19 +23,13 @@ import {
   SmsLogBronzeRecord,
 } from "../storage/parquet-reader";
 import { DataType } from "../storage/r2-client";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 // ============================================================================
 // Supabase Client
 // ============================================================================
 
 // Single client for public schema (all tables use exo_silver_ prefix)
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -68,7 +61,7 @@ async function getLastSyncTime(
   tenantId: string,
   dataType: DataType,
 ): Promise<Date> {
-  const { data, error } = await getSupabase()
+  const { data, error } = await getServiceSupabase()
     .from("exo_silver_sync_log")
     .select("last_sync_at")
     .eq("tenant_id", tenantId)
@@ -95,7 +88,7 @@ async function updateSyncLog(
   const now = new Date().toISOString();
 
   // Get existing record
-  const { data: existing } = await getSupabase()
+  const { data: existing } = await getServiceSupabase()
     .from("exo_silver_sync_log")
     .select("id, bronze_files_processed")
     .eq("tenant_id", tenantId)
@@ -110,7 +103,7 @@ async function updateSyncLog(
         ...filesProcessed,
       ]),
     ];
-    await getSupabase()
+    await getServiceSupabase()
       .from("exo_silver_sync_log")
       .update({
         last_sync_at: now,
@@ -122,7 +115,7 @@ async function updateSyncLog(
       .eq("id", existing.id);
   } else {
     // Insert new
-    await getSupabase().from("exo_silver_sync_log").insert({
+    await getServiceSupabase().from("exo_silver_sync_log").insert({
       tenant_id: tenantId,
       data_type: dataType,
       last_sync_at: now,
@@ -329,7 +322,7 @@ export async function etlConversationsToSilver(
     let inserted = 0;
 
     if (silver.length > 0) {
-      const { error: upsertError, count } = await getSupabase()
+      const { error: upsertError, count } = await getServiceSupabase()
         .from("exo_silver_conversations")
         .upsert(silver, { onConflict: "id", count: "exact" });
 
@@ -399,7 +392,7 @@ export async function etlMessagesToSilver(
 
     let inserted = 0;
     if (silver.length > 0) {
-      const { error: upsertError, count } = await getSupabase()
+      const { error: upsertError, count } = await getServiceSupabase()
         .from("exo_silver_messages")
         .upsert(silver, { onConflict: "id", count: "exact" });
 
@@ -468,7 +461,7 @@ export async function etlVoiceCallsToSilver(
 
     let inserted = 0;
     if (silver.length > 0) {
-      const { error: upsertError, count } = await getSupabase()
+      const { error: upsertError, count } = await getServiceSupabase()
         .from("exo_silver_voice_calls")
         .upsert(silver, { onConflict: "id", count: "exact" });
 
@@ -535,7 +528,7 @@ export async function etlSmsLogsToSilver(tenantId: string): Promise<ETLResult> {
 
     let inserted = 0;
     if (silver.length > 0) {
-      const { error: upsertError, count } = await getSupabase()
+      const { error: upsertError, count } = await getServiceSupabase()
         .from("exo_silver_sms_logs")
         .upsert(silver, { onConflict: "id", count: "exact" });
 
@@ -588,7 +581,7 @@ export async function runSilverETL(): Promise<ETLSummary> {
 
   try {
     // Get all unique tenants from Bronze sync log (public schema)
-    const { data: bronzeLogs } = await getSupabase()
+    const { data: bronzeLogs } = await getServiceSupabase()
       .from("exo_bronze_sync_log")
       .select("tenant_id")
       .order("last_sync_at", { ascending: false });
@@ -658,7 +651,7 @@ export async function getSilverStats(): Promise<{
   smsLogs: number;
   lastSync: string | null;
 }> {
-  const sb = getSupabase();
+  const sb = getServiceSupabase();
   const [convCount, msgCount, voiceCount, smsCount, lastSync] =
     await Promise.all([
       sb

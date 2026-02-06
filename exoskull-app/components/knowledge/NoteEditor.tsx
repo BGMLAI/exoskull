@@ -1,39 +1,46 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Loop, Quest, Op, NoteType, NOTE_TYPE_LABELS } from '@/lib/types/knowledge'
-import { DialogFooter } from '@/components/ui/dialog'
+} from "@/components/ui/select";
+import {
+  Loop,
+  Quest,
+  Op,
+  NoteType,
+  NOTE_TYPE_LABELS,
+} from "@/lib/types/knowledge";
+import { DialogFooter } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 export interface NoteEditorData {
-  type: NoteType
-  title: string
-  content: string
-  tags: string[]
-  isResearch: boolean
-  isExperience: boolean
-  loopSlug: string | null
-  questId: string | null
-  opId: string | null
+  type: NoteType;
+  title: string;
+  content: string;
+  tags: string[];
+  isResearch: boolean;
+  isExperience: boolean;
+  loopSlug: string | null;
+  questId: string | null;
+  opId: string | null;
 }
 
 interface NoteEditorProps {
-  loops: Loop[]
-  quests: Quest[]
-  ops: Op[]
-  initial: NoteEditorData
-  onSave: (data: NoteEditorData) => void
-  onCancel: () => void
+  loops: Loop[];
+  quests: Quest[];
+  ops: Op[];
+  initial: NoteEditorData;
+  onSave: (data: NoteEditorData) => void;
+  onCancel: () => void;
 }
 
 export function NoteEditor({
@@ -44,31 +51,31 @@ export function NoteEditor({
   onSave,
   onCancel,
 }: NoteEditorProps) {
-  const [form, setForm] = useState<NoteEditorData>(initial)
-  const [tagsInput, setTagsInput] = useState(initial.tags.join(', '))
+  const [form, setForm] = useState<NoteEditorData>(initial);
+  const [tagsInput, setTagsInput] = useState(initial.tags.join(", "));
 
   const filteredQuests = form.loopSlug
     ? quests.filter((q) => q.loop_slug === form.loopSlug)
-    : quests
+    : quests;
 
   const filteredOps = form.questId
     ? ops.filter((o) => o.quest_id === form.questId)
     : form.loopSlug
-    ? ops.filter((o) => o.loop_slug === form.loopSlug)
-    : ops
+      ? ops.filter((o) => o.loop_slug === form.loopSlug)
+      : ops;
 
   function handleSave() {
     if (!form.title.trim() && !form.content.trim()) {
-      alert('Podaj tytul lub tresc')
-      return
+      toast.error("Podaj tytul lub tresc");
+      return;
     }
 
     const tags = tagsInput
-      .split(',')
+      .split(",")
       .map((t) => t.trim())
-      .filter(Boolean)
+      .filter(Boolean);
 
-    onSave({ ...form, tags })
+    onSave({ ...form, tags });
   }
 
   return (
@@ -78,28 +85,32 @@ export function NoteEditor({
           <Label>Typ</Label>
           <Select
             value={form.type}
-            onValueChange={(value) => setForm({ ...form, type: value as NoteType })}
+            onValueChange={(value) =>
+              setForm({ ...form, type: value as NoteType })
+            }
           >
             <SelectTrigger>
               <SelectValue placeholder="Wybierz typ" />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(NOTE_TYPE_LABELS).map(([value, { label, icon }]) => (
-                <SelectItem key={value} value={value}>
-                  {icon} {label}
-                </SelectItem>
-              ))}
+              {Object.entries(NOTE_TYPE_LABELS).map(
+                ([value, { label, icon }]) => (
+                  <SelectItem key={value} value={value}>
+                    {icon} {label}
+                  </SelectItem>
+                ),
+              )}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
           <Label>Loop</Label>
           <Select
-            value={form.loopSlug || 'none'}
+            value={form.loopSlug || "none"}
             onValueChange={(value) =>
               setForm({
                 ...form,
-                loopSlug: value === 'none' ? null : value,
+                loopSlug: value === "none" ? null : value,
                 questId: null,
                 opId: null,
               })
@@ -124,11 +135,11 @@ export function NoteEditor({
         <div className="space-y-2">
           <Label>Quest</Label>
           <Select
-            value={form.questId || 'none'}
+            value={form.questId || "none"}
             onValueChange={(value) =>
               setForm({
                 ...form,
-                questId: value === 'none' ? null : value,
+                questId: value === "none" ? null : value,
                 opId: null,
               })
             }
@@ -149,9 +160,9 @@ export function NoteEditor({
         <div className="space-y-2">
           <Label>Op</Label>
           <Select
-            value={form.opId || 'none'}
+            value={form.opId || "none"}
             onValueChange={(value) =>
-              setForm({ ...form, opId: value === 'none' ? null : value })
+              setForm({ ...form, opId: value === "none" ? null : value })
             }
           >
             <SelectTrigger>
@@ -212,7 +223,9 @@ export function NoteEditor({
             type="checkbox"
             className="h-4 w-4"
             checked={form.isExperience}
-            onChange={(e) => setForm({ ...form, isExperience: e.target.checked })}
+            onChange={(e) =>
+              setForm({ ...form, isExperience: e.target.checked })
+            }
           />
           Experience
         </label>
@@ -225,5 +238,5 @@ export function NoteEditor({
         <Button onClick={handleSave}>Zapisz</Button>
       </DialogFooter>
     </div>
-  )
+  );
 }

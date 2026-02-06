@@ -1,23 +1,20 @@
 /**
- * POST /api/chat/stream - Streaming chat endpoint
+ * POST /api/chat/stream - Streaming chat endpoint (Gateway-integrated)
  *
- * Uses Server-Sent Events to stream Claude responses token-by-token.
- * Falls back to /api/chat/send for non-streaming clients.
+ * Uses Server-Sent Events to deliver Claude responses.
+ * Routes through Unified Message Gateway for FULL AI pipeline (28 tools)
+ * instead of raw Anthropic API calls.
+ *
+ * This gives dashboard users the same capabilities as
+ * WhatsApp/Telegram/Slack/Discord users.
  */
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import Anthropic from "@anthropic-ai/sdk";
-import {
-  getOrCreateSession,
-  updateSession,
-} from "@/lib/voice/conversation-handler";
+import { handleInboundMessage } from "@/lib/gateway/gateway";
+import type { GatewayMessage } from "@/lib/gateway/types";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
-import { STATIC_SYSTEM_PROMPT } from "@/lib/voice/system-prompt";
-import { getThreadContext } from "@/lib/unified-thread";
 
 export const dynamic = "force-dynamic";
-
-const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,96 +50,87 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get or create session
-    const sessionKey =
-      conversationId ||
-      `chat-${user.id}-${new Date().toISOString().slice(0, 10)}`;
-    const session = await getOrCreateSession(sessionKey, user.id);
-
-    // Build messages
-    let messages: Anthropic.MessageParam[];
-    try {
-      const threadMessages = await getThreadContext(user.id, 20);
-      if (threadMessages.length > 0) {
-        messages = [...threadMessages, { role: "user", content: message }];
-      } else {
-        messages = [
-          ...session.messages.map((m) => ({
-            role: m.role as "user" | "assistant",
-            content: m.content,
-          })),
-          { role: "user", content: message },
-        ];
-      }
-    } catch {
-      messages = [
-        ...session.messages.map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        })),
-        { role: "user", content: message },
-      ];
-    }
-
-    // Create streaming response
-    const anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY!,
-    });
-
+    // Route through Unified Message Gateway (FULL AI pipeline with 28 tools)
     const encoder = new TextEncoder();
-    let fullText = "";
 
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Send session ID
+          // Send session ID immediately
+          const sessionId =
+            conversationId ||
+            `chat-${user.id}-${new Date().toISOString().slice(0, 10)}`;
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: "session", conversationId: session.id })}\n\n`,
+              `data: ${JSON.stringify({ type: "session", conversationId: sessionId })}\n\n`,
             ),
           );
 
-          const response = await anthropic.messages.create({
-            model: CLAUDE_MODEL,
-            max_tokens: 1024,
-            system: STATIC_SYSTEM_PROMPT,
-            messages,
-            stream: true,
-          });
-
-          for await (const event of response) {
-            if (event.type === "content_block_delta") {
-              const delta = event.delta;
-              if ("text" in delta) {
-                fullText += delta.text;
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({ type: "delta", text: delta.text })}\n\n`,
-                  ),
-                );
-              }
-            } else if (event.type === "message_stop") {
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ type: "done", fullText })}\n\n`,
-                ),
-              );
-            }
-          }
-
-          // Save to session + unified thread (fire and forget)
-          updateSession(session.id, message, fullText, {
-            tenantId: user.id,
-            channel: "web_chat",
-          }).catch((err) =>
-            console.error("[Chat Stream] Failed to update session:", err),
+          // Send "thinking" indicator
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: "status", status: "processing" })}\n\n`,
+            ),
           );
 
-          incrementUsage(user.id, "conversations").catch(() => {});
+          // Get user email for sender name
+          const senderName = user.email || "Dashboard User";
+
+          // Build gateway message
+          const gatewayMsg: GatewayMessage = {
+            channel: "web_chat",
+            tenantId: user.id,
+            from: user.id,
+            senderName,
+            text: message,
+            metadata: {
+              conversationId,
+              source: "dashboard",
+              user_email: user.email,
+            },
+          };
+
+          // Process through full pipeline (28 tools, memory, emotion detection)
+          const result = await handleInboundMessage(gatewayMsg);
+
+          // Send response in chunks for smoother UX
+          const responseText = result.text;
+          const chunkSize = 50; // characters per chunk
+
+          for (let i = 0; i < responseText.length; i += chunkSize) {
+            const chunk = responseText.slice(i, i + chunkSize);
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ type: "delta", text: chunk })}\n\n`,
+              ),
+            );
+          }
+
+          // Send completion event
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "done",
+                fullText: responseText,
+                toolsUsed: result.toolsUsed,
+              })}\n\n`,
+            ),
+          );
+
+          incrementUsage(user.id, "conversations").catch((err) => {
+            console.warn(
+              "[ChatStream] Usage tracking failed:",
+              err instanceof Error ? err.message : String(err),
+            );
+          });
 
           controller.close();
         } catch (error) {
-          console.error("[Chat Stream] Streaming error:", error);
+          console.error("[Chat Stream] Gateway processing error:", {
+            error: error instanceof Error ? error.message : "Unknown error",
+            userId: user.id,
+            stack: error instanceof Error ? error.stack : undefined,
+          });
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({ type: "error", message: "Wystapil blad. Sprobuj ponownie." })}\n\n`,

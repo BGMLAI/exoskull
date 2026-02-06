@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,27 +8,28 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Campaign, CreateCampaignInput, Loop } from '@/lib/types/knowledge'
+} from "@/components/ui/select";
+import { Campaign, CreateCampaignInput, Loop } from "@/lib/types/knowledge";
+import { toast } from "sonner";
 
 interface CampaignFormDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  campaign?: Campaign // undefined = create mode
-  loops: Loop[]
-  defaultLoopSlug?: string
-  onSave: (input: CreateCampaignInput) => Promise<void>
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  campaign?: Campaign; // undefined = create mode
+  loops: Loop[];
+  defaultLoopSlug?: string;
+  onSave: (input: CreateCampaignInput) => Promise<void>;
 }
 
 export function CampaignFormDialog({
@@ -39,35 +40,35 @@ export function CampaignFormDialog({
   defaultLoopSlug,
   onSave,
 }: CampaignFormDialogProps) {
-  const [title, setTitle] = useState('')
-  const [vision, setVision] = useState('')
-  const [loopSlug, setLoopSlug] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [targetDate, setTargetDate] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [title, setTitle] = useState("");
+  const [vision, setVision] = useState("");
+  const [loopSlug, setLoopSlug] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [targetDate, setTargetDate] = useState("");
+  const [saving, setSaving] = useState(false);
 
   // Populate form when editing or reset for create
   useEffect(() => {
     if (campaign) {
-      setTitle(campaign.title)
-      setVision(campaign.vision || '')
-      setLoopSlug(campaign.loop_slug || '')
-      setStartDate(campaign.start_date?.split('T')[0] || '')
-      setTargetDate(campaign.target_date?.split('T')[0] || '')
+      setTitle(campaign.title);
+      setVision(campaign.vision || "");
+      setLoopSlug(campaign.loop_slug || "");
+      setStartDate(campaign.start_date?.split("T")[0] || "");
+      setTargetDate(campaign.target_date?.split("T")[0] || "");
     } else {
-      setTitle('')
-      setVision('')
-      setLoopSlug(defaultLoopSlug || '')
-      setStartDate('')
-      setTargetDate('')
+      setTitle("");
+      setVision("");
+      setLoopSlug(defaultLoopSlug || "");
+      setStartDate("");
+      setTargetDate("");
     }
-  }, [campaign, defaultLoopSlug, open])
+  }, [campaign, defaultLoopSlug, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!title.trim()) return
+    e.preventDefault();
+    if (!title.trim()) return;
 
-    setSaving(true)
+    setSaving(true);
     try {
       await onSave({
         title: title.trim(),
@@ -75,21 +76,23 @@ export function CampaignFormDialog({
         loopSlug: loopSlug || undefined,
         startDate: startDate || undefined,
         targetDate: targetDate || undefined,
-      })
-      onOpenChange(false)
+      });
+      onOpenChange(false);
     } catch (err) {
-      console.error('[CampaignFormDialog] Save error:', err)
-      alert(err instanceof Error ? err.message : 'Blad zapisu')
+      console.error("[CampaignFormDialog] Save error:", err);
+      toast.error(err instanceof Error ? err.message : "Blad zapisu");
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{campaign ? 'Edytuj Kampanie' : 'Nowa Kampania'}</DialogTitle>
+          <DialogTitle>
+            {campaign ? "Edytuj Kampanie" : "Nowa Kampania"}
+          </DialogTitle>
           <DialogDescription>
             Kampania to duza inicjatywa skladajaca sie z wielu Questow
           </DialogDescription>
@@ -161,15 +164,19 @@ export function CampaignFormDialog({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Anuluj
             </Button>
             <Button type="submit" disabled={saving || !title.trim()}>
-              {saving ? 'Zapisywanie...' : campaign ? 'Zapisz' : 'Utworz'}
+              {saving ? "Zapisywanie..." : campaign ? "Zapisz" : "Utworz"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

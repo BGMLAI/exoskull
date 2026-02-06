@@ -26,7 +26,13 @@ export async function GET(req: NextRequest) {
       );
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      // Sanitize search input to prevent query manipulation
+      const sanitized = search.replace(/[%_\\,()]/g, "");
+      if (sanitized.length > 0) {
+        query = query.or(
+          `name.ilike.%${sanitized}%,email.ilike.%${sanitized}%`,
+        );
+      }
     }
 
     query = query.order(sortBy, { ascending: order === "asc" });

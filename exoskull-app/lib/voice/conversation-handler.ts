@@ -6,9 +6,12 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient } from "@supabase/supabase-js";
 import twilio from "twilio";
 import { STATIC_SYSTEM_PROMPT } from "./system-prompt";
+import {
+  getExtensionToolDefinitions,
+  executeExtensionTool,
+} from "@/lib/iors/tools";
 import { makeOutboundCall } from "./twilio-client";
 import {
   appendMessage,
@@ -40,6 +43,7 @@ import { analyzeEmotion } from "@/lib/emotion";
 import { detectCrisis } from "@/lib/emotion/crisis-detector";
 import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
 import { logEmotion } from "@/lib/emotion/logger";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 // ============================================================================
 // CONFIGURATION
@@ -52,7 +56,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
 
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID!;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN!;
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || "+48732144112";
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER!;
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
@@ -71,6 +75,8 @@ export interface VoiceSession {
   startedAt: string;
   endedAt?: string;
   metadata?: Record<string, any>;
+  /** Optional prompt prefix (e.g., IORS birth flow) prepended to system prompt */
+  systemPromptPrefix?: string;
 }
 
 export interface ConversationResult {
@@ -290,6 +296,40 @@ const IORS_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["contact_name", "message"],
+    },
+  },
+  {
+    name: "connect_rig",
+    description:
+      "Połącz zewnętrzną usługę (Google Calendar, Oura Ring, Todoist, Notion, Fitbit, Spotify, Microsoft 365). Generuje link do autoryzacji który user otwiera w przeglądarce. Użyj gdy user chce podłączyć integrację lub mówi o urządzeniu/aplikacji.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        rig_slug: {
+          type: "string",
+          enum: [
+            "google",
+            "oura",
+            "fitbit",
+            "todoist",
+            "notion",
+            "spotify",
+            "microsoft-365",
+          ],
+          description:
+            "Slug integracji do połączenia. google = Gmail + Calendar + Drive + Tasks",
+        },
+      },
+      required: ["rig_slug"],
+    },
+  },
+  {
+    name: "list_integrations",
+    description:
+      "Pokaż listę dostępnych integracji które user może podłączyć do ExoSkull. Użyj gdy user pyta 'co mogę podłączyć?' lub 'jakie integracje?'",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
     },
   },
   {
@@ -525,15 +565,13 @@ const IORS_TOOLS: Anthropic.Tool[] = [
       properties: {},
     },
   },
+  // IORS extension tools (personality, autonomy, emergency)
+  ...getExtensionToolDefinitions(),
 ];
 
 // ============================================================================
 // SUPABASE CLIENT
 // ============================================================================
-
-function getSupabase() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-}
 
 // ============================================================================
 // SESSION MANAGEMENT
@@ -546,7 +584,7 @@ export async function getOrCreateSession(
   callSid: string,
   tenantId: string,
 ): Promise<VoiceSession> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Try to find existing session
   const { data: existing } = await supabase
@@ -608,7 +646,7 @@ export async function updateSession(
   assistantMessage: string,
   options?: { tenantId?: string; channel?: "voice" | "web_chat" },
 ): Promise<void> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const channel = options?.channel || "voice";
   const sourceType =
     channel === "web_chat" ? ("web_chat" as const) : ("voice_session" as const);
@@ -665,7 +703,7 @@ export async function updateSession(
  * End a voice session
  */
 export async function endSession(sessionId: string): Promise<void> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const { error } = await supabase
     .from("exo_voice_sessions")
@@ -691,10 +729,18 @@ async function executeTool(
   toolInput: Record<string, any>,
   tenantId: string,
 ): Promise<string> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   console.log("[ConversationHandler] Executing tool:", toolName, toolInput);
 
   try {
+    // Try IORS extension tools first (personality, autonomy, emergency)
+    const extensionResult = await executeExtensionTool(
+      toolName,
+      toolInput,
+      tenantId,
+    );
+    if (extensionResult !== null) return extensionResult;
+
     if (toolName === "add_task") {
       const { data, error } = await supabase
         .from("exo_tasks")
@@ -1003,6 +1049,36 @@ async function executeTool(
     }
 
     // ================================================================
+    // INTEGRATION TOOLS
+    // ================================================================
+
+    if (toolName === "connect_rig") {
+      const rigSlug = toolInput.rig_slug as string;
+      try {
+        const { generateMagicConnectLink } =
+          await import("@/lib/rigs/in-chat-connector");
+        const { url, rigName } = await generateMagicConnectLink(
+          tenantId,
+          rigSlug,
+        );
+        return `Otwórz ten link żeby połączyć ${rigName}:\n${url}\n\nLink ważny 15 minut.`;
+      } catch (err) {
+        console.error("[ConversationHandler] connect_rig error:", {
+          rigSlug,
+          error: err instanceof Error ? err.message : err,
+        });
+        return `Nie udało się wygenerować linku do ${rigSlug}. Spróbuj ponownie.`;
+      }
+    }
+
+    if (toolName === "list_integrations") {
+      const { getAvailableRigs } = await import("@/lib/rigs/in-chat-connector");
+      const rigs = getAvailableRigs();
+      const list = rigs.map((r) => `• ${r.name} — ${r.description}`).join("\n");
+      return `Dostępne integracje:\n${list}\n\nPowiedz "połącz [nazwa]" żeby podłączyć.`;
+    }
+
+    // ================================================================
     // AUTONOMY TOOLS
     // ================================================================
 
@@ -1275,7 +1351,7 @@ async function executeTool(
         await updateSuggestionStatus(suggestionId, "accepted");
 
         // Load suggestion to get description
-        const supabase = getSupabase();
+        const supabase = getServiceSupabase();
         const { data: suggestion } = await supabase
           .from("exo_skill_suggestions")
           .select("description, suggested_slug")
@@ -1432,12 +1508,14 @@ function normalizePhone(phone: string): string {
 // ============================================================================
 
 async function buildDynamicContext(tenantId: string): Promise<string> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Get user profile
   const { data: tenant } = await supabase
     .from("exo_tenants")
-    .select("name, preferred_name, communication_style")
+    .select(
+      "name, preferred_name, communication_style, iors_personality, iors_name",
+    )
     .eq("id", tenantId)
     .single();
 
@@ -1485,14 +1563,34 @@ async function buildDynamicContext(tenantId: string): Promise<string> {
     context += `- Zainstalowane Mody: ${modList}\n`;
   }
 
+  // IORS Personality — dynamic prompt fragment based on user preferences
+  try {
+    const { getPersonalityPromptFragment } =
+      await import("@/lib/iors/personality");
+    const personalityFragment = getPersonalityPromptFragment(
+      (tenant as any)?.iors_personality ?? null,
+    );
+    if (personalityFragment) {
+      context += personalityFragment;
+    }
+  } catch (err) {
+    console.warn(
+      "[ConversationHandler] Personality fragment failed:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+
   // Cross-channel conversation summary
   try {
     const threadSummary = await getThreadSummary(tenantId);
     if (threadSummary && threadSummary !== "Brak historii rozmow.") {
       context += `- Historia rozmow: ${threadSummary}\n`;
     }
-  } catch {
-    // Non-blocking: context works without thread summary
+  } catch (err) {
+    console.warn(
+      "[ConversationHandler] Thread summary failed:",
+      err instanceof Error ? err.message : err,
+    );
   }
 
   // Active goals status
@@ -1516,8 +1614,11 @@ async function buildDynamicContext(tenantId: string): Promise<string> {
       }
       context += `Gdy user pyta o cele, użyj "check_goals". Gdy raportuje postęp, użyj "log_goal_progress".\n`;
     }
-  } catch {
-    // Non-blocking
+  } catch (err) {
+    console.warn(
+      "[ConversationHandler] Goal status fetch failed:",
+      err instanceof Error ? err.message : err,
+    );
   }
 
   // Pending skill suggestions (from Need Detector)
@@ -1532,8 +1633,11 @@ async function buildDynamicContext(tenantId: string): Promise<string> {
       context += `Gdy użytkownik się zgodzi, użyj narzędzia "accept_skill_suggestion" z ID sugestii.\n`;
       context += `Gdy odmówi, użyj "dismiss_skill_suggestion". NIE naciskaj - zaproponuj raz, naturalnie.\n`;
     }
-  } catch {
-    // Non-blocking
+  } catch (err) {
+    console.warn(
+      "[ConversationHandler] Skill suggestions fetch failed:",
+      err instanceof Error ? err.message : err,
+    );
   }
 
   return context;
@@ -1589,6 +1693,19 @@ export async function processUserMessage(
     analyzeEmotion(userMessage),
   ]);
 
+  // Tau Matrix — fire-and-forget 4-quadrant emotion classification
+  import("@/lib/iors/emotion-matrix")
+    .then(({ classifyTauQuadrant, logEmotionSignal }) => {
+      const signal = classifyTauQuadrant(emotionState);
+      return logEmotionSignal(session.tenantId, signal, session.id);
+    })
+    .catch((err) => {
+      console.warn(
+        "[ConversationHandler] Tau classification failed:",
+        err instanceof Error ? err.message : String(err),
+      );
+    });
+
   // Crisis check (blocks if detected — safety requirement)
   const crisis = await detectCrisis(userMessage, emotionState);
 
@@ -1619,11 +1736,37 @@ export async function processUserMessage(
           crisis.severity!,
         ),
       )
-      .catch(() => {});
+      .catch((err) => {
+        console.error(
+          "[ConversationHandler] Crisis follow-up scheduling failed:",
+          {
+            error: err instanceof Error ? err.message : String(err),
+            tenantId: session.tenantId,
+          },
+        );
+      });
+    // Emergency contact escalation for high/critical crises
+    if (crisis.severity === "high" || crisis.severity === "critical") {
+      import("@/lib/iors/emergency-contact")
+        .then(({ escalateToCrisisContact }) =>
+          escalateToCrisisContact(
+            session.tenantId,
+            crisis.type!,
+            crisis.severity!,
+          ),
+        )
+        .catch((err) => {
+          console.error("[ConversationHandler] Emergency escalation failed:", {
+            error: err instanceof Error ? err.message : String(err),
+            tenantId: session.tenantId,
+          });
+        });
+    }
   } else {
     // Normal: emotion-adaptive prompt
     const adaptive = getAdaptivePrompt(emotionState);
     fullSystemPrompt =
+      (session.systemPromptPrefix || "") +
       STATIC_SYSTEM_PROMPT +
       dynamicContext +
       (adaptive.mode !== "neutral" ? "\n\n" + adaptive.instruction : "");
@@ -1631,7 +1774,12 @@ export async function processUserMessage(
     logEmotion(session.tenantId, emotionState, userMessage, {
       sessionId: session.id,
       personalityAdaptedTo: adaptive.mode,
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error("[ConversationHandler] Emotion logging failed:", {
+        error: err instanceof Error ? err.message : String(err),
+        tenantId: session.tenantId,
+      });
+    });
 
     // Phase 2: background voice prosody enrichment (non-blocking)
     if (options?.recordingUrl) {
@@ -1641,7 +1789,15 @@ export async function processUserMessage(
         userMessage,
         options.recordingUrl,
         adaptive.mode,
-      ).catch(() => {});
+      ).catch((err) => {
+        console.error(
+          "[ConversationHandler] Voice prosody enrichment failed:",
+          {
+            error: err instanceof Error ? err.message : String(err),
+            tenantId: session.tenantId,
+          },
+        );
+      });
     }
   }
 
@@ -1756,7 +1912,7 @@ export async function processUserMessage(
  * Generate personalized greeting for call start
  */
 export async function generateGreeting(tenantId: string): Promise<string> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Get user profile
   const { data: tenant } = await supabase
@@ -1793,7 +1949,7 @@ export async function generateGreeting(tenantId: string): Promise<string> {
 export async function findTenantByPhone(
   phone: string,
 ): Promise<{ id: string; name?: string } | null> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Normalize phone number (remove spaces, +, etc.)
   const normalizedPhone = phone.replace(/\s+/g, "").replace(/^\+/, "");

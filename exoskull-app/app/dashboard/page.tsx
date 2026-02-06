@@ -1,10 +1,9 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { DashboardInboxView } from "@/components/dashboard/DashboardInboxView";
-import { DashboardStatsSection } from "@/components/dashboard/DashboardStatsSection";
-import { WellbeingHero } from "@/components/dashboard/WellbeingHero";
-import { DailyReadinessCard } from "@/components/dashboard/DailyReadinessCard";
+import { CanvasGrid } from "@/components/canvas/CanvasGrid";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Home" };
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -23,32 +22,28 @@ export default async function DashboardPage() {
     );
   }
 
-  // Get tenant profile
+  // Get tenant profile (including IORS data)
   let assistantName = "IORS";
+  let phoneNumber: string | undefined;
   try {
     const { data: tenant } = await supabase
       .from("exo_tenants")
-      .select("assistant_name")
+      .select("assistant_name, phone_number, iors_name")
       .eq("id", user.id)
       .single();
-    assistantName = tenant?.assistant_name || "IORS";
+    assistantName = tenant?.iors_name || tenant?.assistant_name || "IORS";
+    phoneNumber = tenant?.phone_number || undefined;
   } catch (e: unknown) {
     console.error("[Dashboard] Failed to load tenant:", e);
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Wellbeing First — scrollable content above inbox */}
-      <div className="space-y-4 p-4 pb-0">
-        <WellbeingHero />
-        <DailyReadinessCard />
-        <DashboardStatsSection tenantId={user.id} />
-      </div>
-
-      {/* Inbox — takes remaining space */}
-      <div className="flex-1 min-h-0 mt-4">
-        <DashboardInboxView tenantId={user.id} assistantName={assistantName} />
-      </div>
+    <div className="h-full overflow-auto">
+      <CanvasGrid
+        tenantId={user.id}
+        assistantName={assistantName}
+        phoneNumber={phoneNumber}
+      />
     </div>
   );
 }

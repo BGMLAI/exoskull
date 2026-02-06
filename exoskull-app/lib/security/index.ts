@@ -10,8 +10,8 @@ export {
   safeFetch,
   validateMediaUrl,
   isInternalUrl,
-  type SSRFCheckResult
-} from './ssrf-guard'
+  type SSRFCheckResult,
+} from "./ssrf-guard";
 
 // Safety Guardrails
 export {
@@ -19,8 +19,8 @@ export {
   sanitizeUserInput,
   containsSensitiveData,
   maskSensitiveData,
-  checkRateLimit
-} from './safety-guardrails'
+  checkRateLimit,
+} from "./safety-guardrails";
 
 // Gateway Timestamps
 export {
@@ -29,8 +29,8 @@ export {
   createTimestampedMessage,
   formatTimestamp,
   isStaleTimestamp,
-  type TimestampedMessage
-} from './timestamps'
+  type TimestampedMessage,
+} from "./timestamps";
 
 // Embedding Utilities
 export {
@@ -42,5 +42,8 @@ export {
   validateEmbedding,
   averageEmbeddings,
   quantizeEmbedding,
-  dequantizeEmbedding
-} from './embeddings'
+  dequantizeEmbedding,
+} from "./embeddings";
+
+// Webhook HMAC Verification
+export { verifyMetaSignature } from "./webhook-hmac";

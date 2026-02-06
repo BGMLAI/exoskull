@@ -21,6 +21,7 @@ import {
 import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 /**
  * POST /api/cron/gold-etl

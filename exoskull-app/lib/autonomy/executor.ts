@@ -9,23 +9,16 @@
  * 2. Direct approval flow when user says "działaj" / "ok"
  */
 
-import { createClient } from "@supabase/supabase-js";
 import twilio from "twilio";
 import { makeOutboundCall } from "../voice/twilio-client";
 import { appendMessage } from "../unified-thread";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 function getTwilioConfig() {
   return {
     accountSid: process.env.TWILIO_ACCOUNT_SID!,
     authToken: process.env.TWILIO_AUTH_TOKEN!,
-    phoneNumber: process.env.TWILIO_PHONE_NUMBER || "+48732144112",
+    phoneNumber: process.env.TWILIO_PHONE_NUMBER!,
   };
 }
 
@@ -80,7 +73,7 @@ export interface ExecutionResult {
 export async function executeIntervention(
   interventionId: string,
 ): Promise<ExecutionResult> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Load intervention
   const { data: intervention, error: loadError } = await supabase
@@ -198,7 +191,7 @@ export async function executeIntervention(
 export async function processQueue(
   limit: number = 10,
 ): Promise<{ processed: number; succeeded: number; failed: number }> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const now = new Date().toISOString();
 
   // Fetch due queue items (not locked)
@@ -254,7 +247,7 @@ export async function processQueue(
  * Auto-approves and queues them for execution.
  */
 export async function processTimeouts(): Promise<number> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const now = new Date().toISOString();
 
   // Find proposed interventions with expired scheduled_for (timeout passed)
@@ -357,7 +350,13 @@ async function handleSendSms(
     direction: "outbound",
     source_type: "intervention",
     source_id: intervention.id,
-  }).catch(() => {});
+  }).catch((err) => {
+    console.error("[Executor] Failed to log SMS message:", {
+      error: err instanceof Error ? err.message : String(err),
+      tenantId: intervention.tenant_id,
+      interventionId: intervention.id,
+    });
+  });
 
   return { success: true, message: `SMS wysłany do ${targetPhone}` };
 }
@@ -414,7 +413,13 @@ async function handleSendEmail(
     direction: "outbound",
     source_type: "intervention",
     source_id: intervention.id,
-  }).catch(() => {});
+  }).catch((err) => {
+    console.error("[Executor] Failed to log email message:", {
+      error: err instanceof Error ? err.message : String(err),
+      tenantId: intervention.tenant_id,
+      interventionId: intervention.id,
+    });
+  });
 
   return { success: true, message: `Email wysłany do ${targetEmail}` };
 }
@@ -452,7 +457,13 @@ async function handleMakeCall(
     direction: "outbound",
     source_type: "intervention",
     source_id: intervention.id,
-  }).catch(() => {});
+  }).catch((err) => {
+    console.error("[Executor] Failed to log call message:", {
+      error: err instanceof Error ? err.message : String(err),
+      tenantId: intervention.tenant_id,
+      interventionId: intervention.id,
+    });
+  });
 
   return {
     success: true,
@@ -463,7 +474,7 @@ async function handleMakeCall(
 async function handleCreateTask(
   intervention: Intervention,
 ): Promise<ExecutionResult> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { title, priority } = intervention.action_payload as {
     title?: string;
     priority?: number;
@@ -503,7 +514,7 @@ async function handleProactiveMessage(
   }
 
   // Determine preferred channel for this tenant
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { data: tenant } = await supabase
     .from("exo_tenants")
     .select("phone, email")
@@ -619,7 +630,13 @@ async function handleNotifyEmergencyContact(
     direction: "outbound",
     source_type: "intervention",
     source_id: intervention.id,
-  }).catch(() => {});
+  }).catch((err) => {
+    console.error("[Executor] Failed to log emergency notification:", {
+      error: err instanceof Error ? err.message : String(err),
+      tenantId: intervention.tenant_id,
+      interventionId: intervention.id,
+    });
+  });
 
   return {
     success: result.success,
@@ -645,5 +662,11 @@ async function notifyUser(
     source_type: "intervention",
     source_id: intervention.id,
     metadata: { executionResult: result },
-  }).catch(() => {});
+  }).catch((err) => {
+    console.error("[Executor] Failed to log user notification:", {
+      error: err instanceof Error ? err.message : String(err),
+      tenantId: intervention.tenant_id,
+      interventionId: intervention.id,
+    });
+  });
 }

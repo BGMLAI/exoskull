@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,29 +8,30 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Op, CreateOpInput, Loop, Quest } from '@/lib/types/knowledge'
+} from "@/components/ui/select";
+import { Op, CreateOpInput, Loop, Quest } from "@/lib/types/knowledge";
+import { toast } from "sonner";
 
 interface OpFormDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  op?: Op // undefined = create mode
-  loops: Loop[]
-  quests: Quest[]
-  defaultQuestId?: string
-  defaultLoopSlug?: string
-  onSave: (input: CreateOpInput) => Promise<void>
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  op?: Op; // undefined = create mode
+  loops: Loop[];
+  quests: Quest[];
+  defaultQuestId?: string;
+  defaultLoopSlug?: string;
+  onSave: (input: CreateOpInput) => Promise<void>;
 }
 
 export function OpFormDialog({
@@ -43,58 +44,60 @@ export function OpFormDialog({
   defaultLoopSlug,
   onSave,
 }: OpFormDialogProps) {
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [questId, setQuestId] = useState('')
-  const [loopSlug, setLoopSlug] = useState('')
-  const [priority, setPriority] = useState(5)
-  const [dueDate, setDueDate] = useState('')
-  const [scheduledFor, setScheduledFor] = useState('')
-  const [estimatedEffort, setEstimatedEffort] = useState<number | undefined>(undefined)
-  const [tagsInput, setTagsInput] = useState('')
-  const [isRecurring, setIsRecurring] = useState(false)
-  const [recurrenceRule, setRecurrenceRule] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [questId, setQuestId] = useState("");
+  const [loopSlug, setLoopSlug] = useState("");
+  const [priority, setPriority] = useState(5);
+  const [dueDate, setDueDate] = useState("");
+  const [scheduledFor, setScheduledFor] = useState("");
+  const [estimatedEffort, setEstimatedEffort] = useState<number | undefined>(
+    undefined,
+  );
+  const [tagsInput, setTagsInput] = useState("");
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceRule, setRecurrenceRule] = useState("");
+  const [saving, setSaving] = useState(false);
 
   // Populate form when editing or reset for create
   useEffect(() => {
     if (op) {
-      setTitle(op.title)
-      setDescription(op.description || '')
-      setQuestId(op.quest_id || '')
-      setLoopSlug(op.loop_slug || '')
-      setPriority(op.priority)
-      setDueDate(op.due_date?.split('T')[0] || '')
-      setScheduledFor(op.scheduled_for?.split('T')[0] || '')
-      setEstimatedEffort(op.estimated_effort || undefined)
-      setTagsInput(op.tags?.join(', ') || '')
-      setIsRecurring(op.is_recurring)
-      setRecurrenceRule(op.recurrence_rule || '')
+      setTitle(op.title);
+      setDescription(op.description || "");
+      setQuestId(op.quest_id || "");
+      setLoopSlug(op.loop_slug || "");
+      setPriority(op.priority);
+      setDueDate(op.due_date?.split("T")[0] || "");
+      setScheduledFor(op.scheduled_for?.split("T")[0] || "");
+      setEstimatedEffort(op.estimated_effort || undefined);
+      setTagsInput(op.tags?.join(", ") || "");
+      setIsRecurring(op.is_recurring);
+      setRecurrenceRule(op.recurrence_rule || "");
     } else {
-      setTitle('')
-      setDescription('')
-      setQuestId(defaultQuestId || '')
-      setLoopSlug(defaultLoopSlug || '')
-      setPriority(5)
-      setDueDate('')
-      setScheduledFor('')
-      setEstimatedEffort(undefined)
-      setTagsInput('')
-      setIsRecurring(false)
-      setRecurrenceRule('')
+      setTitle("");
+      setDescription("");
+      setQuestId(defaultQuestId || "");
+      setLoopSlug(defaultLoopSlug || "");
+      setPriority(5);
+      setDueDate("");
+      setScheduledFor("");
+      setEstimatedEffort(undefined);
+      setTagsInput("");
+      setIsRecurring(false);
+      setRecurrenceRule("");
     }
-  }, [op, defaultQuestId, defaultLoopSlug, open])
+  }, [op, defaultQuestId, defaultLoopSlug, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!title.trim()) return
+    e.preventDefault();
+    if (!title.trim()) return;
 
     const tags = tagsInput
-      .split(',')
+      .split(",")
       .map((t) => t.trim())
-      .filter((t) => t.length > 0)
+      .filter((t) => t.length > 0);
 
-    setSaving(true)
+    setSaving(true);
     try {
       await onSave({
         title: title.trim(),
@@ -108,21 +111,21 @@ export function OpFormDialog({
         tags: tags.length > 0 ? tags : undefined,
         isRecurring,
         recurrenceRule: isRecurring ? recurrenceRule || undefined : undefined,
-      })
-      onOpenChange(false)
+      });
+      onOpenChange(false);
     } catch (err) {
-      console.error('[OpFormDialog] Save error:', err)
-      alert(err instanceof Error ? err.message : 'Blad zapisu')
+      console.error("[OpFormDialog] Save error:", err);
+      toast.error(err instanceof Error ? err.message : "Blad zapisu");
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{op ? 'Edytuj Op' : 'Nowy Op'}</DialogTitle>
+          <DialogTitle>{op ? "Edytuj Op" : "Nowy Op"}</DialogTitle>
           <DialogDescription>
             Op to konkretne zadanie do wykonania
           </DialogDescription>
@@ -209,8 +212,12 @@ export function OpFormDialog({
                   type="number"
                   min={0.25}
                   step={0.25}
-                  value={estimatedEffort || ''}
-                  onChange={(e) => setEstimatedEffort(e.target.value ? Number(e.target.value) : undefined)}
+                  value={estimatedEffort || ""}
+                  onChange={(e) =>
+                    setEstimatedEffort(
+                      e.target.value ? Number(e.target.value) : undefined,
+                    )
+                  }
                   placeholder="np. 2"
                 />
               </div>
@@ -272,15 +279,19 @@ export function OpFormDialog({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Anuluj
             </Button>
             <Button type="submit" disabled={saving || !title.trim()}>
-              {saving ? 'Zapisywanie...' : op ? 'Zapisz' : 'Utworz'}
+              {saving ? "Zapisywanie..." : op ? "Zapisz" : "Utworz"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

@@ -11,6 +11,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { getWhatsAppClient } from "@/lib/channels/whatsapp/client";
 import { getMessengerClient } from "@/lib/channels/messenger/client";
+import { telegramAdapter } from "@/lib/gateway/adapters/telegram";
+import { slackAdapter } from "@/lib/gateway/adapters/slack";
+import { discordAdapter } from "@/lib/gateway/adapters/discord";
+import { signalAdapter } from "@/lib/gateway/adapters/signal";
+import { imessageAdapter } from "@/lib/gateway/adapters/imessage";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -28,6 +33,11 @@ export interface ScheduledJob {
     | "email"
     | "whatsapp"
     | "messenger"
+    | "telegram"
+    | "slack"
+    | "discord"
+    | "signal"
+    | "imessage"
     | "both";
   display_name: string;
 }
@@ -48,6 +58,11 @@ export interface UserJobConfig {
       email?: boolean;
       whatsapp?: boolean;
       messenger?: boolean;
+      telegram?: boolean;
+      slack?: boolean;
+      discord?: boolean;
+      signal?: boolean;
+      imessage?: boolean;
     };
     rate_limits?: { max_calls_per_day?: number; max_sms_per_day?: number };
     quiet_hours?: { start?: string; end?: string };
@@ -57,17 +72,35 @@ export interface UserJobConfig {
 
 export interface DispatchResult {
   success: boolean;
-  channel: "voice" | "sms" | "email" | "whatsapp" | "messenger";
+  channel:
+    | "voice"
+    | "sms"
+    | "email"
+    | "whatsapp"
+    | "messenger"
+    | "telegram"
+    | "slack"
+    | "discord"
+    | "signal"
+    | "imessage";
   call_id?: string;
   message_sid?: string;
   error?: string;
-  provider?: "twilio" | "resend" | "meta";
+  provider?:
+    | "twilio"
+    | "resend"
+    | "meta"
+    | "telegram"
+    | "slack"
+    | "discord"
+    | "signal"
+    | "bluebubbles";
 }
 
 // Twilio Configuration
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || "+48732143210";
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER!;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 /**
@@ -516,6 +549,225 @@ export async function dispatchMessenger(
 }
 
 /**
+ * Dispatch Telegram message via Bot API
+ */
+export async function dispatchTelegram(
+  job: ScheduledJob,
+  user: UserJobConfig,
+): Promise<DispatchResult> {
+  const chatId = (user.schedule_settings as Record<string, unknown>)
+    ?.telegram_chat_id as string | undefined;
+
+  if (!chatId) {
+    return {
+      success: false,
+      channel: "telegram",
+      error: "User has no Telegram chat ID configured",
+    };
+  }
+
+  if (!process.env.TELEGRAM_BOT_TOKEN) {
+    return {
+      success: false,
+      channel: "telegram",
+      error: "Telegram not configured (missing TELEGRAM_BOT_TOKEN)",
+    };
+  }
+
+  const message = getSmsMessage(job, user);
+
+  try {
+    await telegramAdapter.sendResponse(chatId, message);
+    console.log(`[Dispatcher] Telegram sent to ${user.tenant_id}`);
+    return { success: true, channel: "telegram", provider: "telegram" };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error(`[Dispatcher] Telegram error for ${user.tenant_id}:`, {
+      error: errorMessage,
+      chatId,
+    });
+    return { success: false, channel: "telegram", error: errorMessage };
+  }
+}
+
+/**
+ * Dispatch Slack message via Web API
+ */
+export async function dispatchSlack(
+  job: ScheduledJob,
+  user: UserJobConfig,
+): Promise<DispatchResult> {
+  const slackChannelId = (user.schedule_settings as Record<string, unknown>)
+    ?.slack_channel_id as string | undefined;
+
+  if (!slackChannelId) {
+    return {
+      success: false,
+      channel: "slack",
+      error: "User has no Slack channel ID configured",
+    };
+  }
+
+  if (!process.env.SLACK_BOT_TOKEN) {
+    return {
+      success: false,
+      channel: "slack",
+      error: "Slack not configured (missing SLACK_BOT_TOKEN)",
+    };
+  }
+
+  const message = getSmsMessage(job, user);
+
+  try {
+    await slackAdapter.sendResponse(slackChannelId, message, {
+      slack_channel_id: slackChannelId,
+    });
+    console.log(`[Dispatcher] Slack sent to ${user.tenant_id}`);
+    return { success: true, channel: "slack", provider: "slack" };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error(`[Dispatcher] Slack error for ${user.tenant_id}:`, {
+      error: errorMessage,
+      channelId: slackChannelId,
+    });
+    return { success: false, channel: "slack", error: errorMessage };
+  }
+}
+
+/**
+ * Dispatch Discord message via REST API
+ */
+export async function dispatchDiscord(
+  job: ScheduledJob,
+  user: UserJobConfig,
+): Promise<DispatchResult> {
+  const discordChannelId = (user.schedule_settings as Record<string, unknown>)
+    ?.discord_channel_id as string | undefined;
+
+  if (!discordChannelId) {
+    return {
+      success: false,
+      channel: "discord",
+      error: "User has no Discord channel ID configured",
+    };
+  }
+
+  if (!process.env.DISCORD_BOT_TOKEN) {
+    return {
+      success: false,
+      channel: "discord",
+      error: "Discord not configured (missing DISCORD_BOT_TOKEN)",
+    };
+  }
+
+  const message = getSmsMessage(job, user);
+
+  try {
+    await discordAdapter.sendResponse(discordChannelId, message, {
+      discord_channel_id: discordChannelId,
+    });
+    console.log(`[Dispatcher] Discord sent to ${user.tenant_id}`);
+    return { success: true, channel: "discord", provider: "discord" };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error(`[Dispatcher] Discord error for ${user.tenant_id}:`, {
+      error: errorMessage,
+      channelId: discordChannelId,
+    });
+    return { success: false, channel: "discord", error: errorMessage };
+  }
+}
+
+/**
+ * Dispatch Signal message via signal-cli REST API
+ */
+export async function dispatchSignal(
+  job: ScheduledJob,
+  user: UserJobConfig,
+): Promise<DispatchResult> {
+  const signalPhone = (user.schedule_settings as Record<string, unknown>)
+    ?.signal_phone as string | undefined;
+
+  if (!signalPhone) {
+    return {
+      success: false,
+      channel: "signal",
+      error: "User has no Signal phone configured",
+    };
+  }
+
+  if (!process.env.SIGNAL_API_URL) {
+    return {
+      success: false,
+      channel: "signal",
+      error: "Signal not configured (missing SIGNAL_API_URL)",
+    };
+  }
+
+  const message = getSmsMessage(job, user);
+
+  try {
+    await signalAdapter.sendResponse(signalPhone, message);
+    console.log(`[Dispatcher] Signal sent to ${user.tenant_id}`);
+    return { success: true, channel: "signal", provider: "signal" };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error(`[Dispatcher] Signal error for ${user.tenant_id}:`, {
+      error: errorMessage,
+      phone: signalPhone,
+    });
+    return { success: false, channel: "signal", error: errorMessage };
+  }
+}
+
+/**
+ * Dispatch iMessage via BlueBubbles Server
+ */
+export async function dispatchImessage(
+  job: ScheduledJob,
+  user: UserJobConfig,
+): Promise<DispatchResult> {
+  const imessageAddress = (user.schedule_settings as Record<string, unknown>)
+    ?.imessage_address as string | undefined;
+
+  if (!imessageAddress) {
+    return {
+      success: false,
+      channel: "imessage",
+      error: "User has no iMessage address configured",
+    };
+  }
+
+  if (!process.env.BLUEBUBBLES_URL) {
+    return {
+      success: false,
+      channel: "imessage",
+      error: "iMessage not configured (missing BLUEBUBBLES_URL)",
+    };
+  }
+
+  const message = getSmsMessage(job, user);
+
+  try {
+    await imessageAdapter.sendResponse(imessageAddress, message);
+    console.log(`[Dispatcher] iMessage sent to ${user.tenant_id}`);
+    return { success: true, channel: "imessage", provider: "bluebubbles" };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error(`[Dispatcher] iMessage error for ${user.tenant_id}:`, {
+      error: errorMessage,
+      address: imessageAddress,
+    });
+    return { success: false, channel: "imessage", error: errorMessage };
+  }
+}
+
+/**
  * Dispatch job to appropriate channel
  */
 export async function dispatchJob(
@@ -528,6 +780,11 @@ export async function dispatchJob(
     | "email"
     | "whatsapp"
     | "messenger"
+    | "telegram"
+    | "slack"
+    | "discord"
+    | "signal"
+    | "imessage"
     | "both";
 
   // Check if channel is enabled in user settings
@@ -537,13 +794,28 @@ export async function dispatchJob(
     email: true,
     whatsapp: true,
     messenger: true,
+    telegram: true,
+    slack: true,
+    discord: true,
+    signal: true,
+    imessage: true,
   };
 
-  // Channel priority: Voice > WhatsApp > Messenger > SMS > Email
+  // Channel priority: Voice > Telegram > WhatsApp > Slack > Discord > Signal > iMessage > Messenger > SMS > Email
   if (channel === "voice" && channels.voice !== false) {
     return await dispatchVoiceCall(job, user);
+  } else if (channel === "telegram" && channels.telegram !== false) {
+    return await dispatchTelegram(job, user);
   } else if (channel === "whatsapp" && channels.whatsapp !== false) {
     return await dispatchWhatsApp(job, user);
+  } else if (channel === "slack" && channels.slack !== false) {
+    return await dispatchSlack(job, user);
+  } else if (channel === "discord" && channels.discord !== false) {
+    return await dispatchDiscord(job, user);
+  } else if (channel === "signal" && channels.signal !== false) {
+    return await dispatchSignal(job, user);
+  } else if (channel === "imessage" && channels.imessage !== false) {
+    return await dispatchImessage(job, user);
   } else if (channel === "messenger" && channels.messenger !== false) {
     return await dispatchMessenger(job, user);
   } else if (channel === "sms" && channels.sms !== false) {
@@ -556,9 +828,29 @@ export async function dispatchJob(
       const voiceResult = await dispatchVoiceCall(job, user);
       if (voiceResult.success) return voiceResult;
     }
+    if (channels.telegram !== false) {
+      const telegramResult = await dispatchTelegram(job, user);
+      if (telegramResult.success) return telegramResult;
+    }
     if (channels.whatsapp !== false) {
       const whatsappResult = await dispatchWhatsApp(job, user);
       if (whatsappResult.success) return whatsappResult;
+    }
+    if (channels.slack !== false) {
+      const slackResult = await dispatchSlack(job, user);
+      if (slackResult.success) return slackResult;
+    }
+    if (channels.discord !== false) {
+      const discordResult = await dispatchDiscord(job, user);
+      if (discordResult.success) return discordResult;
+    }
+    if (channels.signal !== false) {
+      const signalResult = await dispatchSignal(job, user);
+      if (signalResult.success) return signalResult;
+    }
+    if (channels.imessage !== false) {
+      const imessageResult = await dispatchImessage(job, user);
+      if (imessageResult.success) return imessageResult;
     }
     if (channels.messenger !== false) {
       const messengerResult = await dispatchMessenger(job, user);

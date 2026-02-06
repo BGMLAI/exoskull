@@ -7,18 +7,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-}
 
 /**
  * Parse and verify the signed_request from Facebook.
@@ -101,7 +93,7 @@ export async function POST(req: NextRequest) {
     // Deactivate all meta pages associated with this FB user
     // Note: We don't have a direct FB user -> tenant mapping here,
     // but we can log the request and handle it asynchronously
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     // Store the deletion request for audit
     await supabase.from("exo_conversations").insert({

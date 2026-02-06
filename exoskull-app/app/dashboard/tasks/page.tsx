@@ -1,18 +1,25 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -21,170 +28,186 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Plus, Pencil, Trash2, CheckCircle2, Circle, AlertCircle, Clock } from 'lucide-react'
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  CheckCircle2,
+  Circle,
+  AlertCircle,
+  Clock,
+} from "lucide-react";
 
 type Task = {
-  id: string
-  title: string
-  description: string | null
-  status: 'pending' | 'in_progress' | 'blocked' | 'done' | 'cancelled'
-  priority: 1 | 2 | 3 | 4 // 1=critical, 2=high, 3=medium, 4=low
-  energy_required: number | null
-  time_estimate_minutes: number | null
-  due_date: string | null
-  created_at: string
-  completed_at: string | null
-}
+  id: string;
+  title: string;
+  description: string | null;
+  status: "pending" | "in_progress" | "blocked" | "done" | "cancelled";
+  priority: 1 | 2 | 3 | 4; // 1=critical, 2=high, 3=medium, 4=low
+  energy_required: number | null;
+  time_estimate_minutes: number | null;
+  due_date: string | null;
+  created_at: string;
+  completed_at: string | null;
+};
 
 const STATUS_COLORS = {
-  pending: 'bg-gray-100 text-gray-800',
-  in_progress: 'bg-blue-100 text-blue-800',
-  blocked: 'bg-red-100 text-red-800',
-  done: 'bg-green-100 text-green-800',
-  cancelled: 'bg-gray-100 text-gray-500'
-}
+  pending: "bg-gray-100 text-gray-800",
+  in_progress: "bg-blue-100 text-blue-800",
+  blocked: "bg-red-100 text-red-800",
+  done: "bg-green-100 text-green-800",
+  cancelled: "bg-gray-100 text-gray-500",
+};
 
 const STATUS_LABELS = {
-  pending: 'Do zrobienia',
-  in_progress: 'W trakcie',
-  blocked: 'Zablokowane',
-  done: 'Gotowe',
-  cancelled: 'Anulowane'
-}
+  pending: "Do zrobienia",
+  in_progress: "W trakcie",
+  blocked: "Zablokowane",
+  done: "Gotowe",
+  cancelled: "Anulowane",
+};
 
 const PRIORITY_COLORS = {
-  1: 'bg-red-100 text-red-800',
-  2: 'bg-orange-100 text-orange-800',
-  3: 'bg-yellow-100 text-yellow-800',
-  4: 'bg-green-100 text-green-800'
-}
+  1: "bg-red-100 text-red-800",
+  2: "bg-orange-100 text-orange-800",
+  3: "bg-yellow-100 text-yellow-800",
+  4: "bg-green-100 text-green-800",
+};
 
 const PRIORITY_LABELS = {
-  1: 'Krytyczny',
-  2: 'Wysoki',
-  3: 'Średni',
-  4: 'Niski'
-}
+  1: "Krytyczny",
+  2: "Wysoki",
+  3: "Średni",
+  4: "Niski",
+};
 
 export default function TasksPage() {
-  const supabase = createClient()
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [filterPriority, setFilterPriority] = useState<string>('all')
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const supabase = createClient();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterPriority, setFilterPriority] = useState<string>("all");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    status: 'pending' as Task['status'],
-    priority: 2 as Task['priority'],
-    energy_required: '',
-    time_estimate_minutes: '',
-    due_date: ''
-  })
+    title: "",
+    description: "",
+    status: "pending" as Task["status"],
+    priority: 2 as Task["priority"],
+    energy_required: "",
+    time_estimate_minutes: "",
+    due_date: "",
+  });
 
   useEffect(() => {
-    initializeAndLoadTasks()
-  }, [])
+    initializeAndLoadTasks();
+  }, []);
 
   async function ensureTenantExists() {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return false
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return false;
 
       // Check if tenant exists
       const { data: existing } = await supabase
-        .from('exo_tenants')
-        .select('id')
-        .eq('id', user.id)
-        .single()
+        .from("exo_tenants")
+        .select("id")
+        .eq("id", user.id)
+        .single();
 
       if (!existing) {
         // Create tenant record
-        const { error } = await supabase
-          .from('exo_tenants')
-          .insert({
-            id: user.id,
-            name: user.email?.split('@')[0] || 'User',
-            email: user.email,
-            created_at: new Date().toISOString()
-          })
+        const { error } = await supabase.from("exo_tenants").insert({
+          id: user.id,
+          name: user.email?.split("@")[0] || "User",
+          email: user.email,
+          created_at: new Date().toISOString(),
+        });
 
         if (error) {
-          console.error('[EnsureTenant] Failed to create tenant:', error)
-          return false
+          console.error("[EnsureTenant] Failed to create tenant:", error);
+          return false;
         }
-        console.log('[EnsureTenant] Created tenant for user:', user.id)
+        console.log("[EnsureTenant] Created tenant for user:", user.id);
       }
-      return true
+      return true;
     } catch (error) {
-      console.error('[EnsureTenant] Error:', error)
-      return false
+      console.error("[EnsureTenant] Error:", error);
+      return false;
     }
   }
 
   async function initializeAndLoadTasks() {
-    await ensureTenantExists()
-    await loadTasks()
+    await ensureTenantExists();
+    await loadTasks();
   }
 
   async function loadTasks() {
     try {
-      setLoading(true)
+      setLoading(true);
       const { data, error } = await supabase
-        .from('exo_tasks')
-        .select('*')
-        .order('created_at', { ascending: false })
+        .from("exo_tasks")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      if (error) throw error
-      setTasks(data || [])
+      if (error) throw error;
+      setTasks(data || []);
     } catch (error) {
-      console.error('Error loading tasks:', error)
-      alert('Nie udało się załadować zadań')
+      console.error("Error loading tasks:", error);
+      toast.error("Nie udało się załadować zadań");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   async function createTask() {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
 
       // Ensure tenant exists before creating task
-      const tenantReady = await ensureTenantExists()
+      const tenantReady = await ensureTenantExists();
       if (!tenantReady) {
-        throw new Error('Failed to initialize user profile')
+        throw new Error("Failed to initialize user profile");
       }
 
-      const { error } = await supabase.from('exo_tasks').insert({
+      const { error } = await supabase.from("exo_tasks").insert({
         tenant_id: user.id,
         title: formData.title,
         description: formData.description || null,
         status: formData.status,
         priority: formData.priority,
-        energy_required: formData.energy_required ? parseInt(formData.energy_required) : null,
-        time_estimate_minutes: formData.time_estimate_minutes ? parseInt(formData.time_estimate_minutes) : null,
-        due_date: formData.due_date || null
-      })
+        energy_required: formData.energy_required
+          ? parseInt(formData.energy_required)
+          : null,
+        time_estimate_minutes: formData.time_estimate_minutes
+          ? parseInt(formData.time_estimate_minutes)
+          : null,
+        due_date: formData.due_date || null,
+      });
 
-      if (error) throw error
+      if (error) throw error;
 
-      await loadTasks()
-      setIsCreateDialogOpen(false)
-      resetForm()
+      await loadTasks();
+      setIsCreateDialogOpen(false);
+      resetForm();
     } catch (error) {
-      console.error('[CreateTask] Error:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        error
-      })
-      alert(`Nie udało się utworzyć zadania: ${error instanceof Error ? error.message : 'Nieznany błąd'}`)
+      console.error("[CreateTask] Error:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        error,
+      });
+      toast.error(
+        `Nie udało się utworzyć zadania: ${error instanceof Error ? error.message : "Nieznany błąd"}`,
+      );
     }
   }
 
@@ -195,114 +218,119 @@ export default function TasksPage() {
         description: formData.description || null,
         status: formData.status,
         priority: formData.priority,
-        energy_required: formData.energy_required ? parseInt(formData.energy_required) : null,
-        time_estimate_minutes: formData.time_estimate_minutes ? parseInt(formData.time_estimate_minutes) : null,
-        due_date: formData.due_date || null
-      }
+        energy_required: formData.energy_required
+          ? parseInt(formData.energy_required)
+          : null,
+        time_estimate_minutes: formData.time_estimate_minutes
+          ? parseInt(formData.time_estimate_minutes)
+          : null,
+        due_date: formData.due_date || null,
+      };
 
       // If marking as done, set completed_at
-      if (formData.status === 'done' && task.status !== 'done') {
-        updates.completed_at = new Date().toISOString()
+      if (formData.status === "done" && task.status !== "done") {
+        updates.completed_at = new Date().toISOString();
       }
       // If unmarking done, clear completed_at
-      if (formData.status !== 'done' && task.status === 'done') {
-        updates.completed_at = null
+      if (formData.status !== "done" && task.status === "done") {
+        updates.completed_at = null;
       }
 
       const { error } = await supabase
-        .from('exo_tasks')
+        .from("exo_tasks")
         .update(updates)
-        .eq('id', task.id)
+        .eq("id", task.id);
 
-      if (error) throw error
+      if (error) throw error;
 
-      await loadTasks()
-      setEditingTask(null)
-      resetForm()
+      await loadTasks();
+      setEditingTask(null);
+      resetForm();
     } catch (error) {
-      console.error('Error updating task:', error)
-      alert('Nie udało się zaktualizować zadania')
+      console.error("Error updating task:", error);
+      toast.error("Nie udało się zaktualizować zadania");
     }
   }
 
   async function deleteTask(taskId: string) {
-    if (!confirm('Czy na pewno chcesz usunąć to zadanie?')) return
+    if (!confirm("Czy na pewno chcesz usunąć to zadanie?")) return;
 
     try {
       const { error } = await supabase
-        .from('exo_tasks')
+        .from("exo_tasks")
         .delete()
-        .eq('id', taskId)
+        .eq("id", taskId);
 
-      if (error) throw error
+      if (error) throw error;
 
-      await loadTasks()
+      await loadTasks();
     } catch (error) {
-      console.error('Error deleting task:', error)
-      alert('Nie udało się usunąć zadania')
+      console.error("Error deleting task:", error);
+      toast.error("Nie udało się usunąć zadania");
     }
   }
 
   async function toggleTaskStatus(task: Task) {
-    const newStatus = task.status === 'done' ? 'pending' : 'done'
-    const updates: any = { status: newStatus }
+    const newStatus = task.status === "done" ? "pending" : "done";
+    const updates: any = { status: newStatus };
 
-    if (newStatus === 'done') {
-      updates.completed_at = new Date().toISOString()
+    if (newStatus === "done") {
+      updates.completed_at = new Date().toISOString();
     } else {
-      updates.completed_at = null
+      updates.completed_at = null;
     }
 
     try {
       const { error } = await supabase
-        .from('exo_tasks')
+        .from("exo_tasks")
         .update(updates)
-        .eq('id', task.id)
+        .eq("id", task.id);
 
-      if (error) throw error
-      await loadTasks()
+      if (error) throw error;
+      await loadTasks();
     } catch (error) {
-      console.error('Error toggling task:', error)
+      console.error("Error toggling task:", error);
     }
   }
 
   function resetForm() {
     setFormData({
-      title: '',
-      description: '',
-      status: 'pending',
+      title: "",
+      description: "",
+      status: "pending",
       priority: 2,
-      energy_required: '',
-      time_estimate_minutes: '',
-      due_date: ''
-    })
+      energy_required: "",
+      time_estimate_minutes: "",
+      due_date: "",
+    });
   }
 
   function openEditDialog(task: Task) {
     setFormData({
       title: task.title,
-      description: task.description || '',
+      description: task.description || "",
       status: task.status,
       priority: task.priority,
-      energy_required: task.energy_required?.toString() || '',
-      time_estimate_minutes: task.time_estimate_minutes?.toString() || '',
-      due_date: task.due_date || ''
-    })
-    setEditingTask(task)
+      energy_required: task.energy_required?.toString() || "",
+      time_estimate_minutes: task.time_estimate_minutes?.toString() || "",
+      due_date: task.due_date || "",
+    });
+    setEditingTask(task);
   }
 
-  const filteredTasks = tasks.filter(task => {
-    if (filterStatus !== 'all' && task.status !== filterStatus) return false
-    if (filterPriority !== 'all' && task.priority.toString() !== filterPriority) return false
-    return true
-  })
+  const filteredTasks = tasks.filter((task) => {
+    if (filterStatus !== "all" && task.status !== filterStatus) return false;
+    if (filterPriority !== "all" && task.priority.toString() !== filterPriority)
+      return false;
+    return true;
+  });
 
   const taskStats = {
     total: tasks.length,
-    pending: tasks.filter(t => t.status === 'pending').length,
-    in_progress: tasks.filter(t => t.status === 'in_progress').length,
-    done: tasks.filter(t => t.status === 'done').length
-  }
+    pending: tasks.filter((t) => t.status === "pending").length,
+    in_progress: tasks.filter((t) => t.status === "in_progress").length,
+    done: tasks.filter((t) => t.status === "done").length,
+  };
 
   return (
     <div className="p-8 space-y-6">
@@ -333,8 +361,8 @@ export default function TasksPage() {
               setFormData={setFormData}
               onSubmit={createTask}
               onCancel={() => {
-                setIsCreateDialogOpen(false)
-                resetForm()
+                setIsCreateDialogOpen(false);
+                resetForm();
               }}
             />
           </DialogContent>
@@ -422,7 +450,7 @@ export default function TasksPage() {
             </CardContent>
           </Card>
         ) : (
-          filteredTasks.map(task => (
+          filteredTasks.map((task) => (
             <Card key={task.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
                 <div className="flex items-start gap-4">
@@ -431,7 +459,7 @@ export default function TasksPage() {
                     onClick={() => toggleTaskStatus(task)}
                     className="mt-1 flex-shrink-0"
                   >
-                    {task.status === 'done' ? (
+                    {task.status === "done" ? (
                       <CheckCircle2 className="h-5 w-5 text-green-600" />
                     ) : (
                       <Circle className="h-5 w-5 text-gray-400" />
@@ -442,7 +470,9 @@ export default function TasksPage() {
                   <div className="flex-1 space-y-2">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h3 className={`font-medium ${task.status === 'done' ? 'line-through text-muted-foreground' : ''}`}>
+                        <h3
+                          className={`font-medium ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}
+                        >
                           {task.title}
                         </h3>
                         {task.description && (
@@ -490,7 +520,8 @@ export default function TasksPage() {
                       )}
                       {task.due_date && (
                         <Badge variant="outline">
-                          📅 {new Date(task.due_date).toLocaleDateString('pl-PL')}
+                          📅{" "}
+                          {new Date(task.due_date).toLocaleDateString("pl-PL")}
                         </Badge>
                       )}
                     </div>
@@ -517,15 +548,15 @@ export default function TasksPage() {
               setFormData={setFormData}
               onSubmit={() => updateTask(editingTask)}
               onCancel={() => {
-                setEditingTask(null)
-                resetForm()
+                setEditingTask(null);
+                resetForm();
               }}
             />
           </DialogContent>
         </Dialog>
       )}
     </div>
-  )
+  );
 }
 
 // Task Form Component
@@ -533,12 +564,12 @@ function TaskForm({
   formData,
   setFormData,
   onSubmit,
-  onCancel
+  onCancel,
 }: {
-  formData: any
-  setFormData: any
-  onSubmit: () => void
-  onCancel: () => void
+  formData: any;
+  setFormData: any;
+  onSubmit: () => void;
+  onCancel: () => void;
 }) {
   return (
     <div className="space-y-4 py-4">
@@ -557,7 +588,9 @@ function TaskForm({
         <Textarea
           id="description"
           value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, description: e.target.value })
+          }
           placeholder="Dodatkowe szczegóły..."
           rows={3}
         />
@@ -568,7 +601,9 @@ function TaskForm({
           <Label htmlFor="status">Status</Label>
           <Select
             value={formData.status}
-            onValueChange={(value) => setFormData({ ...formData, status: value })}
+            onValueChange={(value) =>
+              setFormData({ ...formData, status: value })
+            }
           >
             <SelectTrigger>
               <SelectValue />
@@ -587,7 +622,9 @@ function TaskForm({
           <Label htmlFor="priority">Priorytet</Label>
           <Select
             value={formData.priority.toString()}
-            onValueChange={(value) => setFormData({ ...formData, priority: parseInt(value) })}
+            onValueChange={(value) =>
+              setFormData({ ...formData, priority: parseInt(value) })
+            }
           >
             <SelectTrigger>
               <SelectValue />
@@ -611,7 +648,9 @@ function TaskForm({
             min="1"
             max="10"
             value={formData.energy_required}
-            onChange={(e) => setFormData({ ...formData, energy_required: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, energy_required: e.target.value })
+            }
             placeholder="1-10"
           />
         </div>
@@ -623,7 +662,12 @@ function TaskForm({
             type="number"
             min="1"
             value={formData.time_estimate_minutes}
-            onChange={(e) => setFormData({ ...formData, time_estimate_minutes: e.target.value })}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                time_estimate_minutes: e.target.value,
+              })
+            }
             placeholder="np. 30"
           />
         </div>
@@ -635,7 +679,9 @@ function TaskForm({
           id="due_date"
           type="datetime-local"
           value={formData.due_date}
-          onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, due_date: e.target.value })
+          }
         />
       </div>
 
@@ -648,5 +694,5 @@ function TaskForm({
         </Button>
       </DialogFooter>
     </div>
-  )
+  );
 }

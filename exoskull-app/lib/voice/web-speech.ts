@@ -12,19 +12,19 @@
 // ============================================================================
 
 export interface WebSpeechOptions {
-  language?: string
-  continuous?: boolean
-  interimResults?: boolean
-  onResult?: (transcript: string, isFinal: boolean) => void
-  onError?: (error: string) => void
-  onStart?: () => void
-  onEnd?: () => void
+  language?: string;
+  continuous?: boolean;
+  interimResults?: boolean;
+  onResult?: (transcript: string, isFinal: boolean) => void;
+  onError?: (error: string) => void;
+  onStart?: () => void;
+  onEnd?: () => void;
 }
 
 export interface WebSpeechInstance {
-  start: () => void
-  stop: () => void
-  isListening: () => boolean
+  start: () => void;
+  stop: () => void;
+  isListening: () => boolean;
 }
 
 // ============================================================================
@@ -32,9 +32,9 @@ export interface WebSpeechInstance {
 // ============================================================================
 
 export function isWebSpeechSupported(): boolean {
-  if (typeof window === 'undefined') return false
-  const w = window as any
-  return !!(w.SpeechRecognition || w.webkitSpeechRecognition)
+  if (typeof window === "undefined") return false;
+  const w = window as any;
+  return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
 }
 
 // ============================================================================
@@ -42,86 +42,112 @@ export function isWebSpeechSupported(): boolean {
 // ============================================================================
 
 export function createSpeechRecognition(
-  options: WebSpeechOptions = {}
+  options: WebSpeechOptions = {},
 ): WebSpeechInstance {
   const {
-    language = 'pl-PL',
+    language = "pl-PL",
     continuous = false,
     interimResults = true,
     onResult,
     onError,
     onStart,
-    onEnd
-  } = options
+    onEnd,
+  } = options;
 
   if (!isWebSpeechSupported()) {
-    console.error('[WebSpeech] Speech Recognition not supported in this browser')
+    console.error(
+      "[WebSpeech] Speech Recognition not supported in this browser",
+    );
     return {
-      start: () => onError?.('Speech Recognition not supported'),
+      start: () => onError?.("Speech Recognition not supported"),
       stop: () => {},
-      isListening: () => false
-    }
+      isListening: () => false,
+    };
   }
 
-  const w = window as any
-  const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition
+  const w = window as any;
+  const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
 
-  const recognition = new SpeechRecognition()
-  let listening = false
+  const recognition = new SpeechRecognition();
+  let listening = false;
 
-  recognition.lang = language
-  recognition.continuous = continuous
-  recognition.interimResults = interimResults
-  recognition.maxAlternatives = 1
+  recognition.lang = language;
+  recognition.continuous = continuous;
+  recognition.interimResults = interimResults;
+  recognition.maxAlternatives = 1;
 
   recognition.onstart = () => {
-    listening = true
-    onStart?.()
-  }
+    listening = true;
+    onStart?.();
+  };
 
   recognition.onresult = (event: any) => {
-    const lastResult = event.results[event.results.length - 1]
-    const transcript = lastResult[0].transcript
-    const isFinal = lastResult.isFinal
-    onResult?.(transcript, isFinal)
-  }
+    const lastResult = event.results[event.results.length - 1];
+    const transcript = lastResult[0].transcript;
+    const isFinal = lastResult.isFinal;
+    onResult?.(transcript, isFinal);
+  };
+
+  let noSpeechRetries = 0;
+  const MAX_NO_SPEECH_RETRIES = 2;
 
   recognition.onerror = (event: any) => {
-    console.error('[WebSpeech] Error:', event.error)
-    listening = false
+    console.error("[WebSpeech] Error:", event.error);
 
-    if (event.error === 'not-allowed') {
-      onError?.('Microphone access denied. Please allow microphone access.')
-    } else if (event.error === 'no-speech') {
-      onError?.('No speech detected. Try again.')
-    } else if (event.error === 'network') {
-      onError?.('Network error. Check your connection.')
+    if (event.error === "no-speech") {
+      // Auto-retry up to 2 times before giving up
+      if (noSpeechRetries < MAX_NO_SPEECH_RETRIES) {
+        noSpeechRetries++;
+        console.log(
+          `[WebSpeech] No speech, retry ${noSpeechRetries}/${MAX_NO_SPEECH_RETRIES}`,
+        );
+        try {
+          recognition.start();
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      listening = false;
+      onError?.("Nie wykryto mowy. Sprawdź mikrofon i spróbuj ponownie.");
+    } else if (event.error === "not-allowed") {
+      listening = false;
+      onError?.(
+        "Brak dostępu do mikrofonu. Zezwól w ustawieniach przeglądarki.",
+      );
+    } else if (event.error === "network") {
+      listening = false;
+      onError?.("Błąd sieci. Sprawdź połączenie.");
+    } else if (event.error === "aborted") {
+      listening = false;
+      // Silently handle abort - user likely stopped manually
     } else {
-      onError?.(event.error)
+      listening = false;
+      onError?.(`Błąd rozpoznawania: ${event.error}`);
     }
-  }
+  };
 
   recognition.onend = () => {
-    listening = false
-    onEnd?.()
-  }
+    listening = false;
+    onEnd?.();
+  };
 
   return {
     start: () => {
       try {
-        recognition.start()
+        recognition.start();
       } catch (error) {
-        console.error('[WebSpeech] Start error:', error)
-        onError?.('Failed to start speech recognition')
+        console.error("[WebSpeech] Start error:", error);
+        onError?.("Failed to start speech recognition");
       }
     },
     stop: () => {
       try {
-        recognition.stop()
+        recognition.stop();
       } catch (error) {
         // Ignore - may already be stopped
       }
     },
-    isListening: () => listening
-  }
+    isListening: () => listening,
+  };
 }

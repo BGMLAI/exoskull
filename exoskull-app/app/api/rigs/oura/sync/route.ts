@@ -3,21 +3,15 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { OuraClient } from "@/lib/rigs/oura/client";
 import type {
   OuraSleepPeriod,
   OuraDailyActivity,
 } from "@/lib/rigs/oura/client";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 const DEFAULT_DAYS = 7;
 
@@ -36,14 +30,12 @@ interface HealthMetricInsert {
 // =====================================================
 
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const startTime = Date.now();
-  const tenantId = request.headers.get("x-tenant-id");
 
-  if (!tenantId) {
-    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-  }
-  const tenantIdValue = tenantId;
+  const auth = await verifyTenantAuth(request);
+  if (!auth.ok) return auth.response;
+  const tenantIdValue = auth.tenantId;
 
   try {
     const { days: bodyDays } = (await request.json().catch(() => ({}))) as {
@@ -172,12 +164,11 @@ export async function POST(request: NextRequest) {
 // =====================================================
 
 export async function GET(request: NextRequest) {
-  const supabase = getSupabase();
-  const tenantId = request.headers.get("x-tenant-id");
+  const supabase = getServiceSupabase();
 
-  if (!tenantId) {
-    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(request);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   const { data: connection, error: connError } = await supabase
     .from("exo_rig_connections")

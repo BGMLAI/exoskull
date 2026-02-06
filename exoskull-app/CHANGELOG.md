@@ -4,6 +4,121 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-06] Security Audit — Phase 5: Webhook Auth + Supabase Migration
+
+### Webhook Authentication Hardening (S5, S7, S9, S10, S11)
+
+- **WhatsApp & Messenger**: Made META_APP_SECRET mandatory — HMAC verification no longer silently skipped when env var is missing (returns 500)
+- **Twilio Voice**: Added X-Twilio-Signature validation using existing `validateTwilioSignature()` utility (warns if TWILIO_AUTH_TOKEN missing)
+- **Signal Gateway**: Added SIGNAL_WEBHOOK_SECRET auth via `x-signal-webhook-secret` header or Bearer token (was completely unauthenticated)
+- **iMessage Gateway**: Removed query param password (leaks to access logs), now requires Bearer header only
+
+### Supabase Client Migration (Q-series)
+
+- Migrated 61 files from local `getSupabase()` factory to shared `getServiceSupabase()` from `lib/supabase/service.ts`
+- Removed 61 duplicate `createClient` imports + ~1,200 lines of boilerplate
+- Fixed 3 broken multi-line imports from batch migration
+- Fixed 2 `ReturnType<typeof getSupabase>` references in WhatsApp/Messenger
+
+### Files changed
+
+- 5 webhook/gateway routes (whatsapp, messenger, twilio voice, signal, imessage)
+- 61 files migrated to shared Supabase client
+- Total: ~66 files modified
+
+### New env vars required
+
+- `SIGNAL_WEBHOOK_SECRET` — shared secret for Signal webhook authentication
+
+---
+
+## [2026-02-06] Security Audit — Phase 1 Critical Fixes
+
+### Full Audit Summary
+
+- **76 findings** across 4 areas: Security (29), Code Quality (12), Architecture (17), Frontend (18)
+- **13 CRITICAL**, 22 HIGH, 25 MEDIUM, 16 LOW
+
+### What was done (Phase 1 — Security Critical)
+
+- **S1: IDOR fix** — Replaced spoofable `x-tenant-id` header with JWT verification (`verifyTenantAuth`) across 13 API route files (22 handlers). Created shared `lib/auth/verify-tenant.ts` supporting both cookie and Bearer token auth.
+- **S3: Sandbox escape** — Replaced `new Function()` with `vm.createContext()` + code validation (13 blocked patterns). Prevents prototype chain escapes and RCE.
+- **S4: Pulse auth** — Implemented JWT verification in POST handler (was TODO).
+- **S8: Gateway middleware** — Added `/api/gateway/` to `isPublicApi` list, unblocking Telegram/Discord/Slack/Signal/iMessage webhooks in production.
+- **Frontend cleanup** — Removed all `x-tenant-id` header usage from 7 client files.
+
+### Files changed (24 files)
+
+- `lib/auth/verify-tenant.ts` (NEW)
+- `lib/supabase/middleware.ts`, `lib/skills/sandbox/restricted-function.ts`
+- 13 API route files (skills, rigs, mods, meta, pulse)
+- 7 frontend files (dashboard pages + widgets)
+- `scripts/test-all-routes.ts`
+
+### Remaining
+
+- Webhook signature verification for Twilio voice, WhatsApp, Messenger, Telegram, Signal, iMessage
+- Replace 11 remaining `confirm()` calls with AlertDialog components
+- Break up god files (conversation-handler 1,929 LOC, mape-k-loop 1,194 LOC)
+- Type 134 `any` usages across 45 files
+- Migrate 68 files from local `getSupabase()` to shared `getServiceSupabase()`
+- Add project ESLint config with custom rules
+
+---
+
+## [2026-02-06] Security Audit — Phase 2: Architecture & Stability
+
+### What was done
+
+- **A4: Security headers** — Added HSTS (2yr, preload), X-Frame-Options (DENY), X-Content-Type-Options (nosniff), Referrer-Policy, Permissions-Policy to next.config.js
+- **A1: Ghost table fix** — Fixed 2 naming mismatches in Pulse (`rig_connections`→`exo_rig_connections`, `user_health_metrics`→`exo_health_metrics`, `user_id`→`tenant_id`)
+- **A3: Duplicate migration** — Renamed `20260207000002_signal_imessage_channels.sql` → `20260207000003`
+- **A5: Phone index** — Created migration `20260207000004_index_tenants_phone.sql` for gateway lookups
+- **S12: Setup-cron auth** — Added CRON_SECRET verification to unauthenticated GET handler
+- **Q1: Error logging** — Added `console.warn` to 11 critical silent catch blocks (MAPE-K loop 5x, conversation handler 3x, agent registry 1x)
+
+### Files changed (9 files)
+
+- `next.config.js` — security headers + `images.remotePatterns` migration
+- `app/api/pulse/route.ts` — ghost table + column fixes
+- `app/api/setup-cron/route.ts` — GET auth
+- `lib/autonomy/mape-k-loop.ts` — 5 catch blocks
+- `lib/voice/conversation-handler.ts` — 3 catch blocks
+- `lib/agents/registry.ts` — 1 catch block
+- 2 new migration files
+
+---
+
+## [2026-02-06] Security Audit — Phase 3: Frontend Foundations
+
+### What was done
+
+- **F1/F4: Error handling** — Created `app/error.tsx`, `app/not-found.tsx`, `app/dashboard/error.tsx`, `app/dashboard/loading.tsx`
+- **F5: Toast notifications** — Installed sonner, added `<Toaster>` to root layout, replaced 22 `alert()` calls with `toast.error()` across 12 files
+- **F10: Page metadata** — Added `title.template` to dashboard layout, `metadata` exports to 3 server pages
+- **F2: Accessibility** — Added 11 `aria-label` attributes to icon-only buttons (HierarchyView 7x, card menus 4x)
+
+### Files changed (28 files)
+
+- 4 new error/loading/not-found pages
+- `app/layout.tsx` — Toaster integration
+- `app/dashboard/layout.tsx` — metadata template
+- 12 page/component files — alert→toast migration
+- 4 knowledge card components — aria-labels
+- `components/knowledge/HierarchyView.tsx` — 7 aria-labels
+- `package.json` — added sonner dependency
+
+---
+
+## [2026-02-06] Security Audit — Phase 4: Code Quality (Partial)
+
+### What was done
+
+- **Shared Supabase utility** — Created `lib/supabase/service.ts` with `getServiceSupabase()` (68 files to migrate incrementally)
+- **Deprecated config** — Migrated `images.domains` to `images.remotePatterns` in next.config.js
+
+---
+
 ## [2026-02-05] Autonomous Actions — run_automation + custom action registry
 
 ### Implemented

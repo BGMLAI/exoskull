@@ -6,17 +6,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 async function getAuthUser() {
   const supabase = await createAuthClient();
@@ -38,7 +31,7 @@ export async function GET(request: NextRequest) {
     }
     const userId = user.id;
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     const { data, error } = await supabase
       .from("user_autonomy_grants")
@@ -84,7 +77,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const body = await request.json();
     const { actionPattern, category, expiresAt, spendingLimit, dailyLimit } =
       body;
@@ -164,7 +157,7 @@ export async function PATCH(request: NextRequest) {
     }
     const userId = user.id;
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const body = await request.json();
     const { grantId, isActive, spendingLimit, dailyLimit, expiresAt } = body;
 
@@ -223,7 +216,7 @@ export async function DELETE(request: NextRequest) {
     }
     const userId = user.id;
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const { searchParams } = new URL(request.url);
     const grantId = searchParams.get("grantId");
 

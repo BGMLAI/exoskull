@@ -11,6 +11,7 @@ import { logProgress, detectMomentum } from "@/lib/goals/engine";
 import type { UserGoal, MeasurableProxy } from "@/lib/goals/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 export async function GET(req: NextRequest) {
   if (!verifyCronAuth(req)) {

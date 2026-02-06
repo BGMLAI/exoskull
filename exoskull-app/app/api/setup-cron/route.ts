@@ -8,15 +8,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(supabaseUrl, supabaseServiceKey);
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,7 +20,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     const results: any[] = [];
 
@@ -232,9 +226,15 @@ export async function POST(req: NextRequest) {
 /**
  * GET /api/setup-cron - Check setup status
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Require CRON_SECRET — same as POST handler
+  const authHeader = req.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     // Check if tables exist
     const { data: jobs, error: jobsError } = await supabase

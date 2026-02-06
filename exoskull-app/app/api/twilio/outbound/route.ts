@@ -9,21 +9,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { makeOutboundCall } from "@/lib/voice/twilio-client";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 function getAppUrl() {
   return process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
@@ -55,7 +48,7 @@ export async function POST(req: NextRequest) {
     let targetPhone = phone;
 
     if (!targetPhone && tenantId) {
-      const supabase = getSupabase();
+      const supabase = getServiceSupabase();
       const { data: tenant } = await supabase
         .from("exo_tenants")
         .select("phone")
@@ -97,7 +90,7 @@ export async function POST(req: NextRequest) {
 
     // Pre-create session in database
     if (tenantId) {
-      const supabase = getSupabase();
+      const supabase = getServiceSupabase();
       await supabase.from("exo_voice_sessions").insert({
         call_sid: result.callSid,
         tenant_id: tenantId,

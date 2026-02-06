@@ -3,16 +3,10 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 // Valid metric types
 const VALID_METRIC_TYPES = [
@@ -56,34 +50,13 @@ interface SyncPayload {
 // =====================================================
 
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const startTime = Date.now();
 
   try {
-    // Get tenant ID from header or auth token
-    const tenantId = request.headers.get("x-tenant-id");
-    const authHeader = request.headers.get("authorization");
-
-    let userId: string | null = tenantId;
-
-    // If no tenant ID header, try to extract from JWT
-    if (!userId && authHeader?.startsWith("Bearer ")) {
-      const token = authHeader.slice(7);
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser(token);
-      if (!error && user) {
-        userId = user.id;
-      }
-    }
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized - missing tenant ID or valid token" },
-        { status: 401 },
-      );
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const userId = auth.tenantId;
 
     // Parse payload
     const payload: SyncPayload = await request.json();
@@ -273,23 +246,11 @@ export async function POST(request: NextRequest) {
 // =====================================================
 
 export async function GET(request: NextRequest) {
-  const supabase = getSupabase();
-  const tenantId = request.headers.get("x-tenant-id");
-  const authHeader = request.headers.get("authorization");
+  const supabase = getServiceSupabase();
 
-  let userId: string | null = tenantId;
-
-  if (!userId && authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser(token);
-    if (user) userId = user.id;
-  }
-
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(request);
+  if (!auth.ok) return auth.response;
+  const userId = auth.tenantId;
 
   // Get connection status
   const { data: connection } = await supabase

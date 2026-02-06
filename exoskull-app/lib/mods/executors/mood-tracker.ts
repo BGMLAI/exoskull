@@ -2,15 +2,8 @@
 // MOOD TRACKER MOD - Daily mood check-ins and analysis
 // =====================================================
 
-import { createClient } from "@supabase/supabase-js";
 import { IModExecutor, ModInsight, ModAction, ModSlug } from "../types";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 // =====================================================
 // Types
@@ -81,12 +74,13 @@ export class MoodTrackerExecutor implements IModExecutor {
       ).toISOString();
 
       // Get recent entries (last 30 days)
-      const { data: recentEntries, error: entriesError } = await getSupabase()
-        .from("exo_mood_entries")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .gte("logged_at", monthAgo)
-        .order("logged_at", { ascending: false });
+      const { data: recentEntries, error: entriesError } =
+        await getServiceSupabase()
+          .from("exo_mood_entries")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .gte("logged_at", monthAgo)
+          .order("logged_at", { ascending: false });
 
       if (entriesError) {
         console.error("[MoodTracker] Error fetching entries:", entriesError);
@@ -290,7 +284,7 @@ export class MoodTrackerExecutor implements IModExecutor {
             logged_at: new Date().toISOString(),
           };
 
-          const { data, error } = await getSupabase()
+          const { data, error } = await getServiceSupabase()
             .from("exo_mood_entries")
             .insert(entry)
             .select()
@@ -316,7 +310,7 @@ export class MoodTrackerExecutor implements IModExecutor {
             Date.now() - days * 24 * 60 * 60 * 1000,
           ).toISOString();
 
-          const { data, error } = await getSupabase()
+          const { data, error } = await getServiceSupabase()
             .from("exo_mood_entries")
             .select("*")
             .eq("tenant_id", tenantId)
@@ -343,7 +337,7 @@ export class MoodTrackerExecutor implements IModExecutor {
             return { success: false, error: "Entry ID required" };
           }
 
-          const { error } = await getSupabase()
+          const { error } = await getServiceSupabase()
             .from("exo_mood_entries")
             .delete()
             .eq("id", entryId)

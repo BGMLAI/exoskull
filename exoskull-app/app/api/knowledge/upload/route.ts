@@ -5,16 +5,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(supabaseUrl, supabaseServiceKey);
-}
 
 const ALLOWED_TYPES = [
   // Documents
@@ -53,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
     const tenantId = user.id;
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const category = formData.get("category") as string | null;

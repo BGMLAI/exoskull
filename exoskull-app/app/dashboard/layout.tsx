@@ -1,64 +1,31 @@
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import {
-  Home,
-  CheckSquare,
-  Settings,
-  Clock,
-  FileText,
-  Menu,
-  Heart,
-  TrendingUp,
-  Sparkles,
-  Target,
-  Puzzle,
-  Brain,
-  Shield,
-  Bell,
-  MessageSquare,
-  FolderKanban,
-} from "lucide-react";
+import { Home, MessageSquare, Package, Settings } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: {
+    template: "%s | ExoSkull",
+    default: "Dashboard | ExoSkull",
+  },
+};
 
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { CollapsibleSidebar } from "@/components/dashboard/CollapsibleSidebar";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
-// All nav items for mobile dropdown (full list)
-const ALL_NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/dashboard/conversations", label: "Rozmowy", icon: MessageSquare },
-  { href: "/dashboard/tasks", label: "Zadania", icon: CheckSquare },
-  { href: "/dashboard/projects", label: "Projekty", icon: FolderKanban },
-  { href: "/dashboard/health", label: "Zdrowie", icon: Heart },
-  { href: "/dashboard/goals", label: "Cele", icon: Target },
-  { href: "/dashboard/mods", label: "Mody", icon: Puzzle },
-  { href: "/dashboard/memory", label: "Pamiec", icon: Brain },
-  { href: "/dashboard/knowledge", label: "Wiedza", icon: FileText },
-  { href: "/dashboard/autonomy", label: "Autonomia", icon: Shield },
-  { href: "/dashboard/skills", label: "Skille", icon: Sparkles },
-  { href: "/dashboard/schedule", label: "Harmonogram", icon: Clock },
-  { href: "/dashboard/business", label: "Biznes", icon: TrendingUp },
-  { href: "/dashboard/notifications", label: "Powiadomienia", icon: Bell },
-];
+// react-grid-layout CSS — loaded in globals.css via @import or inline here
+// Note: exports field doesn't expose CSS, so we'll add styles inline in the client component
 
-// Subset for mobile bottom tab bar (5 max for usability)
+// Canvas-first: 4 tabs on mobile
 const MOBILE_TAB_ITEMS = [
   { href: "/dashboard", label: "Home", icon: Home },
-  { href: "/dashboard/conversations", label: "Rozmowy", icon: MessageSquare },
-  { href: "/dashboard/health", label: "Zdrowie", icon: Heart },
-  { href: "/dashboard/mods", label: "Mody", icon: Puzzle },
-  { href: "/dashboard/settings", label: "Wiecej", icon: Settings },
+  { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
+  { href: "/dashboard/mods", label: "Mody", icon: Package },
+  { href: "/dashboard/settings", label: "Ustawienia", icon: Settings },
 ];
 
 export default async function DashboardLayout({
@@ -75,70 +42,48 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  // Fetch IORS data for sidebar badge
+  let iorsName: string | undefined;
+  let birthCompleted: boolean | undefined;
+  try {
+    const { data: tenant } = await supabase
+      .from("exo_tenants")
+      .select("iors_name, iors_birth_completed")
+      .eq("id", user.id)
+      .single();
+    iorsName = tenant?.iors_name || undefined;
+    birthCompleted = tenant?.iors_birth_completed ?? undefined;
+  } catch {
+    // Tenant may not exist yet
+  }
+
   return (
     <div className="min-h-screen flex">
-      {/* Sidebar — collapsible sections */}
-      <CollapsibleSidebar userEmail={user.email || ""} />
+      {/* Sidebar — with IORS badge */}
+      <CollapsibleSidebar
+        userEmail={user.email || ""}
+        iorsName={iorsName}
+        birthCompleted={birthCompleted}
+      />
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b bg-card">
           <div>
             <p className="text-base font-semibold">ExoSkull</p>
-            <p className="text-xs text-muted-foreground">Life OS</p>
+            <p className="text-xs text-muted-foreground">
+              {iorsName || "Voice-First Life OS"}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-9 w-9">
-                  <Menu className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel className="text-xs text-muted-foreground">
-                  {user.email}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {ALL_NAV_ITEMS.map((item) => (
-                  <DropdownMenuItem key={item.href} asChild>
-                    <Link href={item.href} className="flex items-center gap-2">
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.label}</span>
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link
-                    href="/dashboard/settings"
-                    className="flex items-center gap-2"
-                  >
-                    <Settings className="h-4 w-4" />
-                    <span>Ustawienia</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <form
-                  action="/api/auth/signout"
-                  method="post"
-                  className="w-full"
-                >
-                  <DropdownMenuItem asChild>
-                    <button className="w-full text-left">Wyloguj</button>
-                  </DropdownMenuItem>
-                </form>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <ThemeToggle />
         </header>
 
         {/* Main content */}
         <main className="flex-1 min-h-0 overflow-hidden pb-16 md:pb-0">
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
         </main>
 
-        {/* Mobile bottom tab bar */}
+        {/* Mobile bottom tab bar — 4 tabs */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t flex items-center justify-around py-2 z-40">
           {MOBILE_TAB_ITEMS.map((item) => (
             <Link

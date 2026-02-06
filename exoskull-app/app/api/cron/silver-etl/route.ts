@@ -17,6 +17,7 @@ import { checkR2Connection } from "@/lib/storage/r2-client";
 import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 /**
  * POST /api/cron/silver-etl

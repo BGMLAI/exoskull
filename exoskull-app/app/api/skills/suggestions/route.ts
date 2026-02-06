@@ -10,16 +10,16 @@ import {
 } from "@/lib/skills/detector";
 import { generateSkill } from "@/lib/skills/generator/skill-generator";
 import { initiateApproval } from "@/lib/skills/approval/approval-gateway";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   try {
-    const tenantId = request.headers.get("x-tenant-id");
-    if (!tenantId) {
-      return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const suggestions = await getPendingSuggestions(tenantId, 5);
 
@@ -35,10 +35,9 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const tenantId = request.headers.get("x-tenant-id");
-    if (!tenantId) {
-      return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const body = await request.json();
     const { id, action } = body as {

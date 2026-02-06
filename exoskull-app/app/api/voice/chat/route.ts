@@ -63,7 +63,12 @@ export async function POST(request: NextRequest) {
     const result = await processUserMessage(session, message);
 
     // Track usage
-    await incrementUsage(user.id, "voice_minutes").catch(() => {});
+    await incrementUsage(user.id, "voice_minutes").catch((err) => {
+      console.warn(
+        "[VoiceChat] Usage tracking failed:",
+        err instanceof Error ? err.message : String(err),
+      );
+    });
 
     // Update session with conversation
     await updateSession(session.id, message, result.text);

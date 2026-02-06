@@ -355,7 +355,7 @@ async function sendSmNotification(
 
     await client.messages.create({
       to: phone,
-      from: process.env.TWILIO_PHONE_NUMBER || "+48732144112",
+      from: process.env.TWILIO_PHONE_NUMBER!,
       body,
     });
 

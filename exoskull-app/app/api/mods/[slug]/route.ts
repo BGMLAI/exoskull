@@ -3,19 +3,13 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { getModExecutor, hasModExecutor } from "@/lib/mods/executors";
 import { getModDefinition } from "@/lib/mods";
 import { ModSlug } from "@/lib/mods/types";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 // =====================================================
 // GET /api/mods/[slug] - Get mod data & insights
@@ -26,13 +20,12 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const { slug } = await params;
-    const tenantId = request.headers.get("x-tenant-id");
 
-    if (!tenantId) {
-      return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     // Check mod exists (static definition or dynamic skill)
     const modDef = getModDefinition(slug);
@@ -96,13 +89,12 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const { slug } = await params;
-    const tenantId = request.headers.get("x-tenant-id");
 
-    if (!tenantId) {
-      return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const body = await request.json();
     const { action, params: actionParams } = body as {

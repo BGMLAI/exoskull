@@ -3,30 +3,23 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import {
   rollbackToVersion,
   getVersions,
 } from "@/lib/skills/registry/version-manager";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const tenantId = request.headers.get("x-tenant-id");
-    if (!tenantId) {
-      return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { id: skillId } = await params;
     const body = await request.json();
@@ -49,7 +42,7 @@ export async function POST(
     }
 
     // Verify the skill belongs to this tenant
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const { data: skill, error: loadError } = await supabase
       .from("exo_generated_skills")
       .select("tenant_id")

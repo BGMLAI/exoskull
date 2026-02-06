@@ -3,8 +3,8 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { RigConnection } from "@/lib/rigs/types";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 // Import rig clients
 import { createNotionClient } from "@/lib/rigs/notion/client";
@@ -21,15 +21,9 @@ import {
   ingestOutlookMessages,
 } from "@/lib/rigs/email-ingest";
 import { ensureFreshToken } from "@/lib/rigs/oauth";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 interface HealthMetricInsert {
   tenant_id: string;
@@ -49,14 +43,13 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const startTime = Date.now();
   const { slug } = await params;
-  const tenantId = request.headers.get("x-tenant-id");
 
-  if (!tenantId) {
-    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(request);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   try {
     // Get connection
@@ -453,13 +446,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { slug } = await params;
-  const tenantId = request.headers.get("x-tenant-id");
 
-  if (!tenantId) {
-    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(request);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   // Get connection status
   const { data: connection, error: connError } = await supabase
@@ -503,7 +495,7 @@ function toRecordedAt(day: string): string {
 async function upsertHealthMetrics(metrics: HealthMetricInsert[]) {
   if (metrics.length === 0) return;
 
-  const { error } = await getSupabase()
+  const { error } = await getServiceSupabase()
     .from("exo_health_metrics")
     .upsert(metrics, {
       onConflict: "tenant_id,metric_type,recorded_at,source",

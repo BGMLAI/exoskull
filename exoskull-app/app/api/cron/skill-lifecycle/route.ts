@@ -13,6 +13,7 @@ import {
 } from "@/lib/skills/registry/lifecycle-manager";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 export async function GET(request: NextRequest) {
   try {
