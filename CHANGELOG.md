@@ -4,6 +4,50 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-06] feat: Unified Message Gateway — 9 channels, full AI pipeline
+
+### What was done
+- Created Unified Message Gateway (`lib/gateway/`) — central routing for ALL inbound messages
+- Built 3 new channel adapters: Telegram, Slack, Discord (with webhook routes)
+- **Upgraded WhatsApp** from simplified `aiChat()` to full `processUserMessage()` with 28 tools
+- Extended `UnifiedChannel` type and dispatcher with telegram/slack/discord support
+- DB migration: `telegram_chat_id`, `slack_user_id`, `discord_user_id`, `preferred_channel` on `exo_tenants`
+- Channel priority in dispatcher: Voice > Telegram > WhatsApp > Slack > Discord > Messenger > SMS > Email
+
+### Architecture
+```
+Any Channel → Adapter.parseInbound() → GatewayMessage
+  → gateway.handleInboundMessage()
+    → resolveTenant() or autoRegister()
+    → appendMessage() to unified thread
+    → getOrCreateSession() + processUserMessage() (28 tools)
+    → updateSession() + append response
+  → Adapter.sendResponse() → User
+```
+
+### Files changed
+- `lib/gateway/types.ts` — GatewayMessage, GatewayResponse, ChannelAdapter, TenantChannelIds
+- `lib/gateway/gateway.ts` — handleInboundMessage(), resolveTenant(), autoRegisterTenant()
+- `lib/gateway/adapters/telegram.ts` — Telegram Bot API adapter
+- `lib/gateway/adapters/slack.ts` — Slack Events API adapter (HMAC verification)
+- `lib/gateway/adapters/discord.ts` — Discord REST API adapter (Ed25519 verification)
+- `app/api/gateway/telegram/route.ts` — Telegram webhook + setup helper
+- `app/api/gateway/slack/route.ts` — Slack webhook (dedup, url_verification, async processing)
+- `app/api/gateway/discord/route.ts` — Discord webhook (PING, interactions)
+- `app/api/webhooks/whatsapp/route.ts` — **UPGRADED** to use gateway (was aiChat, now full pipeline)
+- `lib/unified-thread.ts` — Extended UnifiedChannel with telegram/slack/discord
+- `lib/cron/dispatcher.ts` — Added dispatchTelegram(), dispatchSlack(), dispatchDiscord()
+- `supabase/migrations/20260206000008_gateway_channels.sql` — Channel ID columns + indexes
+
+### Notes for future agents
+- WhatsApp webhook keeps its own multi-account client resolution (exo_meta_pages) but routes AI through gateway
+- Discord Ed25519 uses Node `crypto.verify` (not Web Crypto API) to avoid TS ArrayBuffer issues
+- Slack route returns 200 immediately and processes async (3s timeout requirement)
+- Gateway auto-registers new tenants from any channel — zero-friction onboarding
+- `updateSession()` only accepts "voice" | "web_chat" — other channels map to "web_chat"
+
+---
+
 ## [2026-02-06] research: OpenClaw vs ExoSkull Competitive Analysis + Transformation Plan
 
 ### What was done

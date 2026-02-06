@@ -16,6 +16,11 @@ import {
   Send,
   Mail,
   MessageSquare,
+  MessageCircle,
+  Hash,
+  Gamepad2,
+  MessagesSquare,
+  Globe,
   Phone,
   Clock,
   Bot,
@@ -59,6 +64,16 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const readerRef = useRef<ReadableStreamDefaultReader | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      readerRef.current?.cancel().catch(() => {});
+    };
+  }, []);
 
   // Fetch recent activity (conversations + messages)
   const fetchTimeline = useCallback(async () => {
@@ -67,9 +82,12 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
 
     try {
       // Fetch both conversations and unified messages in parallel
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
+      const signal = abortRef.current.signal;
       const [conversationsRes, messagesRes] = await Promise.all([
-        fetch("/api/conversations?limit=10"),
-        fetch("/api/unified-thread?limit=20"),
+        fetch(`/api/conversations?limit=10&tenantId=${tenantId}`, { signal }),
+        fetch(`/api/unified-thread?limit=20&tenantId=${tenantId}`, { signal }),
       ]);
 
       const items: TimelineItem[] = [];
@@ -120,13 +138,14 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
       // Take top 15, then reverse for chronological order
       const recent = items.slice(0, 15).reverse();
       setTimeline(recent);
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.name === "AbortError") return;
       console.error("[HomeChat] Fetch error:", err);
       setError("Nie udało się załadować historii");
     } finally {
       setLoadingTimeline(false);
     }
-  }, []);
+  }, [tenantId]);
 
   useEffect(() => {
     fetchTimeline();
@@ -166,6 +185,10 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
       },
     ]);
 
+    // Cancel any in-flight request
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+
     try {
       const res = await fetch("/api/chat/stream", {
         method: "POST",
@@ -174,6 +197,7 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
           message: messageText,
           conversationId,
         }),
+        signal: abortRef.current.signal,
       });
 
       if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -183,6 +207,8 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
 
       if (!reader) throw new Error("No response body");
 
+      // Track reader for cleanup on unmount
+      readerRef.current = reader;
       let buffer = "";
 
       while (true) {
@@ -222,7 +248,10 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
           }
         }
       }
+
+      readerRef.current = null;
     } catch (err: any) {
+      if (err?.name === "AbortError") return;
       console.error("[HomeChat] Send error:", err);
       const errorMsg = err?.message || "Nieznany błąd";
       setChatMessages((prev) =>
@@ -252,6 +281,18 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
         return <MessageSquare className="w-3.5 h-3.5 text-green-500" />;
       case "voice":
         return <Phone className="w-3.5 h-3.5 text-purple-500" />;
+      case "whatsapp":
+        return <MessageCircle className="w-3.5 h-3.5 text-green-600" />;
+      case "telegram":
+        return <Send className="w-3.5 h-3.5 text-sky-500" />;
+      case "slack":
+        return <Hash className="w-3.5 h-3.5 text-pink-500" />;
+      case "discord":
+        return <Gamepad2 className="w-3.5 h-3.5 text-indigo-500" />;
+      case "messenger":
+        return <MessagesSquare className="w-3.5 h-3.5 text-blue-600" />;
+      case "web_chat":
+        return <Globe className="w-3.5 h-3.5 text-primary" />;
       case "conversation":
         return <Bot className="w-3.5 h-3.5 text-primary" />;
       default:

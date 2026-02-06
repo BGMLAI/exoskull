@@ -14,6 +14,7 @@ import { VoiceInterface } from "@/components/voice/VoiceInterface";
 interface VoiceHeroProps {
   tenantId: string;
   assistantName: string;
+  phoneNumber?: string;
 }
 
 interface QuickStats {
@@ -23,7 +24,11 @@ interface QuickStats {
   nextAction: string | null;
 }
 
-export function VoiceHero({ tenantId, assistantName }: VoiceHeroProps) {
+export function VoiceHero({
+  tenantId,
+  assistantName,
+  phoneNumber,
+}: VoiceHeroProps) {
   const [stats, setStats] = useState<QuickStats>({
     energy: null,
     mood: null,
@@ -68,10 +73,15 @@ export function VoiceHero({ tenantId, assistantName }: VoiceHeroProps) {
         </div>
 
         {/* Alternative: phone call */}
-        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-          <Phone className="w-3 h-3" />
-          lub zadzwon: +48 732 144 112
-        </p>
+        {phoneNumber && (
+          <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+            <Phone className="w-3 h-3" />
+            lub zadzwon:{" "}
+            <a href={`tel:${phoneNumber}`} className="underline">
+              {phoneNumber}
+            </a>
+          </p>
+        )}
       </div>
 
       {/* Quick Status Bar */}

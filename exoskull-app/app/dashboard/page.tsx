@@ -23,27 +23,31 @@ export default async function DashboardPage() {
 
   // Get tenant profile
   let assistantName = "IORS";
+  let phoneNumber: string | undefined;
   try {
     const { data: tenant } = await supabase
       .from("exo_tenants")
-      .select("assistant_name")
+      .select("assistant_name, phone_number")
       .eq("id", user.id)
       .single();
     assistantName = tenant?.assistant_name || "IORS";
+    phoneNumber = tenant?.phone_number || undefined;
   } catch (e: unknown) {
     console.error("[Dashboard] Failed to load tenant:", e);
   }
 
   return (
-    <div className="h-full overflow-auto">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Voice-first hero — takes priority, bigger */}
-      <VoiceHero tenantId={user.id} assistantName={assistantName} />
+      <VoiceHero
+        tenantId={user.id}
+        assistantName={assistantName}
+        phoneNumber={phoneNumber}
+      />
 
-      {/* Chat — simple, useful, shows history + incoming messages */}
-      <div className="px-4 pb-4">
-        <div className="h-[350px]">
-          <HomeChat tenantId={user.id} assistantName={assistantName} />
-        </div>
+      {/* Chat — fills remaining space */}
+      <div className="flex-1 min-h-0 px-4 pb-4">
+        <HomeChat tenantId={user.id} assistantName={assistantName} />
       </div>
     </div>
   );
