@@ -5,16 +5,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 // ============================================================================
 // GET - List quests
@@ -22,7 +15,7 @@ function getSupabase() {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const { searchParams } = new URL(request.url);
     const tenantId = searchParams.get("tenantId");
     const campaignId = searchParams.get("campaignId");
@@ -74,7 +67,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const body = await request.json();
     const {
       tenantId,
@@ -133,7 +126,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const body = await request.json();
     const { questId, tenantId, ...updates } = body;
 
@@ -191,7 +184,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const { searchParams } = new URL(request.url);
     const questId = searchParams.get("questId");
     const tenantId = searchParams.get("tenantId");

@@ -9,15 +9,8 @@ import {
   stringParam,
   numberParam,
 } from "./types";
-import { createClient } from "@supabase/supabase-js";
 import { createGoogleWorkspaceClient } from "../rigs/google-workspace/client";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 // =====================================================
 // TOOL DEFINITION
@@ -61,7 +54,7 @@ export const calendarTool: ExoTool = {
 // =====================================================
 
 async function getWorkspaceClient(tenantId: string) {
-  const { data: connection, error } = await getSupabase()
+  const { data: connection, error } = await getServiceSupabase()
     .from("exo_rig_connections")
     .select("*")
     .eq("tenant_id", tenantId)
@@ -183,12 +176,10 @@ export const calendarHandler: ToolHandler = async (
         }
 
         const attendeeList = attendees
-          ? attendees
-              .split(",")
-              .map((email) => ({
-                email: email.trim(),
-                responseStatus: "needsAction",
-              }))
+          ? attendees.split(",").map((email) => ({
+              email: email.trim(),
+              responseStatus: "needsAction",
+            }))
           : undefined;
 
         const event = await client.createEvent("primary", {

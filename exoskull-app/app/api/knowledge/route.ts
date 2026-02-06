@@ -6,15 +6,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(supabaseUrl, supabaseServiceKey);
-}
 
 /**
  * GET /api/knowledge
@@ -22,7 +16,7 @@ function getSupabase() {
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const tenantId = req.nextUrl.searchParams.get("tenant_id");
     const category = req.nextUrl.searchParams.get("category");
     const status = req.nextUrl.searchParams.get("status");
@@ -85,7 +79,7 @@ export async function GET(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const body = await req.json();
     const { tenant_id, document_id } = body;
 

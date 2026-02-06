@@ -5,7 +5,6 @@
  * autonomy interventions for high-confidence predictions.
  */
 
-import { createClient } from "@supabase/supabase-js";
 import type { InterventionPriority } from "../autonomy/types";
 import {
   type Prediction,
@@ -15,6 +14,7 @@ import {
   predictBurnoutRisk,
   predictFitnessTrajectory,
 } from "./health-models";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 // ============================================================================
 // THRESHOLDS FOR INTERVENTION CREATION
@@ -26,14 +26,6 @@ const PROBABILITY_THRESHOLD = 0.5;
 // ============================================================================
 // ORCHESTRATOR
 // ============================================================================
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-}
 
 export async function runPredictions(tenantId: string): Promise<Prediction[]> {
   const data = await loadHealthData(tenantId, 14);
@@ -69,7 +61,7 @@ export async function storePredictions(
 ): Promise<void> {
   if (predictions.length === 0) return;
 
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const rows = predictions.map((p) => ({
     tenant_id: p.tenantId,
@@ -117,7 +109,7 @@ function severityToPriority(
 export async function createInterventionsFromPredictions(
   predictions: Prediction[],
 ): Promise<number> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   let created = 0;
 
   const actionable = predictions.filter(

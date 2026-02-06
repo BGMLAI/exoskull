@@ -6,7 +6,6 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient } from "@supabase/supabase-js";
 import twilio from "twilio";
 import { STATIC_SYSTEM_PROMPT } from "./system-prompt";
 import { makeOutboundCall } from "./twilio-client";
@@ -40,6 +39,7 @@ import { analyzeEmotion } from "@/lib/emotion";
 import { detectCrisis } from "@/lib/emotion/crisis-detector";
 import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
 import { logEmotion } from "@/lib/emotion/logger";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 // ============================================================================
 // CONFIGURATION
@@ -565,10 +565,6 @@ const IORS_TOOLS: Anthropic.Tool[] = [
 // SUPABASE CLIENT
 // ============================================================================
 
-function getSupabase() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-}
-
 // ============================================================================
 // SESSION MANAGEMENT
 // ============================================================================
@@ -580,7 +576,7 @@ export async function getOrCreateSession(
   callSid: string,
   tenantId: string,
 ): Promise<VoiceSession> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Try to find existing session
   const { data: existing } = await supabase
@@ -642,7 +638,7 @@ export async function updateSession(
   assistantMessage: string,
   options?: { tenantId?: string; channel?: "voice" | "web_chat" },
 ): Promise<void> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const channel = options?.channel || "voice";
   const sourceType =
     channel === "web_chat" ? ("web_chat" as const) : ("voice_session" as const);
@@ -699,7 +695,7 @@ export async function updateSession(
  * End a voice session
  */
 export async function endSession(sessionId: string): Promise<void> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const { error } = await supabase
     .from("exo_voice_sessions")
@@ -725,7 +721,7 @@ async function executeTool(
   toolInput: Record<string, any>,
   tenantId: string,
 ): Promise<string> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   console.log("[ConversationHandler] Executing tool:", toolName, toolInput);
 
   try {
@@ -1339,7 +1335,7 @@ async function executeTool(
         await updateSuggestionStatus(suggestionId, "accepted");
 
         // Load suggestion to get description
-        const supabase = getSupabase();
+        const supabase = getServiceSupabase();
         const { data: suggestion } = await supabase
           .from("exo_skill_suggestions")
           .select("description, suggested_slug")
@@ -1496,7 +1492,7 @@ function normalizePhone(phone: string): string {
 // ============================================================================
 
 async function buildDynamicContext(tenantId: string): Promise<string> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Get user profile
   const { data: tenant } = await supabase
@@ -1850,7 +1846,7 @@ export async function processUserMessage(
  * Generate personalized greeting for call start
  */
 export async function generateGreeting(tenantId: string): Promise<string> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Get user profile
   const { data: tenant } = await supabase
@@ -1887,7 +1883,7 @@ export async function generateGreeting(tenantId: string): Promise<string> {
 export async function findTenantByPhone(
   phone: string,
 ): Promise<{ id: string; name?: string } | null> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Normalize phone number (remove spaces, +, etc.)
   const normalizedPhone = phone.replace(/\s+/g, "").replace(/^\+/, "");

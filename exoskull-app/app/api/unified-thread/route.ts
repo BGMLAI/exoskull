@@ -6,17 +6,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,7 +34,7 @@ export async function GET(request: NextRequest) {
     );
     const offset = parseInt(searchParams.get("offset") || "0", 10);
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     // Build query
     let query = supabase

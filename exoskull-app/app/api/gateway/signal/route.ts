@@ -20,6 +20,20 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    // Verify shared secret (mandatory)
+    const expectedSecret = process.env.SIGNAL_WEBHOOK_SECRET;
+    if (!expectedSecret) {
+      console.error("[Signal Route] SIGNAL_WEBHOOK_SECRET not configured");
+      return NextResponse.json({ error: "Not configured" }, { status: 500 });
+    }
+    const headerSecret =
+      req.headers.get("x-signal-webhook-secret") ||
+      req.headers.get("authorization")?.replace("Bearer ", "");
+    if (headerSecret !== expectedSecret) {
+      console.error("[Signal Route] Invalid webhook secret");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const payload = await req.json();
 
     // Parse into GatewayMessage

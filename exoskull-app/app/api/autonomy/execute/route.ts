@@ -10,7 +10,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
 import {
   runAutonomyCycle,
@@ -18,15 +17,9 @@ import {
   getPermissionModel,
 } from "@/lib/autonomy";
 import { detectGaps, optimizeSystem, checkAndSpawnAgents } from "@/lib/agents";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 // ============================================================================
 // POST - Execute autonomy operations
@@ -259,7 +252,7 @@ async function handleApprove(
 
   console.log(`[Autonomy Execute] Approving intervention ${interventionId}`);
 
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { data, error } = await supabase.rpc("approve_intervention", {
     p_intervention_id: interventionId,
     p_approved_by: "user",
@@ -289,7 +282,7 @@ async function handleReject(
 
   console.log(`[Autonomy Execute] Rejecting intervention ${interventionId}`);
 
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { error } = await supabase
     .from("exo_interventions")
     .update({
@@ -332,7 +325,7 @@ async function handleFeedback(
 
   console.log(`[Autonomy Execute] Recording feedback for ${interventionId}`);
 
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { error } = await supabase.rpc("record_intervention_feedback", {
     p_intervention_id: interventionId,
     p_feedback: feedback,
@@ -403,7 +396,7 @@ async function handleSpawnAgents(
 // ============================================================================
 
 async function getPendingInterventions(tenantId: string) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { data, error } = await supabase.rpc("get_pending_interventions", {
     p_tenant_id: tenantId,
     p_limit: 20,
@@ -426,7 +419,7 @@ async function getInterventionHistory(
   const limit = parseInt(searchParams.get("limit") || "50");
   const status = searchParams.get("status");
 
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   let query = supabase
     .from("exo_interventions")
     .select("*")
@@ -456,7 +449,7 @@ async function getCycleHistory(
 ) {
   const limit = parseInt(searchParams.get("limit") || "20");
 
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { data, error } = await supabase
     .from("exo_mapek_cycles")
     .select("*")
@@ -492,7 +485,7 @@ async function getAutonomyStats(
 ) {
   const days = parseInt(searchParams.get("days") || "30");
 
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { data: interventionStats } = await supabase.rpc(
     "get_intervention_stats",
     {

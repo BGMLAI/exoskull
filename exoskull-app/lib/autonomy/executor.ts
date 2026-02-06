@@ -9,17 +9,10 @@
  * 2. Direct approval flow when user says "działaj" / "ok"
  */
 
-import { createClient } from "@supabase/supabase-js";
 import twilio from "twilio";
 import { makeOutboundCall } from "../voice/twilio-client";
 import { appendMessage } from "../unified-thread";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 function getTwilioConfig() {
   return {
@@ -80,7 +73,7 @@ export interface ExecutionResult {
 export async function executeIntervention(
   interventionId: string,
 ): Promise<ExecutionResult> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Load intervention
   const { data: intervention, error: loadError } = await supabase
@@ -198,7 +191,7 @@ export async function executeIntervention(
 export async function processQueue(
   limit: number = 10,
 ): Promise<{ processed: number; succeeded: number; failed: number }> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const now = new Date().toISOString();
 
   // Fetch due queue items (not locked)
@@ -254,7 +247,7 @@ export async function processQueue(
  * Auto-approves and queues them for execution.
  */
 export async function processTimeouts(): Promise<number> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const now = new Date().toISOString();
 
   // Find proposed interventions with expired scheduled_for (timeout passed)
@@ -481,7 +474,7 @@ async function handleMakeCall(
 async function handleCreateTask(
   intervention: Intervention,
 ): Promise<ExecutionResult> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { title, priority } = intervention.action_payload as {
     title?: string;
     priority?: number;
@@ -521,7 +514,7 @@ async function handleProactiveMessage(
   }
 
   // Determine preferred channel for this tenant
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { data: tenant } = await supabase
     .from("exo_tenants")
     .select("phone, email")

@@ -2,15 +2,8 @@
 // TOOL RIG HELPERS - Resolve connected providers
 // =====================================================
 
-import { createClient } from "@supabase/supabase-js";
 import { RigConnection } from "@/lib/rigs/types";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export type ToolProvider = "google" | "google-workspace" | "microsoft-365";
 
@@ -41,7 +34,7 @@ export async function getRigConnection(
   rigSlug: ToolProvider,
 ): Promise<RigConnection | null> {
   try {
-    const { data, error } = await getSupabase()
+    const { data, error } = await getServiceSupabase()
       .from("exo_rig_connections")
       .select("*")
       .eq("tenant_id", tenantId)

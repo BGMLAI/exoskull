@@ -5,15 +5,8 @@
  * Uses service_role client (bypasses RLS) for CRON worker access.
  */
 
-import { createClient } from "@supabase/supabase-js";
 import type { GatewayChannel } from "../gateway/types";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 // ============================================================================
 // TYPES
@@ -58,7 +51,7 @@ export interface CreateTaskParams {
  * Enqueue a new async task. Returns the task ID.
  */
 export async function createTask(params: CreateTaskParams): Promise<string> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const { data, error } = await supabase
     .from("exo_async_tasks")
@@ -104,7 +97,7 @@ export async function createTask(params: CreateTaskParams): Promise<string> {
 export async function claimNextTask(
   workerId: string,
 ): Promise<AsyncTask | null> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const { data, error } = await supabase.rpc("claim_async_task", {
     p_worker_id: workerId,
@@ -145,7 +138,7 @@ export async function completeTask(
   result: string,
   toolsUsed: string[],
 ): Promise<void> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const { error } = await supabase
     .from("exo_async_tasks")
@@ -179,7 +172,7 @@ export async function failTask(
   taskId: string,
   errorMessage: string,
 ): Promise<{ exhausted: boolean }> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Get current retry state
   const { data: task } = await supabase
@@ -231,7 +224,7 @@ export async function failTask(
  * Called at the start of each CRON run as a safety net.
  */
 export async function releaseExpiredLocks(): Promise<number> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const now = new Date().toISOString();
 
   const { data, error } = await supabase
@@ -269,7 +262,7 @@ export async function releaseExpiredLocks(): Promise<number> {
 export async function getLatestPendingTask(
   tenantId: string,
 ): Promise<AsyncTask | null> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const { data } = await supabase
     .from("exo_async_tasks")
@@ -287,7 +280,7 @@ export async function getLatestPendingTask(
  * Get count of pending tasks (for monitoring/CRON logging).
  */
 export async function getPendingCount(): Promise<number> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const { count, error } = await supabase
     .from("exo_async_tasks")

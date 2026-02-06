@@ -3,21 +3,14 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import {
   rollbackToVersion,
   getVersions,
 } from "@/lib/skills/registry/version-manager";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 export async function POST(
   request: NextRequest,
@@ -49,7 +42,7 @@ export async function POST(
     }
 
     // Verify the skill belongs to this tenant
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const { data: skill, error: loadError } = await supabase
       .from("exo_generated_skills")
       .select("tenant_id")

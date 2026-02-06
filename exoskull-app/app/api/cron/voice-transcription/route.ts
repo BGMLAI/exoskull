@@ -9,19 +9,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { transcribeVoiceNote } from "@/lib/voice/transcribe-voice-note";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 const BATCH_SIZE = 3;
 
@@ -31,7 +24,7 @@ export async function GET(req: NextRequest) {
   }
 
   const startTime = Date.now();
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   let processed = 0;
   let failed = 0;
 

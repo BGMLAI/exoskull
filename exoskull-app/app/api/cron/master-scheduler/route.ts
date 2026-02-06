@@ -14,7 +14,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import {
   isTimeToTrigger,
   isWeekend,
@@ -29,15 +28,10 @@ import {
   type UserJobConfig,
 } from "@/lib/cron/dispatcher";
 import { verifyCronAuth } from "@/lib/cron/auth";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
-
-function getSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(supabaseUrl, supabaseServiceKey);
-}
 
 /**
  * Check if a job should run based on its cron expression
@@ -64,7 +58,7 @@ function shouldJobRunNow(job: ScheduledJob, timezone: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const startTime = Date.now();
 
   try {
@@ -253,7 +247,7 @@ async function logJobExecution(
   errorMessage?: string,
 ) {
   try {
-    await getSupabase().rpc("log_job_execution", {
+    await getServiceSupabase().rpc("log_job_execution", {
       p_job_id: job.id,
       p_job_name: job.job_name,
       p_tenant_id: user.tenant_id,
@@ -281,7 +275,7 @@ async function processCustomScheduledJobs(results: {
   details: any[];
 }) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const currentHour = new Date().getHours();
     const currentMinute = new Date().getMinutes();
 
@@ -348,7 +342,7 @@ async function processCustomScheduledJobs(results: {
         }
 
         // Check rate limits
-        const { data: withinLimits } = await getSupabase().rpc(
+        const { data: withinLimits } = await getServiceSupabase().rpc(
           "check_user_rate_limit",
           {
             p_tenant_id: tenant.id,
@@ -395,7 +389,7 @@ async function processCustomScheduledJobs(results: {
           await logCustomJobExecution(customJob, "completed", dispatchResult);
 
           // Update last_executed_at
-          await getSupabase()
+          await getServiceSupabase()
             .from("exo_custom_scheduled_jobs")
             .update({ last_executed_at: new Date().toISOString() })
             .eq("id", customJob.id);
@@ -460,7 +454,7 @@ async function logCustomJobExecution(
   errorMessage?: string,
 ) {
   try {
-    await getSupabase()
+    await getServiceSupabase()
       .from("exo_custom_job_logs")
       .insert({
         job_id: job.id,
@@ -480,7 +474,7 @@ async function logCustomJobExecution(
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     // Get all jobs with consent info
     const { data: jobs } = await supabase
       .from("exo_scheduled_jobs")

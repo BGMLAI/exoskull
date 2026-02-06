@@ -4,6 +4,34 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-06] Security Audit — Phase 5: Webhook Auth + Supabase Migration
+
+### Webhook Authentication Hardening (S5, S7, S9, S10, S11)
+
+- **WhatsApp & Messenger**: Made META_APP_SECRET mandatory — HMAC verification no longer silently skipped when env var is missing (returns 500)
+- **Twilio Voice**: Added X-Twilio-Signature validation using existing `validateTwilioSignature()` utility (warns if TWILIO_AUTH_TOKEN missing)
+- **Signal Gateway**: Added SIGNAL_WEBHOOK_SECRET auth via `x-signal-webhook-secret` header or Bearer token (was completely unauthenticated)
+- **iMessage Gateway**: Removed query param password (leaks to access logs), now requires Bearer header only
+
+### Supabase Client Migration (Q-series)
+
+- Migrated 61 files from local `getSupabase()` factory to shared `getServiceSupabase()` from `lib/supabase/service.ts`
+- Removed 61 duplicate `createClient` imports + ~1,200 lines of boilerplate
+- Fixed 3 broken multi-line imports from batch migration
+- Fixed 2 `ReturnType<typeof getSupabase>` references in WhatsApp/Messenger
+
+### Files changed
+
+- 5 webhook/gateway routes (whatsapp, messenger, twilio voice, signal, imessage)
+- 61 files migrated to shared Supabase client
+- Total: ~66 files modified
+
+### New env vars required
+
+- `SIGNAL_WEBHOOK_SECRET` — shared secret for Signal webhook authentication
+
+---
+
 ## [2026-02-06] Security Audit — Phase 1 Critical Fixes
 
 ### Full Audit Summary

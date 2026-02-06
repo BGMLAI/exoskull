@@ -12,13 +12,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient } from "@supabase/supabase-js";
 import {
   generateGatherTwiML,
   generateSayAndGatherTwiML,
   generateEndCallTwiML,
   generateErrorTwiML,
 } from "@/lib/voice/twilio-client";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
@@ -27,13 +27,6 @@ export const dynamic = "force-dynamic";
 // ============================================================================
 
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 function getAppUrl() {
   return process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
@@ -109,7 +102,7 @@ export async function POST(req: NextRequest) {
     const callSid = formData.CallSid;
     const speechResult = formData.SpeechResult;
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     // Load delegate session
     const { data: session } = await supabase
@@ -346,7 +339,7 @@ async function notifyUserAboutDelegateResult(
   metadata: any,
   messages: any[],
 ): Promise<void> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Get user's phone
   const { data: tenant } = await supabase

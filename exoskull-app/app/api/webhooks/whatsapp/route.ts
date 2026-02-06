@@ -13,7 +13,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import {
   WhatsAppClient,
   getWhatsAppClient,
@@ -24,20 +23,9 @@ import {
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 import type { GatewayMessage } from "@/lib/gateway/types";
 import { verifyMetaSignature } from "@/lib/security/webhook-hmac";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-// =====================================================
-// SUPABASE SERVICE CLIENT
-// =====================================================
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-}
 
 // =====================================================
 // GET - WEBHOOK VERIFICATION
@@ -76,7 +64,7 @@ export async function GET(req: NextRequest) {
 // =====================================================
 
 async function resolveWhatsAppClient(
-  supabase: ReturnType<typeof getSupabase>,
+  supabase: ReturnType<typeof getServiceSupabase>,
   phoneNumberId: string,
 ): Promise<{ client: WhatsAppClient | null; tenantId: string | null }> {
   // Try DB lookup first (multi-account)
@@ -123,17 +111,18 @@ export async function POST(req: NextRequest) {
     // Read raw body for HMAC verification before JSON parsing
     const rawBody = await req.text();
 
-    // Verify X-Hub-Signature-256 if META_APP_SECRET is configured
+    // Verify X-Hub-Signature-256 (mandatory)
     const appSecret = process.env.META_APP_SECRET;
-    if (appSecret) {
-      const signature = req.headers.get("x-hub-signature-256");
-      if (!verifyMetaSignature(rawBody, signature, appSecret)) {
-        console.error("[WhatsApp] HMAC signature verification failed");
-        return NextResponse.json(
-          { error: "Invalid signature" },
-          { status: 401 },
-        );
-      }
+    if (!appSecret) {
+      console.error(
+        "[WhatsApp] META_APP_SECRET not configured — rejecting request",
+      );
+      return NextResponse.json({ error: "Not configured" }, { status: 500 });
+    }
+    const signature = req.headers.get("x-hub-signature-256");
+    if (!verifyMetaSignature(rawBody, signature, appSecret)) {
+      console.error("[WhatsApp] HMAC signature verification failed");
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
     const payload: WhatsAppWebhookPayload = JSON.parse(rawBody);
@@ -160,7 +149,7 @@ export async function POST(req: NextRequest) {
       textLength: text.length,
     });
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     // Resolve client from DB or env var
     const { client, tenantId: accountTenantId } = await resolveWhatsAppClient(

@@ -11,18 +11,11 @@
  * Schedule: Daily at 02:00 UTC
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 // ============================================================================
 // Supabase Client
 // ============================================================================
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 // ============================================================================
 // Types
@@ -80,7 +73,7 @@ async function refreshView(viewName: GoldViewName): Promise<RefreshResult> {
   try {
     // REFRESH MATERIALIZED VIEW CONCURRENTLY requires unique index
     // We use raw SQL via RPC since Supabase JS doesn't support REFRESH directly
-    const { error: refreshError } = await getSupabase().rpc(
+    const { error: refreshError } = await getServiceSupabase().rpc(
       "refresh_gold_view",
       {
         view_name: viewName,
@@ -94,7 +87,7 @@ async function refreshView(viewName: GoldViewName): Promise<RefreshResult> {
     ) {
       // Fallback: Use non-concurrent refresh via raw query
       // Note: This may cause brief read locks
-      const { error: directError } = await getSupabase()
+      const { error: directError } = await getServiceSupabase()
         .from(viewName)
         .select("*", { count: "exact", head: true });
 
@@ -114,7 +107,7 @@ async function refreshView(viewName: GoldViewName): Promise<RefreshResult> {
     }
 
     // Get row count
-    const { count } = await getSupabase()
+    const { count } = await getServiceSupabase()
       .from(viewName)
       .select("*", { count: "exact", head: true });
 
@@ -156,7 +149,7 @@ async function logRefresh(
   status: string,
   errorMessage: string | null,
 ): Promise<void> {
-  await getSupabase().from("exo_gold_sync_log").insert({
+  await getServiceSupabase().from("exo_gold_sync_log").insert({
     view_name: viewName,
     duration_ms: durationMs,
     rows_count: rowsCount,
@@ -238,7 +231,7 @@ export async function refreshSingleView(
  * Get current Gold layer statistics
  */
 export async function getGoldStats(): Promise<GoldStats> {
-  const sb = getSupabase();
+  const sb = getServiceSupabase();
   const [dailyCount, weeklyCount, monthlyCount, msgDailyCount, lastSync] =
     await Promise.all([
       sb
@@ -284,7 +277,7 @@ export async function getRefreshHistory(limit: number = 20): Promise<
     error_message: string | null;
   }[]
 > {
-  const { data } = await getSupabase()
+  const { data } = await getServiceSupabase()
     .from("exo_gold_sync_log")
     .select("*")
     .order("refreshed_at", { ascending: false })

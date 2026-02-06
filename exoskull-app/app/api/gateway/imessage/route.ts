@@ -20,21 +20,17 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    // Verify BlueBubbles password (mandatory)
+    // Verify BlueBubbles password (Bearer header only — query params leak to logs)
     const expectedPassword = process.env.BLUEBUBBLES_PASSWORD;
     if (!expectedPassword) {
       console.error("[iMessage Route] BLUEBUBBLES_PASSWORD not configured");
       return NextResponse.json({ error: "Not configured" }, { status: 500 });
     }
-    const queryPassword = req.nextUrl.searchParams.get("password");
     const headerPassword = req.headers
       .get("authorization")
       ?.replace("Bearer ", "");
-    if (
-      queryPassword !== expectedPassword &&
-      headerPassword !== expectedPassword
-    ) {
-      console.error("[iMessage Route] Invalid password");
+    if (headerPassword !== expectedPassword) {
+      console.error("[iMessage Route] Invalid or missing Bearer token");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

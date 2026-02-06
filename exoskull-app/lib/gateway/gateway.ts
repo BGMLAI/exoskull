@@ -9,7 +9,6 @@
  * 4. Returns response for adapter to send back
  */
 
-import { createClient } from "@supabase/supabase-js";
 import {
   getOrCreateSession,
   processUserMessage,
@@ -24,13 +23,10 @@ import {
 import { classifyMessage } from "../async-tasks/classifier";
 import { createTask, getLatestPendingTask } from "../async-tasks/queue";
 import type { GatewayChannel, GatewayMessage, GatewayResponse } from "./types";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-function getSupabase() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-}
 
 // Map GatewayChannel → UnifiedChannel for unified-thread.ts
 // Now that UnifiedChannel includes telegram/slack/discord, this is a direct pass-through
@@ -49,7 +45,7 @@ export async function resolveTenant(
   from: string,
   senderName?: string,
 ): Promise<{ tenantId: string; name: string } | null> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Channel-specific lookup
   const channelColumn: Record<string, string> = {
@@ -99,7 +95,7 @@ async function autoRegisterTenant(
   from: string,
   senderName?: string,
 ): Promise<string> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const channelColumn: Record<string, string> = {
     telegram: "telegram_chat_id",

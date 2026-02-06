@@ -2,15 +2,8 @@
 // HABIT TRACKER MOD - Build and maintain positive habits
 // =====================================================
 
-import { createClient } from "@supabase/supabase-js";
 import { IModExecutor, ModInsight, ModAction, ModSlug } from "../types";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 // =====================================================
 // Types
@@ -72,7 +65,7 @@ export class HabitTrackerExecutor implements IModExecutor {
       ).toISOString();
 
       // Get all active habits
-      const { data: habits, error: habitsError } = await getSupabase()
+      const { data: habits, error: habitsError } = await getServiceSupabase()
         .from("exo_habits")
         .select("*")
         .eq("tenant_id", tenantId)
@@ -90,12 +83,13 @@ export class HabitTrackerExecutor implements IModExecutor {
       const monthAgo = new Date(
         now.getTime() - 30 * 24 * 60 * 60 * 1000,
       ).toISOString();
-      const { data: completions, error: completionsError } = await getSupabase()
-        .from("exo_habit_completions")
-        .select("*")
-        .eq("tenant_id", tenantId)
-        .gte("completed_at", monthAgo)
-        .order("completed_at", { ascending: false });
+      const { data: completions, error: completionsError } =
+        await getServiceSupabase()
+          .from("exo_habit_completions")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .gte("completed_at", monthAgo)
+          .order("completed_at", { ascending: false });
 
       if (completionsError) {
         console.error(
@@ -355,7 +349,7 @@ export class HabitTrackerExecutor implements IModExecutor {
             active: true,
           };
 
-          const { data, error } = await getSupabase()
+          const { data, error } = await getServiceSupabase()
             .from("exo_habits")
             .insert(habit)
             .select()
@@ -384,7 +378,7 @@ export class HabitTrackerExecutor implements IModExecutor {
           }
 
           // Check if habit exists and belongs to tenant
-          const { data: habit, error: habitError } = await getSupabase()
+          const { data: habit, error: habitError } = await getServiceSupabase()
             .from("exo_habits")
             .select("id, name")
             .eq("id", habitId)
@@ -397,7 +391,7 @@ export class HabitTrackerExecutor implements IModExecutor {
 
           // Check if already completed today
           const today = new Date().toISOString().split("T")[0];
-          const { data: existing } = await getSupabase()
+          const { data: existing } = await getServiceSupabase()
             .from("exo_habit_completions")
             .select("id")
             .eq("habit_id", habitId)
@@ -416,7 +410,7 @@ export class HabitTrackerExecutor implements IModExecutor {
             notes,
           };
 
-          const { data, error } = await getSupabase()
+          const { data, error } = await getServiceSupabase()
             .from("exo_habit_completions")
             .insert(completion)
             .select()
@@ -458,7 +452,7 @@ export class HabitTrackerExecutor implements IModExecutor {
           if (params.active !== undefined)
             updates.active = params.active as boolean;
 
-          const { data, error } = await getSupabase()
+          const { data, error } = await getServiceSupabase()
             .from("exo_habits")
             .update(updates)
             .eq("id", habitId)
@@ -483,7 +477,7 @@ export class HabitTrackerExecutor implements IModExecutor {
           }
 
           // Soft delete - just set active to false
-          const { error } = await getSupabase()
+          const { error } = await getServiceSupabase()
             .from("exo_habits")
             .update({ active: false })
             .eq("id", habitId)
@@ -508,7 +502,7 @@ export class HabitTrackerExecutor implements IModExecutor {
             Date.now() - days * 24 * 60 * 60 * 1000,
           ).toISOString();
 
-          const { data, error } = await getSupabase()
+          const { data, error } = await getServiceSupabase()
             .from("exo_habit_completions")
             .select("*")
             .eq("habit_id", habitId)

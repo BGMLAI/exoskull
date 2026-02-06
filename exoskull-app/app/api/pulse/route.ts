@@ -9,18 +9,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { getRigDefinition } from "@/lib/rigs";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 // Check types
 type CheckType = "health" | "tasks" | "calendar" | "social" | "finance";
@@ -45,7 +38,7 @@ interface PulseResult {
 // ============================================================================
 
 export async function GET(request: NextRequest) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const startTime = Date.now();
 
   // Verify CRON secret
@@ -126,7 +119,7 @@ export async function GET(request: NextRequest) {
 // ============================================================================
 
 export async function POST(request: NextRequest) {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const startTime = Date.now();
 
   try {
@@ -187,7 +180,7 @@ async function runPulseForUser(
   userId: string,
   enabledChecks: CheckType[],
 ): Promise<PulseResult> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const alerts: PulseAlert[] = [];
   const checksPerformed: CheckType[] = [];
   const startTime = Date.now();
@@ -249,7 +242,7 @@ async function runHealthCheck(
   userId: string,
   connectedRigs: string[],
 ): Promise<PulseAlert[]> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const alerts: PulseAlert[] = [];
 
   // Check sleep data from health rigs
@@ -319,7 +312,7 @@ async function runHealthCheck(
 }
 
 async function runTasksCheck(userId: string): Promise<PulseAlert[]> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const alerts: PulseAlert[] = [];
   const now = new Date();
 
@@ -378,7 +371,7 @@ async function runCalendarCheck(
   userId: string,
   connectedRigs: string[],
 ): Promise<PulseAlert[]> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const alerts: PulseAlert[] = [];
 
   const calendarRigs = connectedRigs.filter((r) =>
@@ -431,7 +424,7 @@ async function runCalendarCheck(
 }
 
 async function runSocialCheck(userId: string): Promise<PulseAlert[]> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const alerts: PulseAlert[] = [];
 
   // Check for contacts not reached out to in 30+ days
@@ -465,7 +458,7 @@ async function runFinanceCheck(
   userId: string,
   connectedRigs: string[],
 ): Promise<PulseAlert[]> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const alerts: PulseAlert[] = [];
 
   const financeRigs = connectedRigs.filter((r) => ["plaid"].includes(r));

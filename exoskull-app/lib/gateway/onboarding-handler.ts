@@ -12,7 +12,6 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient } from "@supabase/supabase-js";
 import { getThreadContext } from "../unified-thread";
 import {
   DISCOVERY_SYSTEM_PROMPT,
@@ -21,15 +20,12 @@ import {
 } from "../onboarding/discovery-prompt";
 import { autoInstallMods } from "../builder/proactive-engine";
 import type { GatewayChannel, GatewayResponse } from "./types";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY!;
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
-
-function getSupabase() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-}
 
 /**
  * Check tenant's onboarding status.
@@ -38,7 +34,7 @@ function getSupabase() {
 export async function getOnboardingStatus(
   tenantId: string,
 ): Promise<string | null> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { data } = await supabase
     .from("exo_tenants")
     .select("onboarding_status")
@@ -57,7 +53,7 @@ export async function handleOnboardingMessage(
   text: string,
   channel: GatewayChannel,
 ): Promise<GatewayResponse> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   try {
     // Mark as in_progress if still pending
@@ -187,7 +183,7 @@ async function completeOnboardingInChat(
   profileData: Record<string, unknown>,
   channel: GatewayChannel,
 ): Promise<void> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Build update payload from extracted profile
   const updatePayload: Record<string, unknown> = {

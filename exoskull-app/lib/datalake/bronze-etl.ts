@@ -6,7 +6,6 @@
  * Uses incremental sync based on last sync timestamp per tenant/data_type.
  */
 
-import { createClient } from "@supabase/supabase-js";
 import { writeToBronze, type DataType } from "../storage/r2-client";
 import {
   conversationsToParquet,
@@ -16,15 +15,9 @@ import {
   type MessageRecord,
   type JobLogRecord,
 } from "../storage/parquet-writer";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 // Service role client for ETL (bypasses RLS)
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
-
 // ============================================================================
 // Types
 // ============================================================================
@@ -61,7 +54,7 @@ async function getLastSyncTime(
   tenantId: string,
   dataType: DataType,
 ): Promise<Date> {
-  const { data, error } = await getSupabase()
+  const { data, error } = await getServiceSupabase()
     .from("exo_bronze_sync_log")
     .select("last_sync_at")
     .eq("tenant_id", tenantId)
@@ -86,19 +79,21 @@ async function updateSyncTime(
   recordsSynced: number,
   bytesWritten: number,
 ): Promise<void> {
-  const { error } = await getSupabase().from("exo_bronze_sync_log").upsert(
-    {
-      tenant_id: tenantId,
-      data_type: dataType,
-      last_sync_at: syncTime.toISOString(),
-      records_synced: recordsSynced,
-      bytes_written: bytesWritten,
-      updated_at: new Date().toISOString(),
-    },
-    {
-      onConflict: "tenant_id,data_type",
-    },
-  );
+  const { error } = await getServiceSupabase()
+    .from("exo_bronze_sync_log")
+    .upsert(
+      {
+        tenant_id: tenantId,
+        data_type: dataType,
+        last_sync_at: syncTime.toISOString(),
+        records_synced: recordsSynced,
+        bytes_written: bytesWritten,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "tenant_id,data_type",
+      },
+    );
 
   if (error) {
     console.error(`[Bronze ETL] Failed to update sync log:`, error);
@@ -120,7 +115,7 @@ export async function etlConversations(tenantId: string): Promise<ETLResult> {
 
   try {
     // Fetch new/updated conversations since last sync
-    const { data: conversations, error } = await getSupabase()
+    const { data: conversations, error } = await getServiceSupabase()
       .from("exo_conversations")
       .select("*")
       .eq("tenant_id", tenantId)
@@ -214,7 +209,7 @@ export async function etlMessages(tenantId: string): Promise<ETLResult> {
 
   try {
     // Fetch new messages since last sync
-    const { data: messages, error } = await getSupabase()
+    const { data: messages, error } = await getServiceSupabase()
       .from("exo_messages")
       .select("*")
       .eq("tenant_id", tenantId)
@@ -307,7 +302,7 @@ export async function etlJobLogs(tenantId: string): Promise<ETLResult> {
 
   try {
     // Fetch new job logs since last sync
-    const { data: logs, error } = await getSupabase()
+    const { data: logs, error } = await getServiceSupabase()
       .from("exo_scheduled_job_logs")
       .select(
         `
@@ -426,7 +421,7 @@ export async function runBronzeETL(): Promise<ETLSummary> {
   console.log(`[Bronze ETL] Starting at ${startedAt.toISOString()}`);
 
   // Get all active tenants
-  const { data: tenants, error } = await getSupabase()
+  const { data: tenants, error } = await getServiceSupabase()
     .from("exo_tenants")
     .select("id");
 

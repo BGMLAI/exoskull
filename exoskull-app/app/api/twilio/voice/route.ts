@@ -16,6 +16,7 @@ import {
   generateSayAndGatherTwiML,
   generateEndCallTwiML,
   generateErrorTwiML,
+  validateTwilioSignature,
 } from "@/lib/voice/twilio-client";
 import { textToSpeech, uploadTTSAudio } from "@/lib/voice/elevenlabs-tts";
 import {
@@ -71,6 +72,32 @@ export async function POST(req: NextRequest) {
 
     // Parse Twilio form data
     const formData = await parseFormData(req);
+
+    // Verify Twilio signature (mandatory in production)
+    const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+    if (twilioAuthToken) {
+      const twilioSignature = req.headers.get("x-twilio-signature") || "";
+      const requestUrl = `${getAppUrl()}/api/twilio/voice?action=${action}`;
+      if (
+        !validateTwilioSignature(
+          twilioAuthToken,
+          twilioSignature,
+          requestUrl,
+          formData,
+        )
+      ) {
+        console.error("[Twilio Voice] Signature verification failed");
+        return new NextResponse(generateErrorTwiML(), {
+          status: 403,
+          headers: { "Content-Type": "text/xml" },
+        });
+      }
+    } else {
+      console.warn(
+        "[Twilio Voice] TWILIO_AUTH_TOKEN not set — signature verification skipped",
+      );
+    }
+
     const callSid = formData.CallSid;
     const from = formData.From;
     const speechResult = formData.SpeechResult;

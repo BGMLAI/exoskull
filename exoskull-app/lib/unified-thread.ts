@@ -7,14 +7,10 @@
  * Every channel appends messages here so Claude always has full cross-channel context.
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-function getSupabase() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-}
 
 // ============================================================================
 // TYPES
@@ -76,7 +72,7 @@ export interface AppendMessageParams {
  * Each tenant has exactly one thread (all channels merge here).
  */
 export async function getOrCreateThread(tenantId: string): Promise<string> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   // Try to find existing thread
   const { data: existing, error: selectError } = await supabase
@@ -138,7 +134,7 @@ export async function appendMessage(
   tenantId: string,
   params: AppendMessageParams,
 ): Promise<string> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const threadId = await getOrCreateThread(tenantId);
 
@@ -187,7 +183,7 @@ export async function getRecentMessages(
   tenantId: string,
   limit: number = 20,
 ): Promise<UnifiedMessage[]> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const { data, error } = await supabase
     .from("exo_unified_messages")

@@ -3,17 +3,10 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,7 +19,7 @@ export async function GET(request: NextRequest) {
     }
     const tenantId = user.id;
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const status = request.nextUrl.searchParams.get("status") || "approved";
 
     const query = supabase

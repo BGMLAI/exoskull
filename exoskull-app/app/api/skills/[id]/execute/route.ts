@@ -4,21 +4,14 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { executeInSandbox } from "@/lib/skills/sandbox/restricted-function";
 import { logExecution } from "@/lib/skills/sandbox/execution-logger";
 import { checkCircuitBreaker } from "@/lib/skills/sandbox/circuit-breaker";
 import { SkillExecutionContext } from "@/lib/skills/types";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 export async function POST(
   request: NextRequest,
@@ -44,7 +37,7 @@ export async function POST(
     };
 
     // Load the skill - allow pending in sandbox mode
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     const allowedStatuses = sandbox ? ["approved", "pending"] : ["approved"];
 
     const { data: skill, error: loadError } = await supabase

@@ -13,19 +13,15 @@
  * 6. Confirmation sent back via user's preferred channel
  */
 
-import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
 import { supportsOAuth } from "./oauth";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
 
 const MAGIC_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes
-
-function getSupabase() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-}
 
 /**
  * Generate a magic-link URL for OAuth without requiring browser login.
@@ -39,7 +35,7 @@ export async function generateMagicConnectLink(
     throw new Error(`Integration "${rigSlug}" does not support OAuth`);
   }
 
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const magicToken = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + MAGIC_TOKEN_TTL_MS);
 
@@ -106,7 +102,7 @@ export async function validateMagicToken(
   rigSlug: string,
   magicToken: string,
 ): Promise<{ tenantId: string; connectionId: string } | null> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const { data: connection } = await supabase
     .from("exo_rig_connections")
@@ -152,7 +148,7 @@ export async function validateMagicToken(
  * Clear magic token after successful OAuth.
  */
 export async function clearMagicToken(connectionId: string): Promise<void> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const { data: conn } = await supabase
     .from("exo_rig_connections")

@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { CACHED_PHRASES } from "@/lib/voice/audio-cache";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
 // ElevenLabs voice settings
 const VOICE_ID = "Qs4qmNrqlneCgYPLSNQ7"; // User's custom cloned voice
 const MODEL_ID = "eleven_turbo_v2_5";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 /**
  * POST /api/audio/generate-cache
@@ -29,7 +22,7 @@ export async function POST(req: NextRequest) {
   try {
     // Check for API key
     const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     if (!elevenLabsApiKey) {
       return NextResponse.json(
@@ -162,7 +155,7 @@ export async function POST(req: NextRequest) {
  */
 export async function GET() {
   try {
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
     // List all files in audio-cache bucket
     const { data: files, error } = await supabase.storage
       .from("audio-cache")

@@ -3,21 +3,14 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import {
   confirmChannel,
   rejectApproval,
 } from "@/lib/skills/approval/approval-gateway";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 export async function POST(
   request: NextRequest,
@@ -114,7 +107,7 @@ async function findApprovalRequest(
   skillId: string,
   tenantId: string,
 ): Promise<string | null> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
   const { data } = await supabase
     .from("exo_skill_approval_requests")
     .select("id")

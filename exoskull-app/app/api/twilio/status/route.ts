@@ -6,21 +6,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { cleanupSessionAudio } from "@/lib/voice/elevenlabs-tts";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-}
 
 // ============================================================================
 // TYPES
@@ -79,7 +72,7 @@ export async function POST(req: NextRequest) {
       direction: data.Direction,
     });
 
-    const supabase = getSupabase();
+    const supabase = getServiceSupabase();
 
     // Find session by call_sid
     const { data: session } = await supabase

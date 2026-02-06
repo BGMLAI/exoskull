@@ -5,17 +5,13 @@
  * Handles deduplication by source_id.
  */
 
-import { createClient } from "@supabase/supabase-js";
 import { appendMessage } from "../unified-thread";
 import { GmailMessage } from "./google-workspace/client";
 import { OutlookMessage } from "./microsoft-365/client";
+import { getServiceSupabase } from "@/lib/supabase/service";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-function getSupabase() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-}
 
 export interface EmailIngestionResult {
   ingested: number;
@@ -30,7 +26,7 @@ async function isEmailAlreadyIngested(
   tenantId: string,
   emailId: string,
 ): Promise<boolean> {
-  const supabase = getSupabase();
+  const supabase = getServiceSupabase();
 
   const { count } = await supabase
     .from("exo_unified_messages")
