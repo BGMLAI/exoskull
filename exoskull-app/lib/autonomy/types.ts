@@ -60,6 +60,7 @@ export type InterventionType =
   | "pattern_notification"
   | "gap_detection"
   | "automation_trigger"
+  | "health_prediction"
   | "custom";
 
 export type InterventionStatus =
