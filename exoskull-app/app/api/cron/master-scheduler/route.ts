@@ -27,11 +27,11 @@ import {
   type ScheduledJob,
   type UserJobConfig,
 } from "@/lib/cron/dispatcher";
-import { verifyCronAuth } from "@/lib/cron/auth";
+import { withCronGuard } from "@/lib/admin/cron-guard";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 /**
  * Check if a job should run based on its cron expression
@@ -57,184 +57,165 @@ function shouldJobRunNow(job: ScheduledJob, timezone: string): boolean {
   return isTimeToTrigger(timezone, targetTime, 10); // 10 min window
 }
 
-export async function POST(req: NextRequest) {
+async function postHandler(req: NextRequest) {
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
-  try {
-    // Verify cron secret (supports both x-cron-secret header and Bearer token)
-    if (!verifyCronAuth(req)) {
-      console.log("⚠️ Invalid cron secret");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const body = await req.json().catch(() => ({}));
+  console.log(`🔄 Master Scheduler triggered at ${new Date().toISOString()}`);
+  console.log(`   Source: ${body.source || "unknown"}`);
 
-    const body = await req.json().catch(() => ({}));
-    console.log(`🔄 Master Scheduler triggered at ${new Date().toISOString()}`);
-    console.log(`   Source: ${body.source || "unknown"}`);
+  // Get all active scheduled jobs
+  const { data: jobs, error: jobsError } = await supabase
+    .from("exo_scheduled_jobs")
+    .select("*")
+    .eq("is_active", true);
 
-    // Get all active scheduled jobs
-    const { data: jobs, error: jobsError } = await supabase
-      .from("exo_scheduled_jobs")
-      .select("*")
-      .eq("is_active", true);
-
-    if (jobsError) {
-      console.error("❌ Failed to fetch jobs:", jobsError);
-      return NextResponse.json({ error: jobsError.message }, { status: 500 });
-    }
-
-    const results = {
-      timestamp: new Date().toISOString(),
-      jobs_checked: jobs?.length || 0,
-      custom_jobs_checked: 0,
-      jobs_triggered: 0,
-      users_notified: 0,
-      errors: [] as string[],
-      details: [] as any[],
-    };
-
-    // Process each job
-    for (const job of (jobs || []) as ScheduledJob[]) {
-      console.log(`\n📋 Checking job: ${job.job_name}`);
-
-      // Get users for this job
-      const { data: users, error: usersError } = await supabase.rpc(
-        "get_users_for_scheduled_job",
-        {
-          p_job_name: job.job_name,
-          p_current_utc_hour: new Date().getUTCHours(),
-        },
-      );
-
-      if (usersError) {
-        console.error(
-          `   ❌ Failed to get users for ${job.job_name}:`,
-          usersError,
-        );
-        results.errors.push(`${job.job_name}: ${usersError.message}`);
-        continue;
-      }
-
-      let usersTriggered = 0;
-
-      // Process each user
-      for (const user of (users || []) as UserJobConfig[]) {
-        try {
-          const timezone = user.timezone || "Europe/Warsaw";
-          const settings = user.schedule_settings || {};
-
-          // Check if job should run for this user NOW
-          if (!shouldJobRunNow(job, timezone)) {
-            continue;
-          }
-
-          console.log(
-            `   👤 User ${user.tenant_id} (${timezone}) - ${formatLocalTime(timezone)}`,
-          );
-
-          // Check weekend skip
-          if (settings.skip_weekends && isWeekend(timezone)) {
-            console.log(`      ⏭️ Skipped (weekend)`);
-            await logJobExecution(
-              job,
-              user,
-              "skipped",
-              null,
-              "Weekend skip enabled",
-            );
-            continue;
-          }
-
-          // Check quiet hours
-          const quietStart = settings.quiet_hours?.start || "22:00";
-          const quietEnd = settings.quiet_hours?.end || "07:00";
-          if (isInQuietHours(timezone, quietStart, quietEnd)) {
-            console.log(`      ⏭️ Skipped (quiet hours)`);
-            await logJobExecution(job, user, "skipped", null, "Quiet hours");
-            continue;
-          }
-
-          // Check rate limits
-          const channel = user.preferred_channel || job.default_channel;
-          const { data: withinLimits } = await supabase.rpc(
-            "check_user_rate_limit",
-            {
-              p_tenant_id: user.tenant_id,
-              p_channel: channel,
-            },
-          );
-
-          if (!withinLimits) {
-            console.log(`      ⏭️ Skipped (rate limited)`);
-            await logJobExecution(job, user, "rate_limited");
-            continue;
-          }
-
-          // Dispatch the job
-          const dispatchResult = await dispatchJob(job, user);
-
-          if (dispatchResult.success) {
-            console.log(
-              `      ✅ ${dispatchResult.channel.toUpperCase()} sent`,
-            );
-            usersTriggered++;
-            results.users_notified++;
-            await logJobExecution(job, user, "completed", dispatchResult);
-          } else {
-            console.log(`      ❌ Failed: ${dispatchResult.error}`);
-            results.errors.push(
-              `${job.job_name} for ${user.tenant_id}: ${dispatchResult.error}`,
-            );
-            await logJobExecution(job, user, "failed", dispatchResult);
-          }
-
-          // Small delay between users to avoid rate limiting
-          await new Promise((resolve) => setTimeout(resolve, 200));
-        } catch (userError: any) {
-          console.error(
-            `      ❌ Error for user ${user.tenant_id}:`,
-            userError,
-          );
-          results.errors.push(
-            `${job.job_name} for ${user.tenant_id}: ${userError.message}`,
-          );
-        }
-      }
-
-      if (usersTriggered > 0) {
-        results.jobs_triggered++;
-      }
-
-      results.details.push({
-        job_name: job.job_name,
-        users_checked: users?.length || 0,
-        users_triggered: usersTriggered,
-      });
-    }
-
-    // Process custom scheduled jobs
-    await processCustomScheduledJobs(results);
-
-    const duration = Date.now() - startTime;
-    console.log(`\n✅ Master Scheduler complete in ${duration}ms`);
-    console.log(`   Jobs: ${results.jobs_triggered}/${results.jobs_checked}`);
-    console.log(`   Users notified: ${results.users_notified}`);
-    console.log(`   Errors: ${results.errors.length}`);
-
-    return NextResponse.json({
-      ...results,
-      duration_ms: duration,
-    });
-  } catch (error) {
-    console.error("❌ Master Scheduler fatal error:", error);
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    );
+  if (jobsError) {
+    console.error("❌ Failed to fetch jobs:", jobsError);
+    return NextResponse.json({ error: jobsError.message }, { status: 500 });
   }
+
+  const results = {
+    timestamp: new Date().toISOString(),
+    jobs_checked: jobs?.length || 0,
+    custom_jobs_checked: 0,
+    jobs_triggered: 0,
+    users_notified: 0,
+    errors: [] as string[],
+    details: [] as any[],
+  };
+
+  // Process each job
+  for (const job of (jobs || []) as ScheduledJob[]) {
+    console.log(`\n📋 Checking job: ${job.job_name}`);
+
+    // Get users for this job
+    const { data: users, error: usersError } = await supabase.rpc(
+      "get_users_for_scheduled_job",
+      {
+        p_job_name: job.job_name,
+        p_current_utc_hour: new Date().getUTCHours(),
+      },
+    );
+
+    if (usersError) {
+      console.error(
+        `   ❌ Failed to get users for ${job.job_name}:`,
+        usersError,
+      );
+      results.errors.push(`${job.job_name}: ${usersError.message}`);
+      continue;
+    }
+
+    let usersTriggered = 0;
+
+    // Process each user
+    for (const user of (users || []) as UserJobConfig[]) {
+      try {
+        const timezone = user.timezone || "Europe/Warsaw";
+        const settings = user.schedule_settings || {};
+
+        // Check if job should run for this user NOW
+        if (!shouldJobRunNow(job, timezone)) {
+          continue;
+        }
+
+        console.log(
+          `   👤 User ${user.tenant_id} (${timezone}) - ${formatLocalTime(timezone)}`,
+        );
+
+        // Check weekend skip
+        if (settings.skip_weekends && isWeekend(timezone)) {
+          console.log(`      ⏭️ Skipped (weekend)`);
+          await logJobExecution(
+            job,
+            user,
+            "skipped",
+            null,
+            "Weekend skip enabled",
+          );
+          continue;
+        }
+
+        // Check quiet hours
+        const quietStart = settings.quiet_hours?.start || "22:00";
+        const quietEnd = settings.quiet_hours?.end || "07:00";
+        if (isInQuietHours(timezone, quietStart, quietEnd)) {
+          console.log(`      ⏭️ Skipped (quiet hours)`);
+          await logJobExecution(job, user, "skipped", null, "Quiet hours");
+          continue;
+        }
+
+        // Check rate limits
+        const channel = user.preferred_channel || job.default_channel;
+        const { data: withinLimits } = await supabase.rpc(
+          "check_user_rate_limit",
+          {
+            p_tenant_id: user.tenant_id,
+            p_channel: channel,
+          },
+        );
+
+        if (!withinLimits) {
+          console.log(`      ⏭️ Skipped (rate limited)`);
+          await logJobExecution(job, user, "rate_limited");
+          continue;
+        }
+
+        // Dispatch the job
+        const dispatchResult = await dispatchJob(job, user);
+
+        if (dispatchResult.success) {
+          console.log(`      ✅ ${dispatchResult.channel.toUpperCase()} sent`);
+          usersTriggered++;
+          results.users_notified++;
+          await logJobExecution(job, user, "completed", dispatchResult);
+        } else {
+          console.log(`      ❌ Failed: ${dispatchResult.error}`);
+          results.errors.push(
+            `${job.job_name} for ${user.tenant_id}: ${dispatchResult.error}`,
+          );
+          await logJobExecution(job, user, "failed", dispatchResult);
+        }
+
+        // Small delay between users to avoid rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      } catch (userError: any) {
+        console.error(`      ❌ Error for user ${user.tenant_id}:`, userError);
+        results.errors.push(
+          `${job.job_name} for ${user.tenant_id}: ${userError.message}`,
+        );
+      }
+    }
+
+    if (usersTriggered > 0) {
+      results.jobs_triggered++;
+    }
+
+    results.details.push({
+      job_name: job.job_name,
+      users_checked: users?.length || 0,
+      users_triggered: usersTriggered,
+    });
+  }
+
+  // Process custom scheduled jobs
+  await processCustomScheduledJobs(results);
+
+  const duration = Date.now() - startTime;
+  console.log(`\n✅ Master Scheduler complete in ${duration}ms`);
+  console.log(`   Jobs: ${results.jobs_triggered}/${results.jobs_checked}`);
+  console.log(`   Users notified: ${results.users_notified}`);
+  console.log(`   Errors: ${results.errors.length}`);
+
+  return NextResponse.json({
+    ...results,
+    duration_ms: duration,
+  });
 }
+
+export const POST = withCronGuard({ name: "master-scheduler" }, postHandler);
 
 /**
  * Log job execution to database

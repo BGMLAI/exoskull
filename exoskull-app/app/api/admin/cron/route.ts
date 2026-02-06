@@ -3,8 +3,14 @@ import { requireAdmin, getAdminSupabase } from "@/lib/admin/auth";
 
 export const dynamic = "force-dynamic";
 
-// Cron job definitions from vercel.json
+// Complete CRON definitions (all 26 jobs)
 const CRON_DEFINITIONS = [
+  // High-frequency
+  {
+    name: "async-tasks",
+    schedule: "* * * * *",
+    description: "Async task queue processor (every 1min)",
+  },
   {
     name: "master-scheduler",
     schedule: "0 * * * *",
@@ -20,21 +26,21 @@ const CRON_DEFINITIONS = [
     schedule: "*/15 * * * *",
     description: "Post-conversation processing",
   },
-  { name: "pulse", schedule: "*/30 * * * *", description: "Health check" },
-  {
-    name: "highlight-decay",
-    schedule: "0 3 * * *",
-    description: "Archive old highlights",
-  },
+  // ETL pipeline
   {
     name: "bronze-etl",
     schedule: "0 1 * * *",
-    description: "Raw data ingestion",
+    description: "Raw data ingestion (R2 Parquet)",
   },
   {
     name: "silver-etl",
     schedule: "0 2 * * *",
     description: "Data cleaning & validation",
+  },
+  {
+    name: "highlight-decay",
+    schedule: "0 3 * * *",
+    description: "Archive old highlights",
   },
   {
     name: "gold-etl",
@@ -47,19 +53,20 @@ const CRON_DEFINITIONS = [
     description: "Calculate business KPIs",
   },
   {
-    name: "dunning",
-    schedule: "0 */6 * * *",
-    description: "Payment retry logic",
+    name: "admin-metrics",
+    schedule: "30 5 * * *",
+    description: "Admin daily snapshot",
   },
+  // Daily analytics
   {
     name: "guardian-effectiveness",
     schedule: "0 6 * * *",
     description: "Guardian safety metrics",
   },
   {
-    name: "guardian-values",
-    schedule: "0 8 * * 0",
-    description: "Value alignment (weekly)",
+    name: "predictions",
+    schedule: "0 6 * * *",
+    description: "Health predictions (illness, burnout)",
   },
   {
     name: "engagement-scoring",
@@ -67,14 +74,72 @@ const CRON_DEFINITIONS = [
     description: "User engagement metrics",
   },
   {
-    name: "drip-engine",
-    schedule: "0 */6 * * *",
-    description: "Proactive suggestion system",
+    name: "insight-push",
+    schedule: "0 10 * * *",
+    description: "Cross-domain insight delivery",
   },
   {
-    name: "admin-metrics",
-    schedule: "30 5 * * *",
-    description: "Admin daily snapshot",
+    name: "daily-summary",
+    schedule: "0 19 * * *",
+    description: "User daily recap",
+  },
+  {
+    name: "goal-progress",
+    schedule: "0 20 * * *",
+    description: "Goal progress report",
+  },
+  {
+    name: "skill-lifecycle",
+    schedule: "0 3 * * *",
+    description: "Archive unused skills",
+  },
+  // Periodic
+  {
+    name: "dunning",
+    schedule: "0 */6 * * *",
+    description: "Payment retry logic",
+  },
+  {
+    name: "drip-engine",
+    schedule: "0 */6 * * *",
+    description: "Spaced repetition content delivery",
+  },
+  {
+    name: "self-optimization",
+    schedule: "0 */6 * * *",
+    description: "System self-improvement",
+  },
+  {
+    name: "outbound-monitor",
+    schedule: "0 */2 * * *",
+    description: "Outbound delivery monitoring",
+  },
+  {
+    name: "voice-transcription",
+    schedule: "0 */4 * * *",
+    description: "Voice recording transcription",
+  },
+  // Weekly
+  {
+    name: "weekly-summary",
+    schedule: "0 18 * * 0",
+    description: "User weekly recap (Sunday)",
+  },
+  {
+    name: "guardian-values",
+    schedule: "0 8 * * 0",
+    description: "Value alignment (Sunday)",
+  },
+  {
+    name: "gap-detection",
+    schedule: "0 9 * * 0",
+    description: "Blind spot detection (Sunday)",
+  },
+  // Monthly
+  {
+    name: "monthly-summary",
+    schedule: "0 9 1 * *",
+    description: "User monthly recap",
   },
 ];
 

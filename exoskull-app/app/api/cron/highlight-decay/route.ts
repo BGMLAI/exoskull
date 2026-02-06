@@ -8,25 +8,20 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { runDecay } from "@/lib/learning/self-updater";
-import { verifyCronAuth } from "@/lib/cron/auth";
+import { withCronGuard } from "@/lib/admin/cron-guard";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 // ============================================================================
-// AUTHENTICATION
+// ADDITIONAL AUTH (service key for pg_cron calls)
 // ============================================================================
 
-function validateCronAuth(request: NextRequest): boolean {
-  // Shared cron auth (Bearer token, x-cron-secret header, dev bypass)
-  if (verifyCronAuth(request)) return true;
-
-  // Additional: internal pg_cron call (via service role)
+function validateServiceKey(request: NextRequest): boolean {
   const serviceKey = request.headers.get("x-service-key");
   if (serviceKey === process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return true;
   }
-
   return false;
 }
 
@@ -34,13 +29,8 @@ function validateCronAuth(request: NextRequest): boolean {
 // GET HANDLER (for Vercel CRON)
 // ============================================================================
 
-export async function GET(request: NextRequest) {
+async function getHandler(request: NextRequest) {
   const startTime = Date.now();
-
-  if (!validateCronAuth(request)) {
-    console.warn("[HighlightDecay] Unauthorized CRON attempt");
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   console.log("[HighlightDecay] Starting decay cycle...");
 
@@ -68,3 +58,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export const GET = withCronGuard({ name: "highlight-decay" }, getHandler);

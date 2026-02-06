@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service-client";
-import { verifyCronAuth } from "@/lib/cron/auth";
+import { withCronGuard } from "@/lib/admin/cron-guard";
 import { processEscalations } from "@/lib/autonomy/escalation-manager";
 import {
   detectInactivity,
@@ -22,13 +22,9 @@ import {
 } from "@/lib/autonomy/outbound-triggers";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
-export async function GET(req: NextRequest) {
-  if (!verifyCronAuth(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+async function handler(req: NextRequest) {
   const startTime = Date.now();
   const results = {
     escalations: { checked: 0, escalated: 0, cancelled: 0 },
@@ -112,3 +108,5 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export const GET = withCronGuard({ name: "outbound-monitor" }, handler);

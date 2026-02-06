@@ -7,29 +7,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { verifyCronAuth } from "@/lib/cron/auth";
+import { withCronGuard } from "@/lib/admin/cron-guard";
+import { getServiceSupabase } from "@/lib/supabase/service";
 import { pushInsightsForTenant } from "@/lib/insights/insight-pusher";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
-function getAdminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-}
-
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handler(request: NextRequest): Promise<NextResponse> {
   const startTime = Date.now();
 
-  if (!verifyCronAuth(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const supabase = getAdminClient();
+  const supabase = getServiceSupabase();
 
   // Fetch all active tenants
   const { data: tenants, error: tenantsErr } = await supabase
@@ -104,3 +92,5 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     },
   });
 }
+
+export const GET = withCronGuard({ name: "insight-push" }, handler);

@@ -5,6 +5,7 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import { withCronGuard } from "@/lib/admin/cron-guard";
 import {
   archiveUnusedSkills,
   getSkillStats,
@@ -13,16 +14,10 @@ import {
 } from "@/lib/skills/registry/lifecycle-manager";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
-export async function GET(request: NextRequest) {
+async function handler(request: NextRequest) {
   try {
-    // Verify cron secret
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Archive unused skills
     const archiveResult = await archiveUnusedSkills(30);
 
@@ -55,3 +50,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export const GET = withCronGuard({ name: "skill-lifecycle" }, handler);

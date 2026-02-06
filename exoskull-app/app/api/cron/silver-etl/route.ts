@@ -14,28 +14,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runSilverETL, getSilverStats } from "@/lib/datalake/silver-etl";
 import { checkR2Connection } from "@/lib/storage/r2-client";
-import { verifyCronAuth } from "@/lib/cron/auth";
+import { withCronGuard } from "@/lib/admin/cron-guard";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 /**
  * POST /api/cron/silver-etl
  * Trigger Silver ETL job
  */
-export async function POST(req: NextRequest) {
-  // Verify authorization
-  if (!verifyCronAuth(req)) {
-    return NextResponse.json(
-      {
-        error: "Unauthorized",
-        message:
-          "Valid x-cron-secret header or Authorization bearer token required",
-      },
-      { status: 401 },
-    );
-  }
-
+async function postHandler(req: NextRequest) {
   console.log(`[Silver ETL] Triggered at ${new Date().toISOString()}`);
 
   // Check R2 connection first (needed to read Bronze)
@@ -105,6 +93,11 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withCronGuard(
+  { name: "silver-etl", dependencies: ["bronze-etl"] },
+  postHandler,
+);
 
 /**
  * GET /api/cron/silver-etl

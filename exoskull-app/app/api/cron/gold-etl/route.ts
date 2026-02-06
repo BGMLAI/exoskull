@@ -18,28 +18,16 @@ import {
   getGoldStats,
   getRefreshHistory,
 } from "@/lib/datalake/gold-etl";
-import { verifyCronAuth } from "@/lib/cron/auth";
+import { withCronGuard } from "@/lib/admin/cron-guard";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 /**
  * POST /api/cron/gold-etl
  * Trigger Gold ETL job (refresh materialized views)
  */
-export async function POST(req: NextRequest) {
-  // Verify authorization
-  if (!verifyCronAuth(req)) {
-    return NextResponse.json(
-      {
-        error: "Unauthorized",
-        message:
-          "Valid x-cron-secret header or Authorization bearer token required",
-      },
-      { status: 401 },
-    );
-  }
-
+async function postHandler(req: NextRequest) {
   console.log(`[Gold ETL] Triggered at ${new Date().toISOString()}`);
 
   try {
@@ -94,6 +82,11 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withCronGuard(
+  { name: "gold-etl", dependencies: ["silver-etl"] },
+  postHandler,
+);
 
 /**
  * GET /api/cron/gold-etl

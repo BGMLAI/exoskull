@@ -12,16 +12,12 @@ import {
   getChurnRiskUsers,
 } from "@/lib/marketing/engagement";
 import { triggerReengagement } from "@/lib/marketing/drip-engine";
-import { verifyCronAuth } from "@/lib/cron/auth";
+import { withCronGuard } from "@/lib/admin/cron-guard";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
-export async function GET(req: NextRequest) {
-  if (!verifyCronAuth(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+async function handler(req: NextRequest) {
   const startTime = Date.now();
 
   try {
@@ -71,3 +67,5 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export const GET = withCronGuard({ name: "engagement-scoring" }, handler);
