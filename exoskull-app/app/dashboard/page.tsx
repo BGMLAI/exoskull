@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { VoiceHero } from "@/components/dashboard/VoiceHero";
-import { HomeChat } from "@/components/dashboard/HomeChat";
+import { CanvasGrid } from "@/components/canvas/CanvasGrid";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Home" };
@@ -23,34 +22,28 @@ export default async function DashboardPage() {
     );
   }
 
-  // Get tenant profile
+  // Get tenant profile (including IORS data)
   let assistantName = "IORS";
   let phoneNumber: string | undefined;
   try {
     const { data: tenant } = await supabase
       .from("exo_tenants")
-      .select("assistant_name, phone_number")
+      .select("assistant_name, phone_number, iors_name")
       .eq("id", user.id)
       .single();
-    assistantName = tenant?.assistant_name || "IORS";
+    assistantName = tenant?.iors_name || tenant?.assistant_name || "IORS";
     phoneNumber = tenant?.phone_number || undefined;
   } catch (e: unknown) {
     console.error("[Dashboard] Failed to load tenant:", e);
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {/* Voice-first hero — takes priority, bigger */}
-      <VoiceHero
+    <div className="h-full overflow-auto">
+      <CanvasGrid
         tenantId={user.id}
         assistantName={assistantName}
         phoneNumber={phoneNumber}
       />
-
-      {/* Chat — fills remaining space */}
-      <div className="flex-1 min-h-0 px-4 pb-4">
-        <HomeChat tenantId={user.id} assistantName={assistantName} />
-      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Home, Brain, Settings } from "lucide-react";
+import { Home, MessageSquare, Package, Settings } from "lucide-react";
 
 export const metadata: Metadata = {
   title: {
@@ -17,10 +17,14 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { CollapsibleSidebar } from "@/components/dashboard/CollapsibleSidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
-// Voice-first: 3 tabs only
+// react-grid-layout CSS — loaded in globals.css via @import or inline here
+// Note: exports field doesn't expose CSS, so we'll add styles inline in the client component
+
+// Canvas-first: 4 tabs on mobile
 const MOBILE_TAB_ITEMS = [
   { href: "/dashboard", label: "Home", icon: Home },
-  { href: "/dashboard/memory", label: "Pamiec", icon: Brain },
+  { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
+  { href: "/dashboard/mods", label: "Mody", icon: Package },
   { href: "/dashboard/settings", label: "Ustawienia", icon: Settings },
 ];
 
@@ -38,17 +42,38 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  // Fetch IORS data for sidebar badge
+  let iorsName: string | undefined;
+  let birthCompleted: boolean | undefined;
+  try {
+    const { data: tenant } = await supabase
+      .from("exo_tenants")
+      .select("iors_name, iors_birth_completed")
+      .eq("id", user.id)
+      .single();
+    iorsName = tenant?.iors_name || undefined;
+    birthCompleted = tenant?.iors_birth_completed ?? undefined;
+  } catch {
+    // Tenant may not exist yet
+  }
+
   return (
     <div className="min-h-screen flex">
-      {/* Sidebar — simplified */}
-      <CollapsibleSidebar userEmail={user.email || ""} />
+      {/* Sidebar — with IORS badge */}
+      <CollapsibleSidebar
+        userEmail={user.email || ""}
+        iorsName={iorsName}
+        birthCompleted={birthCompleted}
+      />
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b bg-card">
           <div>
             <p className="text-base font-semibold">ExoSkull</p>
-            <p className="text-xs text-muted-foreground">Voice-First Life OS</p>
+            <p className="text-xs text-muted-foreground">
+              {iorsName || "Voice-First Life OS"}
+            </p>
           </div>
           <ThemeToggle />
         </header>
@@ -58,7 +83,7 @@ export default async function DashboardLayout({
           <ErrorBoundary>{children}</ErrorBoundary>
         </main>
 
-        {/* Mobile bottom tab bar — 3 tabs */}
+        {/* Mobile bottom tab bar — 4 tabs */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t flex items-center justify-around py-2 z-40">
           {MOBILE_TAB_ITEMS.map((item) => (
             <Link

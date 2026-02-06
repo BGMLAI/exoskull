@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Brain, Settings } from "lucide-react";
+import { Home, MessageSquare, Package, Brain, Settings } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 // ============================================================================
-// NAVIGATION CONFIG — Voice-First: 3 screens only
+// NAVIGATION CONFIG — Canvas-first: 5 screens
 // ============================================================================
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Home", icon: Home },
+  { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
+  { href: "/dashboard/mods", label: "Mody", icon: Package },
   { href: "/dashboard/memory", label: "Pamiec", icon: Brain },
   { href: "/dashboard/settings", label: "Ustawienia", icon: Settings },
 ];
@@ -21,9 +23,15 @@ const NAV_ITEMS = [
 
 interface CollapsibleSidebarProps {
   userEmail: string;
+  iorsName?: string;
+  birthCompleted?: boolean;
 }
 
-export function CollapsibleSidebar({ userEmail }: CollapsibleSidebarProps) {
+export function CollapsibleSidebar({
+  userEmail,
+  iorsName,
+  birthCompleted,
+}: CollapsibleSidebarProps) {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
@@ -41,6 +49,23 @@ export function CollapsibleSidebar({ userEmail }: CollapsibleSidebarProps) {
         </div>
         <ThemeToggle />
       </div>
+
+      {/* IORS Badge */}
+      {iorsName && (
+        <div className="px-6 py-3 border-b">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+              {iorsName[0]?.toUpperCase() || "I"}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium truncate">{iorsName}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {birthCompleted ? "Aktywny" : "W narodzinach..."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Navigation — flat list */}
       <nav className="flex-1 p-3 space-y-0.5">

@@ -30,6 +30,7 @@ export interface ToolDefinition {
 import { autonomyTools } from "./autonomy-tools";
 import { emergencyTools } from "./emergency-tools";
 import { personalityTools } from "./personality-tools";
+import { canvasTools } from "./canvas-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -38,6 +39,7 @@ export const IORS_EXTENSION_TOOLS: ToolDefinition[] = [
   ...autonomyTools,
   ...emergencyTools,
   ...personalityTools,
+  ...canvasTools,
 ];
 
 /**
