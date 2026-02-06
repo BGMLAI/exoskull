@@ -4,6 +4,38 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-06] Security Audit — Phase 1 Critical Fixes
+
+### Full Audit Summary
+
+- **76 findings** across 4 areas: Security (29), Code Quality (12), Architecture (17), Frontend (18)
+- **13 CRITICAL**, 22 HIGH, 25 MEDIUM, 16 LOW
+
+### What was done (Phase 1 — Security Critical)
+
+- **S1: IDOR fix** — Replaced spoofable `x-tenant-id` header with JWT verification (`verifyTenantAuth`) across 13 API route files (22 handlers). Created shared `lib/auth/verify-tenant.ts` supporting both cookie and Bearer token auth.
+- **S3: Sandbox escape** — Replaced `new Function()` with `vm.createContext()` + code validation (13 blocked patterns). Prevents prototype chain escapes and RCE.
+- **S4: Pulse auth** — Implemented JWT verification in POST handler (was TODO).
+- **S8: Gateway middleware** — Added `/api/gateway/` to `isPublicApi` list, unblocking Telegram/Discord/Slack/Signal/iMessage webhooks in production.
+- **Frontend cleanup** — Removed all `x-tenant-id` header usage from 7 client files.
+
+### Files changed (24 files)
+
+- `lib/auth/verify-tenant.ts` (NEW)
+- `lib/supabase/middleware.ts`, `lib/skills/sandbox/restricted-function.ts`
+- 13 API route files (skills, rigs, mods, meta, pulse)
+- 7 frontend files (dashboard pages + widgets)
+- `scripts/test-all-routes.ts`
+
+### Remaining (Phase 2-4)
+
+- Webhook signature verification for all messaging gateways
+- Ghost table references in Pulse, duplicate migration, missing indexes
+- Error boundaries, accessibility, component decomposition
+- Silent catch blocks, CRON boilerplate, god files
+
+---
+
 ## [2026-02-05] Autonomous Actions — run_automation + custom action registry
 
 ### Implemented
