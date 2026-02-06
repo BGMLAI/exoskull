@@ -194,7 +194,7 @@ async function runPulseForUser(
 
   // Get user's connected rigs
   const { data: connections } = await supabase
-    .from("rig_connections")
+    .from("exo_rig_connections")
     .select("rig_slug, status, last_sync_at")
     .eq("tenant_id", userId)
     .eq("status", "active");
@@ -263,9 +263,9 @@ async function runHealthCheck(
 
   // Query recent sleep data
   const { data: sleepData } = await supabase
-    .from("user_health_metrics")
+    .from("exo_health_metrics")
     .select("metric_type, value, recorded_at")
-    .eq("user_id", userId)
+    .eq("tenant_id", userId)
     .eq("metric_type", "sleep_duration")
     .gte(
       "recorded_at",
@@ -293,9 +293,9 @@ async function runHealthCheck(
 
   // Check HRV if available
   const { data: hrvData } = await supabase
-    .from("user_health_metrics")
+    .from("exo_health_metrics")
     .select("value")
-    .eq("user_id", userId)
+    .eq("tenant_id", userId)
     .eq("metric_type", "hrv")
     .gte(
       "recorded_at",

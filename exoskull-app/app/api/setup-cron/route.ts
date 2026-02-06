@@ -232,7 +232,13 @@ export async function POST(req: NextRequest) {
 /**
  * GET /api/setup-cron - Check setup status
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Require CRON_SECRET — same as POST handler
+  const authHeader = req.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const supabase = getSupabase();
 

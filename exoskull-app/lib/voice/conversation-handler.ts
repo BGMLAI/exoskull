@@ -1555,8 +1555,11 @@ async function buildDynamicContext(tenantId: string): Promise<string> {
     if (threadSummary && threadSummary !== "Brak historii rozmow.") {
       context += `- Historia rozmow: ${threadSummary}\n`;
     }
-  } catch {
-    // Non-blocking: context works without thread summary
+  } catch (err) {
+    console.warn(
+      "[ConversationHandler] Thread summary failed:",
+      err instanceof Error ? err.message : err,
+    );
   }
 
   // Active goals status
@@ -1580,8 +1583,11 @@ async function buildDynamicContext(tenantId: string): Promise<string> {
       }
       context += `Gdy user pyta o cele, użyj "check_goals". Gdy raportuje postęp, użyj "log_goal_progress".\n`;
     }
-  } catch {
-    // Non-blocking
+  } catch (err) {
+    console.warn(
+      "[ConversationHandler] Goal status fetch failed:",
+      err instanceof Error ? err.message : err,
+    );
   }
 
   // Pending skill suggestions (from Need Detector)
@@ -1596,8 +1602,11 @@ async function buildDynamicContext(tenantId: string): Promise<string> {
       context += `Gdy użytkownik się zgodzi, użyj narzędzia "accept_skill_suggestion" z ID sugestii.\n`;
       context += `Gdy odmówi, użyj "dismiss_skill_suggestion". NIE naciskaj - zaproponuj raz, naturalnie.\n`;
     }
-  } catch {
-    // Non-blocking
+  } catch (err) {
+    console.warn(
+      "[ConversationHandler] Skill suggestions fetch failed:",
+      err instanceof Error ? err.message : err,
+    );
   }
 
   return context;
