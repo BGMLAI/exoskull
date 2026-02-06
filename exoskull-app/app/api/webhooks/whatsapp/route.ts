@@ -23,6 +23,7 @@ import {
 } from "@/lib/channels/whatsapp/client";
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 import type { GatewayMessage } from "@/lib/gateway/types";
+import { verifyMetaSignature } from "@/lib/security/webhook-hmac";
 
 export const dynamic = "force-dynamic";
 
@@ -119,7 +120,23 @@ async function resolveWhatsAppClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const payload: WhatsAppWebhookPayload = await req.json();
+    // Read raw body for HMAC verification before JSON parsing
+    const rawBody = await req.text();
+
+    // Verify X-Hub-Signature-256 if META_APP_SECRET is configured
+    const appSecret = process.env.META_APP_SECRET;
+    if (appSecret) {
+      const signature = req.headers.get("x-hub-signature-256");
+      if (!verifyMetaSignature(rawBody, signature, appSecret)) {
+        console.error("[WhatsApp] HMAC signature verification failed");
+        return NextResponse.json(
+          { error: "Invalid signature" },
+          { status: 401 },
+        );
+      }
+    }
+
+    const payload: WhatsAppWebhookPayload = JSON.parse(rawBody);
 
     // Meta sends various webhook types - we only care about messages
     if (payload.object !== "whatsapp_business_account") {

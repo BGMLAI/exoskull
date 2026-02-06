@@ -18,6 +18,7 @@ import {
   type MessengerWebhookPayload,
 } from "@/lib/channels/messenger/client";
 import { aiChat } from "@/lib/ai";
+import { verifyMetaSignature } from "@/lib/security/webhook-hmac";
 
 export const dynamic = "force-dynamic";
 
@@ -112,7 +113,23 @@ async function resolveMessengerClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const payload: MessengerWebhookPayload = await req.json();
+    // Read raw body for HMAC verification before JSON parsing
+    const rawBody = await req.text();
+
+    // Verify X-Hub-Signature-256 if META_APP_SECRET is configured
+    const appSecret = process.env.META_APP_SECRET;
+    if (appSecret) {
+      const signature = req.headers.get("x-hub-signature-256");
+      if (!verifyMetaSignature(rawBody, signature, appSecret)) {
+        console.error("[Messenger] HMAC signature verification failed");
+        return NextResponse.json(
+          { error: "Invalid signature" },
+          { status: 401 },
+        );
+      }
+    }
+
+    const payload: MessengerWebhookPayload = JSON.parse(rawBody);
 
     // Only handle page events
     if (payload.object !== "page") {
