@@ -4,6 +4,53 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-09] feat: Sprint 2 — Canvas Widget System + Dashboard Simplification
+
+### What was done
+- **Canvas infrastructure**: `exo_canvas_widgets` table with grid positions, RLS, unique constraint per widget type
+- **6 API routes**: widgets CRUD (`GET/POST/PUT/DELETE`), batch layout save, health/tasks data endpoints, IORS profile
+- **react-grid-layout v2**: responsive drag-drop grid (4/4/2/1 cols at lg/md/sm/xs breakpoints)
+- **Widget registry**: 12 built-in widget types with metadata (defaultSize, minSize, icon, category)
+- **CanvasGrid component**: self-fetching wrappers for data widgets, debounced 500ms layout persistence, WidgetPicker dialog
+- **WidgetWrapper**: per-widget error boundary, drag handle (`.canvas-drag-handle`), remove button, loading skeleton
+- **IORSStatusWidget**: personality bars (5 axes), birth status, active permissions count, Tau emotion signal
+- **Canvas tool** (`manage_canvas`): IORS can add/remove/show/hide widgets via conversation
+- **Dashboard refactored**: VoiceHero+HomeChat replaced with CanvasGrid, VoiceHero now pinned widget
+- **Sidebar upgraded**: 5 nav items (Home, Chat, Mody, Pamiec, Ustawienia) + IORS avatar badge
+- **Mobile nav**: 4-tab bottom bar (Home, Chat, Mody, Ustawienia), single-column responsive grid
+- **Default seeding**: 6 widgets auto-created on first visit (voice_hero pinned, health, tasks, emotional, quick_actions, conversations)
+
+### Why
+Canvas-first dashboard replaces static layout. Users can drag, resize, add/remove widgets. IORS can propose widgets through conversation. Foundation for dynamic mod widgets.
+
+### Files created (16)
+- `supabase/migrations/20260209000001_canvas_widgets.sql`
+- `lib/canvas/{types,defaults,widget-registry}.ts`
+- `app/api/canvas/{widgets/route,widgets/[id]/route,widgets/batch/route,data/health/route,data/tasks/route,iors-profile/route}.ts`
+- `components/canvas/{CanvasGrid,WidgetWrapper,WidgetPicker,AddWidgetButton}.tsx`
+- `components/widgets/IORSStatusWidget.tsx`
+- `lib/iors/tools/canvas-tools.ts`
+
+### Files modified (7)
+- `app/dashboard/{page,layout}.tsx`, `components/dashboard/CollapsibleSidebar.tsx`
+- `lib/iors/tools/index.ts`, `app/globals.css`, `package.json`, `package-lock.json`
+
+### How to verify
+1. `cd exoskull-app && npm run build` — zero errors
+2. `/dashboard` loads canvas grid with VoiceHero pinned at top
+3. "+" button opens WidgetPicker, grays out already-added types
+4. Drag widget → position saved → refresh → position preserved
+5. IORSStatusWidget shows personality bars if IORS birth completed
+6. Demoted pages (`/dashboard/health`, `/dashboard/tasks`) still accessible via URL
+
+### Notes for future agents
+- react-grid-layout v2 API: `useContainerWidth` hook (NOT `WidthProvider`), `dragConfig.handle` (NOT `draggableHandle`), `verticalCompactor` (NOT `compactType`)
+- `Layout = readonly LayoutItem[]` in v2, not a single item type
+- CSS must be inlined in `globals.css` (v2 `exports` field doesn't expose CSS paths)
+- `CanvasLayout` interface mirrors `LayoutItem` shape for structural compatibility
+
+---
+
 ## [2026-02-06] fix: Security hardening — deployment readiness audit
 
 ### What was done
