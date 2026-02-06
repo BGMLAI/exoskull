@@ -1,20 +1,29 @@
-'use client'
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import { Op, OP_STATUS_LABELS, Loop } from '@/lib/types/knowledge'
-import { Calendar, CheckCircle2, Circle, Clock, MoreHorizontal, Repeat, Tag, Zap } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Op, OP_STATUS_LABELS, Loop } from "@/lib/types/knowledge";
+import {
+  Calendar,
+  CheckCircle2,
+  Circle,
+  Clock,
+  MoreHorizontal,
+  Repeat,
+  Tag,
+  Zap,
+} from "lucide-react";
 
 interface OpCardProps {
-  op: Op
-  loop?: Loop
-  isSelected?: boolean
-  onClick?: () => void
-  onEdit?: () => void
-  onToggleStatus?: () => void
-  className?: string
+  op: Op;
+  loop?: Loop;
+  isSelected?: boolean;
+  onClick?: () => void;
+  onEdit?: () => void;
+  onToggleStatus?: () => void;
+  className?: string;
 }
 
 export function OpCard({
@@ -26,20 +35,26 @@ export function OpCard({
   onToggleStatus,
   className,
 }: OpCardProps) {
-  const statusInfo = OP_STATUS_LABELS[op.status]
-  const isCompleted = op.status === 'completed'
-  const isOverdue = op.due_date && new Date(op.due_date) < new Date() && !isCompleted
+  const statusInfo = OP_STATUS_LABELS[op.status];
+  const isCompleted = op.status === "completed";
+  const isOverdue =
+    op.due_date && new Date(op.due_date) < new Date() && !isCompleted;
 
-  const priorityColor = op.priority >= 8 ? 'text-red-500' : op.priority >= 5 ? 'text-yellow-500' : 'text-muted-foreground'
+  const priorityColor =
+    op.priority >= 8
+      ? "text-red-500"
+      : op.priority >= 5
+        ? "text-yellow-500"
+        : "text-muted-foreground";
 
   return (
     <Card
       className={cn(
-        'cursor-pointer transition-all hover:shadow-md hover:border-primary/50',
-        isSelected && 'border-primary ring-2 ring-primary/20',
-        isOverdue && 'border-destructive/50',
-        isCompleted && 'opacity-60',
-        className
+        "cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
+        isSelected && "border-primary ring-2 ring-primary/20",
+        isOverdue && "border-destructive/50",
+        isCompleted && "opacity-60",
+        className,
       )}
       onClick={onClick}
     >
@@ -50,8 +65,8 @@ export function OpCard({
             {onToggleStatus && (
               <button
                 onClick={(e) => {
-                  e.stopPropagation()
-                  onToggleStatus()
+                  e.stopPropagation();
+                  onToggleStatus();
                 }}
                 className="flex-shrink-0 hover:scale-110 transition-transform"
               >
@@ -62,16 +77,20 @@ export function OpCard({
                 )}
               </button>
             )}
-            <CardTitle className={cn(
-              'text-base font-semibold flex items-center gap-2 truncate',
-              isCompleted && 'line-through text-muted-foreground'
-            )}>
-              {loop && <span className="text-lg flex-shrink-0">{loop.icon}</span>}
+            <CardTitle
+              className={cn(
+                "text-base font-semibold flex items-center gap-2 truncate",
+                isCompleted && "line-through text-muted-foreground",
+              )}
+            >
+              {loop && (
+                <span className="text-lg flex-shrink-0">{loop.icon}</span>
+              )}
               <span className="truncate">{op.title}</span>
             </CardTitle>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <Badge className={cn('text-xs text-white', statusInfo.color)}>
+            <Badge className={cn("text-xs text-white", statusInfo.color)}>
               {statusInfo.label}
             </Badge>
             {onEdit && (
@@ -80,9 +99,10 @@ export function OpCard({
                 size="icon"
                 className="h-6 w-6"
                 onClick={(e) => {
-                  e.stopPropagation()
-                  onEdit()
+                  e.stopPropagation();
+                  onEdit();
                 }}
+                aria-label="Edytuj op"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
@@ -117,7 +137,7 @@ export function OpCard({
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-3">
             {/* Priority */}
-            <div className={cn('flex items-center gap-1', priorityColor)}>
+            <div className={cn("flex items-center gap-1", priorityColor)}>
               <Zap className="h-3 w-3" />
               <span>P{op.priority}</span>
             </div>
@@ -132,19 +152,22 @@ export function OpCard({
 
             {/* Due date */}
             {op.due_date && (
-              <div className={cn('flex items-center gap-1', isOverdue && 'text-destructive')}>
+              <div
+                className={cn(
+                  "flex items-center gap-1",
+                  isOverdue && "text-destructive",
+                )}
+              >
                 <Calendar className="h-3 w-3" />
-                <span>{new Date(op.due_date).toLocaleDateString('pl-PL')}</span>
+                <span>{new Date(op.due_date).toLocaleDateString("pl-PL")}</span>
               </div>
             )}
           </div>
 
           {/* Recurring indicator */}
-          {op.is_recurring && (
-            <Repeat className="h-4 w-4 text-blue-500" />
-          )}
+          {op.is_recurring && <Repeat className="h-4 w-4 text-blue-500" />}
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

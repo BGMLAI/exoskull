@@ -1,19 +1,25 @@
-'use client'
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import { Quest, QUEST_STATUS_LABELS, Loop } from '@/lib/types/knowledge'
-import { Calendar, CheckSquare, ChevronRight, MoreHorizontal, Tag } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Quest, QUEST_STATUS_LABELS, Loop } from "@/lib/types/knowledge";
+import {
+  Calendar,
+  CheckSquare,
+  ChevronRight,
+  MoreHorizontal,
+  Tag,
+} from "lucide-react";
 
 interface QuestCardProps {
-  quest: Quest
-  loop?: Loop
-  isSelected?: boolean
-  onClick?: () => void
-  onEdit?: () => void
-  className?: string
+  quest: Quest;
+  loop?: Loop;
+  isSelected?: boolean;
+  onClick?: () => void;
+  onEdit?: () => void;
+  className?: string;
 }
 
 export function QuestCard({
@@ -24,20 +30,24 @@ export function QuestCard({
   onEdit,
   className,
 }: QuestCardProps) {
-  const statusInfo = QUEST_STATUS_LABELS[quest.status]
-  const progress = quest.target_ops && quest.target_ops > 0
-    ? Math.round((quest.completed_ops / quest.target_ops) * 100)
-    : null
+  const statusInfo = QUEST_STATUS_LABELS[quest.status];
+  const progress =
+    quest.target_ops && quest.target_ops > 0
+      ? Math.round((quest.completed_ops / quest.target_ops) * 100)
+      : null;
 
-  const isOverdue = quest.deadline && new Date(quest.deadline) < new Date() && quest.status !== 'completed'
+  const isOverdue =
+    quest.deadline &&
+    new Date(quest.deadline) < new Date() &&
+    quest.status !== "completed";
 
   return (
     <Card
       className={cn(
-        'cursor-pointer transition-all hover:shadow-md hover:border-primary/50',
-        isSelected && 'border-primary ring-2 ring-primary/20',
-        isOverdue && 'border-destructive/50',
-        className
+        "cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
+        isSelected && "border-primary ring-2 ring-primary/20",
+        isOverdue && "border-destructive/50",
+        className,
       )}
       onClick={onClick}
     >
@@ -48,7 +58,7 @@ export function QuestCard({
             {quest.title}
           </CardTitle>
           <div className="flex items-center gap-1">
-            <Badge className={cn('text-xs text-white', statusInfo.color)}>
+            <Badge className={cn("text-xs text-white", statusInfo.color)}>
               {statusInfo.label}
             </Badge>
             {onEdit && (
@@ -57,9 +67,10 @@ export function QuestCard({
                 size="icon"
                 className="h-6 w-6"
                 onClick={(e) => {
-                  e.stopPropagation()
-                  onEdit()
+                  e.stopPropagation();
+                  onEdit();
                 }}
+                aria-label="Edytuj quest"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
@@ -111,12 +122,22 @@ export function QuestCard({
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
               <CheckSquare className="h-3 w-3" />
-              <span>{quest.completed_ops}{quest.target_ops ? `/${quest.target_ops}` : ''} ops</span>
+              <span>
+                {quest.completed_ops}
+                {quest.target_ops ? `/${quest.target_ops}` : ""} ops
+              </span>
             </div>
             {quest.deadline && (
-              <div className={cn('flex items-center gap-1', isOverdue && 'text-destructive')}>
+              <div
+                className={cn(
+                  "flex items-center gap-1",
+                  isOverdue && "text-destructive",
+                )}
+              >
                 <Calendar className="h-3 w-3" />
-                <span>{new Date(quest.deadline).toLocaleDateString('pl-PL')}</span>
+                <span>
+                  {new Date(quest.deadline).toLocaleDateString("pl-PL")}
+                </span>
               </div>
             )}
           </div>
@@ -124,5 +145,5 @@ export function QuestCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

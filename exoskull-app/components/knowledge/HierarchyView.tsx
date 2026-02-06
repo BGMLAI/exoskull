@@ -1,43 +1,43 @@
-'use client'
+"use client";
 
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { LoopCard } from './LoopCard'
-import { CampaignCard } from './CampaignCard'
-import { QuestCard } from './QuestCard'
-import { OpCard } from './OpCard'
-import { Loop, Campaign, Quest, Op } from '@/lib/types/knowledge'
-import { Plus, ChevronLeft } from 'lucide-react'
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { LoopCard } from "./LoopCard";
+import { CampaignCard } from "./CampaignCard";
+import { QuestCard } from "./QuestCard";
+import { OpCard } from "./OpCard";
+import { Loop, Campaign, Quest, Op } from "@/lib/types/knowledge";
+import { Plus, ChevronLeft } from "lucide-react";
 
 interface HierarchyViewProps {
   // Data
-  loops: Loop[]
-  campaigns: Campaign[]
-  quests: Quest[]
-  ops: Op[]
+  loops: Loop[];
+  campaigns: Campaign[];
+  quests: Quest[];
+  ops: Op[];
   // Loading states
-  loopsLoading: boolean
-  campaignsLoading: boolean
-  questsLoading: boolean
-  opsLoading: boolean
+  loopsLoading: boolean;
+  campaignsLoading: boolean;
+  questsLoading: boolean;
+  opsLoading: boolean;
   // Selection
-  selectedLoop: Loop | null
-  selectedCampaign: Campaign | null
-  selectedQuest: Quest | null
+  selectedLoop: Loop | null;
+  selectedCampaign: Campaign | null;
+  selectedQuest: Quest | null;
   // Handlers
-  onSelectLoop: (loop: Loop | null) => void
-  onSelectCampaign: (campaign: Campaign | null) => void
-  onSelectQuest: (quest: Quest | null) => void
-  onEditLoop: (loop: Loop) => void
-  onEditCampaign: (campaign: Campaign) => void
-  onEditQuest: (quest: Quest) => void
-  onEditOp: (op: Op) => void
-  onToggleOpStatus: (op: Op) => void
-  onAddLoop: () => void
-  onAddCampaign: () => void
-  onAddQuest: () => void
-  onAddOp: () => void
+  onSelectLoop: (loop: Loop | null) => void;
+  onSelectCampaign: (campaign: Campaign | null) => void;
+  onSelectQuest: (quest: Quest | null) => void;
+  onEditLoop: (loop: Loop) => void;
+  onEditCampaign: (campaign: Campaign) => void;
+  onEditQuest: (quest: Quest) => void;
+  onEditOp: (op: Op) => void;
+  onToggleOpStatus: (op: Op) => void;
+  onAddLoop: () => void;
+  onAddCampaign: () => void;
+  onAddQuest: () => void;
+  onAddOp: () => void;
 }
 
 function ColumnSkeleton() {
@@ -47,10 +47,16 @@ function ColumnSkeleton() {
       <Skeleton className="h-24 w-full" />
       <Skeleton className="h-24 w-full" />
     </div>
-  )
+  );
 }
 
-function EmptyState({ message, onAdd }: { message: string; onAdd: () => void }) {
+function EmptyState({
+  message,
+  onAdd,
+}: {
+  message: string;
+  onAdd: () => void;
+}) {
   return (
     <div className="flex flex-col items-center justify-center py-8 text-center">
       <p className="text-sm text-muted-foreground mb-4">{message}</p>
@@ -59,7 +65,7 @@ function EmptyState({ message, onAdd }: { message: string; onAdd: () => void }) 
         Dodaj
       </Button>
     </div>
-  )
+  );
 }
 
 export function HierarchyView({
@@ -94,7 +100,13 @@ export function HierarchyView({
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium">Loopy</CardTitle>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onAddLoop}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={onAddLoop}
+              aria-label="Dodaj loop"
+            >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
@@ -110,7 +122,9 @@ export function HierarchyView({
                 key={loop.id}
                 loop={loop}
                 isSelected={selectedLoop?.id === loop.id}
-                onClick={() => onSelectLoop(selectedLoop?.id === loop.id ? null : loop)}
+                onClick={() =>
+                  onSelectLoop(selectedLoop?.id === loop.id ? null : loop)
+                }
                 onEdit={() => onEditLoop(loop)}
               />
             ))
@@ -129,15 +143,23 @@ export function HierarchyView({
                   size="icon"
                   className="h-6 w-6"
                   onClick={() => onSelectLoop(null)}
+                  aria-label="Wroc"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
               )}
               <CardTitle className="text-sm font-medium">
-                Kampanie {selectedLoop && `(${selectedLoop.icon} ${selectedLoop.name})`}
+                Kampanie{" "}
+                {selectedLoop && `(${selectedLoop.icon} ${selectedLoop.name})`}
               </CardTitle>
             </div>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onAddCampaign}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={onAddCampaign}
+              aria-label="Dodaj kampanie"
+            >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
@@ -147,7 +169,11 @@ export function HierarchyView({
             <ColumnSkeleton />
           ) : campaigns.length === 0 ? (
             <EmptyState
-              message={selectedLoop ? 'Brak kampanii w tym loopie' : 'Wybierz loop lub dodaj kampanie'}
+              message={
+                selectedLoop
+                  ? "Brak kampanii w tym loopie"
+                  : "Wybierz loop lub dodaj kampanie"
+              }
               onAdd={onAddCampaign}
             />
           ) : (
@@ -157,7 +183,11 @@ export function HierarchyView({
                 campaign={campaign}
                 loop={loops.find((l) => l.slug === campaign.loop_slug)}
                 isSelected={selectedCampaign?.id === campaign.id}
-                onClick={() => onSelectCampaign(selectedCampaign?.id === campaign.id ? null : campaign)}
+                onClick={() =>
+                  onSelectCampaign(
+                    selectedCampaign?.id === campaign.id ? null : campaign,
+                  )
+                }
                 onEdit={() => onEditCampaign(campaign)}
               />
             ))
@@ -176,15 +206,24 @@ export function HierarchyView({
                   size="icon"
                   className="h-6 w-6"
                   onClick={() => onSelectCampaign(null)}
+                  aria-label="Wroc"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
               )}
               <CardTitle className="text-sm font-medium">
-                Questy {selectedCampaign && `(${selectedCampaign.title.slice(0, 15)}...)`}
+                Questy{" "}
+                {selectedCampaign &&
+                  `(${selectedCampaign.title.slice(0, 15)}...)`}
               </CardTitle>
             </div>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onAddQuest}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={onAddQuest}
+              aria-label="Dodaj quest"
+            >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
@@ -194,7 +233,11 @@ export function HierarchyView({
             <ColumnSkeleton />
           ) : quests.length === 0 ? (
             <EmptyState
-              message={selectedCampaign ? 'Brak questow w tej kampanii' : 'Wybierz kampanie lub dodaj quest'}
+              message={
+                selectedCampaign
+                  ? "Brak questow w tej kampanii"
+                  : "Wybierz kampanie lub dodaj quest"
+              }
               onAdd={onAddQuest}
             />
           ) : (
@@ -204,7 +247,9 @@ export function HierarchyView({
                 quest={quest}
                 loop={loops.find((l) => l.slug === quest.loop_slug)}
                 isSelected={selectedQuest?.id === quest.id}
-                onClick={() => onSelectQuest(selectedQuest?.id === quest.id ? null : quest)}
+                onClick={() =>
+                  onSelectQuest(selectedQuest?.id === quest.id ? null : quest)
+                }
                 onEdit={() => onEditQuest(quest)}
               />
             ))
@@ -223,15 +268,23 @@ export function HierarchyView({
                   size="icon"
                   className="h-6 w-6"
                   onClick={() => onSelectQuest(null)}
+                  aria-label="Wroc"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
               )}
               <CardTitle className="text-sm font-medium">
-                Opy {selectedQuest && `(${selectedQuest.title.slice(0, 15)}...)`}
+                Opy{" "}
+                {selectedQuest && `(${selectedQuest.title.slice(0, 15)}...)`}
               </CardTitle>
             </div>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onAddOp}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={onAddOp}
+              aria-label="Dodaj op"
+            >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
@@ -241,7 +294,11 @@ export function HierarchyView({
             <ColumnSkeleton />
           ) : ops.length === 0 ? (
             <EmptyState
-              message={selectedQuest ? 'Brak opow w tym quescie' : 'Wybierz quest lub dodaj op'}
+              message={
+                selectedQuest
+                  ? "Brak opow w tym quescie"
+                  : "Wybierz quest lub dodaj op"
+              }
               onAdd={onAddOp}
             />
           ) : (
@@ -258,5 +315,5 @@ export function HierarchyView({
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

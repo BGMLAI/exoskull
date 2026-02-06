@@ -1,8 +1,10 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { VoiceHero } from "@/components/dashboard/VoiceHero";
 import { HomeChat } from "@/components/dashboard/HomeChat";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Home" };
 
 export default async function DashboardPage() {
   const supabase = await createClient();

@@ -1,18 +1,24 @@
-'use client'
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import { Note, NOTE_TYPE_LABELS } from '@/lib/types/knowledge'
-import { BookOpen, Calendar, FlaskConical, MoreHorizontal, Tag } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Note, NOTE_TYPE_LABELS } from "@/lib/types/knowledge";
+import {
+  BookOpen,
+  Calendar,
+  FlaskConical,
+  MoreHorizontal,
+  Tag,
+} from "lucide-react";
 
 interface NoteCardProps {
-  note: Note
-  isSelected?: boolean
-  onClick?: () => void
-  onEdit?: () => void
-  className?: string
+  note: Note;
+  isSelected?: boolean;
+  onClick?: () => void;
+  onEdit?: () => void;
+  className?: string;
 }
 
 export function NoteCard({
@@ -22,14 +28,14 @@ export function NoteCard({
   onEdit,
   className,
 }: NoteCardProps) {
-  const typeInfo = NOTE_TYPE_LABELS[note.type]
+  const typeInfo = NOTE_TYPE_LABELS[note.type];
 
   return (
     <Card
       className={cn(
-        'cursor-pointer transition-all hover:shadow-md hover:border-primary/50',
-        isSelected && 'border-primary ring-2 ring-primary/20',
-        className
+        "cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
+        isSelected && "border-primary ring-2 ring-primary/20",
+        className,
       )}
       onClick={onClick}
     >
@@ -38,7 +44,7 @@ export function NoteCard({
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <span className="text-xl flex-shrink-0">{typeInfo.icon}</span>
             <CardTitle className="text-base font-semibold truncate">
-              {note.title || 'Bez tytulu'}
+              {note.title || "Bez tytulu"}
             </CardTitle>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -51,9 +57,10 @@ export function NoteCard({
                 size="icon"
                 className="h-6 w-6"
                 onClick={(e) => {
-                  e.stopPropagation()
-                  onEdit()
+                  e.stopPropagation();
+                  onEdit();
                 }}
+                aria-label="Edytuj notatke"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
@@ -108,7 +115,11 @@ export function NoteCard({
         {note.ai_tags && note.ai_tags.length > 0 && !note.tags?.length && (
           <div className="flex flex-wrap gap-1 mb-3">
             {note.ai_tags.slice(0, 3).map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs opacity-70">
+              <Badge
+                key={tag}
+                variant="secondary"
+                className="text-xs opacity-70"
+              >
                 {tag}
               </Badge>
             ))}
@@ -118,7 +129,9 @@ export function NoteCard({
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
-            <span>{new Date(note.captured_at).toLocaleDateString('pl-PL')}</span>
+            <span>
+              {new Date(note.captured_at).toLocaleDateString("pl-PL")}
+            </span>
           </div>
           {note.ai_category && (
             <Badge variant="secondary" className="text-xs opacity-70">
@@ -128,5 +141,5 @@ export function NoteCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import {
   Card,
@@ -30,6 +31,7 @@ import {
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Zdrowie" };
 
 interface HealthMetric {
   metric_type: string;

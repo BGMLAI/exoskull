@@ -1,9 +1,17 @@
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Home, Brain, Settings } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: {
+    template: "%s | ExoSkull",
+    default: "Dashboard | ExoSkull",
+  },
+};
 
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { CollapsibleSidebar } from "@/components/dashboard/CollapsibleSidebar";

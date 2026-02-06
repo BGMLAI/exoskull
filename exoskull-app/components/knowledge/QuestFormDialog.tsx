@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,29 +8,30 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Quest, CreateQuestInput, Loop, Campaign } from '@/lib/types/knowledge'
+} from "@/components/ui/select";
+import { Quest, CreateQuestInput, Loop, Campaign } from "@/lib/types/knowledge";
+import { toast } from "sonner";
 
 interface QuestFormDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  quest?: Quest // undefined = create mode
-  loops: Loop[]
-  campaigns: Campaign[]
-  defaultCampaignId?: string
-  defaultLoopSlug?: string
-  onSave: (input: CreateQuestInput) => Promise<void>
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  quest?: Quest; // undefined = create mode
+  loops: Loop[];
+  campaigns: Campaign[];
+  defaultCampaignId?: string;
+  defaultLoopSlug?: string;
+  onSave: (input: CreateQuestInput) => Promise<void>;
 }
 
 export function QuestFormDialog({
@@ -43,46 +44,46 @@ export function QuestFormDialog({
   defaultLoopSlug,
   onSave,
 }: QuestFormDialogProps) {
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [campaignId, setCampaignId] = useState('')
-  const [loopSlug, setLoopSlug] = useState('')
-  const [targetOps, setTargetOps] = useState<number | undefined>(undefined)
-  const [deadline, setDeadline] = useState('')
-  const [tagsInput, setTagsInput] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [campaignId, setCampaignId] = useState("");
+  const [loopSlug, setLoopSlug] = useState("");
+  const [targetOps, setTargetOps] = useState<number | undefined>(undefined);
+  const [deadline, setDeadline] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
+  const [saving, setSaving] = useState(false);
 
   // Populate form when editing or reset for create
   useEffect(() => {
     if (quest) {
-      setTitle(quest.title)
-      setDescription(quest.description || '')
-      setCampaignId(quest.campaign_id || '')
-      setLoopSlug(quest.loop_slug || '')
-      setTargetOps(quest.target_ops || undefined)
-      setDeadline(quest.deadline?.split('T')[0] || '')
-      setTagsInput(quest.tags?.join(', ') || '')
+      setTitle(quest.title);
+      setDescription(quest.description || "");
+      setCampaignId(quest.campaign_id || "");
+      setLoopSlug(quest.loop_slug || "");
+      setTargetOps(quest.target_ops || undefined);
+      setDeadline(quest.deadline?.split("T")[0] || "");
+      setTagsInput(quest.tags?.join(", ") || "");
     } else {
-      setTitle('')
-      setDescription('')
-      setCampaignId(defaultCampaignId || '')
-      setLoopSlug(defaultLoopSlug || '')
-      setTargetOps(undefined)
-      setDeadline('')
-      setTagsInput('')
+      setTitle("");
+      setDescription("");
+      setCampaignId(defaultCampaignId || "");
+      setLoopSlug(defaultLoopSlug || "");
+      setTargetOps(undefined);
+      setDeadline("");
+      setTagsInput("");
     }
-  }, [quest, defaultCampaignId, defaultLoopSlug, open])
+  }, [quest, defaultCampaignId, defaultLoopSlug, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!title.trim()) return
+    e.preventDefault();
+    if (!title.trim()) return;
 
     const tags = tagsInput
-      .split(',')
+      .split(",")
       .map((t) => t.trim())
-      .filter((t) => t.length > 0)
+      .filter((t) => t.length > 0);
 
-    setSaving(true)
+    setSaving(true);
     try {
       await onSave({
         title: title.trim(),
@@ -92,21 +93,21 @@ export function QuestFormDialog({
         targetOps: targetOps || undefined,
         deadline: deadline || undefined,
         tags: tags.length > 0 ? tags : undefined,
-      })
-      onOpenChange(false)
+      });
+      onOpenChange(false);
     } catch (err) {
-      console.error('[QuestFormDialog] Save error:', err)
-      alert(err instanceof Error ? err.message : 'Blad zapisu')
+      console.error("[QuestFormDialog] Save error:", err);
+      toast.error(err instanceof Error ? err.message : "Blad zapisu");
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{quest ? 'Edytuj Quest' : 'Nowy Quest'}</DialogTitle>
+          <DialogTitle>{quest ? "Edytuj Quest" : "Nowy Quest"}</DialogTitle>
           <DialogDescription>
             Quest to projekt skladajacy sie z konkretnych zadan (Ops)
           </DialogDescription>
@@ -181,8 +182,12 @@ export function QuestFormDialog({
                   id="targetOps"
                   type="number"
                   min={1}
-                  value={targetOps || ''}
-                  onChange={(e) => setTargetOps(e.target.value ? Number(e.target.value) : undefined)}
+                  value={targetOps || ""}
+                  onChange={(e) =>
+                    setTargetOps(
+                      e.target.value ? Number(e.target.value) : undefined,
+                    )
+                  }
                   placeholder="np. 10"
                 />
               </div>
@@ -210,15 +215,19 @@ export function QuestFormDialog({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Anuluj
             </Button>
             <Button type="submit" disabled={saving || !title.trim()}>
-              {saving ? 'Zapisywanie...' : quest ? 'Zapisz' : 'Utworz'}
+              {saving ? "Zapisywanie..." : quest ? "Zapisz" : "Utworz"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
