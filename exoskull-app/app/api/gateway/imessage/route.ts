@@ -20,21 +20,22 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    // Verify BlueBubbles password (from query param or header)
+    // Verify BlueBubbles password (mandatory)
     const expectedPassword = process.env.BLUEBUBBLES_PASSWORD;
-    if (expectedPassword) {
-      const queryPassword = req.nextUrl.searchParams.get("password");
-      const headerPassword = req.headers
-        .get("authorization")
-        ?.replace("Bearer ", "");
-
-      if (
-        queryPassword !== expectedPassword &&
-        headerPassword !== expectedPassword
-      ) {
-        console.error("[iMessage Route] Invalid password");
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+    if (!expectedPassword) {
+      console.error("[iMessage Route] BLUEBUBBLES_PASSWORD not configured");
+      return NextResponse.json({ error: "Not configured" }, { status: 500 });
+    }
+    const queryPassword = req.nextUrl.searchParams.get("password");
+    const headerPassword = req.headers
+      .get("authorization")
+      ?.replace("Bearer ", "");
+    if (
+      queryPassword !== expectedPassword &&
+      headerPassword !== expectedPassword
+    ) {
+      console.error("[iMessage Route] Invalid password");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const payload = await req.json();

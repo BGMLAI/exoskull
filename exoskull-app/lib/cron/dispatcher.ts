@@ -100,7 +100,7 @@ export interface DispatchResult {
 // Twilio Configuration
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || "+48732143210";
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER!;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 /**

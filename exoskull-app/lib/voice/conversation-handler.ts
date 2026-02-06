@@ -52,7 +52,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
 
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID!;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN!;
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || "+48732144112";
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER!;
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
@@ -1683,7 +1683,15 @@ export async function processUserMessage(
           crisis.severity!,
         ),
       )
-      .catch(() => {});
+      .catch((err) => {
+        console.error(
+          "[ConversationHandler] Crisis follow-up scheduling failed:",
+          {
+            error: err instanceof Error ? err.message : String(err),
+            tenantId: session.tenantId,
+          },
+        );
+      });
   } else {
     // Normal: emotion-adaptive prompt
     const adaptive = getAdaptivePrompt(emotionState);
@@ -1695,7 +1703,12 @@ export async function processUserMessage(
     logEmotion(session.tenantId, emotionState, userMessage, {
       sessionId: session.id,
       personalityAdaptedTo: adaptive.mode,
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error("[ConversationHandler] Emotion logging failed:", {
+        error: err instanceof Error ? err.message : String(err),
+        tenantId: session.tenantId,
+      });
+    });
 
     // Phase 2: background voice prosody enrichment (non-blocking)
     if (options?.recordingUrl) {
@@ -1705,7 +1718,15 @@ export async function processUserMessage(
         userMessage,
         options.recordingUrl,
         adaptive.mode,
-      ).catch(() => {});
+      ).catch((err) => {
+        console.error(
+          "[ConversationHandler] Voice prosody enrichment failed:",
+          {
+            error: err instanceof Error ? err.message : String(err),
+            tenantId: session.tenantId,
+          },
+        );
+      });
     }
   }
 

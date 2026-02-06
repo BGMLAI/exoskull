@@ -289,7 +289,12 @@ export async function handleInboundMessage(
           {
             headers: { "x-cron-secret": process.env.CRON_SECRET },
           },
-        ).catch(() => {});
+        ).catch((err) => {
+          console.warn(
+            "[Gateway] CRON wakeup failed:",
+            err instanceof Error ? err.message : String(err),
+          );
+        });
       }
 
       return {
@@ -335,7 +340,12 @@ export async function handleInboundMessage(
           {
             headers: { "x-cron-secret": process.env.CRON_SECRET },
           },
-        ).catch(() => {});
+        ).catch((err) => {
+          console.warn(
+            "[Gateway] CRON wakeup failed:",
+            err instanceof Error ? err.message : String(err),
+          );
+        });
       }
 
       return {

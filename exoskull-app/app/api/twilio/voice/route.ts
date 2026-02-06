@@ -91,13 +91,24 @@ export async function POST(req: NextRequest) {
       // For outbound CRON calls, tenant_id comes as query param
       const queryTenantId = url.searchParams.get("tenant_id");
       const jobType = url.searchParams.get("job_type");
+      const cronSecret = url.searchParams.get("cron_secret");
 
       console.log("[Twilio Voice] New call:", { from, queryTenantId, jobType });
 
-      // Resolve tenant: use query param (outbound) or lookup by phone (inbound)
+      // Resolve tenant: use query param (outbound, CRON-verified) or lookup by phone (inbound)
       let tenantId: string;
       if (queryTenantId) {
-        tenantId = queryTenantId;
+        // Only allow tenant_id override from verified CRON calls
+        const validCronSecret = process.env.CRON_SECRET;
+        if (!validCronSecret || cronSecret !== validCronSecret) {
+          console.error(
+            "[Twilio Voice] Rejected tenant_id override — invalid cron_secret",
+          );
+          const tenant = await findTenantByPhone(from);
+          tenantId = tenant?.id || "anonymous";
+        } else {
+          tenantId = queryTenantId;
+        }
       } else {
         const tenant = await findTenantByPhone(from);
         tenantId = tenant?.id || "anonymous";

@@ -18,8 +18,19 @@ import { handleInboundMessage } from "@/lib/gateway/gateway";
 export const dynamic = "force-dynamic";
 
 // Track processed events to prevent duplicates (Slack retries aggressively)
-const processedEvents = new Set<string>();
+// Uses a Map with timestamps for automatic cleanup to prevent memory leaks
+const processedEvents = new Map<string, number>();
 const DEDUP_WINDOW_MS = 60_000; // 1 minute
+const MAX_DEDUP_ENTRIES = 1000; // Safety cap to prevent memory exhaustion
+
+function cleanupDedupCache(): void {
+  const now = Date.now();
+  for (const [key, timestamp] of processedEvents) {
+    if (now - timestamp > DEDUP_WINDOW_MS) {
+      processedEvents.delete(key);
+    }
+  }
+}
 
 // =====================================================
 // POST - INCOMING SLACK EVENTS
@@ -53,9 +64,11 @@ export async function POST(req: NextRequest) {
       if (processedEvents.has(eventId)) {
         return NextResponse.json({ ok: true });
       }
-      processedEvents.add(eventId);
-      // Clean up old entries
-      setTimeout(() => processedEvents.delete(eventId), DEDUP_WINDOW_MS);
+      // Cleanup stale entries before adding new ones
+      if (processedEvents.size >= MAX_DEDUP_ENTRIES) {
+        cleanupDedupCache();
+      }
+      processedEvents.set(eventId, Date.now());
     }
 
     // Parse into GatewayMessage

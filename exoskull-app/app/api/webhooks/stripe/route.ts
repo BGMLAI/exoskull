@@ -27,20 +27,25 @@ export async function POST(req: NextRequest) {
   const body = await req.text();
   const signature = req.headers.get("stripe-signature");
 
-  // Verify webhook signature if STRIPE_WEBHOOK_SECRET is set
+  // Verify webhook signature — MANDATORY
   let event: any;
   try {
-    if (process.env.STRIPE_WEBHOOK_SECRET && signature) {
-      // Dynamic import to avoid bundling issues if stripe is not installed
-      const stripe = await getStripe();
-      event = stripe.webhooks.constructEvent(
-        body,
-        signature,
-        process.env.STRIPE_WEBHOOK_SECRET,
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error(
+        "[StripeWebhook] CRITICAL: STRIPE_WEBHOOK_SECRET not configured",
       );
-    } else {
-      event = JSON.parse(body);
+      return NextResponse.json(
+        { error: "Webhook not configured" },
+        { status: 500 },
+      );
     }
+    if (!signature) {
+      console.error("[StripeWebhook] Missing stripe-signature header");
+      return NextResponse.json({ error: "Missing signature" }, { status: 400 });
+    }
+    const stripe = await getStripe();
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (error) {
     console.error("[StripeWebhook] Signature verification failed:", {
       error: error instanceof Error ? error.message : String(error),
@@ -207,7 +212,6 @@ export async function POST(req: NextRequest) {
     console.error("[StripeWebhook] Processing error:", {
       error: error instanceof Error ? error.message : String(error),
       eventType: event?.type,
-      stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
       { error: "Webhook processing failed" },

@@ -9,6 +9,7 @@ import { processDunning } from "@/lib/business/dunning";
 import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 export async function GET(req: NextRequest) {
   if (!verifyCronAuth(req)) {

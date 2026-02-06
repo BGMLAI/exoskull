@@ -135,7 +135,7 @@ async function sendViaImessage(address: string, text: string): Promise<void> {
 async function sendViaSms(phone: string, text: string): Promise<void> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID!;
   const authToken = process.env.TWILIO_AUTH_TOKEN!;
-  const fromNumber = process.env.TWILIO_PHONE_NUMBER || "+48732143210";
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER!;
 
   const response = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,

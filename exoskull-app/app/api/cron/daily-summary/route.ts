@@ -19,7 +19,7 @@ import {
 } from "@/lib/memory/daily-summary";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60; // Allow 60 seconds for processing all tenants
+export const maxDuration = 120; // Pro tier: 120s for processing all tenants
 
 // Admin client
 function getAdminClient() {
@@ -38,7 +38,7 @@ function getAdminClient() {
 // Twilio config
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || "+48732143210";
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER!;
 
 /**
  * Send SMS with daily summary

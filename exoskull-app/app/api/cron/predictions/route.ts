@@ -16,6 +16,7 @@ import {
 } from "@/lib/predictions/prediction-engine";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 function getAdminClient() {
   return createClient(

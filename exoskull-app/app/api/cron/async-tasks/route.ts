@@ -30,6 +30,7 @@ import { appendMessage } from "@/lib/unified-thread";
 import type { GatewayChannel } from "@/lib/gateway/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 // ============================================================================
 // DELIVERY — resolve channel → adapter → send

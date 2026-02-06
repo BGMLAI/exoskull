@@ -25,7 +25,7 @@ function getTwilioConfig() {
   return {
     accountSid: process.env.TWILIO_ACCOUNT_SID!,
     authToken: process.env.TWILIO_AUTH_TOKEN!,
-    phoneNumber: process.env.TWILIO_PHONE_NUMBER || "+48732144112",
+    phoneNumber: process.env.TWILIO_PHONE_NUMBER!,
   };
 }
 
@@ -357,7 +357,13 @@ async function handleSendSms(
     direction: "outbound",
     source_type: "intervention",
     source_id: intervention.id,
-  }).catch(() => {});
+  }).catch((err) => {
+    console.error("[Executor] Failed to log SMS message:", {
+      error: err instanceof Error ? err.message : String(err),
+      tenantId: intervention.tenant_id,
+      interventionId: intervention.id,
+    });
+  });
 
   return { success: true, message: `SMS wysłany do ${targetPhone}` };
 }
@@ -414,7 +420,13 @@ async function handleSendEmail(
     direction: "outbound",
     source_type: "intervention",
     source_id: intervention.id,
-  }).catch(() => {});
+  }).catch((err) => {
+    console.error("[Executor] Failed to log email message:", {
+      error: err instanceof Error ? err.message : String(err),
+      tenantId: intervention.tenant_id,
+      interventionId: intervention.id,
+    });
+  });
 
   return { success: true, message: `Email wysłany do ${targetEmail}` };
 }
@@ -452,7 +464,13 @@ async function handleMakeCall(
     direction: "outbound",
     source_type: "intervention",
     source_id: intervention.id,
-  }).catch(() => {});
+  }).catch((err) => {
+    console.error("[Executor] Failed to log call message:", {
+      error: err instanceof Error ? err.message : String(err),
+      tenantId: intervention.tenant_id,
+      interventionId: intervention.id,
+    });
+  });
 
   return {
     success: true,
@@ -619,7 +637,13 @@ async function handleNotifyEmergencyContact(
     direction: "outbound",
     source_type: "intervention",
     source_id: intervention.id,
-  }).catch(() => {});
+  }).catch((err) => {
+    console.error("[Executor] Failed to log emergency notification:", {
+      error: err instanceof Error ? err.message : String(err),
+      tenantId: intervention.tenant_id,
+      interventionId: intervention.id,
+    });
+  });
 
   return {
     success: result.success,
@@ -645,5 +669,11 @@ async function notifyUser(
     source_type: "intervention",
     source_id: intervention.id,
     metadata: { executionResult: result },
-  }).catch(() => {});
+  }).catch((err) => {
+    console.error("[Executor] Failed to log user notification:", {
+      error: err instanceof Error ? err.message : String(err),
+      tenantId: intervention.tenant_id,
+      interventionId: intervention.id,
+    });
+  });
 }

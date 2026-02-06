@@ -379,7 +379,7 @@ async function notifyUserAboutDelegateResult(
     );
     await twilioClient.messages.create({
       to: tenant.phone,
-      from: process.env.TWILIO_PHONE_NUMBER || "+48732144112",
+      from: process.env.TWILIO_PHONE_NUMBER!,
       body: smsBody.substring(0, 1600), // SMS limit
     });
     console.log("[Delegate] SMS notification sent to", tenant.phone);

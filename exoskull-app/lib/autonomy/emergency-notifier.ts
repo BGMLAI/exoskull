@@ -120,7 +120,7 @@ export async function notifyEmergencyContact(
     // Send SMS
     const accountSid = process.env.TWILIO_ACCOUNT_SID!;
     const authToken = process.env.TWILIO_AUTH_TOKEN!;
-    const fromNumber = process.env.TWILIO_PHONE_NUMBER || "+48732144112";
+    const fromNumber = process.env.TWILIO_PHONE_NUMBER!;
 
     const twilioClient = twilio(accountSid, authToken);
     await twilioClient.messages.create({

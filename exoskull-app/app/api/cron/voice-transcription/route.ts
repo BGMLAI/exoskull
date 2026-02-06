@@ -14,6 +14,7 @@ import { verifyCronAuth } from "@/lib/cron/auth";
 import { transcribeVoiceNote } from "@/lib/voice/transcribe-voice-note";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 function getSupabase() {
   return createClient(

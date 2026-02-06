@@ -117,7 +117,12 @@ export async function POST(request: NextRequest) {
             ),
           );
 
-          incrementUsage(user.id, "conversations").catch(() => {});
+          incrementUsage(user.id, "conversations").catch((err) => {
+            console.warn(
+              "[ChatStream] Usage tracking failed:",
+              err instanceof Error ? err.message : String(err),
+            );
+          });
 
           controller.close();
         } catch (error) {

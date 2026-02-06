@@ -12,17 +12,13 @@ import { NextRequest } from "next/server";
  * Accepts: Authorization Bearer token OR x-cron-secret header.
  *
  * CRON_SECRET must be set in environment variables.
- * In development mode, auth is bypassed.
  */
 export function verifyCronAuth(req: NextRequest): boolean {
-  // Development mode bypass
-  if (process.env.NODE_ENV === "development") {
-    return true;
-  }
-
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
-    console.error("[CronAuth] CRON_SECRET env var not set");
+    console.error(
+      "[CronAuth] CRITICAL: CRON_SECRET env var not set — rejecting request",
+    );
     return false;
   }
 

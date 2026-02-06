@@ -7,6 +7,7 @@ import { Home, Brain, Settings } from "lucide-react";
 
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { CollapsibleSidebar } from "@/components/dashboard/CollapsibleSidebar";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Voice-first: 3 tabs only
 const MOBILE_TAB_ITEMS = [
@@ -46,7 +47,7 @@ export default async function DashboardLayout({
 
         {/* Main content */}
         <main className="flex-1 min-h-0 overflow-hidden pb-16 md:pb-0">
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
         </main>
 
         {/* Mobile bottom tab bar — 3 tabs */}

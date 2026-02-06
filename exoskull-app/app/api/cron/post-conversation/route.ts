@@ -14,6 +14,7 @@ import { runSelfUpdate, runDecay } from "@/lib/learning/self-updater";
 import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 // ============================================================================
 // AUTHENTICATION

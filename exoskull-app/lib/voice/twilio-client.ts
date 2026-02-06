@@ -14,7 +14,7 @@ import VoiceResponse from "twilio/lib/twiml/VoiceResponse";
 
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID!;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN!;
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || "+48732144112";
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER!;
 
 // Type alias for language (Twilio uses specific enum)
 type TwilioLanguage = Parameters<VoiceResponse["say"]>[0]["language"];

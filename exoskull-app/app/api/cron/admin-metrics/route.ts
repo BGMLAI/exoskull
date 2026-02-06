@@ -10,6 +10,7 @@ import { createClient } from "@supabase/supabase-js";
 import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 function getSupabase() {
   return createClient(

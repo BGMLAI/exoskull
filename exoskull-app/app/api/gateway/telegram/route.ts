@@ -23,14 +23,16 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    // Verify secret token (optional but recommended)
+    // Verify secret token (mandatory)
     const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET;
-    if (secretToken) {
-      const headerToken = req.headers.get("x-telegram-bot-api-secret-token");
-      if (headerToken !== secretToken) {
-        console.error("[Telegram Route] Invalid secret token");
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+    if (!secretToken) {
+      console.error("[Telegram Route] TELEGRAM_WEBHOOK_SECRET not configured");
+      return NextResponse.json({ error: "Not configured" }, { status: 500 });
+    }
+    const headerToken = req.headers.get("x-telegram-bot-api-secret-token");
+    if (headerToken !== secretToken) {
+      console.error("[Telegram Route] Invalid secret token");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const payload = await req.json();
