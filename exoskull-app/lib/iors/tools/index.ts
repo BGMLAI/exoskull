@@ -31,6 +31,13 @@ import { autonomyTools } from "./autonomy-tools";
 import { emergencyTools } from "./emergency-tools";
 import { personalityTools } from "./personality-tools";
 import { canvasTools } from "./canvas-tools";
+import { taskTools } from "./task-tools";
+import { modTools } from "./mod-tools";
+import { integrationTools } from "./integration-tools";
+import { planningTools } from "./planning-tools";
+import { memoryTools } from "./memory-tools";
+import { skillGoalTools } from "./skill-goal-tools";
+import { communicationTools } from "./communication-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -40,6 +47,13 @@ export const IORS_EXTENSION_TOOLS: ToolDefinition[] = [
   ...emergencyTools,
   ...personalityTools,
   ...canvasTools,
+  ...taskTools,
+  ...modTools,
+  ...integrationTools,
+  ...planningTools,
+  ...memoryTools,
+  ...skillGoalTools,
+  ...communicationTools,
 ];
 
 /**
