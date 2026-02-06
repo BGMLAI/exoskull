@@ -60,6 +60,8 @@ export async function resolveTenant(
     sms: "phone",
     voice: "phone",
     email: "email",
+    signal: "signal_phone",
+    imessage: "imessage_address",
   };
 
   const column = channelColumn[channel];
@@ -79,7 +81,7 @@ export async function resolveTenant(
   }
 
   // Fallback: phone-based lookup for phone-like channels
-  if (["whatsapp", "sms", "voice"].includes(channel)) {
+  if (["whatsapp", "sms", "voice", "signal"].includes(channel)) {
     const tenant = await findTenantByPhone(from);
     if (tenant)
       return { tenantId: tenant.id, name: tenant.name || senderName || "User" };
@@ -106,6 +108,8 @@ async function autoRegisterTenant(
     whatsapp: "phone",
     sms: "phone",
     email: "email",
+    signal: "signal_phone",
+    imessage: "imessage_address",
   };
 
   const insertData: Record<string, unknown> = {

@@ -14,6 +14,8 @@ import { getMessengerClient } from "@/lib/channels/messenger/client";
 import { telegramAdapter } from "@/lib/gateway/adapters/telegram";
 import { slackAdapter } from "@/lib/gateway/adapters/slack";
 import { discordAdapter } from "@/lib/gateway/adapters/discord";
+import { signalAdapter } from "@/lib/gateway/adapters/signal";
+import { imessageAdapter } from "@/lib/gateway/adapters/imessage";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -34,6 +36,8 @@ export interface ScheduledJob {
     | "telegram"
     | "slack"
     | "discord"
+    | "signal"
+    | "imessage"
     | "both";
   display_name: string;
 }
@@ -57,6 +61,8 @@ export interface UserJobConfig {
       telegram?: boolean;
       slack?: boolean;
       discord?: boolean;
+      signal?: boolean;
+      imessage?: boolean;
     };
     rate_limits?: { max_calls_per_day?: number; max_sms_per_day?: number };
     quiet_hours?: { start?: string; end?: string };
@@ -74,11 +80,21 @@ export interface DispatchResult {
     | "messenger"
     | "telegram"
     | "slack"
-    | "discord";
+    | "discord"
+    | "signal"
+    | "imessage";
   call_id?: string;
   message_sid?: string;
   error?: string;
-  provider?: "twilio" | "resend" | "meta" | "telegram" | "slack" | "discord";
+  provider?:
+    | "twilio"
+    | "resend"
+    | "meta"
+    | "telegram"
+    | "slack"
+    | "discord"
+    | "signal"
+    | "bluebubbles";
 }
 
 // Twilio Configuration
@@ -666,6 +682,92 @@ export async function dispatchDiscord(
 }
 
 /**
+ * Dispatch Signal message via signal-cli REST API
+ */
+export async function dispatchSignal(
+  job: ScheduledJob,
+  user: UserJobConfig,
+): Promise<DispatchResult> {
+  const signalPhone = (user.schedule_settings as Record<string, unknown>)
+    ?.signal_phone as string | undefined;
+
+  if (!signalPhone) {
+    return {
+      success: false,
+      channel: "signal",
+      error: "User has no Signal phone configured",
+    };
+  }
+
+  if (!process.env.SIGNAL_API_URL) {
+    return {
+      success: false,
+      channel: "signal",
+      error: "Signal not configured (missing SIGNAL_API_URL)",
+    };
+  }
+
+  const message = getSmsMessage(job, user);
+
+  try {
+    await signalAdapter.sendResponse(signalPhone, message);
+    console.log(`[Dispatcher] Signal sent to ${user.tenant_id}`);
+    return { success: true, channel: "signal", provider: "signal" };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error(`[Dispatcher] Signal error for ${user.tenant_id}:`, {
+      error: errorMessage,
+      phone: signalPhone,
+    });
+    return { success: false, channel: "signal", error: errorMessage };
+  }
+}
+
+/**
+ * Dispatch iMessage via BlueBubbles Server
+ */
+export async function dispatchImessage(
+  job: ScheduledJob,
+  user: UserJobConfig,
+): Promise<DispatchResult> {
+  const imessageAddress = (user.schedule_settings as Record<string, unknown>)
+    ?.imessage_address as string | undefined;
+
+  if (!imessageAddress) {
+    return {
+      success: false,
+      channel: "imessage",
+      error: "User has no iMessage address configured",
+    };
+  }
+
+  if (!process.env.BLUEBUBBLES_URL) {
+    return {
+      success: false,
+      channel: "imessage",
+      error: "iMessage not configured (missing BLUEBUBBLES_URL)",
+    };
+  }
+
+  const message = getSmsMessage(job, user);
+
+  try {
+    await imessageAdapter.sendResponse(imessageAddress, message);
+    console.log(`[Dispatcher] iMessage sent to ${user.tenant_id}`);
+    return { success: true, channel: "imessage", provider: "bluebubbles" };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error(`[Dispatcher] iMessage error for ${user.tenant_id}:`, {
+      error: errorMessage,
+      address: imessageAddress,
+    });
+    return { success: false, channel: "imessage", error: errorMessage };
+  }
+}
+
+/**
  * Dispatch job to appropriate channel
  */
 export async function dispatchJob(
@@ -681,6 +783,8 @@ export async function dispatchJob(
     | "telegram"
     | "slack"
     | "discord"
+    | "signal"
+    | "imessage"
     | "both";
 
   // Check if channel is enabled in user settings
@@ -693,9 +797,11 @@ export async function dispatchJob(
     telegram: true,
     slack: true,
     discord: true,
+    signal: true,
+    imessage: true,
   };
 
-  // Channel priority: Voice > Telegram > WhatsApp > Slack > Discord > Messenger > SMS > Email
+  // Channel priority: Voice > Telegram > WhatsApp > Slack > Discord > Signal > iMessage > Messenger > SMS > Email
   if (channel === "voice" && channels.voice !== false) {
     return await dispatchVoiceCall(job, user);
   } else if (channel === "telegram" && channels.telegram !== false) {
@@ -706,6 +812,10 @@ export async function dispatchJob(
     return await dispatchSlack(job, user);
   } else if (channel === "discord" && channels.discord !== false) {
     return await dispatchDiscord(job, user);
+  } else if (channel === "signal" && channels.signal !== false) {
+    return await dispatchSignal(job, user);
+  } else if (channel === "imessage" && channels.imessage !== false) {
+    return await dispatchImessage(job, user);
   } else if (channel === "messenger" && channels.messenger !== false) {
     return await dispatchMessenger(job, user);
   } else if (channel === "sms" && channels.sms !== false) {
@@ -733,6 +843,14 @@ export async function dispatchJob(
     if (channels.discord !== false) {
       const discordResult = await dispatchDiscord(job, user);
       if (discordResult.success) return discordResult;
+    }
+    if (channels.signal !== false) {
+      const signalResult = await dispatchSignal(job, user);
+      if (signalResult.success) return signalResult;
+    }
+    if (channels.imessage !== false) {
+      const imessageResult = await dispatchImessage(job, user);
+      if (imessageResult.success) return imessageResult;
     }
     if (channels.messenger !== false) {
       const messengerResult = await dispatchMessenger(job, user);

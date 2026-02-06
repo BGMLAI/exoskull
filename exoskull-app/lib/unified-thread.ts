@@ -30,7 +30,9 @@ export type UnifiedChannel =
   | "web_chat"
   | "telegram"
   | "slack"
-  | "discord";
+  | "discord"
+  | "signal"
+  | "imessage";
 
 export type UnifiedRole = "user" | "assistant" | "system" | "tool";
 
@@ -286,6 +288,8 @@ function channelLabel(channel: string): string {
     telegram: "Telegram",
     slack: "Slack",
     discord: "Discord",
+    signal: "Signal",
+    imessage: "iMessage",
   };
   return labels[channel] || channel;
 }

@@ -17,6 +17,8 @@ export type GatewayChannel =
   | "email"
   | "messenger"
   | "instagram"
+  | "signal"
+  | "imessage"
   | "web_chat";
 
 /**
@@ -75,5 +77,7 @@ export interface TenantChannelIds {
   slack_user_id?: string;
   discord_user_id?: string;
   email?: string;
+  signal_phone?: string;
+  imessage_address?: string;
   preferred_channel?: GatewayChannel;
 }

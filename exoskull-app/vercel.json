@@ -119,6 +119,14 @@
     {
       "path": "/api/cron/async-tasks",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/predictions",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/insight-push",
+      "schedule": "0 10 * * *"
     }
   ]
 }

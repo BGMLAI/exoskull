@@ -88,6 +88,19 @@ async function deliverResult(task: AsyncTask, text: string): Promise<void> {
         break;
       }
 
+      case "signal": {
+        const { signalAdapter } = await import("@/lib/gateway/adapters/signal");
+        await signalAdapter.sendResponse(reply_to, text);
+        break;
+      }
+
+      case "imessage": {
+        const { imessageAdapter } =
+          await import("@/lib/gateway/adapters/imessage");
+        await imessageAdapter.sendResponse(reply_to, text);
+        break;
+      }
+
       case "web_chat":
         // Result is already stored in exo_async_tasks.result
         // Frontend polls or subscribes to Supabase realtime

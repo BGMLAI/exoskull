@@ -21,6 +21,8 @@ import { appendMessage, UnifiedChannel } from "@/lib/unified-thread";
 // TYPES
 // ============================================================================
 
+export type ReportType = "weekly" | "monthly" | "insight";
+
 export interface DispatchReportResult {
   success: boolean;
   channel: string;
@@ -142,7 +144,7 @@ async function sendViaSms(phone: string, text: string): Promise<void> {
 async function sendViaEmail(
   email: string,
   text: string,
-  reportType: "weekly" | "monthly",
+  reportType: ReportType,
   language: string,
 ): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY!;
@@ -155,6 +157,10 @@ async function sendViaEmail(
     monthly: {
       pl: "Podsumowanie miesiąca od ExoSkull",
       en: "Your monthly summary from ExoSkull",
+    },
+    insight: {
+      pl: "Dzisiejsze spostrzeżenia od ExoSkull",
+      en: "Today's insights from ExoSkull",
     },
   };
 
@@ -188,7 +194,7 @@ async function sendToChannel(
   channel: TextChannel,
   tenant: TenantChannelInfo,
   text: string,
-  reportType: "weekly" | "monthly",
+  reportType: ReportType,
 ): Promise<void> {
   switch (channel) {
     case "telegram":
@@ -220,7 +226,7 @@ async function sendToChannel(
 export async function dispatchReport(
   tenantId: string,
   reportText: string,
-  reportType: "weekly" | "monthly",
+  reportType: ReportType,
 ): Promise<DispatchReportResult> {
   const supabase = getAdminClient();
 
