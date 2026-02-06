@@ -13,7 +13,12 @@ export type BuiltinModSlug =
   | "calendar-assistant"
   | "mood-tracker"
   | "habit-tracker"
-  | "spending-tracker";
+  | "spending-tracker"
+  | "exercise-logger"
+  | "food-logger"
+  | "water-tracker"
+  | "social-tracker"
+  | "journal";
 
 // Dynamic skills use custom-* prefix (e.g., "custom-water-tracker")
 export type ModSlug = BuiltinModSlug | `custom-${string}`;

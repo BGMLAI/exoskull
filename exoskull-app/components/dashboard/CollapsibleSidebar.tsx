@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageSquare, Package, Brain, Settings } from "lucide-react";
+import {
+  Home,
+  MessageSquare,
+  Package,
+  Brain,
+  Plug,
+  Settings,
+} from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 // ============================================================================
@@ -13,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard/mods", label: "Mody", icon: Package },
+  { href: "/dashboard/settings/integrations", label: "Integracje", icon: Plug },
   { href: "/dashboard/memory", label: "Pamiec", icon: Brain },
   { href: "/dashboard/settings", label: "Ustawienia", icon: Settings },
 ];

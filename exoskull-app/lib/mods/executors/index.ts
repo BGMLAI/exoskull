@@ -9,6 +9,11 @@ import { MoodTrackerExecutor } from "./mood-tracker";
 import { HabitTrackerExecutor } from "./habit-tracker";
 import { SleepTrackerExecutor } from "./sleep-tracker";
 import { ActivityTrackerExecutor } from "./activity-tracker";
+import { ExerciseLoggerExecutor } from "./exercise-logger";
+import { FoodLoggerExecutor } from "./food-logger";
+import { WaterTrackerExecutor } from "./water-tracker";
+import { SocialTrackerExecutor } from "./social-tracker";
+import { JournalExecutor } from "./journal";
 import {
   getDynamicSkillExecutor,
   hasDynamicSkill,
@@ -31,13 +36,38 @@ export function createActivityTrackerExecutor(): IModExecutor {
   return new ActivityTrackerExecutor();
 }
 
+export function createExerciseLoggerExecutor(): IModExecutor {
+  return new ExerciseLoggerExecutor();
+}
+
+export function createFoodLoggerExecutor(): IModExecutor {
+  return new FoodLoggerExecutor();
+}
+
+export function createWaterTrackerExecutor(): IModExecutor {
+  return new WaterTrackerExecutor();
+}
+
+export function createSocialTrackerExecutor(): IModExecutor {
+  return new SocialTrackerExecutor();
+}
+
+export function createJournalExecutor(): IModExecutor {
+  return new JournalExecutor();
+}
+
 // Registry of all static (bundled) mod executors
 const EXECUTORS: Partial<Record<BuiltinModSlug, () => IModExecutor>> = {
   "task-manager": createTaskManagerExecutor,
   "mood-tracker": createMoodTrackerExecutor,
   "habit-tracker": createHabitTrackerExecutor,
   "sleep-tracker": createSleepTrackerExecutor,
-  "energy-monitor": createActivityTrackerExecutor, // Activity tracker uses energy-monitor slug
+  "energy-monitor": createActivityTrackerExecutor,
+  "exercise-logger": createExerciseLoggerExecutor,
+  "food-logger": createFoodLoggerExecutor,
+  "water-tracker": createWaterTrackerExecutor,
+  "social-tracker": createSocialTrackerExecutor,
+  journal: createJournalExecutor,
 };
 
 /**
@@ -97,3 +127,8 @@ export { MoodTrackerExecutor };
 export { HabitTrackerExecutor };
 export { SleepTrackerExecutor };
 export { ActivityTrackerExecutor };
+export { ExerciseLoggerExecutor };
+export { FoodLoggerExecutor };
+export { WaterTrackerExecutor };
+export { SocialTrackerExecutor };
+export { JournalExecutor };
