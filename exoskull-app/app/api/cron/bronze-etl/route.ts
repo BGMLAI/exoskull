@@ -15,28 +15,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runBronzeETL, runBronzeETLForTenant } from "@/lib/datalake/bronze-etl";
 import { checkR2Connection, getBronzeStats } from "@/lib/storage/r2-client";
-import { verifyCronAuth } from "@/lib/cron/auth";
+import { withCronGuard } from "@/lib/admin/cron-guard";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 /**
  * POST /api/cron/bronze-etl
  * Trigger Bronze ETL job
  */
-export async function POST(req: NextRequest) {
-  // Verify authorization
-  if (!verifyCronAuth(req)) {
-    return NextResponse.json(
-      {
-        error: "Unauthorized",
-        message:
-          "Valid x-cron-secret header or Authorization bearer token required",
-      },
-      { status: 401 },
-    );
-  }
-
+async function postHandler(req: NextRequest) {
   console.log(`[Bronze ETL] Triggered at ${new Date().toISOString()}`);
 
   // Check R2 connection first
@@ -97,6 +85,8 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withCronGuard({ name: "bronze-etl" }, postHandler);
 
 /**
  * GET /api/cron/bronze-etl

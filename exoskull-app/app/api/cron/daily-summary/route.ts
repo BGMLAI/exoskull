@@ -10,8 +10,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { withCronGuard } from "@/lib/admin/cron-guard";
 import { verifyCronAuth } from "@/lib/cron/auth";
+import { getServiceSupabase } from "@/lib/supabase/service";
 import {
   createDailySummary,
   getSummaryForDisplay,
@@ -19,21 +20,7 @@ import {
 } from "@/lib/memory/daily-summary";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120; // Pro tier: 120s for processing all tenants
-
-// Admin client
-function getAdminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    },
-  );
-}
+export const maxDuration = 60;
 
 // Twilio config
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
@@ -114,7 +101,7 @@ async function getActiveTenants(): Promise<
     schedule_settings: any;
   }>
 > {
-  const supabase = getAdminClient();
+  const supabase = getServiceSupabase();
 
   const { data, error } = await supabase
     .from("exo_tenants")
@@ -167,7 +154,7 @@ function isRightTimeForSummary(
  * Check if user has had conversations today
  */
 async function hasTodayConversations(tenantId: string): Promise<boolean> {
-  const supabase = getAdminClient();
+  const supabase = getServiceSupabase();
   const today = new Date().toISOString().split("T")[0];
 
   const { count, error } = await supabase
@@ -188,14 +175,8 @@ async function hasTodayConversations(tenantId: string): Promise<boolean> {
 // GET HANDLER (for Vercel CRON)
 // ============================================================================
 
-export async function GET(request: NextRequest) {
+async function getHandler(request: NextRequest) {
   const startTime = Date.now();
-
-  // Auth check
-  if (!verifyCronAuth(request)) {
-    console.warn("[DailySummaryCron] Unauthorized attempt");
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   console.log("[DailySummaryCron] Starting daily summary generation...");
 
@@ -294,6 +275,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export const GET = withCronGuard({ name: "daily-summary" }, getHandler);
+
 // ============================================================================
 // POST HANDLER (for manual triggers / specific tenant)
 // ============================================================================
@@ -331,7 +314,7 @@ export async function POST(request: NextRequest) {
     let smsResult = null;
     if (!skip_sms) {
       // Get tenant phone
-      const supabase = getAdminClient();
+      const supabase = getServiceSupabase();
       const { data: tenant } = await supabase
         .from("exo_tenants")
         .select("phone")

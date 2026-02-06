@@ -5,26 +5,18 @@
 // =====================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { verifyCronAuth } from "@/lib/cron/auth";
+import { getServiceSupabase } from "@/lib/supabase/service";
+import { withCronGuard } from "@/lib/admin/cron-guard";
 import { logProgress, detectMomentum } from "@/lib/goals/engine";
 import type { UserGoal, MeasurableProxy } from "@/lib/goals/types";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
-export async function GET(req: NextRequest) {
-  if (!verifyCronAuth(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+async function handler(req: NextRequest) {
   const startTime = Date.now();
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
+  const supabase = getServiceSupabase();
 
   try {
     // Get tenants with active goals
@@ -386,3 +378,5 @@ function getFrequencyStart(frequency: string): string {
       return now.toISOString();
   }
 }
+
+export const GET = withCronGuard({ name: "goal-progress" }, handler);

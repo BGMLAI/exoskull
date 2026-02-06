@@ -11,13 +11,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { runSelfUpdate, runDecay } from "@/lib/learning/self-updater";
+import { withCronGuard } from "@/lib/admin/cron-guard";
 import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 // ============================================================================
-// AUTHENTICATION
+// AUTHENTICATION (for POST handler only)
 // ============================================================================
 
 function validateCronAuth(request: NextRequest): boolean {
@@ -37,14 +38,8 @@ function validateCronAuth(request: NextRequest): boolean {
 // GET HANDLER (for Vercel CRON)
 // ============================================================================
 
-export async function GET(request: NextRequest) {
+async function getHandler(request: NextRequest) {
   const startTime = Date.now();
-
-  // Auth check
-  if (!validateCronAuth(request)) {
-    console.warn("[PostConversation] Unauthorized CRON attempt");
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   console.log("[PostConversation] Starting CRON job...");
 
@@ -79,6 +74,8 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export const GET = withCronGuard({ name: "post-conversation" }, getHandler);
 
 // ============================================================================
 // POST HANDLER (for manual triggers)

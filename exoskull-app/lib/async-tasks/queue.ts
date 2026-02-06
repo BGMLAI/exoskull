@@ -7,6 +7,7 @@
 
 import type { GatewayChannel } from "../gateway/types";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { logAdminError } from "@/lib/admin/logger";
 
 // ============================================================================
 // TYPES
@@ -211,6 +212,40 @@ export async function failTask(
     exhausted,
     errorMessage,
   });
+
+  // Dead letter queue: capture permanently failed tasks for review
+  if (exhausted) {
+    try {
+      const { data: fullTask } = await supabase
+        .from("exo_async_tasks")
+        .select("tenant_id, channel, prompt")
+        .eq("id", taskId)
+        .single();
+
+      if (fullTask) {
+        await supabase.from("exo_async_dead_letters").insert({
+          original_task_id: taskId,
+          tenant_id: fullTask.tenant_id,
+          channel: fullTask.channel,
+          prompt: fullTask.prompt,
+          final_error: errorMessage,
+          retry_count: newRetryCount,
+        });
+
+        await logAdminError(
+          "async-tasks:dead-letter",
+          "error",
+          `Task ${taskId} exhausted all retries: ${errorMessage}`,
+          { taskId, tenantId: fullTask.tenant_id, channel: fullTask.channel },
+        );
+      }
+    } catch (dlError) {
+      console.error("[AsyncQueue] Failed to create dead letter:", {
+        taskId,
+        error: dlError instanceof Error ? dlError.message : dlError,
+      });
+    }
+  }
 
   return { exhausted };
 }

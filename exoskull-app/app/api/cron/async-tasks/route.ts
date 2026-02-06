@@ -12,7 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifyCronAuth } from "@/lib/cron/auth";
+import { withCronGuard } from "@/lib/admin/cron-guard";
 import {
   claimNextTask,
   releaseExpiredLocks,
@@ -30,7 +30,7 @@ import { appendMessage } from "@/lib/unified-thread";
 import type { GatewayChannel } from "@/lib/gateway/types";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 // ============================================================================
 // DELIVERY — resolve channel → adapter → send
@@ -218,11 +218,7 @@ async function processTask(task: AsyncTask): Promise<void> {
 // CRON ENDPOINT
 // ============================================================================
 
-export async function GET(req: NextRequest) {
-  if (!verifyCronAuth(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+async function handler(req: NextRequest) {
   const startTime = Date.now();
 
   try {
@@ -268,3 +264,5 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export const GET = withCronGuard({ name: "async-tasks" }, handler);

@@ -6,26 +6,18 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceSupabase } from "@/lib/supabase/service";
 import { getAlignmentGuardian } from "@/lib/autonomy/guardian";
-import { verifyCronAuth } from "@/lib/cron/auth";
+import { withCronGuard } from "@/lib/admin/cron-guard";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
-export async function GET(req: NextRequest) {
-  if (!verifyCronAuth(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+async function handler(req: NextRequest) {
   const startTime = Date.now();
   const guardian = getAlignmentGuardian();
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
+  const supabase = getServiceSupabase();
 
   try {
     // Get active tenants
@@ -106,3 +98,5 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export const GET = withCronGuard({ name: "guardian-values" }, handler);
