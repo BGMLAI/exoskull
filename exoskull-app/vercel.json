@@ -104,6 +104,14 @@
     {
       "path": "/api/cron/outbound-monitor",
       "schedule": "0 */2 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-summary",
+      "schedule": "0 18 * * 0"
+    },
+    {
+      "path": "/api/cron/monthly-summary",
+      "schedule": "0 9 1 * *"
     }
   ]
 }

@@ -4,6 +4,91 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-06] feat: Proactive Report Push — weekly + monthly summaries via preferred channel
+
+### What was done
+- **Summary Generator** (`lib/reports/summary-generator.ts`) — queries conversations, messages, tasks, highlights; uses AI (Tier 1 extraction + Tier 2 summarization) for topic summary + personalized insight
+- **Report Dispatcher** (`lib/reports/report-dispatcher.ts`) — sends report via tenant's preferred channel with fallback chain (telegram → whatsapp → slack → discord → sms → email); logs to unified thread
+- **Weekly Summary CRON** (`app/api/cron/weekly-summary/route.ts`) — every Sunday 18:00 UTC, generates 7-day recap for all active tenants
+- **Monthly Summary CRON** (`app/api/cron/monthly-summary/route.ts`) — 1st of month 09:00 UTC, generates 30-day recap for all active tenants
+- Added 2 CRON entries to `vercel.json` (now 23 total)
+
+### Why
+Users had to open the dashboard to see their data. ExoSkull should push insights proactively — weekly and monthly summaries sent to their preferred communication channel.
+
+### Files changed
+- `exoskull-app/lib/reports/summary-generator.ts` (new)
+- `exoskull-app/lib/reports/report-dispatcher.ts` (new)
+- `exoskull-app/app/api/cron/weekly-summary/route.ts` (new)
+- `exoskull-app/app/api/cron/monthly-summary/route.ts` (new)
+- `exoskull-app/vercel.json` (modified — 2 new CRON entries)
+
+### How to verify
+- `cd exoskull-app && npm run build` → zero errors
+- CRON routes respond 200 with execution summary JSON
+- Reports dispatch to preferred channel with fallback
+
+### Notes for future agents
+- AI uses Tier 1 (Gemini Flash) for topic extraction, Tier 2 (Haiku) for insights — cheap for batch jobs
+- User timezone not yet tracked per-user — currently UTC. Add timezone-aware scheduling later
+- Report format is plain text (no markdown) to work across all channels (SMS, WhatsApp, Telegram, etc.)
+- Bilingual: Polish (default) + English based on tenant.language
+
+---
+
+## [2026-02-06] research: AI Message Authentication — layered hybrid architecture
+
+### What was done
+- **Deep research** on 10 approaches to authenticating AI-sent messages on behalf of users
+- Analyzed: Ed25519 signing, DID/VC (W3C), DKIM-like, OAuth delegation, C2PA, blockchain attestation, OpenPGP, Matrix/Signal protocols, AI watermarking
+- Mapped IETF/W3C/EU standards landscape (2025-2026)
+- Identified tools: Veramo (DID/VC), @noble/ed25519, Cloudflare Web Bot Auth, EAS
+- Designed 5-layer hybrid architecture: Signing → Portal → Per-channel → EU AI Act → DID/VC
+- Mapped integration points in ExoSkull codebase (executor.ts, conversation-handler.ts, gateway.ts)
+
+### Why
+ExoSkull sends messages on 9 channels on behalf of users (SMS, email, WhatsApp, Discord, etc.). Recipients need to verify messages are genuinely user-authorized. EU AI Act Article 50 mandates AI disclosure by August 2, 2026.
+
+### Files changed
+- `~/.claude/plans/imperative-plotting-willow.md` — Full research document + architecture plan
+
+### How to verify
+- Research document only — no code changes
+
+### Notes for future agents
+- Plan saved at `~/.claude/plans/imperative-plotting-willow.md`
+- Key deps when implementing: `@noble/ed25519`, `jose`, optionally `@veramo/core`
+- Hook points: `dispatchAction()` in executor.ts, tool handlers in conversation-handler.ts
+- EU AI Act deadline: August 2, 2026 — plan implementation before that
+
+---
+
+## [2026-02-06] feat: Dashboard chat upgrade — full 28-tool pipeline + 9 channel icons
+
+### What was done
+- **Upgraded `/api/chat/stream`** from raw Anthropic API (0 tools) to Unified Message Gateway pipeline (28 tools)
+- Dashboard users now get SAME capabilities as WhatsApp/Telegram/Slack/Discord users
+- Added channel icons in HomeChat for all 9 channels (whatsapp, telegram, slack, discord, messenger, web_chat, email, sms, voice)
+- Voice-first dashboard: VoiceHero + HomeChat simplified layout
+
+### Why
+Dashboard chat was using raw `anthropic.messages.create()` (no tools, no memory, no emotion detection). Meanwhile messaging channels were getting full `processUserMessage()` with 28 tools. This was backwards — dashboard should be the BEST experience, not the worst.
+
+### Files changed
+- `app/api/chat/stream/route.ts` — Gateway integration (was raw Anthropic API → now handleInboundMessage)
+- `components/dashboard/HomeChat.tsx` — 9 channel icons (whatsapp, telegram, slack, discord, messenger, web_chat)
+- `components/dashboard/VoiceHero.tsx` — Voice-first hero
+- `components/voice/VoiceInterface.tsx` — Groq Whisper STT + ElevenLabs TTS
+- `lib/voice/web-speech.ts` — Polish language support
+- `app/api/voice/transcribe/route.ts` — Whisper hallucination detection
+
+### How to verify
+1. `cd exoskull-app && npm run build` → zero errors
+2. Dashboard chat → send message → response should use tools (add_task, search_memory, etc.)
+3. HomeChat timeline → messages from all channels show correct icons
+
+---
+
 ## [2026-02-06] feat: Unified Message Gateway — 9 channels, full AI pipeline
 
 ### What was done
