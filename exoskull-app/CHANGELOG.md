@@ -27,12 +27,67 @@ All notable changes to this project.
 - 7 frontend files (dashboard pages + widgets)
 - `scripts/test-all-routes.ts`
 
-### Remaining (Phase 2-4)
+### Remaining
 
-- Webhook signature verification for all messaging gateways
-- Ghost table references in Pulse, duplicate migration, missing indexes
-- Error boundaries, accessibility, component decomposition
-- Silent catch blocks, CRON boilerplate, god files
+- Webhook signature verification for Twilio voice, WhatsApp, Messenger, Telegram, Signal, iMessage
+- Replace 11 remaining `confirm()` calls with AlertDialog components
+- Break up god files (conversation-handler 1,929 LOC, mape-k-loop 1,194 LOC)
+- Type 134 `any` usages across 45 files
+- Migrate 68 files from local `getSupabase()` to shared `getServiceSupabase()`
+- Add project ESLint config with custom rules
+
+---
+
+## [2026-02-06] Security Audit — Phase 2: Architecture & Stability
+
+### What was done
+
+- **A4: Security headers** — Added HSTS (2yr, preload), X-Frame-Options (DENY), X-Content-Type-Options (nosniff), Referrer-Policy, Permissions-Policy to next.config.js
+- **A1: Ghost table fix** — Fixed 2 naming mismatches in Pulse (`rig_connections`→`exo_rig_connections`, `user_health_metrics`→`exo_health_metrics`, `user_id`→`tenant_id`)
+- **A3: Duplicate migration** — Renamed `20260207000002_signal_imessage_channels.sql` → `20260207000003`
+- **A5: Phone index** — Created migration `20260207000004_index_tenants_phone.sql` for gateway lookups
+- **S12: Setup-cron auth** — Added CRON_SECRET verification to unauthenticated GET handler
+- **Q1: Error logging** — Added `console.warn` to 11 critical silent catch blocks (MAPE-K loop 5x, conversation handler 3x, agent registry 1x)
+
+### Files changed (9 files)
+
+- `next.config.js` — security headers + `images.remotePatterns` migration
+- `app/api/pulse/route.ts` — ghost table + column fixes
+- `app/api/setup-cron/route.ts` — GET auth
+- `lib/autonomy/mape-k-loop.ts` — 5 catch blocks
+- `lib/voice/conversation-handler.ts` — 3 catch blocks
+- `lib/agents/registry.ts` — 1 catch block
+- 2 new migration files
+
+---
+
+## [2026-02-06] Security Audit — Phase 3: Frontend Foundations
+
+### What was done
+
+- **F1/F4: Error handling** — Created `app/error.tsx`, `app/not-found.tsx`, `app/dashboard/error.tsx`, `app/dashboard/loading.tsx`
+- **F5: Toast notifications** — Installed sonner, added `<Toaster>` to root layout, replaced 22 `alert()` calls with `toast.error()` across 12 files
+- **F10: Page metadata** — Added `title.template` to dashboard layout, `metadata` exports to 3 server pages
+- **F2: Accessibility** — Added 11 `aria-label` attributes to icon-only buttons (HierarchyView 7x, card menus 4x)
+
+### Files changed (28 files)
+
+- 4 new error/loading/not-found pages
+- `app/layout.tsx` — Toaster integration
+- `app/dashboard/layout.tsx` — metadata template
+- 12 page/component files — alert→toast migration
+- 4 knowledge card components — aria-labels
+- `components/knowledge/HierarchyView.tsx` — 7 aria-labels
+- `package.json` — added sonner dependency
+
+---
+
+## [2026-02-06] Security Audit — Phase 4: Code Quality (Partial)
+
+### What was done
+
+- **Shared Supabase utility** — Created `lib/supabase/service.ts` with `getServiceSupabase()` (68 files to migrate incrementally)
+- **Deprecated config** — Migrated `images.domains` to `images.remotePatterns` in next.config.js
 
 ---
 

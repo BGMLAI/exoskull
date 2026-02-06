@@ -8,7 +8,12 @@ const nextConfig = {
     },
   },
   images: {
-    domains: ['ocixoxjozzldqldadrip.supabase.co'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+      },
+    ],
   },
   async headers() {
     return [
