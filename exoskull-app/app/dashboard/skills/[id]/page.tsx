@@ -184,9 +184,7 @@ export default function SkillDetailPage() {
   async function loadSkill(tenantId: string) {
     try {
       setLoading(true);
-      const res = await fetch(`/api/skills/${id}`, {
-        headers: { "x-tenant-id": tenantId },
-      });
+      const res = await fetch(`/api/skills/${id}`);
 
       if (!res.ok) {
         router.push("/dashboard/skills");
@@ -215,7 +213,6 @@ export default function SkillDetailPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": userId,
         },
         body: JSON.stringify({ code: approvalCode.trim(), channel: "sms" }),
       });
@@ -247,7 +244,6 @@ export default function SkillDetailPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": userId,
         },
         body: JSON.stringify({
           action: "reject",
@@ -274,7 +270,6 @@ export default function SkillDetailPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": userId,
         },
         body: JSON.stringify({
           method: testMethod,
@@ -307,7 +302,6 @@ export default function SkillDetailPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": userId,
         },
         body: JSON.stringify({ version }),
       });

@@ -99,7 +99,6 @@ export function IntegrationsWidget({
     try {
       const response = await fetch(`/api/rigs/${slug}/sync`, {
         method: "POST",
-        headers: { "x-tenant-id": tenantId },
       });
       if (response.ok) {
         const result = await response.json();

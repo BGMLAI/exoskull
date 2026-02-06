@@ -3,6 +3,7 @@
 // Executes generated skill code with limited scope
 // =====================================================
 
+import * as vm from "node:vm";
 import { SkillExecutionResult, SkillExecutionContext } from "../types";
 import {
   createSupabaseProxy,
@@ -12,6 +13,35 @@ import {
 import { IModExecutor } from "@/lib/mods/types";
 
 const EXECUTION_TIMEOUT_MS = 5000;
+
+/**
+ * Blocked code patterns that could escape the sandbox.
+ * Validated BEFORE execution as defense-in-depth.
+ */
+const BLOCKED_PATTERNS = [
+  /\.constructor\s*[\[(]/, // prototype chain escape
+  /\.__proto__/, // prototype manipulation
+  /\bprocess\b/, // Node.js process access
+  /\brequire\s*\(/, // CommonJS require
+  /\bimport\s*\(/, // Dynamic import
+  /\bglobalThis\b/, // Global scope access
+  /\beval\s*\(/, // eval execution
+  /\bFunction\s*\(/, // Function constructor
+  /\bProxy\s*\(/, // Proxy creation
+  /\bReflect\b/, // Reflect API
+  /\bSymbol\b/, // Symbol access (prototype manipulation)
+  /\bWeakRef\b/, // WeakRef access
+  /\bFinalizationRegistry\b/, // GC manipulation
+];
+
+function validateCode(code: string): string | null {
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(code)) {
+      return `Blocked pattern detected: ${pattern.source}`;
+    }
+  }
+  return null;
+}
 
 /**
  * Execute generated skill code in a restricted sandbox.
@@ -31,6 +61,16 @@ export async function executeInSandbox(
   const callLog: ProxyCallLog[] = [];
 
   try {
+    // Validate code against blocked patterns BEFORE execution
+    const validationError = validateCode(code);
+    if (validationError) {
+      return {
+        success: false,
+        error: `Code validation failed: ${validationError}`,
+        executionTimeMs: Math.round(performance.now() - startTime),
+      };
+    }
+
     // Create restricted scope
     const supabaseProxy = createSupabaseProxy(context.tenant_id, callLog);
     const { proxy: consoleProxy, logs: consoleLogs } = createConsoleProxy();
@@ -143,8 +183,14 @@ function buildExecutor(
       clearTimeout,
     ];
 
+    // Build sandbox context with only safe globals
+    const sandboxContext: Record<string, unknown> = {};
+    for (let i = 0; i < scopeVars.length; i++) {
+      sandboxContext[scopeVars[i]] = scopeValues[i];
+    }
+
     // Freeze all injected objects to prevent modification
-    for (const val of scopeValues) {
+    for (const val of Object.values(sandboxContext)) {
       if (val && typeof val === "object") {
         try {
           Object.freeze(val);
@@ -154,18 +200,22 @@ function buildExecutor(
       }
     }
 
-    // Build the function with restricted scope
+    // Create an isolated V8 context — prevents prototype chain escapes
+    const vmContext = vm.createContext(sandboxContext, {
+      codeGeneration: { strings: false, wasm: false },
+    });
+
     // The code should end with: function createExecutor() { return new XClass(); }
-    // We call createExecutor() to get the instance
     const wrappedCode = `
       "use strict";
       ${code}
-      return createExecutor();
+      createExecutor();
     `;
 
-    // eslint-disable-next-line no-new-func
-    const factory = new Function(...scopeVars, wrappedCode);
-    const executor = factory(...scopeValues);
+    const executor = vm.runInContext(wrappedCode, vmContext, {
+      timeout: EXECUTION_TIMEOUT_MS,
+      filename: `skill-${Date.now()}.js`,
+    });
 
     // Validate the executor has required methods
     if (!executor || typeof executor.getData !== "function") {

@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getModExecutor, hasModExecutor } from "@/lib/mods/executors";
 import { getModDefinition } from "@/lib/mods";
 import { ModSlug } from "@/lib/mods/types";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -28,11 +29,10 @@ export async function GET(
   try {
     const supabase = getSupabase();
     const { slug } = await params;
-    const tenantId = request.headers.get("x-tenant-id");
 
-    if (!tenantId) {
-      return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     // Check mod exists (static definition or dynamic skill)
     const modDef = getModDefinition(slug);
@@ -98,11 +98,10 @@ export async function POST(
   try {
     const supabase = getSupabase();
     const { slug } = await params;
-    const tenantId = request.headers.get("x-tenant-id");
 
-    if (!tenantId) {
-      return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const body = await request.json();
     const { action, params: actionParams } = body as {

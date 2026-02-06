@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getRigDefinition } from "@/lib/rigs";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -129,24 +130,32 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   try {
-    const body = await request.json();
-    const { userId, checks } = body;
+    const body = (await request.json().catch(() => ({}))) as {
+      userId?: string;
+      checks?: CheckType[];
+    };
 
-    if (!userId) {
-      return NextResponse.json({ error: "userId required" }, { status: 400 });
-    }
-
-    // Verify auth (service role or user's own request)
+    // Verify auth: service role (internal) or user JWT
     const authHeader = request.headers.get("authorization");
     const isServiceRole =
       authHeader === `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`;
 
-    if (!isServiceRole) {
-      // TODO: Verify user JWT matches userId
-      console.log("[PULSE] User-triggered pulse for:", userId);
+    let userId: string;
+
+    if (isServiceRole) {
+      // Internal call — trust userId from body
+      if (!body.userId) {
+        return NextResponse.json({ error: "userId required" }, { status: 400 });
+      }
+      userId = body.userId;
+    } else {
+      // User call — verify JWT and use authenticated user ID
+      const auth = await verifyTenantAuth(request);
+      if (!auth.ok) return auth.response;
+      userId = auth.tenantId;
     }
 
-    const enabledChecks = checks || ["health", "tasks", "calendar"];
+    const enabledChecks = body.checks || ["health", "tasks", "calendar"];
     const result = await runPulseForUser(userId, enabledChecks);
 
     // Update state

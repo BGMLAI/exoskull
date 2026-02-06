@@ -64,9 +64,7 @@ export function EmailInboxWidget({
     setError(null);
 
     try {
-      const response = await fetch(`/api/rigs/${rigSlug}/emails?max=10`, {
-        headers: { "x-tenant-id": tenantId },
-      });
+      const response = await fetch(`/api/rigs/${rigSlug}/emails?max=10`);
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));

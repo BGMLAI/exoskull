@@ -4,6 +4,7 @@ import { RigConnection } from "@/lib/rigs/types";
 import { createGoogleClient } from "@/lib/rigs/google/client";
 import { createGoogleWorkspaceClient } from "@/lib/rigs/google-workspace/client";
 import { createMicrosoft365Client } from "@/lib/rigs/microsoft-365/client";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -20,11 +21,10 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
-  const tenantId = request.headers.get("x-tenant-id");
 
-  if (!tenantId) {
-    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(request);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   try {
     const supabase = getSupabase();

@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { RigConnection } from "@/lib/rigs/types";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 // Import rig clients
 import { createNotionClient } from "@/lib/rigs/notion/client";
@@ -52,11 +53,10 @@ export async function POST(
   const supabase = getSupabase();
   const startTime = Date.now();
   const { slug } = await params;
-  const tenantId = request.headers.get("x-tenant-id");
 
-  if (!tenantId) {
-    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(request);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   try {
     // Get connection
@@ -455,11 +455,10 @@ export async function GET(
 ) {
   const supabase = getSupabase();
   const { slug } = await params;
-  const tenantId = request.headers.get("x-tenant-id");
 
-  if (!tenantId) {
-    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(request);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   // Get connection status
   const { data: connection, error: connError } = await supabase

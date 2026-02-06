@@ -9,6 +9,7 @@ import { executeInSandbox } from "@/lib/skills/sandbox/restricted-function";
 import { logExecution } from "@/lib/skills/sandbox/execution-logger";
 import { checkCircuitBreaker } from "@/lib/skills/sandbox/circuit-breaker";
 import { SkillExecutionContext } from "@/lib/skills/types";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +25,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const tenantId = request.headers.get("x-tenant-id");
-    if (!tenantId) {
-      return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { id: skillId } = await params;
     const body = await request.json();

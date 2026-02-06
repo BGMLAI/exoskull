@@ -9,6 +9,7 @@ import type {
   OuraSleepPeriod,
   OuraDailyActivity,
 } from "@/lib/rigs/oura/client";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -38,12 +39,10 @@ interface HealthMetricInsert {
 export async function POST(request: NextRequest) {
   const supabase = getSupabase();
   const startTime = Date.now();
-  const tenantId = request.headers.get("x-tenant-id");
 
-  if (!tenantId) {
-    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-  }
-  const tenantIdValue = tenantId;
+  const auth = await verifyTenantAuth(request);
+  if (!auth.ok) return auth.response;
+  const tenantIdValue = auth.tenantId;
 
   try {
     const { days: bodyDays } = (await request.json().catch(() => ({}))) as {
@@ -173,11 +172,10 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const supabase = getSupabase();
-  const tenantId = request.headers.get("x-tenant-id");
 
-  if (!tenantId) {
-    return NextResponse.json({ error: "Missing tenant ID" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(request);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   const { data: connection, error: connError } = await supabase
     .from("exo_rig_connections")

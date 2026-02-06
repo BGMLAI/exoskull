@@ -180,7 +180,6 @@ export default function SkillsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": userId,
         },
         body: JSON.stringify({ description: generateDescription.trim() }),
       });
@@ -216,7 +215,6 @@ export default function SkillsPage() {
     try {
       const res = await fetch(`/api/skills/${skillId}`, {
         method: "DELETE",
-        headers: { "x-tenant-id": userId },
       });
 
       if (res.ok) {

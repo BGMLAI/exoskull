@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -67,29 +68,9 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   try {
-    // Get tenant ID from header or auth token
-    const tenantId = request.headers.get("x-tenant-id");
-    const authHeader = request.headers.get("authorization");
-
-    let userId: string | null = tenantId;
-
-    if (!userId && authHeader?.startsWith("Bearer ")) {
-      const token = authHeader.slice(7);
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser(token);
-      if (!error && user) {
-        userId = user.id;
-      }
-    }
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized - missing tenant ID or valid token" },
-        { status: 401 },
-      );
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const userId = auth.tenantId;
 
     const payload: SyncPayload = await request.json();
 
@@ -275,22 +256,10 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const supabase = getSupabase();
-  const tenantId = request.headers.get("x-tenant-id");
-  const authHeader = request.headers.get("authorization");
 
-  let userId: string | null = tenantId;
-
-  if (!userId && authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.slice(7);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser(token);
-    if (user) userId = user.id;
-  }
-
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(request);
+  if (!auth.ok) return auth.response;
+  const userId = auth.tenantId;
 
   const { data: connection } = await supabase
     .from("exo_rig_connections")

@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -29,13 +30,9 @@ function getSupabase() {
 
 export async function GET(req: NextRequest) {
   try {
-    const tenantId = req.headers.get("x-tenant-id");
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: "Missing x-tenant-id" },
-        { status: 401 },
-      );
-    }
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const supabase = getSupabase();
     const { data: pages, error } = await supabase
@@ -78,12 +75,16 @@ interface ConnectRequest {
 
 export async function POST(req: NextRequest) {
   try {
-    const body: ConnectRequest = await req.json();
-    const { user_access_token, tenant_id, page_ids } = body;
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenant_id = auth.tenantId;
 
-    if (!user_access_token || !tenant_id) {
+    const body: ConnectRequest = await req.json();
+    const { user_access_token, page_ids } = body;
+
+    if (!user_access_token) {
       return NextResponse.json(
-        { error: "Missing user_access_token or tenant_id" },
+        { error: "Missing user_access_token" },
         { status: 400 },
       );
     }
@@ -238,15 +239,15 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const { searchParams } = req.nextUrl;
     const pageId = searchParams.get("page_id");
-    const tenantId = req.headers.get("x-tenant-id");
 
-    if (!pageId || !tenantId) {
-      return NextResponse.json(
-        { error: "Missing page_id or x-tenant-id" },
-        { status: 400 },
-      );
+    if (!pageId) {
+      return NextResponse.json({ error: "Missing page_id" }, { status: 400 });
     }
 
     const supabase = getSupabase();

@@ -286,7 +286,7 @@ const tests: TestPath[] = [
     description: "Onboarding status (cookie auth)",
   },
 
-  // ── 7. KNOWLEDGE (tenant_id query param + x-tenant-id header) ──
+  // ── 7. KNOWLEDGE (tenant_id query param) ──
   {
     id: 42,
     category: "knowledge",
@@ -353,7 +353,7 @@ const tests: TestPath[] = [
     description: "List autonomy grants",
   },
 
-  // ── 9. RIGS (x-tenant-id header) ──
+  // ── 9. RIGS (cookie auth) ──
   {
     id: 64,
     category: "rigs",
@@ -391,7 +391,7 @@ const tests: TestPath[] = [
     description: "Oura sync status",
   },
 
-  // ── 10. MODS (x-tenant-id header) ──
+  // ── 10. MODS (cookie auth) ──
   {
     id: 76,
     category: "mods",
@@ -758,8 +758,6 @@ async function runTest(test: TestPath): Promise<TestResult> {
     }
     // Send Supabase SSR cookie for cookie-based auth
     headers["Cookie"] = session.cookie;
-    // Also send x-tenant-id for routes that need it
-    headers["x-tenant-id"] = session.userId;
   } else if (test.auth === "cron") {
     if (!CRON_SECRET) {
       return {
