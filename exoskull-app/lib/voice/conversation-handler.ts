@@ -8,6 +8,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import twilio from "twilio";
 import { STATIC_SYSTEM_PROMPT } from "./system-prompt";
+import {
+  getExtensionToolDefinitions,
+  executeExtensionTool,
+} from "@/lib/iors/tools";
 import { makeOutboundCall } from "./twilio-client";
 import {
   appendMessage,
@@ -71,6 +75,8 @@ export interface VoiceSession {
   startedAt: string;
   endedAt?: string;
   metadata?: Record<string, any>;
+  /** Optional prompt prefix (e.g., IORS birth flow) prepended to system prompt */
+  systemPromptPrefix?: string;
 }
 
 export interface ConversationResult {
@@ -559,6 +565,8 @@ const IORS_TOOLS: Anthropic.Tool[] = [
       properties: {},
     },
   },
+  // IORS extension tools (personality, autonomy, emergency)
+  ...getExtensionToolDefinitions(),
 ];
 
 // ============================================================================
@@ -725,6 +733,14 @@ async function executeTool(
   console.log("[ConversationHandler] Executing tool:", toolName, toolInput);
 
   try {
+    // Try IORS extension tools first (personality, autonomy, emergency)
+    const extensionResult = await executeExtensionTool(
+      toolName,
+      toolInput,
+      tenantId,
+    );
+    if (extensionResult !== null) return extensionResult;
+
     if (toolName === "add_task") {
       const { data, error } = await supabase
         .from("exo_tasks")
@@ -1497,7 +1513,9 @@ async function buildDynamicContext(tenantId: string): Promise<string> {
   // Get user profile
   const { data: tenant } = await supabase
     .from("exo_tenants")
-    .select("name, preferred_name, communication_style")
+    .select(
+      "name, preferred_name, communication_style, iors_personality, iors_name",
+    )
     .eq("id", tenantId)
     .single();
 
@@ -1543,6 +1561,23 @@ async function buildDynamicContext(tenantId: string): Promise<string> {
       .map((m: any) => m.exo_mod_registry?.slug || "unknown")
       .join(", ");
     context += `- Zainstalowane Mody: ${modList}\n`;
+  }
+
+  // IORS Personality — dynamic prompt fragment based on user preferences
+  try {
+    const { getPersonalityPromptFragment } =
+      await import("@/lib/iors/personality");
+    const personalityFragment = getPersonalityPromptFragment(
+      (tenant as any)?.iors_personality ?? null,
+    );
+    if (personalityFragment) {
+      context += personalityFragment;
+    }
+  } catch (err) {
+    console.warn(
+      "[ConversationHandler] Personality fragment failed:",
+      err instanceof Error ? err.message : err,
+    );
   }
 
   // Cross-channel conversation summary
@@ -1658,6 +1693,19 @@ export async function processUserMessage(
     analyzeEmotion(userMessage),
   ]);
 
+  // Tau Matrix — fire-and-forget 4-quadrant emotion classification
+  import("@/lib/iors/emotion-matrix")
+    .then(({ classifyTauQuadrant, logEmotionSignal }) => {
+      const signal = classifyTauQuadrant(emotionState);
+      return logEmotionSignal(session.tenantId, signal, session.id);
+    })
+    .catch((err) => {
+      console.warn(
+        "[ConversationHandler] Tau classification failed:",
+        err instanceof Error ? err.message : String(err),
+      );
+    });
+
   // Crisis check (blocks if detected — safety requirement)
   const crisis = await detectCrisis(userMessage, emotionState);
 
@@ -1697,10 +1745,28 @@ export async function processUserMessage(
           },
         );
       });
+    // Emergency contact escalation for high/critical crises
+    if (crisis.severity === "high" || crisis.severity === "critical") {
+      import("@/lib/iors/emergency-contact")
+        .then(({ escalateToCrisisContact }) =>
+          escalateToCrisisContact(
+            session.tenantId,
+            crisis.type!,
+            crisis.severity!,
+          ),
+        )
+        .catch((err) => {
+          console.error("[ConversationHandler] Emergency escalation failed:", {
+            error: err instanceof Error ? err.message : String(err),
+            tenantId: session.tenantId,
+          });
+        });
+    }
   } else {
     // Normal: emotion-adaptive prompt
     const adaptive = getAdaptivePrompt(emotionState);
     fullSystemPrompt =
+      (session.systemPromptPrefix || "") +
       STATIC_SYSTEM_PROMPT +
       dynamicContext +
       (adaptive.mode !== "neutral" ? "\n\n" + adaptive.instruction : "");

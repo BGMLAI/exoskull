@@ -20,6 +20,8 @@ import {
   getOnboardingStatus,
   handleOnboardingMessage,
 } from "./onboarding-handler";
+import { isBirthPending, handleBirthMessage } from "@/lib/iors/birth-flow";
+import { findOrCreateLead, handleLeadMessage } from "@/lib/iors/lead-manager";
 import { classifyMessage } from "../async-tasks/classifier";
 import { createTask, getLatestPendingTask } from "../async-tasks/queue";
 import type { GatewayChannel, GatewayMessage, GatewayResponse } from "./types";
@@ -172,7 +174,26 @@ export async function handleInboundMessage(
       if (tenant) {
         tenantId = tenant.tenantId;
       } else {
-        // Auto-register new user
+        // Unknown sender — try lead system first (lightweight Tier 1 conversation)
+        try {
+          const leadResult = await findOrCreateLead(
+            msg.channel,
+            msg.from,
+            msg.senderName,
+          );
+          if (leadResult) {
+            return await handleLeadMessage(
+              leadResult.lead,
+              msg.text,
+              msg.channel,
+            );
+          }
+        } catch (leadErr) {
+          console.error("[Gateway] Lead system failed, falling back:", {
+            error: leadErr instanceof Error ? leadErr.message : leadErr,
+          });
+        }
+        // Fallback: auto-register new user
         tenantId = await autoRegisterTenant(
           msg.channel,
           msg.from,
@@ -197,7 +218,41 @@ export async function handleInboundMessage(
       },
     });
 
-    // 3. Check onboarding status — route new users to discovery conversation
+    // 3a. IORS Birth Flow — new IORS birth (full pipeline with tools)
+    // Skip for web_chat (has own UI) and voice (synchronous)
+    if (msg.channel !== "web_chat" && msg.channel !== "voice") {
+      const birthPending = await isBirthPending(tenantId);
+      if (birthPending) {
+        const birthResult = await handleBirthMessage(
+          tenantId,
+          msg.text,
+          msg.channel,
+        );
+
+        // Append assistant response to unified thread
+        await appendMessage(tenantId, {
+          role: "assistant",
+          content: birthResult.text,
+          channel: unifiedChannel,
+          direction: "outbound",
+          metadata: {
+            gateway_channel: msg.channel,
+            iors_birth: true,
+          },
+        });
+
+        const durationMs = Date.now() - startTime;
+        console.log("[Gateway] Birth message processed:", {
+          channel: msg.channel,
+          tenantId,
+          durationMs,
+        });
+
+        return birthResult;
+      }
+    }
+
+    // 3b. Legacy onboarding — route users to discovery conversation
     // Skip for web_chat (dashboard has its own onboarding UI) and voice (synchronous)
     if (msg.channel !== "web_chat" && msg.channel !== "voice") {
       const onboardingStatus = await getOnboardingStatus(tenantId);
