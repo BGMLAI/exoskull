@@ -7,11 +7,11 @@
 -- 1. ADD 'health_prediction' TO INTERVENTION TYPE CHECK
 -- =====================================================
 
-ALTER TABLE exo_autonomy_interventions
-  DROP CONSTRAINT IF EXISTS exo_autonomy_interventions_intervention_type_check;
+ALTER TABLE exo_interventions
+  DROP CONSTRAINT IF EXISTS exo_interventions_intervention_type_check;
 
-ALTER TABLE exo_autonomy_interventions
-  ADD CONSTRAINT exo_autonomy_interventions_intervention_type_check
+ALTER TABLE exo_interventions
+  ADD CONSTRAINT exo_interventions_intervention_type_check
   CHECK (intervention_type IN (
     'proactive_message',
     'task_creation',
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS exo_predictions (
   metadata JSONB DEFAULT '{}',
 
   -- Link to intervention (if one was created)
-  intervention_id UUID REFERENCES exo_autonomy_interventions(id),
+  intervention_id UUID REFERENCES exo_interventions(id),
 
   -- Timestamps
   created_at TIMESTAMPTZ DEFAULT NOW(),

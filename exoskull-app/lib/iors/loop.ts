@@ -263,7 +263,7 @@ export async function quickStateCheck(tenantId: string): Promise<{
   // Run checks in parallel
   const [interventions, tasks, insights, lastMsg] = await Promise.all([
     supabase
-      .from("exo_autonomy_interventions")
+      .from("exo_interventions")
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", tenantId)
       .eq("status", "proposed"),

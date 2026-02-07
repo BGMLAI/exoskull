@@ -136,6 +136,16 @@ export default function SettingsPage() {
   const [notificationsSaved, setNotificationsSaved] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [exportingData, setExportingData] = useState(false);
+  const [autonomyPermissions, setAutonomyPermissions] = useState<
+    Array<{
+      action_type: string;
+      domain: string;
+      granted: boolean;
+      requires_confirmation: boolean;
+      threshold_amount?: number;
+    }>
+  >([]);
+  const [autonomyLoading, setAutonomyLoading] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -235,6 +245,17 @@ export default function SettingsPage() {
           .eq("tenant_id", user.id)
           .eq("status", "active");
         setActiveSkills(skills || []);
+      }
+
+      // Load autonomy permissions
+      try {
+        const autoRes = await fetch("/api/settings/autonomy");
+        if (autoRes.ok) {
+          const autoJson = await autoRes.json();
+          setAutonomyPermissions(autoJson.permissions || []);
+        }
+      } catch {
+        // Non-blocking — permissions will show empty
       }
     } catch (err) {
       console.error("[SettingsPage] Error:", err);
@@ -347,6 +368,34 @@ export default function SettingsPage() {
       setError(err instanceof Error ? err.message : "Nieznany blad");
     } finally {
       setSavingNotifications(false);
+    }
+  }
+
+  async function toggleAutonomy(
+    actionType: string,
+    granted: boolean,
+    requiresConfirmation: boolean = false,
+  ) {
+    setAutonomyLoading(true);
+    try {
+      const res = await fetch("/api/settings/autonomy", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action_type: actionType,
+          domain: "*",
+          granted,
+          requires_confirmation: requiresConfirmation,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAutonomyPermissions(data.permissions || []);
+      }
+    } catch (err) {
+      console.error("[Settings] Autonomy toggle error:", err);
+    } finally {
+      setAutonomyLoading(false);
     }
   }
 

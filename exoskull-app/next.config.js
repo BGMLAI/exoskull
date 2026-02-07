@@ -24,7 +24,7 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' blob:",
+              `script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === 'development' ? "'unsafe-eval'" : ''} blob:`,
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.elevenlabs.io https://api.anthropic.com https://*.sentry.io https://*.ingest.sentry.io",
               "media-src 'self' blob: https://*.daily.co",
               "worker-src 'self' blob:",

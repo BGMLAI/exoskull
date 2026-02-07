@@ -84,6 +84,16 @@ CREATE TABLE IF NOT EXISTS exo_emergency_contacts (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Ensure columns exist (table may have been created by earlier migration without these)
+ALTER TABLE exo_emergency_contacts ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE exo_emergency_contacts ADD COLUMN IF NOT EXISTS name TEXT;
+ALTER TABLE exo_emergency_contacts ADD COLUMN IF NOT EXISTS relationship TEXT;
+ALTER TABLE exo_emergency_contacts ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE;
+ALTER TABLE exo_emergency_contacts ADD COLUMN IF NOT EXISTS verification_code TEXT;
+ALTER TABLE exo_emergency_contacts ADD COLUMN IF NOT EXISTS verification_sent_at TIMESTAMPTZ;
+ALTER TABLE exo_emergency_contacts ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
+ALTER TABLE exo_emergency_contacts ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT FALSE;
+
 CREATE INDEX IF NOT EXISTS idx_emergency_contacts_tenant ON exo_emergency_contacts(tenant_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_emergency_primary ON exo_emergency_contacts(tenant_id) WHERE is_primary = TRUE;
 
