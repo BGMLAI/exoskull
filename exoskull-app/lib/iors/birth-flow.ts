@@ -135,7 +135,7 @@ export async function handleBirthMessage(
 /**
  * Complete the IORS birth — save personality and mark as born.
  */
-async function completeBirth(
+export async function completeBirth(
   tenantId: string,
   birthDataJson: string,
 ): Promise<void> {

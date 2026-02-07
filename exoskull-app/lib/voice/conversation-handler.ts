@@ -46,6 +46,10 @@ export interface VoiceSession {
   metadata?: Record<string, any>;
   /** Optional prompt prefix (e.g., IORS birth flow) prepended to system prompt */
   systemPromptPrefix?: string;
+  /** Override max_tokens (default 200 for voice, set higher for birth/chat flows) */
+  maxTokens?: number;
+  /** Skip end-call phrase detection (e.g., during birth flow where "cześć" is a greeting) */
+  skipEndCallDetection?: boolean;
 }
 
 export interface ConversationResult {
@@ -257,8 +261,8 @@ export async function processUserMessage(
 ): Promise<ConversationResult> {
   const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
-  // Check for end call phrases
-  if (shouldEndCall(userMessage)) {
+  // Check for end call phrases (skip during birth flow etc.)
+  if (!session.skipEndCallDetection && shouldEndCall(userMessage)) {
     return {
       text: "Do usłyszenia! Miłego dnia!",
       toolsUsed: [],
@@ -409,7 +413,7 @@ export async function processUserMessage(
     // First API call (max_tokens low for voice = short, fast responses)
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: maxTokensOverride || 200,
+      max_tokens: session.maxTokens || maxTokensOverride || 200,
       system: fullSystemPrompt,
       messages,
       tools: IORS_TOOLS,
@@ -443,7 +447,7 @@ export async function processUserMessage(
       // Second API call with tool results (reuse emotion-adapted prompt)
       const followUpResponse = await anthropic.messages.create({
         model: CLAUDE_MODEL,
-        max_tokens: maxTokensOverride || 150,
+        max_tokens: session.maxTokens || maxTokensOverride || 150,
         system: fullSystemPrompt,
         messages: [
           ...messages,
