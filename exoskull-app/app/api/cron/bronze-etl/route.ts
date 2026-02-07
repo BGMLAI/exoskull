@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runBronzeETL, runBronzeETLForTenant } from "@/lib/datalake/bronze-etl";
 import { checkR2Connection, getBronzeStats } from "@/lib/storage/r2-client";
 import { withCronGuard } from "@/lib/admin/cron-guard";
+import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -93,6 +94,10 @@ export const POST = withCronGuard({ name: "bronze-etl" }, postHandler);
  * Get Bronze ETL status and stats
  */
 export async function GET(req: NextRequest) {
+  if (!verifyCronAuth(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   // Check R2 connection
   const r2Check = await checkR2Connection();
 

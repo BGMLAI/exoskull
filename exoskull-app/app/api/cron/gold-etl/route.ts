@@ -19,6 +19,7 @@ import {
   getRefreshHistory,
 } from "@/lib/datalake/gold-etl";
 import { withCronGuard } from "@/lib/admin/cron-guard";
+import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -92,7 +93,11 @@ export const POST = withCronGuard(
  * GET /api/cron/gold-etl
  * Get Gold ETL status and stats
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!verifyCronAuth(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const [stats, history] = await Promise.all([
       getGoldStats(),

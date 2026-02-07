@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[Transcribe] Error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
+      { error: "Transcription failed" },
       { status: 500 },
     );
   }

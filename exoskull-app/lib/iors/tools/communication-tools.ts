@@ -389,8 +389,15 @@ export const communicationTools: ToolDefinition[] = [
         required: ["contact_name", "message"],
       },
     },
-    execute: async () => {
-      return "Messenger nie jest jeszcze skonfigurowany.";
+    execute: async (_args: Record<string, unknown>, tenantId?: string) => {
+      console.warn(
+        "[send_messenger] Not yet implemented — needs CRM contact lookup",
+        {
+          tenantId,
+          contact: _args.contact_name,
+        },
+      );
+      return "Wysyłanie przez Messenger wymaga skonfigurowania integracji z Facebook Pages. Użyj 'connect_rig' aby połączyć konto Facebook.";
     },
   },
 ];

@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("[Autonomy] GET error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
+      { error: "Failed to fetch autonomy grants" },
       { status: 500 },
     );
   }
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[Autonomy] POST error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
+      { error: "Failed to create autonomy grant" },
       { status: 500 },
     );
   }
@@ -198,7 +198,7 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     console.error("[Autonomy] PATCH error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
+      { error: "Failed to update autonomy grant" },
       { status: 500 },
     );
   }
@@ -241,7 +241,7 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     console.error("[Autonomy] DELETE error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
+      { error: "Failed to revoke autonomy grant" },
       { status: 500 },
     );
   }

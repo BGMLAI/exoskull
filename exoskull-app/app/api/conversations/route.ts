@@ -30,11 +30,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ conversations });
   } catch (error: any) {
-    console.error("Error fetching conversations:", error);
+    console.error("[Conversations] GET error:", error);
     return NextResponse.json(
-      {
-        error: error.message,
-      },
+      { error: "Failed to fetch conversations" },
       { status: 500 },
     );
   }
@@ -72,11 +70,9 @@ export async function POST(req: NextRequest) {
       tenant_id: user.id,
     });
   } catch (error: any) {
-    console.error("Error creating conversation:", error);
+    console.error("[Conversations] POST error:", error);
     return NextResponse.json(
-      {
-        error: error.message,
-      },
+      { error: "Failed to create conversation" },
       { status: 500 },
     );
   }

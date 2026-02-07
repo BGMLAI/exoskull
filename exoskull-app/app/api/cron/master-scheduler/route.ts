@@ -28,6 +28,7 @@ import {
   type UserJobConfig,
 } from "@/lib/cron/dispatcher";
 import { withCronGuard } from "@/lib/admin/cron-guard";
+import { verifyCronAuth } from "@/lib/cron/auth";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
@@ -454,6 +455,10 @@ async function logCustomJobExecution(
  * GET endpoint for manual testing / status check
  */
 export async function GET(req: NextRequest) {
+  if (!verifyCronAuth(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const supabase = getServiceSupabase();
     // Get all jobs with consent info

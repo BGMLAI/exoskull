@@ -48,122 +48,135 @@ export const canvasTools: ToolDefinition[] = [
       const widgetId = input.widget_id as string | undefined;
       const title = input.title as string | undefined;
 
-      switch (action) {
-        case "add": {
-          // Check if non-mod widget already exists
-          if (!widgetType.startsWith("dynamic_mod:")) {
-            const { data: existing } = await supabase
-              .from("exo_canvas_widgets")
-              .select("id")
-              .eq("tenant_id", tenantId)
-              .eq("widget_type", widgetType)
-              .maybeSingle();
-
-            if (existing) {
-              // Already exists — just make visible
-              await supabase
+      try {
+        switch (action) {
+          case "add": {
+            // Check if non-mod widget already exists
+            if (!widgetType.startsWith("dynamic_mod:")) {
+              const { data: existing } = await supabase
                 .from("exo_canvas_widgets")
-                .update({ visible: true, updated_at: new Date().toISOString() })
-                .eq("id", existing.id);
-              return `Widget ${widgetType} juz istnieje — pokazalem go na dashboardzie.`;
+                .select("id")
+                .eq("tenant_id", tenantId)
+                .eq("widget_type", widgetType)
+                .maybeSingle();
+
+              if (existing) {
+                // Already exists — just make visible
+                await supabase
+                  .from("exo_canvas_widgets")
+                  .update({
+                    visible: true,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", existing.id);
+                return `Widget ${widgetType} juz istnieje — pokazalem go na dashboardzie.`;
+              }
             }
-          }
 
-          const modSlug = widgetType.startsWith("dynamic_mod:")
-            ? widgetType.replace("dynamic_mod:", "")
-            : null;
+            const modSlug = widgetType.startsWith("dynamic_mod:")
+              ? widgetType.replace("dynamic_mod:", "")
+              : null;
 
-          const { error } = await supabase.from("exo_canvas_widgets").insert({
-            tenant_id: tenantId,
-            widget_type: widgetType,
-            title: title || null,
-            mod_slug: modSlug,
-            position_x: 0,
-            position_y: 100, // auto-place at bottom
-            size_w: 2,
-            size_h: 2,
-            created_by: "iors_proposed",
-          });
-
-          if (error) {
-            console.error("[CanvasTools] Add failed:", {
-              tenantId,
-              widgetType,
-              error: error.message,
+            const { error } = await supabase.from("exo_canvas_widgets").insert({
+              tenant_id: tenantId,
+              widget_type: widgetType,
+              title: title || null,
+              mod_slug: modSlug,
+              position_x: 0,
+              position_y: 100, // auto-place at bottom
+              size_w: 2,
+              size_h: 2,
+              created_by: "iors_proposed",
             });
-            return "Nie udalo sie dodac widgetu. Sprobuj ponownie.";
-          }
-          return `Dodalem widget ${title || widgetType} na Twoj dashboard.`;
-        }
 
-        case "remove": {
-          const id =
-            widgetId || (await findWidgetId(supabase, tenantId, widgetType));
-          if (!id)
-            return `Nie znalazlem widgetu ${widgetType} na dashboardzie.`;
-
-          const { data: widget } = await supabase
-            .from("exo_canvas_widgets")
-            .select("pinned")
-            .eq("id", id)
-            .eq("tenant_id", tenantId)
-            .single();
-
-          if (widget?.pinned) {
-            return "Ten widget jest przypierty i nie mozna go usunac.";
+            if (error) {
+              console.error("[CanvasTools] Add failed:", {
+                tenantId,
+                widgetType,
+                error: error.message,
+              });
+              return "Nie udalo sie dodac widgetu. Sprobuj ponownie.";
+            }
+            return `Dodalem widget ${title || widgetType} na Twoj dashboard.`;
           }
 
-          await supabase
-            .from("exo_canvas_widgets")
-            .delete()
-            .eq("id", id)
-            .eq("tenant_id", tenantId);
+          case "remove": {
+            const id =
+              widgetId || (await findWidgetId(supabase, tenantId, widgetType));
+            if (!id)
+              return `Nie znalazlem widgetu ${widgetType} na dashboardzie.`;
 
-          return `Usuniety widget ${widgetType} z dashboardu.`;
-        }
+            const { data: widget } = await supabase
+              .from("exo_canvas_widgets")
+              .select("pinned")
+              .eq("id", id)
+              .eq("tenant_id", tenantId)
+              .single();
 
-        case "show": {
-          const id =
-            widgetId ||
-            (await findWidgetId(supabase, tenantId, widgetType, false));
-          if (!id) return `Nie znalazlem ukrytego widgetu ${widgetType}.`;
+            if (widget?.pinned) {
+              return "Ten widget jest przypierty i nie mozna go usunac.";
+            }
 
-          await supabase
-            .from("exo_canvas_widgets")
-            .update({ visible: true, updated_at: new Date().toISOString() })
-            .eq("id", id)
-            .eq("tenant_id", tenantId);
+            await supabase
+              .from("exo_canvas_widgets")
+              .delete()
+              .eq("id", id)
+              .eq("tenant_id", tenantId);
 
-          return `Widget ${widgetType} jest teraz widoczny.`;
-        }
-
-        case "hide": {
-          const id =
-            widgetId || (await findWidgetId(supabase, tenantId, widgetType));
-          if (!id) return `Nie znalazlem widgetu ${widgetType}.`;
-
-          const { data: widget } = await supabase
-            .from("exo_canvas_widgets")
-            .select("pinned")
-            .eq("id", id)
-            .eq("tenant_id", tenantId)
-            .single();
-
-          if (widget?.pinned) {
-            return "Ten widget jest przypierty i nie mozna go ukryc.";
+            return `Usuniety widget ${widgetType} z dashboardu.`;
           }
 
-          await supabase
-            .from("exo_canvas_widgets")
-            .update({ visible: false, updated_at: new Date().toISOString() })
-            .eq("id", id)
-            .eq("tenant_id", tenantId);
+          case "show": {
+            const id =
+              widgetId ||
+              (await findWidgetId(supabase, tenantId, widgetType, false));
+            if (!id) return `Nie znalazlem ukrytego widgetu ${widgetType}.`;
 
-          return `Widget ${widgetType} ukryty.`;
+            await supabase
+              .from("exo_canvas_widgets")
+              .update({ visible: true, updated_at: new Date().toISOString() })
+              .eq("id", id)
+              .eq("tenant_id", tenantId);
+
+            return `Widget ${widgetType} jest teraz widoczny.`;
+          }
+
+          case "hide": {
+            const id =
+              widgetId || (await findWidgetId(supabase, tenantId, widgetType));
+            if (!id) return `Nie znalazlem widgetu ${widgetType}.`;
+
+            const { data: widget } = await supabase
+              .from("exo_canvas_widgets")
+              .select("pinned")
+              .eq("id", id)
+              .eq("tenant_id", tenantId)
+              .single();
+
+            if (widget?.pinned) {
+              return "Ten widget jest przypierty i nie mozna go ukryc.";
+            }
+
+            await supabase
+              .from("exo_canvas_widgets")
+              .update({ visible: false, updated_at: new Date().toISOString() })
+              .eq("id", id)
+              .eq("tenant_id", tenantId);
+
+            return `Widget ${widgetType} ukryty.`;
+          }
+
+          default:
+            return `Nieznana akcja: ${action}. Uzyj: add, remove, show, hide.`;
         }
-
-        default:
-          return `Nieznana akcja: ${action}. Uzyj: add, remove, show, hide.`;
+      } catch (error) {
+        console.error("[manage_canvas] Error:", {
+          action,
+          widgetType,
+          tenantId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return "Wystapil blad przy zarzadzaniu widgetami. Sprobuj ponownie.";
       }
     },
   },

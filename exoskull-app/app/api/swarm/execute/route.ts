@@ -115,10 +115,11 @@ export async function POST(req: NextRequest) {
       latencyMs: result.totalLatencyMs,
     });
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error("[Swarm API] Execute failed:", { error: errorMsg });
+    console.error("[Swarm API] Execute failed:", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
-      { status: "failed", error: errorMsg },
+      { status: "failed", error: "Swarm execution failed" },
       { status: 500 },
     );
   }

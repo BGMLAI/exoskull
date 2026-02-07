@@ -107,10 +107,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("[PULSE] CRON error:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Pulse check failed" }, { status: 500 });
   }
 }
 
@@ -165,10 +162,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[PULSE] POST error:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Pulse check failed" }, { status: 500 });
   }
 }
 

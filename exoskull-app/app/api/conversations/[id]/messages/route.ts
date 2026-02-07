@@ -32,11 +32,9 @@ export async function GET(
 
     return NextResponse.json({ messages });
   } catch (error: any) {
-    console.error("Error fetching messages:", error);
+    console.error("[Messages] GET error:", error);
     return NextResponse.json(
-      {
-        error: error.message,
-      },
+      { error: "Failed to fetch messages" },
       { status: 500 },
     );
   }
@@ -106,11 +104,9 @@ export async function POST(
 
     return NextResponse.json({ message });
   } catch (error: any) {
-    console.error("Error adding message:", error);
+    console.error("[Messages] POST error:", error);
     return NextResponse.json(
-      {
-        error: error.message,
-      },
+      { error: "Failed to add message" },
       { status: 500 },
     );
   }

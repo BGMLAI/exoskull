@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runSilverETL, getSilverStats } from "@/lib/datalake/silver-etl";
 import { checkR2Connection } from "@/lib/storage/r2-client";
 import { withCronGuard } from "@/lib/admin/cron-guard";
+import { verifyCronAuth } from "@/lib/cron/auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -103,7 +104,11 @@ export const POST = withCronGuard(
  * GET /api/cron/silver-etl
  * Get Silver ETL status and stats
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!verifyCronAuth(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   // Check R2 connection (needed to read Bronze)
   const r2Check = await checkR2Connection();
 
