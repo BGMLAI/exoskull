@@ -68,10 +68,18 @@ export interface GeneratedSkill {
 // Skill Generation
 // =====================================================
 
+export type SkillGeneratorModel =
+  | "claude-sonnet"
+  | "codex"
+  | "gemini-flash"
+  | "auto";
+
 export interface SkillGenerationRequest {
   tenant_id: string;
   description: string;
   source: "user_request" | "gap_detection" | "pattern_match";
+  /** Which AI model to use for code generation. Defaults to "auto" (router decides). */
+  model?: SkillGeneratorModel;
 }
 
 export interface SkillGenerationResult {

@@ -18,7 +18,10 @@ export async function POST(request: NextRequest) {
     const tenantId = auth.tenantId;
 
     const body = await request.json();
-    const { description } = body as { description?: string };
+    const { description, model } = body as {
+      description?: string;
+      model?: string;
+    };
 
     if (!description || description.trim().length < 5) {
       return NextResponse.json(
@@ -27,11 +30,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate the skill (AI code generation + validation + DB insert)
+    const allowedModels = ["claude-sonnet", "codex", "gemini-flash", "auto"];
+    if (model && !allowedModels.includes(model)) {
+      return NextResponse.json(
+        {
+          error: `Invalid model. Allowed: ${allowedModels.join(", ")}`,
+        },
+        { status: 400 },
+      );
+    }
+
+    // Generate the skill (AI code generation + validation + smoke test + DB insert)
     const result = await generateSkill({
       tenant_id: tenantId,
       description: description.trim(),
       source: "user_request",
+      model:
+        (model as "claude-sonnet" | "codex" | "gemini-flash" | "auto") ||
+        "auto",
     });
 
     if (!result.success || !result.skill) {
@@ -58,6 +74,7 @@ export async function POST(request: NextRequest) {
         risk_level: result.skill.risk_level,
         capabilities: result.skill.capabilities,
         approval_status: result.skill.approval_status,
+        generated_by: result.skill.generated_by,
       },
       approval: {
         initiated: approvalResult.success,

@@ -20,7 +20,10 @@ import {
   SkillGenerationRequest,
   SkillGenerationResult,
   SecurityAuditResult,
+  SkillGeneratorModel,
 } from "../types";
+import type { TaskCategory, ModelId } from "@/lib/ai/types";
+import { runSmokeTest } from "../verification/smoke-test";
 import { createClient } from "@supabase/supabase-js";
 
 const MAX_GENERATION_RETRIES = 3;
@@ -39,15 +42,19 @@ function getServiceSupabase() {
 export async function generateSkill(
   request: SkillGenerationRequest,
 ): Promise<SkillGenerationResult> {
-  const { tenant_id, description, source } = request;
+  const { tenant_id, description } = request;
 
   let lastError: string | null = null;
   let lastValidationErrors: string[] = [];
 
   for (let attempt = 1; attempt <= MAX_GENERATION_RETRIES; attempt++) {
     try {
-      // Step 1: Generate code via AI
-      const code = await generateCode(description, lastValidationErrors);
+      // Step 1: Generate code via AI (using chosen model)
+      const code = await generateCode(
+        description,
+        lastValidationErrors,
+        request.model,
+      );
 
       if (!code || code.trim().length === 0) {
         lastError = "AI returned empty code";
@@ -97,7 +104,24 @@ export async function generateSkill(
         schemaResult.detectedSlug || `custom-${slugify(description)}`;
       const name = generateName(description);
 
+      // Step 5.5: Smoke test — run getActions() + getData() in sandbox
+      const smokeResult = await runSmokeTest(code, tenant_id, "pre-insert");
+      if (!smokeResult.passed) {
+        lastError = "Smoke test failed — generated code crashes at runtime";
+        lastValidationErrors = smokeResult.errors;
+        console.error(
+          "[SkillGenerator] Smoke test failed:",
+          smokeResult.errors,
+        );
+        continue;
+      }
+
+      console.log(
+        `[SkillGenerator] Smoke test passed (${smokeResult.durationMs}ms)`,
+      );
+
       // Step 6: Store in database
+      const modelUsed = resolveModelName(request.model);
       const supabase = getServiceSupabase();
       const { data: skill, error: insertError } = await supabase
         .from("exo_generated_skills")
@@ -114,9 +138,13 @@ export async function generateSkill(
           allowed_tools: buildAllowedTools(capabilities),
           risk_level: riskLevel,
           generation_prompt: description,
-          generated_by: "claude-sonnet-4-5",
+          generated_by: modelUsed,
           approval_status: "pending",
-          security_audit: securityAudit,
+          security_audit: {
+            ...securityAudit,
+            smokeTestPassed: true,
+            smokeTestDurationMs: smokeResult.durationMs,
+          },
           last_audit_at: new Date().toISOString(),
         })
         .select()
@@ -152,11 +180,50 @@ export async function generateSkill(
 }
 
 /**
+ * Resolve the model name for DB storage from the user's choice.
+ */
+function resolveModelName(model?: SkillGeneratorModel): string {
+  switch (model) {
+    case "codex":
+      return "openai-codex";
+    case "gemini-flash":
+      return "gemini-flash";
+    case "claude-sonnet":
+      return "claude-sonnet-4-5";
+    case "auto":
+    default:
+      return "auto-routed";
+  }
+}
+
+/**
+ * Map SkillGeneratorModel to AI router options.
+ */
+function getModelOptions(model?: SkillGeneratorModel): {
+  taskCategory?: TaskCategory;
+  forceModel?: ModelId;
+} {
+  switch (model) {
+    case "codex":
+      // Codex not yet in ModelId union — cast until added
+      return { forceModel: "openai-codex" as ModelId };
+    case "gemini-flash":
+      return { forceModel: "gemini-1.5-flash" };
+    case "claude-sonnet":
+      return { forceModel: "claude-sonnet-4-5" };
+    case "auto":
+    default:
+      return { taskCategory: "code_generation" };
+  }
+}
+
+/**
  * Call AI to generate IModExecutor code
  */
 async function generateCode(
   description: string,
   previousErrors: string[],
+  model?: SkillGeneratorModel,
 ): Promise<string> {
   const systemPrompt = buildExecutorPrompt();
   let userPrompt = buildUserPrompt(description);
@@ -166,13 +233,14 @@ async function generateCode(
     userPrompt += `\n\nIMPORTANT: Your previous attempt had these errors. Fix them:\n${previousErrors.map((e) => `- ${e}`).join("\n")}`;
   }
 
+  const modelOptions = getModelOptions(model);
   const response = await aiChat(
     [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
     {
-      taskCategory: "code_generation",
+      ...modelOptions,
       maxTokens: 8192,
     },
   );
