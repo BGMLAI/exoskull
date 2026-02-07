@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 
 // ============================================================================
 // TYPES
@@ -88,8 +87,8 @@ export function EmotionalWidget({ tenantId, className }: EmotionalWidgetProps) {
   )[0];
 
   return (
-    <Link href="/dashboard/health" className={cn("block", className)}>
-      <div className="p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer">
+    <div className={cn("block", className)}>
+      <div className="p-3 rounded-lg border bg-card">
         {config ? (
           <>
             <div className="flex items-center gap-2 mb-1">
@@ -139,6 +138,6 @@ export function EmotionalWidget({ tenantId, className }: EmotionalWidgetProps) {
           </div>
         )}
       </div>
-    </Link>
+    </div>
   );
 }

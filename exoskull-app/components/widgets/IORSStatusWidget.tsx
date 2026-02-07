@@ -96,7 +96,7 @@ export function IORSStatusWidget() {
             {profile.name}
           </span>
           <Link
-            href="/dashboard/autonomy"
+            href="/dashboard/settings"
             className="text-sm font-normal text-muted-foreground hover:text-foreground"
           >
             Zarzadzaj

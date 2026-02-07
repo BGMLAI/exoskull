@@ -1,12 +1,12 @@
-'use client'
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Brain, Target } from 'lucide-react'
-import Link from 'next/link'
-import { KnowledgeSummary } from '@/lib/dashboard/types'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Brain, Target } from "lucide-react";
+import Link from "next/link";
+import { KnowledgeSummary } from "@/lib/dashboard/types";
 
 interface KnowledgeWidgetProps {
-  summary: KnowledgeSummary
+  summary: KnowledgeSummary;
 }
 
 export function KnowledgeWidget({ summary }: KnowledgeWidgetProps) {
@@ -19,7 +19,7 @@ export function KnowledgeWidget({ summary }: KnowledgeWidgetProps) {
             Wiedza
           </span>
           <Link
-            href="/dashboard/knowledge"
+            href="/dashboard/memory"
             className="text-sm font-normal text-muted-foreground hover:text-foreground"
           >
             Zobacz baze
@@ -40,7 +40,7 @@ export function KnowledgeWidget({ summary }: KnowledgeWidgetProps) {
 
         {summary.topLoop && (
           <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-            <span className="text-2xl">{summary.topLoop.icon || '📌'}</span>
+            <span className="text-2xl">{summary.topLoop.icon || "📌"}</span>
             <div>
               <p className="text-sm font-medium">{summary.topLoop.name}</p>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -52,5 +52,5 @@ export function KnowledgeWidget({ summary }: KnowledgeWidgetProps) {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

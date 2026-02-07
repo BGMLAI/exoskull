@@ -1,14 +1,12 @@
 /**
- * In-Chat Onboarding Handler
+ * @deprecated Use `lib/iors/birth-flow.ts` instead.
  *
- * Routes new users (onboarding_status='pending'/'in_progress') through
- * a discovery conversation via their messaging channel (WhatsApp, Telegram, etc.).
+ * Legacy In-Chat Onboarding Handler — REPLACED by IORS Birth Flow.
+ * Birth flow uses the full processUserMessage() pipeline with all 30+ tools,
+ * unlike this handler which used a separate Claude call with no tools.
  *
- * Reuses:
- * - DISCOVERY_SYSTEM_PROMPT (60-topic natural conversation)
- * - DISCOVERY_FIRST_MESSAGE (warm greeting)
- * - EXTRACTION_PROMPT (structured profile extraction)
- * - autoInstallMods() (post-onboarding Mod setup)
+ * This file is retained for reference only. Gateway no longer routes here.
+ * See: lib/iors/birth-flow.ts, lib/iors/birth-prompt.ts
  */
 
 import Anthropic from "@anthropic-ai/sdk";

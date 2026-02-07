@@ -1,19 +1,21 @@
-'use client'
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Heart, Activity, Moon } from 'lucide-react'
-import Link from 'next/link'
-import { HealthSummary } from '@/lib/dashboard/types'
-import { AreaChartWrapper } from '@/components/charts/AreaChartWrapper'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Heart, Activity, Moon } from "lucide-react";
+import Link from "next/link";
+import { HealthSummary } from "@/lib/dashboard/types";
+import { AreaChartWrapper } from "@/components/charts/AreaChartWrapper";
 
 interface HealthWidgetProps {
-  summary: HealthSummary
+  summary: HealthSummary;
 }
 
 export function HealthWidget({ summary }: HealthWidgetProps) {
-  const sleepHours = summary.sleepMinutes ? Math.floor(summary.sleepMinutes / 60) : null
-  const sleepMinutes = summary.sleepMinutes ? summary.sleepMinutes % 60 : null
-  const hasSeries = summary.sleepSeries.some((point) => point.value > 0)
+  const sleepHours = summary.sleepMinutes
+    ? Math.floor(summary.sleepMinutes / 60)
+    : null;
+  const sleepMinutes = summary.sleepMinutes ? summary.sleepMinutes % 60 : null;
+  const hasSeries = summary.sleepSeries.some((point) => point.value > 0);
 
   return (
     <Card>
@@ -24,10 +26,10 @@ export function HealthWidget({ summary }: HealthWidgetProps) {
             Zdrowie
           </span>
           <Link
-            href="/dashboard/health"
+            href="/dashboard/mods"
             className="text-sm font-normal text-muted-foreground hover:text-foreground"
           >
-            Zobacz szczegoly
+            Mody zdrowia
           </Link>
         </CardTitle>
       </CardHeader>
@@ -39,7 +41,7 @@ export function HealthWidget({ summary }: HealthWidgetProps) {
               Kroki
             </div>
             <p className="text-base font-semibold">
-              {summary.steps ? summary.steps.toLocaleString() : '--'}
+              {summary.steps ? summary.steps.toLocaleString() : "--"}
             </p>
           </div>
           <div className="p-2 rounded-lg bg-muted/50">
@@ -48,9 +50,7 @@ export function HealthWidget({ summary }: HealthWidgetProps) {
               Sen
             </div>
             <p className="text-base font-semibold">
-              {summary.sleepMinutes
-                ? `${sleepHours}h ${sleepMinutes}m`
-                : '--'}
+              {summary.sleepMinutes ? `${sleepHours}h ${sleepMinutes}m` : "--"}
             </p>
           </div>
           <div className="p-2 rounded-lg bg-muted/50">
@@ -59,7 +59,7 @@ export function HealthWidget({ summary }: HealthWidgetProps) {
               HRV
             </div>
             <p className="text-base font-semibold">
-              {summary.hrv ? `${Math.round(summary.hrv)} ms` : '--'}
+              {summary.hrv ? `${Math.round(summary.hrv)} ms` : "--"}
             </p>
           </div>
         </div>
@@ -74,5 +74,5 @@ export function HealthWidget({ summary }: HealthWidgetProps) {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
