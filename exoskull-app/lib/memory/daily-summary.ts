@@ -15,6 +15,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getModelRouter } from "../ai/model-router";
 import { getUserHighlights } from "./highlights";
 
+import { logger } from "@/lib/logger";
 // Types
 export interface DailySummary {
   id: string;
@@ -283,7 +284,7 @@ export async function createDailySummary(
     .single();
 
   if (existing?.final_summary) {
-    console.log("[DailySummary] Already finalized for today");
+    logger.info("[DailySummary] Already finalized for today");
     return existing as DailySummary;
   }
 

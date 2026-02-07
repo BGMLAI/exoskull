@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 /**
  * Environment Variable Validation
  *
@@ -50,12 +51,12 @@ export function validateEnv(): void {
   }
 
   if (warnings.length > 0) {
-    console.warn(
+    logger.warn(
       `[EnvCheck] Missing recommended env vars: ${warnings.join(", ")}`,
     );
   }
 
   if (missing.length === 0) {
-    console.log("[EnvCheck] All required environment variables present");
+    logger.info("[EnvCheck] All required environment variables present");
   }
 }

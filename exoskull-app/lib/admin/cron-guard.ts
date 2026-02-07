@@ -16,6 +16,7 @@ import { verifyCronAuth } from "@/lib/cron/auth";
 import { logCronStart, logCronComplete, logCronFailed } from "./logger";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 type CronHandler = (req: NextRequest) => Promise<NextResponse>;
 
 interface CronGuardOptions {
@@ -77,7 +78,7 @@ export function withCronGuard(
         ? new Date(cbRows.cooldown_until)
         : null;
       if (cooldownUntil && cooldownUntil > new Date()) {
-        console.warn(
+        logger.warn(
           `[CronGuard:${name}] Circuit OPEN — skipping (cooldown until ${cbRows.cooldown_until})`,
         );
         return NextResponse.json({
@@ -109,7 +110,7 @@ export function withCronGuard(
           }) =>
             `${d.dependency}: last success ${d.last_success || "never"} (required within ${d.required_within_hours}h)`,
         );
-        console.warn(
+        logger.warn(
           `[CronGuard:${name}] Dependencies not met:`,
           reasons.join(", "),
         );

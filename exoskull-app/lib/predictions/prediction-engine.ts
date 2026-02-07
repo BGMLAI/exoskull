@@ -16,6 +16,7 @@ import {
 } from "./health-models";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // THRESHOLDS FOR INTERVENTION CREATION
 // ============================================================================
@@ -31,7 +32,7 @@ export async function runPredictions(tenantId: string): Promise<Prediction[]> {
   const data = await loadHealthData(tenantId, 14);
 
   if (data.length === 0) {
-    console.log("[Predictions] No health data for tenant:", tenantId);
+    logger.info("[Predictions] No health data for tenant:", tenantId);
     return [];
   }
 

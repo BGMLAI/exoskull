@@ -26,6 +26,7 @@ import type { TaskCategory, ModelId } from "@/lib/ai/types";
 import { runSmokeTest } from "../verification/smoke-test";
 import { createClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
 const MAX_GENERATION_RETRIES = 3;
 
 function getServiceSupabase() {
@@ -116,7 +117,7 @@ export async function generateSkill(
         continue;
       }
 
-      console.log(
+      logger.info(
         `[SkillGenerator] Smoke test passed (${smokeResult.durationMs}ms)`,
       );
 
@@ -158,7 +159,7 @@ export async function generateSkill(
         };
       }
 
-      console.log(
+      logger.info(
         `[SkillGenerator] Skill generated: ${slug} (attempt ${attempt})`,
       );
 

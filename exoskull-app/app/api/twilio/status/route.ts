@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cleanupSessionAudio } from "@/lib/voice/elevenlabs-tts";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
   try {
     const data = await parseFormData(req);
 
-    console.log("[Twilio Status] Update:", {
+    logger.info("[Twilio Status] Update:", {
       callSid: data.CallSid,
       status: data.CallStatus,
       duration: data.CallDuration,
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (!session) {
-      console.log("[Twilio Status] No session found for:", data.CallSid);
+      logger.info("[Twilio Status] No session found for:", data.CallSid);
       return NextResponse.json({ success: true });
     }
 
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
           })
           .eq("id", session.id);
 
-        console.log("[Twilio Status] Session ended:", {
+        logger.info("[Twilio Status] Session ended:", {
           sessionId: session.id,
           status: data.CallStatus,
           duration: data.CallDuration,

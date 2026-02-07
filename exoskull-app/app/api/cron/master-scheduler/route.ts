@@ -31,6 +31,7 @@ import { withCronGuard } from "@/lib/admin/cron-guard";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -63,8 +64,8 @@ async function postHandler(req: NextRequest) {
   const startTime = Date.now();
 
   const body = await req.json().catch(() => ({}));
-  console.log(`🔄 Master Scheduler triggered at ${new Date().toISOString()}`);
-  console.log(`   Source: ${body.source || "unknown"}`);
+  logger.info(`🔄 Master Scheduler triggered at ${new Date().toISOString()}`);
+  logger.info(`   Source: ${body.source || "unknown"}`);
 
   // Get all active scheduled jobs
   const { data: jobs, error: jobsError } = await supabase
@@ -89,7 +90,7 @@ async function postHandler(req: NextRequest) {
 
   // Process each job
   for (const job of (jobs || []) as ScheduledJob[]) {
-    console.log(`\n📋 Checking job: ${job.job_name}`);
+    logger.info(`\n📋 Checking job: ${job.job_name}`);
 
     // Get users for this job
     const { data: users, error: usersError } = await supabase.rpc(
@@ -122,13 +123,13 @@ async function postHandler(req: NextRequest) {
           continue;
         }
 
-        console.log(
+        logger.info(
           `   👤 User ${user.tenant_id} (${timezone}) - ${formatLocalTime(timezone)}`,
         );
 
         // Check weekend skip
         if (settings.skip_weekends && isWeekend(timezone)) {
-          console.log(`      ⏭️ Skipped (weekend)`);
+          logger.info(`      ⏭️ Skipped (weekend)`);
           await logJobExecution(
             job,
             user,
@@ -143,7 +144,7 @@ async function postHandler(req: NextRequest) {
         const quietStart = settings.quiet_hours?.start || "22:00";
         const quietEnd = settings.quiet_hours?.end || "07:00";
         if (isInQuietHours(timezone, quietStart, quietEnd)) {
-          console.log(`      ⏭️ Skipped (quiet hours)`);
+          logger.info(`      ⏭️ Skipped (quiet hours)`);
           await logJobExecution(job, user, "skipped", null, "Quiet hours");
           continue;
         }
@@ -159,7 +160,7 @@ async function postHandler(req: NextRequest) {
         );
 
         if (!withinLimits) {
-          console.log(`      ⏭️ Skipped (rate limited)`);
+          logger.info(`      ⏭️ Skipped (rate limited)`);
           await logJobExecution(job, user, "rate_limited");
           continue;
         }
@@ -168,12 +169,12 @@ async function postHandler(req: NextRequest) {
         const dispatchResult = await dispatchJob(job, user);
 
         if (dispatchResult.success) {
-          console.log(`      ✅ ${dispatchResult.channel.toUpperCase()} sent`);
+          logger.info(`      ✅ ${dispatchResult.channel.toUpperCase()} sent`);
           usersTriggered++;
           results.users_notified++;
           await logJobExecution(job, user, "completed", dispatchResult);
         } else {
-          console.log(`      ❌ Failed: ${dispatchResult.error}`);
+          logger.info(`      ❌ Failed: ${dispatchResult.error}`);
           results.errors.push(
             `${job.job_name} for ${user.tenant_id}: ${dispatchResult.error}`,
           );
@@ -205,10 +206,10 @@ async function postHandler(req: NextRequest) {
   await processCustomScheduledJobs(results);
 
   const duration = Date.now() - startTime;
-  console.log(`\n✅ Master Scheduler complete in ${duration}ms`);
-  console.log(`   Jobs: ${results.jobs_triggered}/${results.jobs_checked}`);
-  console.log(`   Users notified: ${results.users_notified}`);
-  console.log(`   Errors: ${results.errors.length}`);
+  logger.info(`\n✅ Master Scheduler complete in ${duration}ms`);
+  logger.info(`   Jobs: ${results.jobs_triggered}/${results.jobs_checked}`);
+  logger.info(`   Users notified: ${results.users_notified}`);
+  logger.info(`   Errors: ${results.errors.length}`);
 
   return NextResponse.json({
     ...results,
@@ -282,18 +283,18 @@ async function processCustomScheduledJobs(results: {
     }
 
     if (!customJobs || customJobs.length === 0) {
-      console.log("📋 No custom jobs to process");
+      logger.info("📋 No custom jobs to process");
       return;
     }
 
     results.custom_jobs_checked = customJobs.length;
-    console.log(`\n📋 Processing ${customJobs.length} custom jobs`);
+    logger.info(`\n📋 Processing ${customJobs.length} custom jobs`);
 
     for (const customJob of customJobs) {
       try {
         const tenant = customJob.tenant;
         if (!tenant || !tenant.phone) {
-          console.log(`   ⏭️ ${customJob.display_name}: No tenant or phone`);
+          logger.info(`   ⏭️ ${customJob.display_name}: No tenant or phone`);
           continue;
         }
 
@@ -304,7 +305,7 @@ async function processCustomScheduledJobs(results: {
           continue;
         }
 
-        console.log(
+        logger.info(
           `   👤 Custom job "${customJob.display_name}" for tenant ${tenant.id}`,
         );
 
@@ -313,7 +314,7 @@ async function processCustomScheduledJobs(results: {
         const quietStart = settings.quiet_hours?.start || "22:00";
         const quietEnd = settings.quiet_hours?.end || "07:00";
         if (isInQuietHours(timezone, quietStart, quietEnd)) {
-          console.log(`      ⏭️ Skipped (quiet hours)`);
+          logger.info(`      ⏭️ Skipped (quiet hours)`);
           await logCustomJobExecution(
             customJob,
             "skipped",
@@ -333,7 +334,7 @@ async function processCustomScheduledJobs(results: {
         );
 
         if (!withinLimits) {
-          console.log(`      ⏭️ Skipped (rate limited)`);
+          logger.info(`      ⏭️ Skipped (rate limited)`);
           await logCustomJobExecution(customJob, "rate_limited");
           continue;
         }
@@ -365,7 +366,7 @@ async function processCustomScheduledJobs(results: {
         const dispatchResult = await dispatchJob(fakeJob, userConfig);
 
         if (dispatchResult.success) {
-          console.log(`      ✅ ${dispatchResult.channel.toUpperCase()} sent`);
+          logger.info(`      ✅ ${dispatchResult.channel.toUpperCase()} sent`);
           results.jobs_triggered++;
           results.users_notified++;
           await logCustomJobExecution(customJob, "completed", dispatchResult);
@@ -376,7 +377,7 @@ async function processCustomScheduledJobs(results: {
             .update({ last_executed_at: new Date().toISOString() })
             .eq("id", customJob.id);
         } else {
-          console.log(`      ❌ Failed: ${dispatchResult.error}`);
+          logger.info(`      ❌ Failed: ${dispatchResult.error}`);
           results.errors.push(
             `Custom ${customJob.display_name}: ${dispatchResult.error}`,
           );

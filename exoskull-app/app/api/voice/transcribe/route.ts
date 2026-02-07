@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHallucination } from "@/lib/voice/transcribe-voice-note";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     // Reject too-small files (likely just noise/clicks)
     if (audio.size < 5000) {
-      console.log("[Transcribe] Audio too small:", audio.size, "bytes");
+      logger.info("[Transcribe] Audio too small:", audio.size, "bytes");
       return NextResponse.json({ transcript: "" });
     }
 
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
     const result = await response.json();
     const transcript = (result.text || "").trim();
 
-    console.log(
+    logger.info(
       "[Transcribe] Raw result:",
       JSON.stringify({
         text: transcript,
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     // Filter hallucinations
     if (isHallucination(transcript)) {
-      console.log("[Transcribe] Filtered hallucination:", transcript);
+      logger.info("[Transcribe] Filtered hallucination:", transcript);
       return NextResponse.json({ transcript: "" });
     }
 
@@ -95,7 +96,7 @@ export async function POST(req: NextRequest) {
         (s: { no_speech_prob?: number }) => (s.no_speech_prob || 0) < 0.8,
       );
       if (realSegments.length === 0) {
-        console.log("[Transcribe] All segments have high no_speech_prob");
+        logger.info("[Transcribe] All segments have high no_speech_prob");
         return NextResponse.json({ transcript: "" });
       }
     }

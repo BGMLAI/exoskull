@@ -14,6 +14,7 @@ import { handleInboundMessage } from "@/lib/gateway/gateway";
 import type { GatewayMessage } from "@/lib/gateway/types";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
           );
 
           incrementUsage(user.id, "conversations").catch((err) => {
-            console.warn(
+            logger.warn(
               "[ChatStream] Usage tracking failed:",
               err instanceof Error ? err.message : String(err),
             );

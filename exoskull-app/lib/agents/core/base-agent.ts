@@ -6,6 +6,7 @@
  */
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { logger } from "@/lib/logger";
 import {
   IAgent,
   AgentTier,
@@ -164,13 +165,13 @@ export abstract class BaseAgent implements IAgent {
   async onSpawn(): Promise<void> {
     this.status = "running";
     this.startTime = Date.now();
-    console.log(`[${this.name}] Spawned for tenant ${this.context.tenantId}`);
+    logger.info(`[${this.name}] Spawned for tenant ${this.context.tenantId}`);
   }
 
   async onRelease(): Promise<void> {
     this.status = "idle";
     const duration = this.startTime ? Date.now() - this.startTime : 0;
-    console.log(`[${this.name}] Released after ${duration}ms`);
+    logger.info(`[${this.name}] Released after ${duration}ms`);
   }
 
   // ============================================================================

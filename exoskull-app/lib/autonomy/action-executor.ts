@@ -16,6 +16,7 @@ import {
 import { getPermissionModel, isActionPermitted } from "./permission-model";
 import { makeOutboundCall } from "../voice/twilio-client";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // ACTION DEFINITIONS
 // ============================================================================
@@ -186,7 +187,7 @@ export class ActionExecutor {
         );
 
         if (!permitted) {
-          console.log(
+          logger.info(
             `[ActionExecutor] Action denied: ${actionPattern} for tenant ${request.tenantId}`,
           );
           return {

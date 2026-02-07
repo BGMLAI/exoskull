@@ -13,6 +13,7 @@ import {
 } from "@/lib/business/dunning";
 import type { BusinessEventType } from "@/lib/business/types";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 function getServiceClient() {
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!tenantId) {
-      console.warn("[StripeWebhook] No tenant found for event:", {
+      logger.warn("[StripeWebhook] No tenant found for event:", {
         type,
         customer: data.customer,
       });
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest) {
             p_amount: amount,
           });
         } catch {
-          console.warn(
+          logger.warn(
             "[StripeWebhook] increment_usage RPC not available, skipping total_paid_pln increment",
           );
         }
@@ -200,7 +201,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    console.log("[StripeWebhook] Processed:", {
+    logger.info("[StripeWebhook] Processed:", {
       type,
       eventType,
       tenantId,

@@ -9,6 +9,7 @@
 
 import type { VoiceFeatures } from "./types";
 
+import { logger } from "@/lib/logger";
 interface DeepgramWord {
   word: string;
   start: number; // seconds
@@ -32,7 +33,7 @@ export async function analyzeVoiceProsody(
 ): Promise<VoiceFeatures | null> {
   const deepgramKey = process.env.DEEPGRAM_API_KEY;
   if (!deepgramKey) {
-    console.warn("[VoiceAnalyzer] DEEPGRAM_API_KEY not configured");
+    logger.warn("[VoiceAnalyzer] DEEPGRAM_API_KEY not configured");
     return null;
   }
 
@@ -93,7 +94,7 @@ export async function analyzeVoiceProsody(
       (words.length > 0 ? words[words.length - 1].end : 0);
 
     if (words.length === 0 || duration === 0) {
-      console.warn("[VoiceAnalyzer] No words detected in recording");
+      logger.warn("[VoiceAnalyzer] No words detected in recording");
       return null;
     }
 

@@ -5,6 +5,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { BusinessDailyMetrics, CohortData, ChannelRevenue } from "./types";
 
+import { logger } from "@/lib/logger";
 function getServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -160,7 +161,7 @@ export async function calculateDailyMetrics(): Promise<BusinessDailyMetrics> {
     throw error;
   }
 
-  console.log("[BusinessMetrics] Daily metrics calculated:", {
+  logger.info("[BusinessMetrics] Daily metrics calculated:", {
     date: today,
     mrr: metrics.mrr_pln,
     churn: metrics.churn_rate_30d,

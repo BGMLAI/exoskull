@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { autoInstallMods } from "@/lib/builder/proactive-engine";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 /**
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const method = body.method || "form";
 
-    console.log("[Complete API] Starting for user:", user.id, { method });
+    logger.info("[Complete API] Starting for user:", user.id, { method });
 
     // Update tenant status - THIS IS THE CRITICAL STEP
     const { error: updateError } = await supabase
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
         data: { method },
       });
     } catch (e) {
-      console.warn(
+      logger.warn(
         "[Complete API] Non-critical: onboarding session log failed:",
         e,
       );
@@ -92,13 +93,13 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (e) {
-      console.warn(
+      logger.warn(
         "[Complete API] Non-critical: check-in scheduling failed:",
         e,
       );
     }
 
-    console.log("[Complete API] Onboarding completed for user:", user.id);
+    logger.info("[Complete API] Onboarding completed for user:", user.id);
 
     // Auto-install Mods based on user goals (fire-and-forget)
     autoInstallMods(user.id).catch((err) =>

@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
     const results: any[] = [];
 
     // Step 1: Check if tables exist by trying to select from them
-    console.log("📋 Checking existing tables...");
+    logger.info("📋 Checking existing tables...");
 
     const { error: checkJobsError } = await supabase
       .from("exo_scheduled_jobs")
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
     results.push({ step: "check_tables", status: "exists" });
 
     // Step 2: Insert/update default jobs
-    console.log("📝 Inserting default scheduled jobs...");
+    logger.info("📝 Inserting default scheduled jobs...");
 
     const defaultJobs = [
       {
@@ -204,7 +205,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(`✅ Setup complete. ${jobs?.length || 0} jobs configured.`);
+    logger.info(`✅ Setup complete. ${jobs?.length || 0} jobs configured.`);
 
     return NextResponse.json({
       success: true,

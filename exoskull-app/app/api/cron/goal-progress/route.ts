@@ -10,6 +10,7 @@ import { withCronGuard } from "@/lib/admin/cron-guard";
 import { logProgress, detectMomentum } from "@/lib/goals/engine";
 import type { UserGoal, MeasurableProxy } from "@/lib/goals/types";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -117,7 +118,7 @@ async function handler(req: NextRequest) {
 
     const duration = Date.now() - startTime;
 
-    console.log("[GoalProgress] Cron complete:", {
+    logger.info("[GoalProgress] Cron complete:", {
       tenantsProcessed: byTenant.size,
       goalsChecked: tenantGoals.length,
       checkpointsCreated,

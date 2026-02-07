@@ -12,6 +12,7 @@
 
 import { aiChat, type AIMessage, type AIResponse } from "../index";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // TYPES
 // =====================================================
@@ -109,7 +110,7 @@ export async function executeSwarm(
   );
 
   if (failed.length > 0) {
-    console.warn(
+    logger.warn(
       `[Swarm:${definition.name}] Failed agents:`,
       failed.map((f) => f.name),
     );

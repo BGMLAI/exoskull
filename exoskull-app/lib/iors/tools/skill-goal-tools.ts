@@ -12,6 +12,7 @@
 import type { ToolDefinition } from "./index";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { updateSuggestionStatus } from "@/lib/skills/detector";
+import { logger } from "@/lib/logger";
 import {
   defineGoal,
   logProgressByName,
@@ -38,7 +39,7 @@ export const skillGoalTools: ToolDefinition[] = [
     execute: async (input, tenantId) => {
       const suggestionId = input.suggestion_id as string;
 
-      console.log("[SkillGoalTools] accept_skill_suggestion:", {
+      logger.info("[SkillGoalTools] accept_skill_suggestion:", {
         suggestionId,
         tenantId,
       });
@@ -100,7 +101,7 @@ export const skillGoalTools: ToolDefinition[] = [
     execute: async (input) => {
       const suggestionId = input.suggestion_id as string;
 
-      console.log("[SkillGoalTools] dismiss_skill_suggestion:", {
+      logger.info("[SkillGoalTools] dismiss_skill_suggestion:", {
         suggestionId,
       });
 
@@ -147,7 +148,7 @@ export const skillGoalTools: ToolDefinition[] = [
       },
     },
     execute: async (input, tenantId) => {
-      console.log("[SkillGoalTools] define_goal:", { tenantId, input });
+      logger.info("[SkillGoalTools] define_goal:", { tenantId, input });
 
       try {
         const goal = await defineGoal(tenantId, {
@@ -189,7 +190,7 @@ export const skillGoalTools: ToolDefinition[] = [
       },
     },
     execute: async (input, tenantId) => {
-      console.log("[SkillGoalTools] log_goal_progress:", {
+      logger.info("[SkillGoalTools] log_goal_progress:", {
         tenantId,
         goalName: input.goal_name,
         value: input.value,
@@ -235,7 +236,7 @@ export const skillGoalTools: ToolDefinition[] = [
       },
     },
     execute: async (_input, tenantId) => {
-      console.log("[SkillGoalTools] check_goals:", { tenantId });
+      logger.info("[SkillGoalTools] check_goals:", { tenantId });
 
       try {
         return await getGoalsForVoice(tenantId);

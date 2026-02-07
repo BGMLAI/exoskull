@@ -14,6 +14,7 @@ import { runSelfUpdate, runDecay } from "@/lib/learning/self-updater";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { verifyCronAuth } from "@/lib/cron/auth";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -41,7 +42,7 @@ function validateCronAuth(request: NextRequest): boolean {
 async function getHandler(request: NextRequest) {
   const startTime = Date.now();
 
-  console.log("[PostConversation] Starting CRON job...");
+  logger.info("[PostConversation] Starting CRON job...");
 
   try {
     // Run the self-update cycle
@@ -59,7 +60,7 @@ async function getHandler(request: NextRequest) {
       },
     };
 
-    console.log("[PostConversation] CRON completed:", response);
+    logger.info("[PostConversation] CRON completed:", response);
     return NextResponse.json(response);
   } catch (error) {
     console.error("[PostConversation] CRON failed:", error);

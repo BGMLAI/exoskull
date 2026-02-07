@@ -9,13 +9,14 @@
 import { emitEvent, completeWork, failWork } from "@/lib/iors/loop";
 import type { PetlaWorkItem, SubLoopResult } from "@/lib/iors/loop-types";
 
+import { logger } from "@/lib/logger";
 export async function handleObservation(
   item: PetlaWorkItem,
 ): Promise<SubLoopResult> {
   const { tenant_id, params } = item;
 
   try {
-    console.log("[Petla:Observation] Processing:", {
+    logger.info("[Petla:Observation] Processing:", {
       tenantId: tenant_id,
       handler: item.handler,
       dataSource: params.source,
@@ -73,7 +74,7 @@ export async function handleObservation(
       }
 
       default:
-        console.log("[Petla:Observation] Unknown handler:", item.handler);
+        logger.info("[Petla:Observation] Unknown handler:", item.handler);
     }
 
     if (item.id && item.status === "processing") {

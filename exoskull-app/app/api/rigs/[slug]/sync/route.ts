@@ -23,6 +23,7 @@ import {
 import { ensureFreshToken } from "@/lib/rigs/oauth";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 interface HealthMetricInsert {
@@ -80,7 +81,7 @@ export async function POST(
         connection.access_token = freshToken;
       }
     } catch (tokenError) {
-      console.warn(
+      logger.warn(
         `[Rig Sync] Token refresh skipped for ${slug}:`,
         (tokenError as Error).message,
       );

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { processDunning } from "@/lib/business/dunning";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -18,7 +19,7 @@ async function handler(req: NextRequest) {
     const result = await processDunning();
     const duration = Date.now() - startTime;
 
-    console.log("[Dunning] Cron complete:", {
+    logger.info("[Dunning] Cron complete:", {
       ...result,
       durationMs: duration,
     });

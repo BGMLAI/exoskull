@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { processDripSequences } from "@/lib/marketing/drip-engine";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -19,7 +20,7 @@ async function handler(req: NextRequest) {
     const result = await processDripSequences();
     const duration = Date.now() - startTime;
 
-    console.log("[DripCron] Complete:", { ...result, durationMs: duration });
+    logger.info("[DripCron] Complete:", { ...result, durationMs: duration });
 
     return NextResponse.json({
       status: "completed",

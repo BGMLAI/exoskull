@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 /**
  * Web Speech API Wrapper
  *
@@ -98,7 +99,7 @@ export function createSpeechRecognition(
       // Auto-retry up to 2 times before giving up
       if (noSpeechRetries < MAX_NO_SPEECH_RETRIES) {
         noSpeechRetries++;
-        console.log(
+        logger.info(
           `[WebSpeech] No speech, retry ${noSpeechRetries}/${MAX_NO_SPEECH_RETRIES}`,
         );
         try {

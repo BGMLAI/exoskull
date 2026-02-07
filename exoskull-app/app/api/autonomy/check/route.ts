@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(
+    logger.info(
       `[Autonomy Check] ${action} for ${userId}: ${isGranted ? "GRANTED" : reason}`,
     );
 
@@ -141,7 +142,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
-    console.log(
+    logger.info(
       `[Autonomy Check] Error recorded for ${action}: ${errorMessage}`,
     );
 

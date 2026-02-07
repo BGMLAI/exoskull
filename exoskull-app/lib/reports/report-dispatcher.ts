@@ -19,6 +19,7 @@ import { imessageAdapter } from "@/lib/gateway/adapters/imessage";
 import { getWhatsAppClient } from "@/lib/channels/whatsapp/client";
 import { appendMessage, UnifiedChannel } from "@/lib/unified-thread";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -322,7 +323,7 @@ export async function dispatchReport(
         });
       }
 
-      console.log(
+      logger.info(
         `[ReportDispatcher] ${reportType} report sent to ${tenantId} via ${channel}`,
       );
       return { success: true, channel };

@@ -9,6 +9,7 @@ import type { GatewayChannel } from "../gateway/types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { logAdminError } from "@/lib/admin/logger";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -77,7 +78,7 @@ export async function createTask(params: CreateTaskParams): Promise<string> {
     throw new Error(`Failed to create async task: ${error?.message}`);
   }
 
-  console.log("[AsyncQueue] Task created:", {
+  logger.info("[AsyncQueue] Task created:", {
     taskId: data.id,
     tenantId: params.tenantId,
     channel: params.channel,
@@ -117,7 +118,7 @@ export async function claimNextTask(
   const task = Array.isArray(data) ? data[0] : data;
   if (!task) return null;
 
-  console.log("[AsyncQueue] Task claimed:", {
+  logger.info("[AsyncQueue] Task claimed:", {
     taskId: task.id,
     tenantId: task.tenant_id,
     channel: task.channel,
@@ -205,7 +206,7 @@ export async function failTask(
     });
   }
 
-  console.log("[AsyncQueue] Task failed:", {
+  logger.info("[AsyncQueue] Task failed:", {
     taskId,
     retryCount: newRetryCount,
     maxRetries,
@@ -282,7 +283,7 @@ export async function releaseExpiredLocks(): Promise<number> {
 
   const count = data?.length || 0;
   if (count > 0) {
-    console.log("[AsyncQueue] Released expired locks:", count);
+    logger.info("[AsyncQueue] Released expired locks:", count);
   }
   return count;
 }

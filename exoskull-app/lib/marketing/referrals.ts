@@ -4,6 +4,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
 function getServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,7 +53,7 @@ export async function processReferralSignup(
       .single();
 
     if (!referrer) {
-      console.warn("[Referrals] Invalid referral code:", { referralCode });
+      logger.warn("[Referrals] Invalid referral code:", { referralCode });
       return { success: false };
     }
 
@@ -74,7 +75,7 @@ export async function processReferralSignup(
       })
       .eq("id", newTenantId);
 
-    console.log("[Referrals] Signup tracked:", {
+    logger.info("[Referrals] Signup tracked:", {
       referrerCode: referralCode,
       referrerId: referrer.id,
       newTenantId,
@@ -149,7 +150,7 @@ export async function grantReferralReward(
       },
     });
 
-    console.log("[Referrals] Reward granted:", {
+    logger.info("[Referrals] Reward granted:", {
       referrerId: referral.referrer_id,
       referredTenantId,
       reward: rewardAmount,

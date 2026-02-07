@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { imessageAdapter } from "@/lib/gateway/adapters/imessage";
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    console.log("[iMessage Route] Inbound:", {
+    logger.info("[iMessage Route] Inbound:", {
       from: msg.from,
       senderName: msg.senderName,
       textLength: msg.text.length,
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
     // Send response back via iMessage
     await imessageAdapter.sendResponse(msg.from, response.text);
 
-    console.log("[iMessage Route] Reply sent:", {
+    logger.info("[iMessage Route] Reply sent:", {
       to: msg.from,
       toolsUsed: response.toolsUsed,
       responseLength: response.text.length,

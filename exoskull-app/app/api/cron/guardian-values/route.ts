@@ -10,6 +10,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { getAlignmentGuardian } from "@/lib/autonomy/guardian";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -73,7 +74,7 @@ async function handler(req: NextRequest) {
 
     const duration = Date.now() - startTime;
 
-    console.log("[GuardianValues] Cron complete:", {
+    logger.info("[GuardianValues] Cron complete:", {
       tenantsChecked: tenants?.length || 0,
       driftsDetected,
       conflictsFound,

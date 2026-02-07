@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { calculateDailyMetrics } from "@/lib/business/metrics";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -18,7 +19,7 @@ async function handler(req: NextRequest) {
     const metrics = await calculateDailyMetrics();
     const duration = Date.now() - startTime;
 
-    console.log("[BusinessMetrics] Cron complete:", {
+    logger.info("[BusinessMetrics] Cron complete:", {
       mrr: metrics.mrr_pln,
       activeUsers: metrics.active_users_30d,
       churn: metrics.churn_rate_30d,

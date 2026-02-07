@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { logger } from "@/lib/logger";
 import {
   createDailySummary,
   getSummaryForDisplay,
@@ -72,7 +73,7 @@ async function sendSummarySmS(
     const data = await response.json();
 
     if (response.ok && data.sid) {
-      console.log(`[DailySummaryCron] SMS sent to ${tenantId}: ${data.sid}`);
+      logger.info(`[DailySummaryCron] SMS sent to ${tenantId}: ${data.sid}`);
       return { success: true, sid: data.sid };
     } else {
       console.error(`[DailySummaryCron] SMS failed for ${tenantId}:`, data);
@@ -178,7 +179,7 @@ async function hasTodayConversations(tenantId: string): Promise<boolean> {
 async function getHandler(request: NextRequest) {
   const startTime = Date.now();
 
-  console.log("[DailySummaryCron] Starting daily summary generation...");
+  logger.info("[DailySummaryCron] Starting daily summary generation...");
 
   const results = {
     processed: 0,
@@ -191,7 +192,7 @@ async function getHandler(request: NextRequest) {
 
   try {
     const tenants = await getActiveTenants();
-    console.log(`[DailySummaryCron] Found ${tenants.length} active tenants`);
+    logger.info(`[DailySummaryCron] Found ${tenants.length} active tenants`);
 
     for (const tenant of tenants) {
       results.processed++;
@@ -258,7 +259,7 @@ async function getHandler(request: NextRequest) {
       results,
     };
 
-    console.log("[DailySummaryCron] Completed:", response);
+    logger.info("[DailySummaryCron] Completed:", response);
     return NextResponse.json(response);
   } catch (error) {
     console.error("[DailySummaryCron] Fatal error:", error);
@@ -301,7 +302,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate summary for specific tenant
-    console.log(`[DailySummaryCron] Manual trigger for tenant ${tenant_id}`);
+    logger.info(`[DailySummaryCron] Manual trigger for tenant ${tenant_id}`);
 
     const summary = await createDailySummary(tenant_id);
     if (!summary) {

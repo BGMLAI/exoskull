@@ -9,13 +9,14 @@ import { completeWork, failWork } from "@/lib/iors/loop";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import type { PetlaWorkItem, SubLoopResult } from "@/lib/iors/loop-types";
 
+import { logger } from "@/lib/logger";
 export async function handleMaintenance(
   item: PetlaWorkItem,
 ): Promise<SubLoopResult> {
   const { tenant_id } = item;
 
   try {
-    console.log("[Petla:Maintenance] Processing:", {
+    logger.info("[Petla:Maintenance] Processing:", {
       tenantId: tenant_id,
       handler: item.handler,
     });
@@ -65,7 +66,7 @@ export async function handleMaintenance(
           )
           .gte("attempts", 3);
 
-        console.log("[Petla:Maintenance] Cleanup stats:", {
+        logger.info("[Petla:Maintenance] Cleanup stats:", {
           tenantId: tenant_id,
           ...stats,
         });
@@ -75,7 +76,7 @@ export async function handleMaintenance(
       case "etl_bronze": {
         // Bronze is raw data on R2 — no transformation needed from Pętla.
         // Bronze writes happen at ingestion time in gateway + device sync.
-        console.log(
+        logger.info(
           "[Petla:Maintenance] Bronze ETL: no-op (writes at ingestion)",
           {
             tenantId: tenant_id,
@@ -88,7 +89,7 @@ export async function handleMaintenance(
         // Bridge to existing Silver ETL (Bronze Parquet → Postgres)
         const { runSilverETL } = await import("@/lib/datalake/silver-etl");
         const silverResult = await runSilverETL();
-        console.log("[Petla:Maintenance] Silver ETL completed:", {
+        logger.info("[Petla:Maintenance] Silver ETL completed:", {
           tenantId: tenant_id,
           records: silverResult.totalRecords,
           errors: silverResult.totalErrors,
@@ -100,7 +101,7 @@ export async function handleMaintenance(
         // Bridge to existing Gold ETL (refresh materialized views)
         const { runGoldETL } = await import("@/lib/datalake/gold-etl");
         const goldResult = await runGoldETL();
-        console.log("[Petla:Maintenance] Gold ETL completed:", {
+        logger.info("[Petla:Maintenance] Gold ETL completed:", {
           tenantId: tenant_id,
           views: goldResult.results.length,
           success: goldResult.results.filter((r) => r.success).length,
@@ -112,7 +113,7 @@ export async function handleMaintenance(
         // Reduce importance of stale memory highlights (>30 days untouched)
         const { runDecay } = await import("@/lib/learning/self-updater");
         const decayResult = await runDecay();
-        console.log("[Petla:Maintenance] Highlight decay completed:", {
+        logger.info("[Petla:Maintenance] Highlight decay completed:", {
           tenantId: tenant_id,
           decayed: decayResult.decayed,
         });
@@ -133,7 +134,7 @@ export async function handleMaintenance(
           revokeUnhealthySkills(10, 0.3),
         ]);
 
-        console.log("[Petla:Maintenance] Skill lifecycle completed:", {
+        logger.info("[Petla:Maintenance] Skill lifecycle completed:", {
           tenantId: tenant_id,
           archived: archived.archivedCount,
           expired,
@@ -143,7 +144,7 @@ export async function handleMaintenance(
       }
 
       default:
-        console.log("[Petla:Maintenance] Unknown handler:", item.handler);
+        logger.info("[Petla:Maintenance] Unknown handler:", item.handler);
     }
 
     if (item.id && item.status === "processing") {

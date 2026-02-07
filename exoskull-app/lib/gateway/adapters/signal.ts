@@ -7,6 +7,7 @@
 
 import type { ChannelAdapter, GatewayMessage } from "../types";
 
+import { logger } from "@/lib/logger";
 const SIGNAL_API_URL = process.env.SIGNAL_API_URL; // e.g. "http://signal-bridge:8080"
 const SIGNAL_SENDER = process.env.SIGNAL_SENDER_NUMBER; // registered Signal phone number
 
@@ -44,7 +45,7 @@ export const signalAdapter: ChannelAdapter = {
 
   parseInbound(rawPayload: unknown): GatewayMessage | null {
     if (!SIGNAL_API_URL) {
-      console.warn("[Signal] SIGNAL_API_URL not set, skipping inbound");
+      logger.warn("[Signal] SIGNAL_API_URL not set, skipping inbound");
       return null;
     }
 

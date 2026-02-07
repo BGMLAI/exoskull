@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // Tool Handlers (legacy VAPI format - kept for backward compatibility)
@@ -257,7 +258,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    console.log(
+    logger.info(
       "[VoiceTools] Tool call received:",
       JSON.stringify(body, null, 2),
     );
@@ -270,7 +271,7 @@ export async function POST(request: Request) {
     const urlTenantId = url.searchParams.get("tenant_id");
     const conversationId = url.searchParams.get("conversation_id");
 
-    console.log("[VoiceTools] URL params:", {
+    logger.info("[VoiceTools] URL params:", {
       tenant_id: urlTenantId,
       conversation_id: conversationId,
     });
@@ -298,7 +299,7 @@ export async function POST(request: Request) {
       });
     }
 
-    console.log(
+    logger.info(
       "[VoiceTools] Found tenant_id:",
       tenantId,
       urlTenantId ? "(from URL)" : "(from payload)",
@@ -331,7 +332,7 @@ export async function POST(request: Request) {
         const parameters = functionCall.parameters || {};
         const toolCallId = functionCall.id || body?.toolCallId || "unknown";
 
-        console.log(
+        logger.info(
           `[VoiceTools] Function: ${functionName}, Params:`,
           parameters,
           `ToolCallId:`,
@@ -367,7 +368,7 @@ export async function POST(request: Request) {
             resultData = { error: `Unknown function: ${functionName}` };
         }
 
-        console.log(`[VoiceTools] Result:`, resultData);
+        logger.info(`[VoiceTools] Result:`, resultData);
 
         // Return results array with toolCallId and result as STRING
         const resultString =
@@ -392,7 +393,7 @@ export async function POST(request: Request) {
           toolCall.parameters || toolCall.function?.arguments || {};
         const toolCallId = toolCall.id || toolCall.toolCall?.id || "unknown";
 
-        console.log(
+        logger.info(
           `[VoiceTools] Function: ${functionName}, Params:`,
           parameters,
           `ToolCallId:`,
@@ -428,7 +429,7 @@ export async function POST(request: Request) {
             resultData = { error: `Unknown function: ${functionName}` };
         }
 
-        console.log(`[VoiceTools] Result for ${functionName}:`, resultData);
+        logger.info(`[VoiceTools] Result for ${functionName}:`, resultData);
 
         // Convert result to string
         const resultString =
@@ -446,7 +447,7 @@ export async function POST(request: Request) {
 
     // Handle other message types (transcript, end-of-call, etc.)
     if (message?.type === "end-of-call-report") {
-      console.log("[VoiceTools] Call ended:", message);
+      logger.info("[VoiceTools] Call ended:", message);
       return NextResponse.json({ received: true });
     }
 

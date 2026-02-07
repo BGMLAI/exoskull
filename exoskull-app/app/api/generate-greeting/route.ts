@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { aiChat } from "@/lib/ai";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
           );
         }
       } catch (e) {
-        console.log("No conversation history yet");
+        logger.info("No conversation history yet");
       }
     }
 

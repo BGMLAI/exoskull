@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { GeneratedSkill, SkillVersion } from "../types";
 import { invalidateSkillCache } from "./dynamic-registry";
 
+import { logger } from "@/lib/logger";
 function getServiceSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -130,7 +131,7 @@ export async function rollbackToVersion(
     // Invalidate cache
     invalidateSkillCache(currentSkill.slug, currentSkill.tenant_id);
 
-    console.log(
+    logger.info(
       `[VersionManager] Rolled back skill ${skillId} to version ${targetVersion} (now ${newVersion})`,
     );
 

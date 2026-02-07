@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const GRAPH_API_VERSION = "v21.0";
@@ -198,7 +199,7 @@ export async function POST(req: NextRequest) {
     }
 
     const connected = results.filter((r) => r.status === "connected").length;
-    console.log("[MetaPages] Connection result:", {
+    logger.info("[MetaPages] Connection result:", {
       tenantId: tenant_id,
       total: pagesToConnect.length,
       connected,

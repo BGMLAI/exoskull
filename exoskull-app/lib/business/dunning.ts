@@ -5,6 +5,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { DunningResult } from "./types";
 
+import { logger } from "@/lib/logger";
 function getServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -159,7 +160,7 @@ export async function processDunning(): Promise<DunningResult> {
       }
     }
 
-    console.log("[Dunning] Processing complete:", result);
+    logger.info("[Dunning] Processing complete:", result);
     return result;
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
@@ -190,7 +191,7 @@ export async function handlePaymentFailed(
       .single();
 
     if (existing) {
-      console.log("[Dunning] Already tracking invoice:", {
+      logger.info("[Dunning] Already tracking invoice:", {
         invoiceId,
         tenantId,
       });
@@ -243,7 +244,7 @@ export async function handlePaymentFailed(
       metadata: { error_message: errorMessage },
     });
 
-    console.log("[Dunning] Payment failure tracked:", {
+    logger.info("[Dunning] Payment failure tracked:", {
       tenantId,
       invoiceId,
       amount,
@@ -292,7 +293,7 @@ export async function handlePaymentRecovered(
       metadata: { recovered_from_dunning: true },
     });
 
-    console.log("[Dunning] Payment recovered:", { tenantId, invoiceId });
+    logger.info("[Dunning] Payment recovered:", { tenantId, invoiceId });
   } catch (error) {
     console.error("[Dunning] handlePaymentRecovered error:", {
       error: error instanceof Error ? error.message : String(error),

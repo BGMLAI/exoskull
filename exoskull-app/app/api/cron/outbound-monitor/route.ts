@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service-client";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { processEscalations } from "@/lib/autonomy/escalation-manager";
+import { logger } from "@/lib/logger";
 import {
   detectInactivity,
   handleInactivityTrigger,
@@ -87,7 +88,7 @@ async function handler(req: NextRequest) {
 
     const duration = Date.now() - startTime;
 
-    console.log("[OutboundMonitor] CRON complete:", {
+    logger.info("[OutboundMonitor] CRON complete:", {
       ...results,
       durationMs: duration,
     });

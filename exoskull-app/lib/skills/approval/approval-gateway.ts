@@ -6,6 +6,7 @@
 import { createClient } from "@supabase/supabase-js";
 import twilio from "twilio";
 import { GeneratedSkill, SkillApprovalRequest } from "../types";
+import { logger } from "@/lib/logger";
 import {
   generateDisclosure,
   formatDisclosureForSms,
@@ -208,7 +209,7 @@ export async function confirmChannel(
         if (tenantData) {
           const ch2Result = await sendChannel2Notification(request, tenantData);
           if (!ch2Result.success) {
-            console.warn(
+            logger.warn(
               "[ApprovalGateway] Channel 2 notification failed:",
               ch2Result.error,
             );
@@ -314,7 +315,7 @@ async function activateSkill(skillId: string): Promise<void> {
     })
     .eq("id", skillId);
 
-  console.log(`[ApprovalGateway] Skill ${skillId} activated`);
+  logger.info(`[ApprovalGateway] Skill ${skillId} activated`);
 }
 
 /**
@@ -334,7 +335,7 @@ async function sendApprovalNotification(
   }
 
   // Fallback: log it (email integration can be added later)
-  console.log(
+  logger.info(
     "[ApprovalGateway] Approval pending for code:",
     request.confirmation_code,
   );
@@ -405,7 +406,7 @@ async function sendChannel2Notification(
         status: "pending",
       });
 
-      console.log(
+      logger.info(
         `[ApprovalGateway] Channel 2 email notification queued for ${tenant.email}`,
       );
       return { success: true };
@@ -415,7 +416,7 @@ async function sendChannel2Notification(
     }
   }
 
-  console.warn(
+  logger.warn(
     `[ApprovalGateway] No delivery method for channel 2: ${channel2}`,
   );
   return { success: false, error: `Cannot deliver to channel: ${channel2}` };

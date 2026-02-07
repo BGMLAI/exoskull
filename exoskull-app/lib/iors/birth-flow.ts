@@ -29,6 +29,7 @@ import type { IORSPersonality } from "./types";
 import { DEFAULT_PERSONALITY } from "./types";
 import { getThreadContext } from "../unified-thread";
 
+import { logger } from "@/lib/logger";
 /**
  * Check if a tenant is in the birth flow.
  * Returns true if iors_birth_enabled=true AND iors_birth_completed=false.
@@ -226,7 +227,7 @@ async function completeBirth(
     });
   }
 
-  console.log("[BirthFlow] Birth complete:", {
+  logger.info("[BirthFlow] Birth complete:", {
     tenantId,
     iors_name: personality.name,
     insights: birthData.user_insights?.length ?? 0,

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { UserProfile } from "@/lib/types/user";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // Fields that can be updated via PATCH
@@ -115,7 +116,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    console.log("[API:user/profile] Profile updated:", {
+    logger.info("[API:user/profile] Profile updated:", {
       userId: user.id,
       fields: Object.keys(updates),
     });

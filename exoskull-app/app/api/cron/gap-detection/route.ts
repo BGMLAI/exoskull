@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { detectGaps } from "@/lib/agents/specialized/gap-detector";
+import { logger } from "@/lib/logger";
 import {
   executeSwarm,
   getSwarmDefinition,
@@ -70,7 +71,7 @@ async function handler(req: NextRequest) {
 
     const gapDuration = Date.now() - startTime;
 
-    console.log("[GapDetection] Deterministic analysis complete:", {
+    logger.info("[GapDetection] Deterministic analysis complete:", {
       tenantsChecked: tenants.length,
       successCount,
       errorCount,
@@ -116,7 +117,7 @@ async function handler(req: NextRequest) {
           swarmResults++;
         } catch (swarmError) {
           // Swarm failure is non-critical — existing analysis still works
-          console.warn(
+          logger.warn(
             `[GapDetection] Swarm failed for tenant ${tenant.id}:`,
             swarmError instanceof Error ? swarmError.message : swarmError,
           );

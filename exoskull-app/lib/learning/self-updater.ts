@@ -19,6 +19,7 @@ import {
 import { SelfUpdateResult, LearningEvent } from "../agents/types";
 import { detectSkillNeeds } from "../skills/detector";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -76,12 +77,12 @@ export class SelfUpdater {
     let conversationsProcessed = 0;
     const patternsDetected: string[] = [];
 
-    console.log("[SelfUpdater] Starting update cycle...");
+    logger.info("[SelfUpdater] Starting update cycle...");
 
     try {
       // 1. Get unprocessed conversations
       const conversations = await this.getUnprocessedConversations();
-      console.log(
+      logger.info(
         `[SelfUpdater] Found ${conversations.length} unprocessed conversations`,
       );
 
@@ -135,7 +136,7 @@ export class SelfUpdater {
             lastConvId,
           );
           if (detection.suggestions.length > 0) {
-            console.log(
+            logger.info(
               `[SelfUpdater] Skill needs detected for ${tenantId}: ${detection.suggestions.length} suggestions`,
             );
             patternsDetected.push(
@@ -166,7 +167,7 @@ export class SelfUpdater {
         timestamp: new Date().toISOString(),
       });
 
-      console.log(
+      logger.info(
         `[SelfUpdater] Cycle complete: ${conversationsProcessed} convs, ` +
           `${highlightsAdded} added, ${highlightsBoosted} boosted`,
       );
@@ -304,7 +305,7 @@ export class SelfUpdater {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - CONFIG.DECAY_AFTER_DAYS);
 
-    console.log(
+    logger.info(
       `[SelfUpdater] Running decay cycle (cutoff: ${cutoffDate.toISOString()})`,
     );
 
@@ -347,7 +348,7 @@ export class SelfUpdater {
         });
       }
 
-      console.log(`[SelfUpdater] Decayed ${decayed} highlights`);
+      logger.info(`[SelfUpdater] Decayed ${decayed} highlights`);
     } catch (error) {
       console.error("[SelfUpdater] Decay cycle failed:", error);
     }
@@ -421,7 +422,7 @@ Respond ONLY with a valid JSON array of objects with these fields:
       // Parse AI response
       const jsonMatch = response.content.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
-        console.warn(
+        logger.warn(
           "[SelfUpdater] AI validation returned non-JSON, using regex candidates",
         );
         return candidates;

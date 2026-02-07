@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/conversations/[id]/messages - Get messages for a conversation
@@ -99,7 +100,7 @@ export async function POST(
           .eq("id", conversationId);
       }
     } catch (countError) {
-      console.warn("Failed to update message count:", countError);
+      logger.warn("Failed to update message count:", countError);
     }
 
     return NextResponse.json({ message });

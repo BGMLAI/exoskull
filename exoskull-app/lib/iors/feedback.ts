@@ -7,6 +7,7 @@
 
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export type FeedbackType =
   | "response_quality"
   | "personality"
@@ -68,7 +69,7 @@ export async function submitFeedback(
     return { success: false, error: error.message };
   }
 
-  console.log("[Feedback] Submitted:", {
+  logger.info("[Feedback] Submitted:", {
     tenantId,
     type: input.type,
     rating,

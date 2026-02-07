@@ -11,13 +11,14 @@ import { appendMessage } from "@/lib/unified-thread";
 import { completeWork, failWork } from "@/lib/iors/loop";
 import type { PetlaWorkItem, SubLoopResult } from "@/lib/iors/loop-types";
 
+import { logger } from "@/lib/logger";
 export async function handleEmergency(
   item: PetlaWorkItem,
 ): Promise<SubLoopResult> {
   const { tenant_id, params } = item;
 
   try {
-    console.log("[Petla:Emergency] Crisis detected:", {
+    logger.info("[Petla:Emergency] Crisis detected:", {
       tenantId: tenant_id,
       source: params.source,
     });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getOAuthConfig, exchangeCodeForTokens } from "@/lib/rigs/oauth";
+import { logger } from "@/lib/logger";
 import {
   validateMagicToken,
   clearMagicToken,
@@ -179,7 +180,7 @@ export async function GET(
       );
     }
 
-    console.log(`[OAuth] ${slug} connected successfully for user ${user.id}`);
+    logger.info(`[OAuth] ${slug} connected successfully for user ${user.id}`);
 
     // Facebook-specific: auto-fetch page tokens and store in exo_meta_pages
     if (slug === "facebook" && tokens.access_token) {
@@ -306,7 +307,7 @@ async function handleMagicLinkCallback(
     );
   }
 
-  console.log(`[OAuth] Magic-link: ${slug} connected for tenant ${tenantId}`);
+  logger.info(`[OAuth] Magic-link: ${slug} connected for tenant ${tenantId}`);
 
   const rigNames: Record<string, string> = {
     google: "Google",
@@ -363,7 +364,7 @@ async function syncFacebookPages(
   }> = data.data || [];
 
   if (pages.length === 0) {
-    console.log("[OAuth/FB] No pages found for user");
+    logger.info("[OAuth/FB] No pages found for user");
     return;
   }
 
@@ -424,7 +425,7 @@ async function syncFacebookPages(
     }
   }
 
-  console.log(
+  logger.info(
     `[OAuth/FB] Synced ${connected}/${pages.length} pages for tenant ${tenantId}`,
   );
 }

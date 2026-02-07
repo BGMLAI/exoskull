@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runDecay } from "@/lib/learning/self-updater";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -32,7 +33,7 @@ function validateServiceKey(request: NextRequest): boolean {
 async function getHandler(request: NextRequest) {
   const startTime = Date.now();
 
-  console.log("[HighlightDecay] Starting decay cycle...");
+  logger.info("[HighlightDecay] Starting decay cycle...");
 
   try {
     const result = await runDecay();
@@ -44,7 +45,7 @@ async function getHandler(request: NextRequest) {
       highlights_decayed: result.decayed,
     };
 
-    console.log("[HighlightDecay] Decay completed:", response);
+    logger.info("[HighlightDecay] Decay completed:", response);
     return NextResponse.json(response);
   } catch (error) {
     console.error("[HighlightDecay] Decay failed:", error);

@@ -25,6 +25,7 @@ import type { GatewayMessage } from "@/lib/gateway/types";
 import { verifyMetaSignature } from "@/lib/security/webhook-hmac";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (mode === "subscribe" && token === verifyToken) {
-    console.log("[WhatsApp] Webhook verified successfully");
+    logger.info("[WhatsApp] Webhook verified successfully");
     return new NextResponse(challenge, { status: 200 });
   }
 
@@ -77,7 +78,7 @@ async function resolveWhatsAppClient(
     .single();
 
   if (account?.page_access_token && account?.phone_number_id) {
-    console.log("[WhatsApp] Using DB token for account:", {
+    logger.info("[WhatsApp] Using DB token for account:", {
       phoneNumberId,
       pageName: account.page_name,
       tenantId: account.tenant_id,
@@ -141,7 +142,7 @@ export async function POST(req: NextRequest) {
 
     const { from, text, messageId, senderName, phoneNumberId } = incoming;
 
-    console.log("[WhatsApp] Incoming message:", {
+    logger.info("[WhatsApp] Incoming message:", {
       from,
       senderName,
       phoneNumberId,
@@ -256,7 +257,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      console.log("[WhatsApp] Reply sent via gateway:", {
+      logger.info("[WhatsApp] Reply sent via gateway:", {
         to: from,
         phoneNumberId,
         conversationId: conversation?.id,

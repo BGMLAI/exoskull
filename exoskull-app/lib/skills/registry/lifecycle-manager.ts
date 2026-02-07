@@ -5,6 +5,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
 function getServiceSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,7 +35,7 @@ export async function archiveUnusedSkills(
     const archivedCount = typeof data === "number" ? data : 0;
 
     if (archivedCount > 0) {
-      console.log(
+      logger.info(
         `[LifecycleManager] Archived ${archivedCount} unused skills (>${daysThreshold} days)`,
       );
     }
@@ -68,7 +69,7 @@ export async function expireOldSuggestions(
     const expiredCount = typeof data === "number" ? data : 0;
 
     if (expiredCount > 0) {
-      console.log(
+      logger.info(
         `[LifecycleManager] Expired ${expiredCount} skill suggestions (>${daysThreshold} days)`,
       );
     }
@@ -94,7 +95,7 @@ export async function revokeUnhealthySkills(
     const result = await sweep(minExecutions, errorThreshold);
 
     if (result.revokedCount > 0) {
-      console.log(
+      logger.info(
         `[LifecycleManager] Revoked ${result.revokedCount} unhealthy skills: ${result.skills.join(", ")}`,
       );
     }

@@ -24,6 +24,7 @@ import type { GatewayChannel, GatewayMessage, GatewayResponse } from "./types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { emitEvent } from "@/lib/iors/loop";
 
+import { logger } from "@/lib/logger";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
@@ -135,7 +136,7 @@ async function autoRegisterTenant(
 
   const newTenantId = data!.id;
 
-  console.log("[Gateway] Auto-registered tenant:", {
+  logger.info("[Gateway] Auto-registered tenant:", {
     tenantId: newTenantId,
     channel,
     from,
@@ -149,14 +150,14 @@ async function autoRegisterTenant(
     const lead = await findLead(channel, from);
     if (lead) {
       await convertLeadToTenant(lead.id, newTenantId);
-      console.log("[Gateway] Merged lead into new tenant:", {
+      logger.info("[Gateway] Merged lead into new tenant:", {
         leadId: lead.id,
         tenantId: newTenantId,
         conversations: lead.conversations?.length || 0,
       });
     }
   } catch (mergeErr) {
-    console.warn("[Gateway] Lead merge failed (non-blocking):", {
+    logger.warn("[Gateway] Lead merge failed (non-blocking):", {
       error: mergeErr instanceof Error ? mergeErr.message : mergeErr,
     });
   }
@@ -260,7 +261,7 @@ export async function handleInboundMessage(
         });
 
         const durationMs = Date.now() - startTime;
-        console.log("[Gateway] Birth message processed:", {
+        logger.info("[Gateway] Birth message processed:", {
           channel: msg.channel,
           tenantId,
           durationMs,
@@ -307,7 +308,7 @@ export async function handleInboundMessage(
         sessionId,
       });
 
-      console.log("[Gateway] Queued async task:", {
+      logger.info("[Gateway] Queued async task:", {
         taskId,
         channel: msg.channel,
         reason: classification.reason,
@@ -322,7 +323,7 @@ export async function handleInboundMessage(
             headers: { "x-cron-secret": process.env.CRON_SECRET },
           },
         ).catch((err) => {
-          console.warn(
+          logger.warn(
             "[Gateway] CRON wakeup failed:",
             err instanceof Error ? err.message : String(err),
           );
@@ -358,7 +359,7 @@ export async function handleInboundMessage(
         sessionId,
       });
 
-      console.log("[Gateway] Sync timed out, escalated to async:", {
+      logger.info("[Gateway] Sync timed out, escalated to async:", {
         taskId,
         channel: msg.channel,
         elapsed: Date.now() - startTime,
@@ -373,7 +374,7 @@ export async function handleInboundMessage(
             headers: { "x-cron-secret": process.env.CRON_SECRET },
           },
         ).catch((err) => {
-          console.warn(
+          logger.warn(
             "[Gateway] CRON wakeup failed:",
             err instanceof Error ? err.message : String(err),
           );
@@ -396,7 +397,7 @@ export async function handleInboundMessage(
     });
 
     const durationMs = Date.now() - startTime;
-    console.log("[Gateway] Message processed:", {
+    logger.info("[Gateway] Message processed:", {
       channel: msg.channel,
       tenantId,
       toolsUsed: result.toolsUsed,

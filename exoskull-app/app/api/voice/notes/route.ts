@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 /**
@@ -251,7 +252,7 @@ export async function DELETE(req: NextRequest) {
  * Status stays "uploaded" — CRON worker handles the "processing" transition.
  */
 async function queueTranscription(voiceNoteId: string) {
-  console.log(`[VoiceNotes] Queued for transcription: ${voiceNoteId}`);
+  logger.info(`[VoiceNotes] Queued for transcription: ${voiceNoteId}`);
 
   // Fire-and-forget: wake up the CRON worker for immediate processing
   const cronSecret = process.env.CRON_SECRET;
@@ -262,7 +263,7 @@ async function queueTranscription(voiceNoteId: string) {
       method: "GET",
       headers: { "x-cron-secret": cronSecret },
     }).catch((err) => {
-      console.warn(
+      logger.warn(
         "[VoiceNotes] CRON wakeup failed (non-blocking):",
         err.message,
       );

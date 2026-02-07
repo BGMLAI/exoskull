@@ -29,6 +29,7 @@ import {
 import { appendMessage } from "@/lib/unified-thread";
 import type { GatewayChannel } from "@/lib/gateway/types";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -108,10 +109,10 @@ async function deliverResult(task: AsyncTask, text: string): Promise<void> {
         break;
 
       default:
-        console.warn("[AsyncCRON] No delivery adapter for channel:", channel);
+        logger.warn("[AsyncCRON] No delivery adapter for channel:", channel);
     }
 
-    console.log("[AsyncCRON] Delivered:", {
+    logger.info("[AsyncCRON] Delivered:", {
       taskId: task.id,
       channel,
       replyTo: reply_to,
@@ -136,7 +137,7 @@ async function processTask(task: AsyncTask): Promise<void> {
   const startTime = Date.now();
 
   try {
-    console.log("[AsyncCRON] Processing task:", {
+    logger.info("[AsyncCRON] Processing task:", {
       taskId: task.id,
       tenantId: task.tenant_id,
       channel: task.channel,
@@ -180,7 +181,7 @@ async function processTask(task: AsyncTask): Promise<void> {
     // 6. Deliver result back to user
     await deliverResult(task, result.text);
 
-    console.log("[AsyncCRON] Task completed:", {
+    logger.info("[AsyncCRON] Task completed:", {
       taskId: task.id,
       channel: task.channel,
       toolsUsed: result.toolsUsed,

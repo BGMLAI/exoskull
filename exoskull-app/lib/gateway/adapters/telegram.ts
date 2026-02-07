@@ -7,6 +7,7 @@
 
 import type { ChannelAdapter, GatewayMessage } from "../types";
 
+import { logger } from "@/lib/logger";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
@@ -171,7 +172,7 @@ export async function setupTelegramWebhook(
   });
 
   const result = await response.json();
-  console.log("[Telegram] Webhook setup:", result);
+  logger.info("[Telegram] Webhook setup:", result);
   return result.ok === true;
 }
 

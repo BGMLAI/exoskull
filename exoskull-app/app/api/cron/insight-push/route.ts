@@ -11,6 +11,7 @@ import { withCronGuard } from "@/lib/admin/cron-guard";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { pushInsightsForTenant } from "@/lib/insights/insight-pusher";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -46,7 +47,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   for (const tenant of activeTenants) {
     // Safety: bail before Vercel timeout
     if (Date.now() - startTime > 100_000) {
-      console.warn("[InsightPush] Approaching timeout, stopping early", {
+      logger.warn("[InsightPush] Approaching timeout, stopping early", {
         processed: results.processed,
         remaining: activeTenants.length - results.processed,
       });
@@ -76,7 +77,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
 
   const durationMs = Date.now() - startTime;
 
-  console.log("[InsightPush] Completed:", {
+  logger.info("[InsightPush] Completed:", {
     ...results,
     durationMs,
     error_count: results.errors.length,

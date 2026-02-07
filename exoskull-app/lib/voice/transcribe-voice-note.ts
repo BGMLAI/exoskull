@@ -7,6 +7,7 @@
 
 import { transcribeAudio, type STTResult } from "./elevenlabs-stt";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -104,7 +105,7 @@ async function transcribeWithGroq(
 
   // Filter hallucinations
   if (isHallucination(transcript)) {
-    console.log("[TranscribeLib] Groq hallucination filtered:", transcript);
+    logger.info("[TranscribeLib] Groq hallucination filtered:", transcript);
     return "";
   }
 
@@ -114,7 +115,7 @@ async function transcribeWithGroq(
       (s: { no_speech_prob?: number }) => (s.no_speech_prob || 0) < 0.8,
     );
     if (realSegments.length === 0) {
-      console.log("[TranscribeLib] All segments have high no_speech_prob");
+      logger.info("[TranscribeLib] All segments have high no_speech_prob");
       return "";
     }
   }
@@ -142,7 +143,7 @@ export async function transcribeVoiceNote(
 
   // Reject too-small files (noise/clicks)
   if (audioBuffer.byteLength < 5000) {
-    console.log(
+    logger.info(
       "[TranscribeLib] Audio too small:",
       audioBuffer.byteLength,
       "bytes",
@@ -154,13 +155,13 @@ export async function transcribeVoiceNote(
   try {
     const groqResult = await transcribeWithGroq(audioBuffer, language);
     if (groqResult !== null) {
-      console.log("[TranscribeLib] Groq succeeded:", {
+      logger.info("[TranscribeLib] Groq succeeded:", {
         textLength: groqResult.length,
       });
       return { text: groqResult, provider: "groq" };
     }
   } catch (error) {
-    console.warn("[TranscribeLib] Groq failed:", (error as Error).message);
+    logger.warn("[TranscribeLib] Groq failed:", (error as Error).message);
   }
 
   // Tier 2+3: ElevenLabs → Deepgram (unified fallback)
@@ -177,7 +178,7 @@ export async function transcribeVoiceNote(
     // Determine which provider actually succeeded
     const provider =
       fallbackResult.confidence !== undefined ? "deepgram" : "elevenlabs";
-    console.log("[TranscribeLib] Fallback succeeded:", {
+    logger.info("[TranscribeLib] Fallback succeeded:", {
       provider,
       textLength: text.length,
     });

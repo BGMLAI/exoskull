@@ -14,6 +14,7 @@ import {
 } from "@/lib/voice/conversation-handler";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     // Track usage
     await incrementUsage(user.id, "conversations").catch((err) => {
-      console.warn(
+      logger.warn(
         "[ChatSend] Usage tracking failed:",
         err instanceof Error ? err.message : String(err),
       );

@@ -13,6 +13,7 @@ import { getRigDefinition } from "@/lib/rigs";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // Check types
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  console.log("[PULSE] CRON triggered - running batch check for all users");
+  logger.info("[PULSE] CRON triggered - running batch check for all users");
 
   try {
     // Get all users with impulse enabled

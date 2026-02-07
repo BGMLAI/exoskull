@@ -22,6 +22,7 @@ import { getCircuitBreaker } from "./circuit-breaker";
 import { getModelsForTier, getModelConfig, ROUTER_CONFIG } from "./config";
 import { GeminiProvider, AnthropicProvider, KimiProvider } from "./providers";
 
+import { logger } from "@/lib/logger";
 export class ModelRouter {
   private providers: Map<ModelProvider, IAIProvider> = new Map();
   private taskHistory: Map<string, ModelId[]> = new Map(); // tenant:category -> successful models
@@ -122,7 +123,7 @@ export class ModelRouter {
 
         return response;
       } catch (error) {
-        console.warn(`[ModelRouter] ${model} failed, trying next...`, {
+        logger.warn(`[ModelRouter] ${model} failed, trying next...`, {
           error: error instanceof Error ? error.message : "Unknown error",
         });
       }
@@ -168,7 +169,7 @@ export class ModelRouter {
               this.recordSuccess(options.tenantId, category, model);
               return response;
             } catch (error) {
-              console.warn(`[ModelRouter] Fallback ${model} failed`, {
+              logger.warn(`[ModelRouter] Fallback ${model} failed`, {
                 error: error instanceof Error ? error.message : "Unknown error",
               });
             }

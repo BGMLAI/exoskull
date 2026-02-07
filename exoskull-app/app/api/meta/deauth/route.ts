@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 /**
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(
+    logger.info(
       "[MetaDeauth] Data deletion request for FB user:",
       data.user_id,
     );

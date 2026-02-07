@@ -20,6 +20,7 @@ import type {
 } from "./guardian-types";
 import type { PlannedIntervention } from "./types";
 
+import { logger } from "@/lib/logger";
 let _instance: AlignmentGuardian | null = null;
 
 export function getAlignmentGuardian(): AlignmentGuardian {
@@ -198,7 +199,7 @@ export class AlignmentGuardian {
         })
         .eq("id", record.id);
 
-      console.log("[Guardian] Effectiveness measured:", {
+      logger.info("[Guardian] Effectiveness measured:", {
         interventionId,
         phase: isFirst ? "24h" : "7d",
         score,
@@ -292,7 +293,7 @@ export class AlignmentGuardian {
         driftDetected || userValues.some((v) => v.drift_detected);
 
       if (driftDetected) {
-        console.log("[Guardian] Value drift detected:", { tenantId, areas });
+        logger.info("[Guardian] Value drift detected:", { tenantId, areas });
       }
 
       return { driftDetected, areas, suggestReconfirmation };
@@ -366,7 +367,7 @@ export class AlignmentGuardian {
         { onConflict: "tenant_id" },
       );
 
-      console.log("[Guardian] Throttle adjusted:", {
+      logger.info("[Guardian] Throttle adjusted:", {
         tenantId,
         avgScore,
         newMax,

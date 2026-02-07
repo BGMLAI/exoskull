@@ -19,6 +19,7 @@ import type {
 } from "./types";
 import { scanCrisisKeywords } from "./text-analyzer";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // EMOTIONAL PATTERN DETECTION
 // ============================================================================
@@ -315,7 +316,7 @@ export async function detectCrisis(
   }
 
   // Layer 3: AI assessment (only when flags detected)
-  console.log(
+  logger.info(
     `[CrisisDetector] Flags detected (${allFlags.length}): ${allFlags.join(", ")}`,
   );
 
@@ -324,7 +325,7 @@ export async function detectCrisis(
   if (aiResult.is_crisis && aiResult.type) {
     const protocol = getCrisisProtocol(aiResult.type, aiResult.severity);
 
-    console.log(
+    logger.info(
       `[CrisisDetector] 🚨 CRISIS CONFIRMED: ${aiResult.type} (severity: ${aiResult.severity}, confidence: ${aiResult.confidence})`,
     );
 
@@ -345,7 +346,7 @@ export async function detectCrisis(
     const type = inferCrisisType(keywordFlags);
     const protocol = getCrisisProtocol(type, "low");
 
-    console.log(
+    logger.info(
       `[CrisisDetector] ⚠️ FAIL-SAFE: Keywords detected but AI uncertain. Flagging as low-severity ${type}.`,
     );
 

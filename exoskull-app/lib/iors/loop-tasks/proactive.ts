@@ -15,6 +15,7 @@ import type { PetlaWorkItem, SubLoopResult } from "@/lib/iors/loop-types";
 import type { IORSPersonality } from "@/lib/iors/types";
 import { DEFAULT_PERSONALITY } from "@/lib/iors/types";
 
+import { logger } from "@/lib/logger";
 /**
  * Check if current time is within user's communication hours.
  */
@@ -78,7 +79,7 @@ export async function handleProactive(
     // 2. Check autonomy permission for proactive messaging
     const perm = await checkPermission(tenant_id, "message", "*");
     if (!perm.permitted) {
-      console.log("[Petla:Proactive] No 'message' permission, skipping:", {
+      logger.info("[Petla:Proactive] No 'message' permission, skipping:", {
         tenantId: tenant_id,
       });
       if (item.id && item.status === "processing") {
@@ -92,7 +93,7 @@ export async function handleProactive(
 
     // 3. Check quiet hours
     if (!isWithinCommunicationHours(personality, timezone)) {
-      console.log("[Petla:Proactive] Outside communication hours, deferring:", {
+      logger.info("[Petla:Proactive] Outside communication hours, deferring:", {
         tenantId: tenant_id,
         hours: personality.communication_hours,
       });
@@ -117,7 +118,7 @@ export async function handleProactive(
     const message = (params.message as string) || (params.text as string);
 
     if (!message) {
-      console.log("[Petla:Proactive] No message content, skipping:", {
+      logger.info("[Petla:Proactive] No message content, skipping:", {
         tenantId: tenant_id,
       });
       if (item.id && item.status === "processing") {

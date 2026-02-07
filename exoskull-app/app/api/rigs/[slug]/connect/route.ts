@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getOAuthConfig, buildAuthUrl, supportsOAuth } from "@/lib/rigs/oauth";
 import { randomBytes } from "crypto";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/rigs/[slug]/connect - Start OAuth flow
@@ -90,7 +91,7 @@ export async function GET(
     // Build auth URL and redirect
     const authUrl = buildAuthUrl(config, state);
 
-    console.log(`[OAuth] Redirecting to ${slug} auth`, {
+    logger.info(`[OAuth] Redirecting to ${slug} auth`, {
       userId: user.id,
       redirectUri: config.redirectUri,
       scopeCount: config.scopes.length,

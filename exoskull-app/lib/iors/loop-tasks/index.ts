@@ -14,6 +14,7 @@ export { handleMaintenance } from "./maintenance";
 import type { SubLoop, SubLoopHandler } from "@/lib/iors/loop-types";
 import type { PetlaWorkItem, SubLoopResult } from "@/lib/iors/loop-types";
 
+import { logger } from "@/lib/logger";
 /**
  * Dispatch a work item to the appropriate sub-loop handler.
  */
@@ -46,7 +47,7 @@ export async function dispatchToHandler(
       return handleMaintenance(item);
     }
     default:
-      console.warn("[Petla] Unknown sub_loop:", item.sub_loop);
+      logger.warn("[Petla] Unknown sub_loop:", item.sub_loop);
       return { handled: false, error: `Unknown sub_loop: ${item.sub_loop}` };
   }
 }

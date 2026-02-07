@@ -15,6 +15,7 @@ import { appendMessage } from "../unified-thread";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { emitEvent } from "@/lib/iors/loop";
 
+import { logger } from "@/lib/logger";
 function getTwilioConfig() {
   return {
     accountSid: process.env.TWILIO_ACCOUNT_SID!,
@@ -135,7 +136,7 @@ export async function executeIntervention(
     // Notify user about completed action
     await notifyUser(intervention as Intervention, result);
 
-    console.log("[Executor] Completed:", {
+    logger.info("[Executor] Completed:", {
       interventionId,
       result: result.message,
     });
@@ -249,7 +250,7 @@ export async function processQueue(
     }
   }
 
-  console.log("[Executor] Queue processed:", {
+  logger.info("[Executor] Queue processed:", {
     total: dueItems.length,
     succeeded,
     failed,
@@ -288,7 +289,7 @@ export async function processTimeouts(): Promise<number> {
 
     if (!error) {
       autoApproved++;
-      console.log("[Executor] Auto-approved after timeout:", intervention.id);
+      logger.info("[Executor] Auto-approved after timeout:", intervention.id);
     }
   }
 

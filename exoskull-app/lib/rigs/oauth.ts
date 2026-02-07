@@ -398,6 +398,7 @@ export function supportsOAuth(rigSlug: string): boolean {
 
 import { createClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
 function getServiceSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -449,7 +450,7 @@ export async function ensureFreshToken(connection: {
     );
   }
 
-  console.log(
+  logger.info(
     `[OAuth] Refreshing token for ${connection.rig_slug} (expires: ${connection.expires_at})`,
   );
 

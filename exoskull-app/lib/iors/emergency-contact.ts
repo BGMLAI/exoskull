@@ -16,6 +16,7 @@
 import { getServiceSupabase } from "@/lib/supabase/service";
 import type { EmergencyContact } from "./types";
 
+import { logger } from "@/lib/logger";
 /**
  * Add an emergency contact and send verification SMS.
  */
@@ -108,7 +109,7 @@ export async function verifyEmergencyContact(
     const sentAt = new Date(contact.verification_sent_at);
     const hoursElapsed = (Date.now() - sentAt.getTime()) / (1000 * 60 * 60);
     if (hoursElapsed > 24) {
-      console.warn("[EmergencyContact] Verification code expired:", contactId);
+      logger.warn("[EmergencyContact] Verification code expired:", contactId);
       return false;
     }
   }
@@ -165,12 +166,12 @@ export async function escalateToCrisisContact(
   const contact = await getPrimaryEmergencyContact(tenantId);
 
   if (!contact) {
-    console.warn("[EmergencyContact] No emergency contact set:", tenantId);
+    logger.warn("[EmergencyContact] No emergency contact set:", tenantId);
     return { escalated: false, reason: "no_contact_set" };
   }
 
   if (!contact.verified) {
-    console.warn("[EmergencyContact] Contact not verified:", {
+    logger.warn("[EmergencyContact] Contact not verified:", {
       tenantId,
       contactId: contact.id,
     });
@@ -194,7 +195,7 @@ export async function escalateToCrisisContact(
   try {
     const sent = await sendSMS(contact.phone, message);
 
-    console.log("[EmergencyContact] Crisis escalation:", {
+    logger.info("[EmergencyContact] Crisis escalation:", {
       tenantId,
       contactId: contact.id,
       crisisType,

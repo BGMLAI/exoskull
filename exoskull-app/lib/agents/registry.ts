@@ -19,6 +19,7 @@ import {
 } from "./types";
 import { createAgentContext } from "./core/agent-context";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // AGENT REGISTRY IMPLEMENTATION
 // ============================================================================
@@ -41,20 +42,20 @@ class AgentRegistryImpl implements IAgentRegistry {
 
   register(agent: AgentRegistration): void {
     if (this.registrations.has(agent.id)) {
-      console.warn(
+      logger.warn(
         `[AgentRegistry] Agent ${agent.id} already registered, updating...`,
       );
     }
 
     this.registrations.set(agent.id, agent);
-    console.log(
+    logger.info(
       `[AgentRegistry] Registered agent: ${agent.name} (tier ${agent.tier}, caps: ${agent.capabilities.join(", ")})`,
     );
   }
 
   unregister(agentId: string): void {
     this.registrations.delete(agentId);
-    console.log(`[AgentRegistry] Unregistered agent: ${agentId}`);
+    logger.info(`[AgentRegistry] Unregistered agent: ${agentId}`);
   }
 
   // ============================================================================
@@ -62,7 +63,7 @@ class AgentRegistryImpl implements IAgentRegistry {
   // ============================================================================
 
   async spawn(request: SpawnRequest): Promise<IAgent | null> {
-    console.log(
+    logger.info(
       `[AgentRegistry] Spawn request: task="${request.task}", tenant=${request.tenantId}, priority=${request.priority}`,
     );
 
@@ -83,7 +84,7 @@ class AgentRegistryImpl implements IAgentRegistry {
       });
 
     if (matching.length === 0) {
-      console.warn(`[AgentRegistry] No agent can handle task: ${request.task}`);
+      logger.warn(`[AgentRegistry] No agent can handle task: ${request.task}`);
       return null;
     }
 
@@ -95,7 +96,7 @@ class AgentRegistryImpl implements IAgentRegistry {
       }
     }
 
-    console.warn(
+    logger.warn(
       `[AgentRegistry] All matching agents unavailable for: ${request.task}`,
     );
     this.failures++;
@@ -112,7 +113,7 @@ class AgentRegistryImpl implements IAgentRegistry {
     const lastSpawn = this.cooldowns.get(id) || 0;
     const cooldownRemaining = cooldownMs - (Date.now() - lastSpawn);
     if (cooldownRemaining > 0) {
-      console.log(
+      logger.info(
         `[AgentRegistry] Agent ${name} on cooldown (${cooldownRemaining}ms remaining)`,
       );
       return null;
@@ -121,7 +122,7 @@ class AgentRegistryImpl implements IAgentRegistry {
     // Check max instances
     const active = this.activeAgents.get(id) || [];
     if (active.length >= maxInstances) {
-      console.log(
+      logger.info(
         `[AgentRegistry] Agent ${name} at max instances (${maxInstances})`,
       );
       return null;
@@ -152,7 +153,7 @@ class AgentRegistryImpl implements IAgentRegistry {
         await agent.onSpawn();
       }
 
-      console.log(
+      logger.info(
         `[AgentRegistry] Spawned ${name} for tenant ${request.tenantId} (total active: ${active.length})`,
       );
       return agent;
@@ -202,11 +203,11 @@ class AgentRegistryImpl implements IAgentRegistry {
 
         agents.splice(index, 1);
         this.activeAgents.set(registrationId, agents);
-        console.log(`[AgentRegistry] Released agent: ${agentId}`);
+        logger.info(`[AgentRegistry] Released agent: ${agentId}`);
         return;
       }
     }
-    console.warn(`[AgentRegistry] Agent not found for release: ${agentId}`);
+    logger.warn(`[AgentRegistry] Agent not found for release: ${agentId}`);
   }
 
   // ============================================================================
@@ -283,7 +284,7 @@ class AgentRegistryImpl implements IAgentRegistry {
           agent
             .onRelease()
             .catch((err) =>
-              console.warn(
+              logger.warn(
                 "[AgentRegistry] Agent release failed:",
                 err instanceof Error ? err.message : err,
               ),
@@ -296,7 +297,7 @@ class AgentRegistryImpl implements IAgentRegistry {
     this.activeAgents.clear();
     this.cooldowns.clear();
     this.tenantAgents.clear();
-    console.log("[AgentRegistry] Cleared all registrations and active agents");
+    logger.info("[AgentRegistry] Cleared all registrations and active agents");
   }
 }
 

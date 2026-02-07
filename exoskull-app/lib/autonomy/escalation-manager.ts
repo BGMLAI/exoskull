@@ -11,6 +11,7 @@
 
 import { createServiceClient } from "@/lib/supabase/service-client";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -204,7 +205,7 @@ export async function createEscalationChain(
     }
   }
 
-  console.log(
+  logger.info(
     `[EscalationManager] Chain created: ${chainId} (${steps.length} steps, reason: ${opts.reason})`,
   );
 
@@ -300,7 +301,7 @@ export async function processEscalations(): Promise<{
           payload.escalation_level,
         );
         cancelled++;
-        console.log(
+        logger.info(
           `[EscalationManager] Cancelled escalation: user responded (chain: ${payload.escalation_chain_id}, level: ${payload.escalation_level})`,
         );
       } else {
@@ -312,7 +313,7 @@ export async function processEscalations(): Promise<{
           });
         }
         escalated++;
-        console.log(
+        logger.info(
           `[EscalationManager] Escalating: level ${payload.escalation_level} (chain: ${payload.escalation_chain_id})`,
         );
       }

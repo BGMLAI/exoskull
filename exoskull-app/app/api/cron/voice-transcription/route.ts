@@ -13,6 +13,7 @@ import { withCronGuard } from "@/lib/admin/cron-guard";
 import { transcribeVoiceNote } from "@/lib/voice/transcribe-voice-note";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -35,7 +36,7 @@ async function handler(req: NextRequest) {
       .select("id");
 
     if (stuck?.length) {
-      console.log("[VoiceCRON] Released stuck notes:", stuck.length);
+      logger.info("[VoiceCRON] Released stuck notes:", stuck.length);
     }
 
     // 2. Fetch pending voice notes
@@ -106,7 +107,7 @@ async function handler(req: NextRequest) {
           })
           .eq("id", note.id);
 
-        console.log("[VoiceCRON] Transcribed:", {
+        logger.info("[VoiceCRON] Transcribed:", {
           noteId: note.id,
           provider: result.provider,
           textLength: result.text.length,

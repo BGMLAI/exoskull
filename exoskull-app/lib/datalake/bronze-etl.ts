@@ -17,6 +17,7 @@ import {
 } from "../storage/parquet-writer";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // Service role client for ETL (bypasses RLS)
 // ============================================================================
 // Types
@@ -418,7 +419,7 @@ export async function runBronzeETL(): Promise<ETLSummary> {
   const startedAt = new Date();
   const results: ETLResult[] = [];
 
-  console.log(`[Bronze ETL] Starting at ${startedAt.toISOString()}`);
+  logger.info(`[Bronze ETL] Starting at ${startedAt.toISOString()}`);
 
   // Get all active tenants
   const { data: tenants, error } = await getServiceSupabase()
@@ -442,7 +443,7 @@ export async function runBronzeETL(): Promise<ETLSummary> {
   }
 
   if (!tenants || tenants.length === 0) {
-    console.log("[Bronze ETL] No tenants found");
+    logger.info("[Bronze ETL] No tenants found");
     return {
       started_at: startedAt.toISOString(),
       completed_at: new Date().toISOString(),
@@ -455,11 +456,11 @@ export async function runBronzeETL(): Promise<ETLSummary> {
     };
   }
 
-  console.log(`[Bronze ETL] Processing ${tenants.length} tenants`);
+  logger.info(`[Bronze ETL] Processing ${tenants.length} tenants`);
 
   // Process each tenant
   for (const tenant of tenants) {
-    console.log(`[Bronze ETL] Processing tenant: ${tenant.id}`);
+    logger.info(`[Bronze ETL] Processing tenant: ${tenant.id}`);
 
     // Run ETL for each data type
     const conversationsResult = await etlConversations(tenant.id);
@@ -493,7 +494,7 @@ export async function runBronzeETL(): Promise<ETLSummary> {
       })),
   };
 
-  console.log(`[Bronze ETL] Complete:`, {
+  logger.info(`[Bronze ETL] Complete:`, {
     duration_ms: summary.duration_ms,
     tenants: summary.tenants_processed,
     records: summary.total_records,

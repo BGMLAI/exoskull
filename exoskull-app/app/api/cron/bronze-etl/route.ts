@@ -18,6 +18,7 @@ import { checkR2Connection, getBronzeStats } from "@/lib/storage/r2-client";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { verifyCronAuth } from "@/lib/cron/auth";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -26,7 +27,7 @@ export const maxDuration = 60;
  * Trigger Bronze ETL job
  */
 async function postHandler(req: NextRequest) {
-  console.log(`[Bronze ETL] Triggered at ${new Date().toISOString()}`);
+  logger.info(`[Bronze ETL] Triggered at ${new Date().toISOString()}`);
 
   // Check R2 connection first
   const r2Check = await checkR2Connection();
@@ -49,7 +50,7 @@ async function postHandler(req: NextRequest) {
 
     if (tenantId) {
       // Single tenant ETL
-      console.log(`[Bronze ETL] Running for single tenant: ${tenantId}`);
+      logger.info(`[Bronze ETL] Running for single tenant: ${tenantId}`);
       const results = await runBronzeETLForTenant(tenantId);
 
       return NextResponse.json({

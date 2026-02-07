@@ -11,6 +11,7 @@ import { withCronGuard } from "@/lib/admin/cron-guard";
 import { generateMonthlySummary } from "@/lib/reports/summary-generator";
 import { dispatchReport } from "@/lib/reports/report-dispatcher";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -80,7 +81,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
 
   const durationMs = Date.now() - startTime;
 
-  console.log("[MonthlySummary] Completed:", {
+  logger.info("[MonthlySummary] Completed:", {
     ...results,
     durationMs,
     errorCount: results.errors.length,

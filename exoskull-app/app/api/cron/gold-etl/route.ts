@@ -21,6 +21,7 @@ import {
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { verifyCronAuth } from "@/lib/cron/auth";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -29,7 +30,7 @@ export const maxDuration = 60;
  * Trigger Gold ETL job (refresh materialized views)
  */
 async function postHandler(req: NextRequest) {
-  console.log(`[Gold ETL] Triggered at ${new Date().toISOString()}`);
+  logger.info(`[Gold ETL] Triggered at ${new Date().toISOString()}`);
 
   try {
     // Check if specific view requested
@@ -38,7 +39,7 @@ async function postHandler(req: NextRequest) {
 
     if (viewName) {
       // Single view refresh
-      console.log(`[Gold ETL] Refreshing single view: ${viewName}`);
+      logger.info(`[Gold ETL] Refreshing single view: ${viewName}`);
       const result = await refreshSingleView(viewName);
 
       return NextResponse.json({

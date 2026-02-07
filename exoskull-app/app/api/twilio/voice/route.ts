@@ -19,6 +19,7 @@ import {
   validateTwilioSignature,
 } from "@/lib/voice/twilio-client";
 import { textToSpeech, uploadTTSAudio } from "@/lib/voice/elevenlabs-tts";
+import { logger } from "@/lib/logger";
 import {
   getOrCreateSession,
   updateSession,
@@ -93,7 +94,7 @@ export async function POST(req: NextRequest) {
         });
       }
     } else {
-      console.warn(
+      logger.warn(
         "[Twilio Voice] TWILIO_AUTH_TOKEN not set — signature verification skipped",
       );
     }
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
     const speechResult = formData.SpeechResult;
     const recordingUrl = formData.RecordingUrl;
 
-    console.log("[Twilio Voice] Request:", {
+    logger.info("[Twilio Voice] Request:", {
       action,
       callSid,
       from,
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
       const jobType = url.searchParams.get("job_type");
       const cronSecret = url.searchParams.get("cron_secret");
 
-      console.log("[Twilio Voice] New call:", { from, queryTenantId, jobType });
+      logger.info("[Twilio Voice] New call:", { from, queryTenantId, jobType });
 
       // Resolve tenant: use query param (outbound, CRON-verified) or lookup by phone (inbound)
       let tenantId: string;
@@ -153,7 +154,7 @@ export async function POST(req: NextRequest) {
       try {
         const audioBuffer = await textToSpeech(greeting);
         audioUrl = await uploadTTSAudio(audioBuffer, session.id, 0);
-        console.log("[Twilio Voice] TTS greeting uploaded:", audioUrl);
+        logger.info("[Twilio Voice] TTS greeting uploaded:", audioUrl);
       } catch (ttsError) {
         console.error("[Twilio Voice] TTS Error:", ttsError);
         // Will fall back to Twilio Say
@@ -197,13 +198,13 @@ export async function POST(req: NextRequest) {
       const userText = speechResult?.trim();
 
       if (!userText) {
-        console.log("[Twilio Voice] No speech detected");
+        logger.info("[Twilio Voice] No speech detected");
         return new NextResponse(generateEndCallTwiML(), {
           headers: { "Content-Type": "application/xml" },
         });
       }
 
-      console.log("[Twilio Voice] User said:", userText);
+      logger.info("[Twilio Voice] User said:", userText);
 
       // Process with Claude
       const result = await processUserMessage(session, userText, {
@@ -211,7 +212,7 @@ export async function POST(req: NextRequest) {
       });
       const processingTime = Date.now() - startTime;
 
-      console.log("[Twilio Voice] Claude response:", {
+      logger.info("[Twilio Voice] Claude response:", {
         text: result.text.substring(0, 100),
         toolsUsed: result.toolsUsed,
         shouldEndCall: result.shouldEndCall,
@@ -298,7 +299,7 @@ export async function POST(req: NextRequest) {
       try {
         const session = await getOrCreateSession(callSid, tenantId);
         await endSession(session.id);
-        console.log("[Twilio Voice] Call ended:", callSid);
+        logger.info("[Twilio Voice] Call ended:", callSid);
       } catch (error) {
         console.error("[Twilio Voice] Error ending session:", error);
       }
@@ -307,7 +308,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Unknown action - end call
-    console.warn("[Twilio Voice] Unknown action:", action);
+    logger.warn("[Twilio Voice] Unknown action:", action);
     return new NextResponse(generateEndCallTwiML(), {
       headers: { "Content-Type": "application/xml" },
     });

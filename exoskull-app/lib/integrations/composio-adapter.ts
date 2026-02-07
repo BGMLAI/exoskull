@@ -12,6 +12,7 @@
 
 import { Composio } from "@composio/core";
 
+import { logger } from "@/lib/logger";
 let _client: Composio | null = null;
 
 function getClient(): Composio {
@@ -89,7 +90,7 @@ export async function initiateConnection(
   const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
   const callbackUrl = `${APP_URL}/api/integrations/composio/callback`;
 
-  console.log("[Composio] Initiating connection:", { tenantId, toolkit });
+  logger.info("[Composio] Initiating connection:", { tenantId, toolkit });
 
   const connRequest = await client.connectedAccounts.initiate(
     tenantId,
@@ -167,7 +168,7 @@ export async function executeAction(
 ): Promise<{ success: boolean; data?: unknown; error?: string }> {
   const client = getClient();
 
-  console.log("[Composio] Executing action:", {
+  logger.info("[Composio] Executing action:", {
     toolSlug,
     tenantId,
     argKeys: Object.keys(args),

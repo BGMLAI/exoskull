@@ -22,6 +22,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { dispatchToHandler } from "@/lib/iors/loop-tasks";
 import { claimQueuedWork } from "@/lib/iors/loop";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -34,11 +35,11 @@ async function handler(req: NextRequest) {
   try {
     // Step 1: Reset daily budgets
     const budgetResets = await resetDailyBudgets();
-    console.log("[LoopDaily] Budget resets:", budgetResets);
+    logger.info("[LoopDaily] Budget resets:", budgetResets);
 
     // Step 2: Reclassify all tenants
     const reclassified = await reclassifyTenants();
-    console.log("[LoopDaily] Reclassified tenants:", reclassified);
+    logger.info("[LoopDaily] Reclassified tenants:", reclassified);
 
     // Step 3: Seed maintenance tasks for off-peak execution
     const supabase = getServiceSupabase();
@@ -91,7 +92,7 @@ async function handler(req: NextRequest) {
     const prunedEvents = await pruneOldEvents(7);
     const prunedWork = await pruneOldWorkItems(7);
 
-    console.log("[LoopDaily] Pruned:", {
+    logger.info("[LoopDaily] Pruned:", {
       events: prunedEvents,
       workItems: prunedWork,
     });

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -19,7 +20,7 @@ async function postHandler(req: NextRequest) {
   const today = new Date().toISOString().split("T")[0];
   const yesterday = new Date(Date.now() - 86400000).toISOString();
 
-  console.log(`[AdminMetrics] Calculating snapshot for ${today}`);
+  logger.info(`[AdminMetrics] Calculating snapshot for ${today}`);
 
   // Users
   const { count: totalUsers } = await db
@@ -117,7 +118,7 @@ async function postHandler(req: NextRequest) {
   }
 
   const duration = Date.now() - startTime;
-  console.log(`[AdminMetrics] Snapshot calculated in ${duration}ms`);
+  logger.info(`[AdminMetrics] Snapshot calculated in ${duration}ms`);
 
   return NextResponse.json({
     snapshot,

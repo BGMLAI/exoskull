@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 /**
  * Circuit Breaker — Centralized failure tracking per tenant/service
  *
@@ -76,7 +77,7 @@ export const CircuitBreaker = {
           if (Date.now() - entry.openedAt >= DEFAULT_OPTS.cooldownMs) {
             entry.state = "half_open";
             entry.successes = 0;
-            console.log(`[CircuitBreaker] ${k} → half_open (cooldown elapsed)`);
+            logger.info(`[CircuitBreaker] ${k} → half_open (cooldown elapsed)`);
             return true;
           }
           return false;
@@ -96,7 +97,7 @@ export const CircuitBreaker = {
           if (entry.successes >= DEFAULT_OPTS.halfOpenSuccessThreshold) {
             entry.state = "closed";
             entry.failures = 0;
-            console.log(`[CircuitBreaker] ${k} → closed (recovered)`);
+            logger.info(`[CircuitBreaker] ${k} → closed (recovered)`);
           }
         } else if (entry.state === "closed") {
           // Reset failure count on success
@@ -117,7 +118,7 @@ export const CircuitBreaker = {
         ) {
           entry.state = "open";
           entry.openedAt = Date.now();
-          console.warn(
+          logger.warn(
             `[CircuitBreaker] ${k} → OPEN after ${entry.failures} failures: ${error}`,
           );
         }

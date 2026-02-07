@@ -13,26 +13,27 @@ import {
   Decision,
   ExecutionResult,
   AGENT_TIERS,
-} from '../types'
-import { BaseAgent } from '../core/base-agent'
-import {
-  GapAnalysis,
-  LIFE_AREAS,
-  LifeArea,
-} from '../../autonomy/types'
+} from "../types";
+import { BaseAgent } from "../core/base-agent";
+import { logger } from "@/lib/logger";
+import { GapAnalysis, LIFE_AREAS, LifeArea } from "../../autonomy/types";
 
 // ============================================================================
 // GAP DETECTOR AGENT
 // ============================================================================
 
 export class GapDetectorAgent extends BaseAgent {
-  readonly id = 'gap-detector'
-  readonly name = 'Gap Detector'
-  readonly tier: AgentTier = AGENT_TIERS.BALANCED
-  readonly capabilities = ['gap_detection', 'blind_spot_analysis', 'coverage_analysis']
+  readonly id = "gap-detector";
+  readonly name = "Gap Detector";
+  readonly tier: AgentTier = AGENT_TIERS.BALANCED;
+  readonly capabilities = [
+    "gap_detection",
+    "blind_spot_analysis",
+    "coverage_analysis",
+  ];
 
   constructor(context: AgentContext) {
-    super(context)
+    super(context);
   }
 
   // ============================================================================
@@ -42,39 +43,39 @@ export class GapDetectorAgent extends BaseAgent {
   async decide(
     resources: ResourceAnalysis,
     environment: EnvironmentAnalysis,
-    _context?: AgentContext
+    _context?: AgentContext,
   ): Promise<Decision[]> {
-    const decisions: Decision[] = []
+    const decisions: Decision[] = [];
 
     // Only run weekly or when specifically triggered
     if (
       environment.dayOfWeek !== 0 && // Sunday
       !this.context.metadata?.forceRun
     ) {
-      console.log('[GapDetector] Skipping - not Sunday and not forced')
-      return []
+      logger.info("[GapDetector] Skipping - not Sunday and not forced");
+      return [];
     }
 
     // Check if we have enough data to analyze
     if (resources.availableData.conversations < 5) {
-      console.log('[GapDetector] Skipping - insufficient conversation data')
-      return []
+      logger.info("[GapDetector] Skipping - insufficient conversation data");
+      return [];
     }
 
     // Decide to run gap analysis
     decisions.push({
-      action: 'analyze_gaps',
+      action: "analyze_gaps",
       confidence: 0.9,
-      reasoning: 'Weekly gap analysis to identify blind spots',
+      reasoning: "Weekly gap analysis to identify blind spots",
       params: {
         areas: LIFE_AREAS.map((a) => a.slug),
         lookbackDays: 30,
       },
-      urgency: 'background',
+      urgency: "background",
       requiredTier: AGENT_TIERS.BALANCED,
-    })
+    });
 
-    return decisions
+    return decisions;
   }
 
   // ============================================================================
@@ -82,45 +83,48 @@ export class GapDetectorAgent extends BaseAgent {
   // ============================================================================
 
   async execute(decision: Decision): Promise<ExecutionResult> {
-    const startTime = Date.now()
-    this.status = 'running'
+    const startTime = Date.now();
+    this.status = "running";
 
     try {
-      if (decision.action !== 'analyze_gaps') {
+      if (decision.action !== "analyze_gaps") {
         return {
           success: false,
           action: decision.action,
           error: `Unknown action: ${decision.action}`,
           metrics: { durationMs: Date.now() - startTime },
-        }
+        };
       }
 
-      const lookbackDays = (decision.params.lookbackDays as number) || 30
-      const gaps = await this.analyzeAllGaps(this.context.tenantId, lookbackDays)
+      const lookbackDays = (decision.params.lookbackDays as number) || 30;
+      const gaps = await this.analyzeAllGaps(
+        this.context.tenantId,
+        lookbackDays,
+      );
 
       // Filter to significant gaps only
-      const significantGaps = gaps.filter((g) => g.severity !== 'none')
+      const significantGaps = gaps.filter((g) => g.severity !== "none");
 
       // Create interventions for severe gaps
       const interventionsCreated = await this.createGapInterventions(
         this.context.tenantId,
-        significantGaps
-      )
+        significantGaps,
+      );
 
       // Store gap analysis results
-      await this.storeGapAnalysis(this.context.tenantId, gaps)
+      await this.storeGapAnalysis(this.context.tenantId, gaps);
 
-      this.status = 'completed'
+      this.status = "completed";
 
       const result: ExecutionResult = {
         success: true,
-        action: 'analyze_gaps',
+        action: "analyze_gaps",
         data: {
           totalAreas: LIFE_AREAS.length,
           gapsDetected: significantGaps.length,
-          severeGaps: gaps.filter((g) => g.severity === 'severe').length,
-          moderateGaps: gaps.filter((g) => g.severity === 'moderate').length,
-          mildGaps: gaps.filter((g) => g.severity === 'mild').length,
+          severeGaps: gaps.filter((g) => g.severity === "severe").length,
+          moderateGaps: gaps.filter((g) => g.severity === "moderate").length,
+          mildGaps: gaps.filter((g) => g.severity === "mild").length,
           interventionsCreated,
           gaps: significantGaps.map((g) => ({
             area: g.area.name,
@@ -133,23 +137,23 @@ export class GapDetectorAgent extends BaseAgent {
           durationMs: Date.now() - startTime,
           tier: this.tier,
         },
-      }
+      };
 
-      await this.logExecution(decision, result)
-      return result
+      await this.logExecution(decision, result);
+      return result;
     } catch (error) {
-      this.status = 'failed'
-      const errorMsg = error instanceof Error ? error.message : String(error)
+      this.status = "failed";
+      const errorMsg = error instanceof Error ? error.message : String(error);
 
       const result: ExecutionResult = {
         success: false,
         action: decision.action,
         error: errorMsg,
         metrics: { durationMs: Date.now() - startTime },
-      }
+      };
 
-      await this.logExecution(decision, result, errorMsg)
-      return result
+      await this.logExecution(decision, result, errorMsg);
+      return result;
     }
   }
 
@@ -159,65 +163,73 @@ export class GapDetectorAgent extends BaseAgent {
 
   private async analyzeAllGaps(
     tenantId: string,
-    lookbackDays: number
+    lookbackDays: number,
   ): Promise<GapAnalysis[]> {
-    const gaps: GapAnalysis[] = []
+    const gaps: GapAnalysis[] = [];
 
     for (const area of LIFE_AREAS) {
-      const gap = await this.analyzeGap(tenantId, area, lookbackDays)
-      gaps.push(gap)
+      const gap = await this.analyzeGap(tenantId, area, lookbackDays);
+      gaps.push(gap);
     }
 
-    return gaps
+    return gaps;
   }
 
   private async analyzeGap(
     tenantId: string,
     area: LifeArea,
-    lookbackDays: number
+    lookbackDays: number,
   ): Promise<GapAnalysis> {
-    const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - lookbackDays)
-    const cutoffIso = cutoffDate.toISOString()
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - lookbackDays);
+    const cutoffIso = cutoffDate.toISOString();
 
     // Count activity based on data points
-    let activityCount = 0
-    let lastActivity: string | null = null
+    let activityCount = 0;
+    let lastActivity: string | null = null;
 
     for (const dataPoint of area.dataPoints) {
       const { count, latest } = await this.countDataPoint(
         tenantId,
         dataPoint,
-        cutoffIso
-      )
-      activityCount += count
+        cutoffIso,
+      );
+      activityCount += count;
       if (latest && (!lastActivity || latest > lastActivity)) {
-        lastActivity = latest
+        lastActivity = latest;
       }
     }
 
     // Calculate expected count based on tracking frequency
-    const expectedCount = this.calculateExpectedCount(area.trackingFrequency, lookbackDays)
-    const coveragePercent = expectedCount > 0
-      ? Math.min(100, Math.round((activityCount / expectedCount) * 100))
-      : 0
+    const expectedCount = this.calculateExpectedCount(
+      area.trackingFrequency,
+      lookbackDays,
+    );
+    const coveragePercent =
+      expectedCount > 0
+        ? Math.min(100, Math.round((activityCount / expectedCount) * 100))
+        : 0;
 
     // Calculate days since activity
     const daysSinceActivity = lastActivity
-      ? Math.floor((Date.now() - new Date(lastActivity).getTime()) / (24 * 60 * 60 * 1000))
-      : null
+      ? Math.floor(
+          (Date.now() - new Date(lastActivity).getTime()) /
+            (24 * 60 * 60 * 1000),
+        )
+      : null;
 
     // Determine severity
     const severity = this.calculateSeverity(
       area.trackingFrequency,
       daysSinceActivity,
-      coveragePercent
-    )
+      coveragePercent,
+    );
 
     // Generate suggested intervention
-    const suggestedIntervention = severity !== 'none'
-      ? this.generateSuggestion(area, severity, daysSinceActivity)
-      : null
+    const suggestedIntervention =
+      severity !== "none"
+        ? this.generateSuggestion(area, severity, daysSinceActivity)
+        : null;
 
     return {
       area,
@@ -228,39 +240,78 @@ export class GapDetectorAgent extends BaseAgent {
       coveragePercent,
       severity,
       suggestedIntervention,
-    }
+    };
   }
 
   private async countDataPoint(
     tenantId: string,
     dataPoint: string,
-    cutoffDate: string
+    cutoffDate: string,
   ): Promise<{ count: number; latest: string | null }> {
     // Map data points to tables
-    const tableMap: Record<string, { table: string; tenantCol: string; dateCol: string }> = {
-      sleep_entries: { table: 'exo_sleep_entries', tenantCol: 'tenant_id', dateCol: 'sleep_date' },
-      activity_entries: { table: 'exo_activity_entries', tenantCol: 'tenant_id', dateCol: 'entry_date' },
-      health_checkins: { table: 'exo_user_checkins', tenantCol: 'tenant_id', dateCol: 'created_at' },
-      mood_entries: { table: 'exo_mood_entries', tenantCol: 'tenant_id', dateCol: 'created_at' },
-      tasks_completed: { table: 'exo_tasks', tenantCol: 'tenant_id', dateCol: 'completed_at' },
-      social_events: { table: 'exo_conversations', tenantCol: 'tenant_id', dateCol: 'created_at' },
-      transactions: { table: 'exo_transactions', tenantCol: 'tenant_id', dateCol: 'created_at' },
-      journal_entries: { table: 'user_notes', tenantCol: 'tenant_id', dateCol: 'created_at' },
-      meditation_sessions: { table: 'exo_meditation_sessions', tenantCol: 'tenant_id', dateCol: 'created_at' },
-    }
+    const tableMap: Record<
+      string,
+      { table: string; tenantCol: string; dateCol: string }
+    > = {
+      sleep_entries: {
+        table: "exo_sleep_entries",
+        tenantCol: "tenant_id",
+        dateCol: "sleep_date",
+      },
+      activity_entries: {
+        table: "exo_activity_entries",
+        tenantCol: "tenant_id",
+        dateCol: "entry_date",
+      },
+      health_checkins: {
+        table: "exo_user_checkins",
+        tenantCol: "tenant_id",
+        dateCol: "created_at",
+      },
+      mood_entries: {
+        table: "exo_mood_entries",
+        tenantCol: "tenant_id",
+        dateCol: "created_at",
+      },
+      tasks_completed: {
+        table: "exo_tasks",
+        tenantCol: "tenant_id",
+        dateCol: "completed_at",
+      },
+      social_events: {
+        table: "exo_conversations",
+        tenantCol: "tenant_id",
+        dateCol: "created_at",
+      },
+      transactions: {
+        table: "exo_transactions",
+        tenantCol: "tenant_id",
+        dateCol: "created_at",
+      },
+      journal_entries: {
+        table: "user_notes",
+        tenantCol: "tenant_id",
+        dateCol: "created_at",
+      },
+      meditation_sessions: {
+        table: "exo_meditation_sessions",
+        tenantCol: "tenant_id",
+        dateCol: "created_at",
+      },
+    };
 
-    const mapping = tableMap[dataPoint]
+    const mapping = tableMap[dataPoint];
     if (!mapping) {
       // Unknown data point - count from conversations mentioning the topic
-      return this.countConversationMentions(tenantId, dataPoint, cutoffDate)
+      return this.countConversationMentions(tenantId, dataPoint, cutoffDate);
     }
 
     try {
       const { count } = await this.supabase
         .from(mapping.table)
-        .select('*', { count: 'exact', head: true })
+        .select("*", { count: "exact", head: true })
         .eq(mapping.tenantCol, tenantId)
-        .gte(mapping.dateCol, cutoffDate)
+        .gte(mapping.dateCol, cutoffDate);
 
       const { data: latest } = await this.supabase
         .from(mapping.table)
@@ -268,96 +319,99 @@ export class GapDetectorAgent extends BaseAgent {
         .eq(mapping.tenantCol, tenantId)
         .order(mapping.dateCol, { ascending: false })
         .limit(1)
-        .single()
+        .single();
 
       return {
         count: count || 0,
         latest: (latest as any)?.[mapping.dateCol] || null,
-      }
+      };
     } catch {
       // Table might not exist
-      return { count: 0, latest: null }
+      return { count: 0, latest: null };
     }
   }
 
   private async countConversationMentions(
     tenantId: string,
     topic: string,
-    cutoffDate: string
+    cutoffDate: string,
   ): Promise<{ count: number; latest: string | null }> {
     // Use text search in conversations
     const { data } = await this.supabase
-      .from('exo_conversations')
-      .select('created_at')
-      .eq('tenant_id', tenantId)
-      .gte('created_at', cutoffDate)
-      .textSearch('context', topic, { type: 'plain' })
-      .order('created_at', { ascending: false })
+      .from("exo_conversations")
+      .select("created_at")
+      .eq("tenant_id", tenantId)
+      .gte("created_at", cutoffDate)
+      .textSearch("context", topic, { type: "plain" })
+      .order("created_at", { ascending: false });
 
     return {
       count: data?.length || 0,
       latest: data?.[0]?.created_at || null,
-    }
+    };
   }
 
   private calculateExpectedCount(
-    frequency: 'daily' | 'weekly' | 'monthly' | 'on_demand',
-    lookbackDays: number
+    frequency: "daily" | "weekly" | "monthly" | "on_demand",
+    lookbackDays: number,
   ): number {
     switch (frequency) {
-      case 'daily':
-        return lookbackDays
-      case 'weekly':
-        return Math.floor(lookbackDays / 7)
-      case 'monthly':
-        return Math.floor(lookbackDays / 30)
-      case 'on_demand':
-        return Math.floor(lookbackDays / 14) // Expect some activity every 2 weeks
+      case "daily":
+        return lookbackDays;
+      case "weekly":
+        return Math.floor(lookbackDays / 7);
+      case "monthly":
+        return Math.floor(lookbackDays / 30);
+      case "on_demand":
+        return Math.floor(lookbackDays / 14); // Expect some activity every 2 weeks
     }
   }
 
   private calculateSeverity(
-    frequency: 'daily' | 'weekly' | 'monthly' | 'on_demand',
+    frequency: "daily" | "weekly" | "monthly" | "on_demand",
     daysSinceActivity: number | null,
-    coveragePercent: number
-  ): 'none' | 'mild' | 'moderate' | 'severe' {
+    coveragePercent: number,
+  ): "none" | "mild" | "moderate" | "severe" {
     if (daysSinceActivity === null) {
       // Never tracked this area
-      return 'severe'
+      return "severe";
     }
 
     // Thresholds based on frequency
-    const thresholds: Record<string, { mild: number; moderate: number; severe: number }> = {
+    const thresholds: Record<
+      string,
+      { mild: number; moderate: number; severe: number }
+    > = {
       daily: { mild: 3, moderate: 7, severe: 14 },
       weekly: { mild: 14, moderate: 21, severe: 30 },
       monthly: { mild: 45, moderate: 60, severe: 90 },
       on_demand: { mild: 21, moderate: 30, severe: 45 },
-    }
+    };
 
-    const t = thresholds[frequency]
+    const t = thresholds[frequency];
 
     // Consider both days since activity and coverage
     if (daysSinceActivity >= t.severe || coveragePercent < 20) {
-      return 'severe'
+      return "severe";
     }
     if (daysSinceActivity >= t.moderate || coveragePercent < 40) {
-      return 'moderate'
+      return "moderate";
     }
     if (daysSinceActivity >= t.mild || coveragePercent < 60) {
-      return 'mild'
+      return "mild";
     }
 
-    return 'none'
+    return "none";
   }
 
   private generateSuggestion(
     area: LifeArea,
-    severity: 'mild' | 'moderate' | 'severe',
-    daysSinceActivity: number | null
+    severity: "mild" | "moderate" | "severe",
+    daysSinceActivity: number | null,
   ): string {
     const timeMsg = daysSinceActivity
       ? `It's been ${daysSinceActivity} days since any activity.`
-      : 'No data has been recorded yet.'
+      : "No data has been recorded yet.";
 
     const suggestions: Record<string, Record<string, string>> = {
       health: {
@@ -395,10 +449,12 @@ export class GapDetectorAgent extends BaseAgent {
         moderate: `Creative data is sparse. ${timeMsg} What projects are you working on?`,
         severe: `No creative activities found. ${timeMsg} Missing this area of life?`,
       },
-    }
+    };
 
-    return suggestions[area.slug]?.[severity] ||
+    return (
+      suggestions[area.slug]?.[severity] ||
       `Gap detected in ${area.name}. ${timeMsg}`
+    );
   }
 
   // ============================================================================
@@ -407,52 +463,55 @@ export class GapDetectorAgent extends BaseAgent {
 
   private async createGapInterventions(
     tenantId: string,
-    gaps: GapAnalysis[]
+    gaps: GapAnalysis[],
   ): Promise<number> {
-    let count = 0
+    let count = 0;
 
     for (const gap of gaps) {
-      if (gap.severity === 'none' || !gap.suggestedIntervention) continue
+      if (gap.severity === "none" || !gap.suggestedIntervention) continue;
 
       // Only create interventions for moderate/severe gaps
-      if (gap.severity === 'mild') continue
+      if (gap.severity === "mild") continue;
 
       try {
-        await this.supabase.rpc('propose_intervention', {
+        await this.supabase.rpc("propose_intervention", {
           p_tenant_id: tenantId,
-          p_type: 'gap_detection',
+          p_type: "gap_detection",
           p_title: `Blind spot: ${gap.area.name}`,
           p_description: gap.suggestedIntervention,
           p_action_payload: {
-            action: 'trigger_checkin',
+            action: "trigger_checkin",
             params: {
               checkinType: gap.area.slug,
               message: gap.suggestedIntervention,
             },
           },
-          p_priority: gap.severity === 'severe' ? 'high' : 'medium',
+          p_priority: gap.severity === "severe" ? "high" : "medium",
           p_source_agent: this.id,
           p_requires_approval: true,
           p_scheduled_for: null,
-        })
-        count++
+        });
+        count++;
       } catch (error) {
-        console.error(`[GapDetector] Failed to create intervention for ${gap.area.slug}:`, error)
+        console.error(
+          `[GapDetector] Failed to create intervention for ${gap.area.slug}:`,
+          error,
+        );
       }
     }
 
-    return count
+    return count;
   }
 
   private async storeGapAnalysis(
     tenantId: string,
-    gaps: GapAnalysis[]
+    gaps: GapAnalysis[],
   ): Promise<void> {
-    await this.supabase.from('learning_events').insert({
+    await this.supabase.from("learning_events").insert({
       tenant_id: tenantId,
-      event_type: 'pattern_detected',
+      event_type: "pattern_detected",
       data: {
-        type: 'gap_analysis',
+        type: "gap_analysis",
         gaps: gaps.map((g) => ({
           area: g.area.slug,
           severity: g.severity,
@@ -462,7 +521,7 @@ export class GapDetectorAgent extends BaseAgent {
         analyzedAt: new Date().toISOString(),
       },
       agent_id: this.id,
-    })
+    });
   }
 }
 
@@ -472,40 +531,40 @@ export class GapDetectorAgent extends BaseAgent {
 
 export async function detectGaps(
   tenantId: string,
-  forceRun = false
+  forceRun = false,
 ): Promise<{
-  success: boolean
-  result?: unknown
-  error?: string
+  success: boolean;
+  result?: unknown;
+  error?: string;
 }> {
   const context: AgentContext = {
     tenantId,
     depth: 0,
     startedAt: new Date().toISOString(),
     metadata: { forceRun },
-  }
+  };
 
-  const agent = new GapDetectorAgent(context)
+  const agent = new GapDetectorAgent(context);
 
   try {
-    await agent.onSpawn?.()
+    await agent.onSpawn?.();
 
-    const resources = await agent.analyzeResources(tenantId)
-    const environment = await agent.analyzeEnvironment(tenantId)
-    const decisions = await agent.decide(resources, environment, context)
+    const resources = await agent.analyzeResources(tenantId);
+    const environment = await agent.analyzeEnvironment(tenantId);
+    const decisions = await agent.decide(resources, environment, context);
 
     if (decisions.length === 0) {
-      return { success: true, result: { action: 'no_action_needed' } }
+      return { success: true, result: { action: "no_action_needed" } };
     }
 
-    const result = await agent.execute(decisions[0])
+    const result = await agent.execute(decisions[0]);
 
     return {
       success: result.success,
       result: result.data,
       error: result.error,
-    }
+    };
   } finally {
-    await agent.onRelease?.()
+    await agent.onRelease?.();
   }
 }

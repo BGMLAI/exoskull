@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { withCronGuard } from "@/lib/admin/cron-guard";
+import { logger } from "@/lib/logger";
 import {
   runPredictions,
   storePredictions,
@@ -60,7 +61,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     // Deduplicate tenant IDs
     const tenantIds = [...new Set((tenantRows || []).map((r) => r.tenant_id))];
 
-    console.log(
+    logger.info(
       `[PredictionsCron] Processing ${tenantIds.length} tenants with health data`,
     );
 
@@ -93,7 +94,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     }
 
     const durationMs = Date.now() - startTime;
-    console.log("[PredictionsCron] Completed:", { ...results, durationMs });
+    logger.info("[PredictionsCron] Completed:", { ...results, durationMs });
 
     return NextResponse.json({
       success: true,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOAuthConfig, buildAuthUrl } from "@/lib/rigs/oauth";
 import { validateMagicToken } from "@/lib/rigs/in-chat-connector";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 /**
@@ -65,7 +66,7 @@ export async function GET(
     // Build auth URL and redirect to provider
     const authUrl = buildAuthUrl(config, state);
 
-    console.log(`[MagicConnect] Redirecting to ${slug} OAuth:`, {
+    logger.info(`[MagicConnect] Redirecting to ${slug} OAuth:`, {
       tenantId: validation.tenantId,
       connectionId: validation.connectionId,
     });

@@ -7,6 +7,7 @@
 
 import type { ChannelAdapter, GatewayMessage } from "../types";
 
+import { logger } from "@/lib/logger";
 const BLUEBUBBLES_URL = process.env.BLUEBUBBLES_URL; // e.g. "http://mac-server:1234"
 const BLUEBUBBLES_PASSWORD = process.env.BLUEBUBBLES_PASSWORD;
 
@@ -48,7 +49,7 @@ export const imessageAdapter: ChannelAdapter = {
 
   parseInbound(rawPayload: unknown): GatewayMessage | null {
     if (!BLUEBUBBLES_URL) {
-      console.warn("[iMessage] BLUEBUBBLES_URL not set, skipping inbound");
+      logger.warn("[iMessage] BLUEBUBBLES_URL not set, skipping inbound");
       return null;
     }
 

@@ -9,6 +9,7 @@
 
 import type { ToolDefinition } from "./index";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { logger } from "@/lib/logger";
 import {
   getSummaryForDisplay,
   applyCorrection,
@@ -38,7 +39,7 @@ export const memoryTools: ToolDefinition[] = [
     },
     execute: async (input, tenantId) => {
       const date = input.date as string | undefined;
-      console.log("[MemoryTools] get_daily_summary:", { date, tenantId });
+      logger.info("[MemoryTools] get_daily_summary:", { date, tenantId });
 
       try {
         let summaryText = await getSummaryForDisplay(tenantId, date);
@@ -95,7 +96,7 @@ export const memoryTools: ToolDefinition[] = [
       const original = (input.original as string) || "";
       const corrected = input.corrected as string;
 
-      console.log("[MemoryTools] correct_daily_summary:", {
+      logger.info("[MemoryTools] correct_daily_summary:", {
         correctionType,
         original: original.slice(0, 50),
         corrected: corrected.slice(0, 50),
@@ -173,7 +174,7 @@ export const memoryTools: ToolDefinition[] = [
       const dateFrom = input.date_from as string | undefined;
       const dateTo = input.date_to as string | undefined;
 
-      console.log("[MemoryTools] search_memory:", {
+      logger.info("[MemoryTools] search_memory:", {
         query,
         dateFrom,
         dateTo,

@@ -12,6 +12,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import type { GatewayChannel } from "@/lib/gateway/types";
 import type { LeadRecord, LeadConversationEntry } from "./types";
 
+import { logger } from "@/lib/logger";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
 
 const LEAD_SYSTEM_PROMPT = `Jestes IORS — osobisty asystent AI. Rozmawiasz z potencjalnym uzytkownikiem ktory jeszcze sie nie zarejestrowal.
@@ -289,7 +290,7 @@ export async function convertLeadToTenant(
         });
       }
     } catch (threadErr) {
-      console.warn(
+      logger.warn(
         "[LeadManager] Failed to copy lead conversations to thread:",
         {
           error: threadErr instanceof Error ? threadErr.message : threadErr,
@@ -298,7 +299,7 @@ export async function convertLeadToTenant(
     }
   }
 
-  console.log("[LeadManager] Lead converted to tenant:", {
+  logger.info("[LeadManager] Lead converted to tenant:", {
     leadId,
     tenantId,
     conversationsCopied: conversations.length,

@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { makeOutboundCall } from "@/lib/voice/twilio-client";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     const body: OutboundCallRequest = await req.json();
     const { phone, tenantId, purpose = "test" } = body;
 
-    console.log("[Twilio Outbound] Request:", { phone, tenantId, purpose });
+    logger.info("[Twilio Outbound] Request:", { phone, tenantId, purpose });
 
     // Resolve phone number
     let targetPhone = phone;
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
       timeout: 30,
     });
 
-    console.log("[Twilio Outbound] Call initiated:", {
+    logger.info("[Twilio Outbound] Call initiated:", {
       callSid: result.callSid,
       to: targetPhone,
       purpose,

@@ -13,6 +13,7 @@
 
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // Supabase Client
 // ============================================================================
@@ -99,7 +100,7 @@ async function refreshView(viewName: GoldViewName): Promise<RefreshResult> {
 
       // The view exists, but we can't refresh it directly from JS
       // Log that manual refresh is needed
-      console.warn(
+      logger.warn(
         `[GoldETL] View ${viewName} exists but REFRESH requires manual SQL or RPC function`,
       );
     } else if (refreshError) {
@@ -169,17 +170,17 @@ export async function runGoldETL(): Promise<GoldETLSummary> {
   const startedAt = new Date();
   const results: RefreshResult[] = [];
 
-  console.log(`[GoldETL] Starting refresh at ${startedAt.toISOString()}`);
+  logger.info(`[GoldETL] Starting refresh at ${startedAt.toISOString()}`);
 
   // Refresh each view sequentially
   // (parallel refresh could cause resource contention)
   for (const viewName of GOLD_VIEWS) {
-    console.log(`[GoldETL] Refreshing ${viewName}...`);
+    logger.info(`[GoldETL] Refreshing ${viewName}...`);
     const result = await refreshView(viewName);
     results.push(result);
 
     if (result.success) {
-      console.log(
+      logger.info(
         `[GoldETL] ${viewName}: ${result.rowsCount} rows in ${result.durationMs}ms`,
       );
     } else {
@@ -190,7 +191,7 @@ export async function runGoldETL(): Promise<GoldETLSummary> {
   const completedAt = new Date();
   const successCount = results.filter((r) => r.success).length;
 
-  console.log(
+  logger.info(
     `[GoldETL] Completed: ${successCount}/${results.length} views refreshed`,
   );
 

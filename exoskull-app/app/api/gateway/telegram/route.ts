@@ -15,6 +15,7 @@ import {
 } from "@/lib/gateway/adapters/telegram";
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    console.log("[Telegram Route] Inbound:", {
+    logger.info("[Telegram Route] Inbound:", {
       from: msg.from,
       senderName: msg.senderName,
       textLength: msg.text.length,
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
     // Send response back via Telegram
     await telegramAdapter.sendResponse(msg.from, response.text, msg.metadata);
 
-    console.log("[Telegram Route] Reply sent:", {
+    logger.info("[Telegram Route] Reply sent:", {
       to: msg.from,
       toolsUsed: response.toolsUsed,
       responseLength: response.text.length,

@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { slackAdapter } from "@/lib/gateway/adapters/slack";
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // Track processed events to prevent duplicates (Slack retries aggressively)
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
 
     // Handle url_verification challenge (Slack setup requirement)
     if (payload.type === "url_verification") {
-      console.log("[Slack Route] URL verification challenge received");
+      logger.info("[Slack Route] URL verification challenge received");
       return NextResponse.json({ challenge: payload.challenge });
     }
 
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    console.log("[Slack Route] Inbound:", {
+    logger.info("[Slack Route] Inbound:", {
       from: msg.from,
       channel: msg.metadata.slack_channel_id,
       textLength: msg.text.length,
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
         const response = await handleInboundMessage(msg);
         await slackAdapter.sendResponse(msg.from, response.text, msg.metadata);
 
-        console.log("[Slack Route] Reply sent:", {
+        logger.info("[Slack Route] Reply sent:", {
           to: msg.from,
           channel: msg.metadata.slack_channel_id,
           toolsUsed: response.toolsUsed,

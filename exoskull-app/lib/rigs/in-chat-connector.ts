@@ -17,6 +17,7 @@ import { randomBytes } from "crypto";
 import { supportsOAuth } from "./oauth";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
@@ -81,7 +82,7 @@ export async function generateMagicConnectLink(
 
   const url = `${APP_URL}/api/rigs/${rigSlug}/magic-connect?t=${magicToken}`;
 
-  console.log("[InChatConnector] Magic link generated:", {
+  logger.info("[InChatConnector] Magic link generated:", {
     tenantId,
     rigSlug,
     expiresAt: expiresAt.toISOString(),
@@ -128,7 +129,7 @@ export async function validateMagicToken(
     // Check expiry
     const expires = meta.magic_token_expires as string | undefined;
     if (expires && new Date(expires).getTime() < Date.now()) {
-      console.warn("[InChatConnector] Magic token expired:", {
+      logger.warn("[InChatConnector] Magic token expired:", {
         tenantId: conn.tenant_id,
         rigSlug,
       });

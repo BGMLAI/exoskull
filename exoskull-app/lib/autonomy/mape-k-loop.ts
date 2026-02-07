@@ -25,6 +25,7 @@ import { getPermissionModel } from "./permission-model";
 import { getAlignmentGuardian } from "./guardian";
 import { collectSystemMetrics } from "../optimization/system-metrics";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // MAPE-K LOOP CLASS
 // ============================================================================
@@ -54,7 +55,7 @@ export class MAPEKLoop {
     const startTime = Date.now();
     const cycleId = crypto.randomUUID();
 
-    console.log(
+    logger.info(
       `[MAPE-K] Starting cycle ${cycleId} for tenant ${tenantId} (trigger: ${trigger})`,
     );
 
@@ -77,23 +78,23 @@ export class MAPEKLoop {
 
     try {
       // M - Monitor
-      console.log(`[MAPE-K] ${cycleId} - MONITOR phase`);
+      logger.info(`[MAPE-K] ${cycleId} - MONITOR phase`);
       monitor = await this.monitor(tenantId);
 
       // A - Analyze
-      console.log(`[MAPE-K] ${cycleId} - ANALYZE phase`);
+      logger.info(`[MAPE-K] ${cycleId} - ANALYZE phase`);
       analyze = await this.analyze(tenantId, monitor);
 
       // P - Plan
-      console.log(`[MAPE-K] ${cycleId} - PLAN phase`);
+      logger.info(`[MAPE-K] ${cycleId} - PLAN phase`);
       plan = await this.plan(tenantId, analyze);
 
       // E - Execute
-      console.log(`[MAPE-K] ${cycleId} - EXECUTE phase`);
+      logger.info(`[MAPE-K] ${cycleId} - EXECUTE phase`);
       execute = await this.execute(tenantId, plan);
 
       // K - Knowledge
-      console.log(`[MAPE-K] ${cycleId} - KNOWLEDGE phase`);
+      logger.info(`[MAPE-K] ${cycleId} - KNOWLEDGE phase`);
       knowledge = await this.knowledge(tenantId, execute);
     } catch (err) {
       success = false;
@@ -129,7 +130,7 @@ export class MAPEKLoop {
       })
       .eq("id", cycleId);
 
-    console.log(
+    logger.info(
       `[MAPE-K] Cycle ${cycleId} completed in ${durationMs}ms. ` +
         `Proposed: ${plan.interventions.length}, Executed: ${execute.interventionsExecuted}`,
     );
@@ -155,7 +156,7 @@ export class MAPEKLoop {
         actual_impact: success ? "completed" : "failed",
       });
     } catch (err) {
-      console.warn(
+      logger.warn(
         "[MAPE-K] Optimization logging failed:",
         err instanceof Error ? err.message : err,
       );
@@ -332,7 +333,7 @@ export class MAPEKLoop {
     try {
       systemMetrics = await collectSystemMetrics(tenantId);
     } catch (err) {
-      console.warn(
+      logger.warn(
         "[MAPE-K] System metrics collection failed:",
         err instanceof Error ? err.message : err,
       );
@@ -508,7 +509,7 @@ export class MAPEKLoop {
         }
       }
     } catch (err) {
-      console.warn(
+      logger.warn(
         "[MAPE-K] Emotion data fetch failed:",
         err instanceof Error ? err.message : err,
       );
@@ -543,7 +544,7 @@ export class MAPEKLoop {
         }
       }
     } catch (err) {
-      console.warn(
+      logger.warn(
         "[MAPE-K] Goal data fetch failed:",
         err instanceof Error ? err.message : err,
       );
@@ -747,7 +748,7 @@ export class MAPEKLoop {
             .eq("id", interventionId);
 
           if (verdict.action === "blocked" || verdict.action === "deferred") {
-            console.log("[MAPE-K] Guardian blocked intervention:", {
+            logger.info("[MAPE-K] Guardian blocked intervention:", {
               interventionId,
               type: planned.type,
               verdict: verdict.action,
@@ -955,7 +956,7 @@ export class MAPEKLoop {
         }
       }
     } catch (err) {
-      console.warn(
+      logger.warn(
         "[MAPE-K] Pattern detection failed:",
         err instanceof Error ? err.message : err,
       );

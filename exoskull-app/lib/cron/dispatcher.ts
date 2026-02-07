@@ -17,6 +17,7 @@ import { discordAdapter } from "@/lib/gateway/adapters/discord";
 import { signalAdapter } from "@/lib/gateway/adapters/signal";
 import { imessageAdapter } from "@/lib/gateway/adapters/imessage";
 
+import { logger } from "@/lib/logger";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
@@ -223,7 +224,7 @@ export async function dispatchVoiceCall(
     const data = await response.json();
 
     if (response.ok && data.sid) {
-      console.log(
+      logger.info(
         `[Dispatcher] Twilio call initiated for ${user.tenant_id}: ${data.sid}`,
       );
       return {
@@ -337,7 +338,7 @@ export async function dispatchSms(
     const data = await response.json();
 
     if (response.ok && data.sid) {
-      console.log(`[Dispatcher] SMS sent to ${user.tenant_id}: ${data.sid}`);
+      logger.info(`[Dispatcher] SMS sent to ${user.tenant_id}: ${data.sid}`);
       return {
         success: true,
         channel: "sms",
@@ -431,7 +432,7 @@ export async function dispatchEmail(
       };
     }
 
-    console.log(`[Dispatcher] Email sent to ${user.tenant_id}`);
+    logger.info(`[Dispatcher] Email sent to ${user.tenant_id}`);
     return { success: true, channel: "email", provider: "resend" };
   } catch (error) {
     const errorMessage =
@@ -475,7 +476,7 @@ export async function dispatchWhatsApp(
     const result = await client.sendTextMessage(user.phone, message);
     const messageId = result.messages?.[0]?.id;
 
-    console.log(
+    logger.info(
       `[Dispatcher] WhatsApp sent to ${user.tenant_id}: ${messageId}`,
     );
     return {
@@ -528,7 +529,7 @@ export async function dispatchMessenger(
   try {
     const result = await client.sendTextMessage(messengerPsid, message);
 
-    console.log(
+    logger.info(
       `[Dispatcher] Messenger sent to ${user.tenant_id}: ${result.message_id}`,
     );
     return {
@@ -578,7 +579,7 @@ export async function dispatchTelegram(
 
   try {
     await telegramAdapter.sendResponse(chatId, message);
-    console.log(`[Dispatcher] Telegram sent to ${user.tenant_id}`);
+    logger.info(`[Dispatcher] Telegram sent to ${user.tenant_id}`);
     return { success: true, channel: "telegram", provider: "telegram" };
   } catch (error) {
     const errorMessage =
@@ -623,7 +624,7 @@ export async function dispatchSlack(
     await slackAdapter.sendResponse(slackChannelId, message, {
       slack_channel_id: slackChannelId,
     });
-    console.log(`[Dispatcher] Slack sent to ${user.tenant_id}`);
+    logger.info(`[Dispatcher] Slack sent to ${user.tenant_id}`);
     return { success: true, channel: "slack", provider: "slack" };
   } catch (error) {
     const errorMessage =
@@ -668,7 +669,7 @@ export async function dispatchDiscord(
     await discordAdapter.sendResponse(discordChannelId, message, {
       discord_channel_id: discordChannelId,
     });
-    console.log(`[Dispatcher] Discord sent to ${user.tenant_id}`);
+    logger.info(`[Dispatcher] Discord sent to ${user.tenant_id}`);
     return { success: true, channel: "discord", provider: "discord" };
   } catch (error) {
     const errorMessage =
@@ -711,7 +712,7 @@ export async function dispatchSignal(
 
   try {
     await signalAdapter.sendResponse(signalPhone, message);
-    console.log(`[Dispatcher] Signal sent to ${user.tenant_id}`);
+    logger.info(`[Dispatcher] Signal sent to ${user.tenant_id}`);
     return { success: true, channel: "signal", provider: "signal" };
   } catch (error) {
     const errorMessage =
@@ -754,7 +755,7 @@ export async function dispatchImessage(
 
   try {
     await imessageAdapter.sendResponse(imessageAddress, message);
-    console.log(`[Dispatcher] iMessage sent to ${user.tenant_id}`);
+    logger.info(`[Dispatcher] iMessage sent to ${user.tenant_id}`);
     return { success: true, channel: "imessage", provider: "bluebubbles" };
   } catch (error) {
     const errorMessage =

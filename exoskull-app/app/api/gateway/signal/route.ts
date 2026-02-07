@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { signalAdapter } from "@/lib/gateway/adapters/signal";
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    console.log("[Signal Route] Inbound:", {
+    logger.info("[Signal Route] Inbound:", {
       from: msg.from,
       textLength: msg.text.length,
       hasMedia: !!msg.mediaUrl,
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
     // Send response back via Signal
     await signalAdapter.sendResponse(msg.from, response.text);
 
-    console.log("[Signal Route] Reply sent:", {
+    logger.info("[Signal Route] Reply sent:", {
       to: msg.from,
       toolsUsed: response.toolsUsed,
       responseLength: response.text.length,

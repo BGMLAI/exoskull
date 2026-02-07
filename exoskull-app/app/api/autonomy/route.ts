@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 async function getAuthUser() {
@@ -128,7 +129,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
-    console.log(
+    logger.info(
       `[Autonomy] Grant created: ${actionPattern} for user ${userId}`,
     );
 
@@ -235,7 +236,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
-    console.log(`[Autonomy] Grant revoked: ${grantId} for user ${userId}`);
+    logger.info(`[Autonomy] Grant revoked: ${grantId} for user ${userId}`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

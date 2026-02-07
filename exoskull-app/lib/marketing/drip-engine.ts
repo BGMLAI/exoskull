@@ -4,6 +4,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
 function getServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -228,7 +229,7 @@ export async function processDripSequences(): Promise<DripResult> {
       }
     }
 
-    console.log("[DripEngine] Processing complete:", result);
+    logger.info("[DripEngine] Processing complete:", result);
     return result;
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
@@ -267,7 +268,7 @@ export async function startDripSequence(
     { onConflict: "tenant_id,sequence_name" },
   );
 
-  console.log("[DripEngine] Sequence started:", { tenantId, sequenceName });
+  logger.info("[DripEngine] Sequence started:", { tenantId, sequenceName });
 }
 
 /**

@@ -12,6 +12,7 @@ import { completeWork, failWork } from "@/lib/iors/loop";
 import type { PetlaWorkItem, SubLoopResult } from "@/lib/iors/loop-types";
 import type { AutonomyActionType, AutonomyDomain } from "@/lib/iors/types";
 
+import { logger } from "@/lib/logger";
 export async function handleOutbound(
   item: PetlaWorkItem,
 ): Promise<SubLoopResult> {
@@ -21,7 +22,7 @@ export async function handleOutbound(
     const actionType = (params.action_type as AutonomyActionType) || "message";
     const domain = (params.domain as AutonomyDomain) || "*";
 
-    console.log("[Petla:Outbound] Processing:", {
+    logger.info("[Petla:Outbound] Processing:", {
       tenantId: tenant_id,
       actionType,
       domain,
@@ -32,7 +33,7 @@ export async function handleOutbound(
     const perm = await checkPermission(tenant_id, actionType, domain);
 
     if (!perm.permitted) {
-      console.log("[Petla:Outbound] No permission, skipping:", {
+      logger.info("[Petla:Outbound] No permission, skipping:", {
         tenantId: tenant_id,
         actionType,
         domain,

@@ -10,11 +10,12 @@
  * - HALF-OPEN: Testing if provider recovered
  */
 
-import { ModelId, CircuitBreakerState } from './types'
-import { CIRCUIT_BREAKER_CONFIG } from './config'
+import { ModelId, CircuitBreakerState } from "./types";
+import { CIRCUIT_BREAKER_CONFIG } from "./config";
 
+import { logger } from "@/lib/logger";
 export class CircuitBreaker {
-  private states: Map<ModelId, CircuitBreakerState> = new Map()
+  private states: Map<ModelId, CircuitBreakerState> = new Map();
 
   /**
    * Get the state for a model (create if not exists)
@@ -24,30 +25,35 @@ export class CircuitBreaker {
       this.states.set(modelId, {
         failures: 0,
         lastFailure: null,
-        state: 'closed',
-        cooldownUntil: null
-      })
+        state: "closed",
+        cooldownUntil: null,
+      });
     }
-    return this.states.get(modelId)!
+    return this.states.get(modelId)!;
   }
 
   /**
    * Record a failure for a model
    */
   recordFailure(modelId: ModelId, error?: Error): void {
-    const state = this.getState(modelId)
-    state.failures++
-    state.lastFailure = new Date()
+    const state = this.getState(modelId);
+    state.failures++;
+    state.lastFailure = new Date();
 
     if (state.failures >= CIRCUIT_BREAKER_CONFIG.failureThreshold) {
-      state.state = 'open'
-      state.cooldownUntil = new Date(Date.now() + CIRCUIT_BREAKER_CONFIG.cooldownMs)
+      state.state = "open";
+      state.cooldownUntil = new Date(
+        Date.now() + CIRCUIT_BREAKER_CONFIG.cooldownMs,
+      );
 
-      console.warn(`[CircuitBreaker] OPENED for ${modelId} after ${state.failures} failures`, {
-        model: modelId,
-        cooldownUntil: state.cooldownUntil.toISOString(),
-        lastError: error?.message
-      })
+      logger.warn(
+        `[CircuitBreaker] OPENED for ${modelId} after ${state.failures} failures`,
+        {
+          model: modelId,
+          cooldownUntil: state.cooldownUntil.toISOString(),
+          lastError: error?.message,
+        },
+      );
     }
   }
 
@@ -55,40 +61,42 @@ export class CircuitBreaker {
    * Record a success for a model
    */
   recordSuccess(modelId: ModelId): void {
-    const state = this.getState(modelId)
-    state.failures = 0
-    state.state = 'closed'
-    state.cooldownUntil = null
+    const state = this.getState(modelId);
+    state.failures = 0;
+    state.state = "closed";
+    state.cooldownUntil = null;
 
-    console.debug(`[CircuitBreaker] Reset for ${modelId}`)
+    console.debug(`[CircuitBreaker] Reset for ${modelId}`);
   }
 
   /**
    * Check if a model is allowed to be called
    */
   isAllowed(modelId: ModelId): boolean {
-    const state = this.getState(modelId)
+    const state = this.getState(modelId);
 
     switch (state.state) {
-      case 'closed':
-        return true
+      case "closed":
+        return true;
 
-      case 'open':
+      case "open":
         // Check if cooldown has passed
         if (state.cooldownUntil && new Date() >= state.cooldownUntil) {
-          state.state = 'half-open'
-          console.info(`[CircuitBreaker] Half-open for ${modelId}, allowing test request`)
-          return true
+          state.state = "half-open";
+          console.info(
+            `[CircuitBreaker] Half-open for ${modelId}, allowing test request`,
+          );
+          return true;
         }
-        return false
+        return false;
 
-      case 'half-open':
+      case "half-open":
         // In half-open, we allow limited requests to test recovery
         // For simplicity, allow 1 request at a time
-        return true
+        return true;
 
       default:
-        return true
+        return true;
     }
   }
 
@@ -96,14 +104,14 @@ export class CircuitBreaker {
    * Get current state for a model
    */
   getStatus(modelId: ModelId): CircuitBreakerState {
-    return { ...this.getState(modelId) }
+    return { ...this.getState(modelId) };
   }
 
   /**
    * Get all circuit breaker statuses
    */
   getAllStatuses(): Map<ModelId, CircuitBreakerState> {
-    return new Map(this.states)
+    return new Map(this.states);
   }
 
   /**
@@ -113,27 +121,27 @@ export class CircuitBreaker {
     this.states.set(modelId, {
       failures: 0,
       lastFailure: null,
-      state: 'closed',
-      cooldownUntil: null
-    })
-    console.info(`[CircuitBreaker] Manually reset for ${modelId}`)
+      state: "closed",
+      cooldownUntil: null,
+    });
+    console.info(`[CircuitBreaker] Manually reset for ${modelId}`);
   }
 
   /**
    * Reset all circuit breakers
    */
   resetAll(): void {
-    this.states.clear()
-    console.info('[CircuitBreaker] All circuit breakers reset')
+    this.states.clear();
+    console.info("[CircuitBreaker] All circuit breakers reset");
   }
 }
 
 // Singleton instance
-let circuitBreakerInstance: CircuitBreaker | null = null
+let circuitBreakerInstance: CircuitBreaker | null = null;
 
 export function getCircuitBreaker(): CircuitBreaker {
   if (!circuitBreakerInstance) {
-    circuitBreakerInstance = new CircuitBreaker()
+    circuitBreakerInstance = new CircuitBreaker();
   }
-  return circuitBreakerInstance
+  return circuitBreakerInstance;
 }

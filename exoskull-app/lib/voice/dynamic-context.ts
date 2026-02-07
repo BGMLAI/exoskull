@@ -9,6 +9,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { getThreadSummary } from "../unified-thread";
 import { getPendingSuggestions } from "../skills/detector";
 
+import { logger } from "@/lib/logger";
 /**
  * Build dynamic context string for the IORS system prompt.
  * Runs 6+ DB queries in parallel where possible.
@@ -80,7 +81,7 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
       context += personalityFragment;
     }
   } catch (err) {
-    console.warn(
+    logger.warn(
       "[DynamicContext] Personality fragment failed:",
       err instanceof Error ? err.message : err,
     );
@@ -93,7 +94,7 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
       context += `- Historia rozmow: ${threadSummary}\n`;
     }
   } catch (err) {
-    console.warn(
+    logger.warn(
       "[DynamicContext] Thread summary failed:",
       err instanceof Error ? err.message : err,
     );
@@ -121,7 +122,7 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
       context += `Gdy user pyta o cele, użyj "check_goals". Gdy raportuje postęp, użyj "log_goal_progress".\n`;
     }
   } catch (err) {
-    console.warn(
+    logger.warn(
       "[DynamicContext] Goal status fetch failed:",
       err instanceof Error ? err.message : err,
     );
@@ -140,7 +141,7 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
       context += `Gdy odmówi, użyj "dismiss_skill_suggestion". NIE naciskaj - zaproponuj raz, naturalnie.\n`;
     }
   } catch (err) {
-    console.warn(
+    logger.warn(
       "[DynamicContext] Skill suggestions fetch failed:",
       err instanceof Error ? err.message : err,
     );

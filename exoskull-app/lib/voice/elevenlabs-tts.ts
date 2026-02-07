@@ -8,6 +8,7 @@
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -112,7 +113,7 @@ export async function textToSpeech(
     const audioBuffer = await response.arrayBuffer();
     const durationMs = Date.now() - startTime;
 
-    console.log("[ElevenLabs TTS] Generated:", {
+    logger.info("[ElevenLabs TTS] Generated:", {
       textLength: text.length,
       audioBytes: audioBuffer.byteLength,
       durationMs,
@@ -185,7 +186,7 @@ export async function uploadTTSAudio(
     .from(AUDIO_BUCKET)
     .getPublicUrl(fileName);
 
-  console.log("[ElevenLabs TTS] Uploaded audio:", fileName);
+  logger.info("[ElevenLabs TTS] Uploaded audio:", fileName);
 
   return urlData.publicUrl;
 }
@@ -213,7 +214,7 @@ export async function generateAndUploadTTS(
       .from(AUDIO_BUCKET)
       .getPublicUrl(cachedPath);
 
-    console.log("[ElevenLabs TTS] Cache hit:", cacheKey);
+    logger.info("[ElevenLabs TTS] Cache hit:", cacheKey);
 
     return {
       audioBuffer: await cachedFile.arrayBuffer(),
@@ -235,8 +236,8 @@ export async function generateAndUploadTTS(
       contentType: "audio/mpeg",
       upsert: true,
     })
-    .then(() => console.log("[ElevenLabs TTS] Cached:", cacheKey))
-    .catch((err) => console.warn("[ElevenLabs TTS] Cache write failed:", err));
+    .then(() => logger.info("[ElevenLabs TTS] Cached:", cacheKey))
+    .catch((err) => logger.warn("[ElevenLabs TTS] Cache write failed:", err));
 
   return {
     audioBuffer,
@@ -265,7 +266,7 @@ const COMMON_PHRASES = [
  * Run this on app startup or via cron
  */
 export async function precacheCommonPhrases(): Promise<void> {
-  console.log("[ElevenLabs TTS] Pre-caching common phrases...");
+  logger.info("[ElevenLabs TTS] Pre-caching common phrases...");
 
   for (const phrase of COMMON_PHRASES) {
     try {
@@ -278,7 +279,7 @@ export async function precacheCommonPhrases(): Promise<void> {
         .list("cache", { search: `${cacheKey}.mp3` });
 
       if (data && data.length > 0) {
-        console.log(
+        logger.info(
           "[ElevenLabs TTS] Already cached:",
           phrase.substring(0, 30),
         );
@@ -294,7 +295,7 @@ export async function precacheCommonPhrases(): Promise<void> {
           upsert: true,
         });
 
-      console.log("[ElevenLabs TTS] Cached:", phrase.substring(0, 30));
+      logger.info("[ElevenLabs TTS] Cached:", phrase.substring(0, 30));
 
       // Rate limit: wait 500ms between requests
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -303,7 +304,7 @@ export async function precacheCommonPhrases(): Promise<void> {
     }
   }
 
-  console.log("[ElevenLabs TTS] Pre-caching complete");
+  logger.info("[ElevenLabs TTS] Pre-caching complete");
 }
 
 // ============================================================================
@@ -340,5 +341,5 @@ export async function cleanupSessionAudio(sessionId: string): Promise<void> {
     return;
   }
 
-  console.log("[ElevenLabs TTS] Cleaned up session audio:", sessionId);
+  logger.info("[ElevenLabs TTS] Cleaned up session audio:", sessionId);
 }

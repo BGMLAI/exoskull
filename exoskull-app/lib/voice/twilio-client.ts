@@ -8,6 +8,7 @@
 import twilio from "twilio";
 import VoiceResponse from "twilio/lib/twiml/VoiceResponse";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -248,7 +249,7 @@ export async function makeOutboundCall(options: OutboundCallOptions) {
       timeout,
     });
 
-    console.log("[Twilio] Outbound call initiated:", {
+    logger.info("[Twilio] Outbound call initiated:", {
       sid: call.sid,
       to: call.to,
       status: call.status,

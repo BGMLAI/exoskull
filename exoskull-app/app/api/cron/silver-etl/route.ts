@@ -17,6 +17,7 @@ import { checkR2Connection } from "@/lib/storage/r2-client";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { verifyCronAuth } from "@/lib/cron/auth";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -25,7 +26,7 @@ export const maxDuration = 60;
  * Trigger Silver ETL job
  */
 async function postHandler(req: NextRequest) {
-  console.log(`[Silver ETL] Triggered at ${new Date().toISOString()}`);
+  logger.info(`[Silver ETL] Triggered at ${new Date().toISOString()}`);
 
   // Check R2 connection first (needed to read Bronze)
   const r2Check = await checkR2Connection();

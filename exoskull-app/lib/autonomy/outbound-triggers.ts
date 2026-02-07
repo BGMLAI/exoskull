@@ -13,6 +13,7 @@ import { createServiceClient } from "@/lib/supabase/service-client";
 import type { CrisisType, CrisisSeverity } from "@/lib/emotion/types";
 import { createEscalationChain } from "./escalation-manager";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // RATE LIMITING
 // ============================================================================
@@ -110,7 +111,7 @@ export async function scheduleCrisisFollowUp(
       .limit(1);
 
     if (recent && recent.length > 0) {
-      console.log(
+      logger.info(
         "[OutboundTriggers] Skipping crisis follow-up — already scheduled in last 24h",
       );
       return;
@@ -133,7 +134,7 @@ export async function scheduleCrisisFollowUp(
       interventionIds[0],
     );
 
-    console.log(
+    logger.info(
       `[OutboundTriggers] Crisis follow-up scheduled: ${crisisType} (${severity}), ${interventionIds.length} interventions`,
     );
   } catch (error) {

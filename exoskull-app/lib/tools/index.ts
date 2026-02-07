@@ -2,14 +2,21 @@
 // EXOSKULL TOOLS - Central Registry
 // =====================================================
 
-import { ExoTool, ToolHandler, ToolResult, ToolContext, ToolRegistration } from './types';
-import { taskTool, taskHandler } from './task-tool';
-import { calendarTool, calendarHandler } from './calendar-tool';
+import {
+  ExoTool,
+  ToolHandler,
+  ToolResult,
+  ToolContext,
+  ToolRegistration,
+} from "./types";
+import { taskTool, taskHandler } from "./task-tool";
+import { calendarTool, calendarHandler } from "./calendar-tool";
 // email-tool uses different structure - see EMAIL_TOOL_DEFINITIONS/EMAIL_TOOL_REGISTRY
-import { searchTool, searchHandler } from './search-tool';
+import { searchTool, searchHandler } from "./search-tool";
 
+import { logger } from "@/lib/logger";
 // Re-export types
-export * from './types';
+export * from "./types";
 
 // =====================================================
 // TOOL REGISTRY
@@ -19,19 +26,19 @@ export const TOOL_REGISTRY: Record<string, ToolRegistration> = {
   task: {
     definition: taskTool,
     handler: taskHandler,
-    category: 'productivity',
+    category: "productivity",
   },
   calendar: {
     definition: calendarTool,
     handler: calendarHandler,
-    requires_rig: ['google-workspace'],
-    category: 'productivity',
+    requires_rig: ["google-workspace"],
+    category: "productivity",
   },
   // Email tools have separate registry - see lib/tools/email-tool.ts
   web_search: {
     definition: searchTool,
     handler: searchHandler,
-    category: 'search',
+    category: "search",
   },
 };
 
@@ -49,7 +56,9 @@ export function getAllToolDefinitions(): ExoTool[] {
 /**
  * Get tool definitions by category
  */
-export function getToolsByCategory(category: ToolRegistration['category']): ExoTool[] {
+export function getToolsByCategory(
+  category: ToolRegistration["category"],
+): ExoTool[] {
   return Object.values(TOOL_REGISTRY)
     .filter((r) => r.category === category)
     .map((r) => r.definition);
@@ -75,14 +84,14 @@ export function getToolRequirements(name: string): string[] | undefined {
 export async function executeTool(
   name: string,
   context: ToolContext,
-  params: Record<string, unknown>
+  params: Record<string, unknown>,
 ): Promise<ToolResult> {
   const registration = TOOL_REGISTRY[name];
 
   if (!registration) {
     return {
       success: false,
-      error: `Unknown tool: ${name}. Available tools: ${Object.keys(TOOL_REGISTRY).join(', ')}`,
+      error: `Unknown tool: ${name}. Available tools: ${Object.keys(TOOL_REGISTRY).join(", ")}`,
     };
   }
 
@@ -92,7 +101,7 @@ export async function executeTool(
     const result = await registration.handler(context, params);
 
     // Log execution for analytics
-    console.log('[Tools] Executed:', {
+    logger.info("[Tools] Executed:", {
       tool: name,
       tenant_id: context.tenant_id,
       success: result.success,
@@ -101,7 +110,7 @@ export async function executeTool(
 
     return result;
   } catch (error) {
-    console.error('[Tools] Execution error:', {
+    console.error("[Tools] Execution error:", {
       tool: name,
       tenant_id: context.tenant_id,
       error: error instanceof Error ? error.message : error,
@@ -110,7 +119,7 @@ export async function executeTool(
 
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Tool execution failed',
+      error: error instanceof Error ? error.message : "Tool execution failed",
     };
   }
 }
@@ -120,13 +129,13 @@ export async function executeTool(
  */
 export async function executeToolsBatch(
   context: ToolContext,
-  calls: { name: string; params: Record<string, unknown> }[]
+  calls: { name: string; params: Record<string, unknown> }[],
 ): Promise<{ name: string; result: ToolResult }[]> {
   const results = await Promise.all(
     calls.map(async (call) => ({
       name: call.name,
       result: await executeTool(call.name, context, call.params),
-    }))
+    })),
   );
 
   return results;

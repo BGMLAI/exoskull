@@ -10,6 +10,7 @@ import { withCronGuard } from "@/lib/admin/cron-guard";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { runHealthCheck } from "@/lib/skills/verification/smoke-test";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -70,7 +71,7 @@ async function handler(_request: NextRequest) {
         failed++;
         const newFailCount = prevFailures + 1;
 
-        console.warn(
+        logger.warn(
           `[CRON] skill-health FAIL: ${skill.slug} (${newFailCount} consecutive)`,
           result.errors,
         );
@@ -137,7 +138,7 @@ async function handler(_request: NextRequest) {
     }
   }
 
-  console.log(
+  logger.info(
     `[CRON] skill-health complete: ${checked} checked, ${failed} failed, ${revoked} revoked`,
   );
 

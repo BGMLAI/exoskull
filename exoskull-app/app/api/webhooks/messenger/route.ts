@@ -20,6 +20,7 @@ import { aiChat } from "@/lib/ai";
 import { verifyMetaSignature } from "@/lib/security/webhook-hmac";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (mode === "subscribe" && token === verifyToken) {
-    console.log("[Messenger] Webhook verified successfully");
+    logger.info("[Messenger] Webhook verified successfully");
     return new NextResponse(challenge, { status: 200 });
   }
 
@@ -72,7 +73,7 @@ async function resolveMessengerClient(
     .single();
 
   if (page?.page_access_token) {
-    console.log("[Messenger] Using DB token for page:", {
+    logger.info("[Messenger] Using DB token for page:", {
       pageId,
       pageName: page.page_name,
       tenantId: page.tenant_id,
@@ -134,7 +135,7 @@ export async function POST(req: NextRequest) {
 
     const { senderPsid, text, messageId, pageId } = incoming;
 
-    console.log("[Messenger] Incoming message:", {
+    logger.info("[Messenger] Incoming message:", {
       senderPsid,
       pageId,
       messageId,
@@ -252,7 +253,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      console.log("[Messenger] Reply sent:", {
+      logger.info("[Messenger] Reply sent:", {
         to: senderPsid,
         pageId,
         conversationId: conversation?.id,

@@ -8,6 +8,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
 const MIN_EXECUTIONS = 10;
 const ERROR_RATE_THRESHOLD = 0.3; // 30%
 const LOOKBACK_WINDOW = 50;
@@ -66,7 +67,7 @@ export async function checkCircuitBreaker(
         return { tripped: false };
       }
 
-      console.warn(
+      logger.warn(
         `[CircuitBreaker] Skill ${skillId} revoked: ${Math.round(errorRate * 100)}% error rate over ${totalExecutions} executions`,
       );
       return { tripped: true, errorRate };
@@ -116,7 +117,7 @@ export async function revokeUnhealthySkills(
     }
 
     if (revoked.length > 0) {
-      console.log(
+      logger.info(
         `[CircuitBreaker] CRON sweep: revoked ${revoked.length} unhealthy skills: ${revoked.join(", ")}`,
       );
     }

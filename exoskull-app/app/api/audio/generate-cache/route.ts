@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { CACHED_PHRASES } from "@/lib/voice/audio-cache";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ElevenLabs voice settings
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
       ? CACHED_PHRASES.filter((p) => requestedKeys.includes(p.key))
       : CACHED_PHRASES;
 
-    console.log(`🎙️ Generating ${phrasesToGenerate.length} audio phrases...`);
+    logger.info(`🎙️ Generating ${phrasesToGenerate.length} audio phrases...`);
 
     for (const phrase of phrasesToGenerate) {
       // Check if already exists (unless force)
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
 
         if (existing && existing.length > 0) {
           results[phrase.key] = { success: true, skipped: true };
-          console.log(`⏭️ Skipped ${phrase.key} (already exists)`);
+          logger.info(`⏭️ Skipped ${phrase.key} (already exists)`);
           continue;
         }
       }
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
         }
 
         results[phrase.key] = { success: true };
-        console.log(`✅ Generated ${phrase.key}: "${phrase.text}"`);
+        logger.info(`✅ Generated ${phrase.key}: "${phrase.text}"`);
 
         // Small delay to avoid rate limiting
         await new Promise((r) => setTimeout(r, 200));

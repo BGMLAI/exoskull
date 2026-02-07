@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { EXTRACTION_PROMPT } from "@/lib/onboarding/discovery-prompt";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 /**
@@ -167,7 +168,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(
+    logger.info(
       "[Extract API] Profile extracted successfully for user:",
       user.id,
     );

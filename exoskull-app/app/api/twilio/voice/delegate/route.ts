@@ -20,6 +20,7 @@ import {
 } from "@/lib/voice/twilio-client";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -125,7 +126,7 @@ export async function POST(req: NextRequest) {
       ...(session.metadata || {}),
     };
 
-    console.log("[Delegate] Request:", {
+    logger.info("[Delegate] Request:", {
       action,
       sessionId,
       hasSpeech: !!speechResult,
@@ -200,7 +201,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      console.log("[Delegate] Third party said:", userText);
+      logger.info("[Delegate] Third party said:", userText);
 
       // Get conversation history
       const messages = session.messages || [];
@@ -349,7 +350,7 @@ async function notifyUserAboutDelegateResult(
     .single();
 
   if (!tenant?.phone) {
-    console.log("[Delegate] No phone for tenant, skipping notification");
+    logger.info("[Delegate] No phone for tenant, skipping notification");
     return;
   }
 
@@ -375,7 +376,7 @@ async function notifyUserAboutDelegateResult(
       from: process.env.TWILIO_PHONE_NUMBER!,
       body: smsBody.substring(0, 1600), // SMS limit
     });
-    console.log("[Delegate] SMS notification sent to", tenant.phone);
+    logger.info("[Delegate] SMS notification sent to", tenant.phone);
   } catch (smsError) {
     console.error("[Delegate] SMS notification failed:", smsError);
   }

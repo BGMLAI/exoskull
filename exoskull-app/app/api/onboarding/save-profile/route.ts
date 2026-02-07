@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 interface LoopPayload {
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    console.log("[SaveProfile] Saving for tenant:", user.id, {
+    logger.info("[SaveProfile] Saving for tenant:", user.id, {
       preferred_name: body.preferred_name,
       primary_goal: body.primary_goal,
       loops_count: body.selected_loops?.length || 0,
@@ -133,9 +134,9 @@ export async function POST(request: NextRequest) {
         });
         // Non-fatal: profile was saved, loops creation failed
         // Don't return error - the profile data is already saved
-        console.warn("[SaveProfile] Loops creation failed but profile saved");
+        logger.warn("[SaveProfile] Loops creation failed but profile saved");
       } else {
-        console.log(
+        logger.info(
           "[SaveProfile] Created",
           loopRows.length,
           "loops for tenant:",
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log("[SaveProfile] Profile saved for tenant:", user.id);
+    logger.info("[SaveProfile] Profile saved for tenant:", user.id);
 
     return NextResponse.json({ success: true });
   } catch (error) {

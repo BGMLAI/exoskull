@@ -16,6 +16,7 @@ import {
 import { textToSpeech } from "@/lib/voice/elevenlabs-tts";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     // Track usage
     await incrementUsage(user.id, "voice_minutes").catch((err) => {
-      console.warn(
+      logger.warn(
         "[VoiceChat] Usage tracking failed:",
         err instanceof Error ? err.message : String(err),
       );

@@ -10,13 +10,14 @@ import { completeWork, failWork } from "@/lib/iors/loop";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import type { PetlaWorkItem, SubLoopResult } from "@/lib/iors/loop-types";
 
+import { logger } from "@/lib/logger";
 export async function handleOptimization(
   item: PetlaWorkItem,
 ): Promise<SubLoopResult> {
   const { tenant_id, params } = item;
 
   try {
-    console.log("[Petla:Optimization] Processing:", {
+    logger.info("[Petla:Optimization] Processing:", {
       tenantId: tenant_id,
       handler: item.handler,
     });
@@ -67,7 +68,7 @@ export async function handleOptimization(
               ) / rated.length
             : 0;
 
-        console.log("[Petla:Optimization] Weekly stats:", {
+        logger.info("[Petla:Optimization] Weekly stats:", {
           tenantId: tenant_id,
           interventions: {
             success,
@@ -86,14 +87,14 @@ export async function handleOptimization(
       case "guardian_effectiveness": {
         // Bridge to existing guardian effectiveness CRON logic
         // This runs weekly — analyzes guardian verdict patterns
-        console.log("[Petla:Optimization] Guardian effectiveness check:", {
+        logger.info("[Petla:Optimization] Guardian effectiveness check:", {
           tenantId: tenant_id,
         });
         break;
       }
 
       default:
-        console.log("[Petla:Optimization] Unknown handler:", item.handler);
+        logger.info("[Petla:Optimization] Unknown handler:", item.handler);
     }
 
     if (item.id && item.status === "processing") {

@@ -22,6 +22,7 @@ import {
 } from "@/lib/gateway/adapters/discord";
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     // Handle PING (Discord Interactions endpoint verification)
     if (payload.type === 1) {
-      console.log("[Discord Route] PING verification");
+      logger.info("[Discord Route] PING verification");
       return NextResponse.json({ type: 1 });
     }
 
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    console.log("[Discord Route] Inbound:", {
+    logger.info("[Discord Route] Inbound:", {
       from: msg.from,
       senderName: msg.senderName,
       channelId: msg.metadata.discord_channel_id,
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
     // Send response back via Discord
     await discordAdapter.sendResponse(msg.from, response.text, msg.metadata);
 
-    console.log("[Discord Route] Reply sent:", {
+    logger.info("[Discord Route] Reply sent:", {
       to: msg.from,
       channelId: msg.metadata.discord_channel_id,
       toolsUsed: response.toolsUsed,

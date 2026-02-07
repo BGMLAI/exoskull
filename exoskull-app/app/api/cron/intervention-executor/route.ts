@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { processQueue, processTimeouts } from "@/lib/autonomy/executor";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -27,7 +28,7 @@ async function handler(req: NextRequest) {
 
     const duration = Date.now() - startTime;
 
-    console.log("[InterventionExecutor] Cron complete:", {
+    logger.info("[InterventionExecutor] Cron complete:", {
       autoApproved,
       ...queueResult,
       durationMs: duration,

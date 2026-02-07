@@ -16,6 +16,7 @@
 import { createServiceClient } from "@/lib/supabase/service-client";
 import twilio from "twilio";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -79,7 +80,7 @@ export async function notifyEmergencyContact(
       .order("created_at", { ascending: true });
 
     if (!contacts || contacts.length === 0) {
-      console.log(
+      logger.info(
         "[EmergencyNotifier] No consented emergency contacts for tenant:",
         tenantId,
       );
@@ -152,7 +153,7 @@ export async function notifyEmergencyContact(
       },
     });
 
-    console.log(
+    logger.info(
       `[EmergencyNotifier] Notified ${contact.name} (${contact.phone}) for tenant ${tenantId}`,
     );
 

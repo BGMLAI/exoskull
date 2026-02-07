@@ -14,6 +14,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { makeOutboundCall } from "@/lib/voice/twilio-client";
 import { appendMessage } from "@/lib/unified-thread";
 
+import { logger } from "@/lib/logger";
 /** Normalize phone number to E.164 format */
 function normalizePhone(phone: string): string {
   let cleaned = phone.replace(/[\s\-\(\)]/g, "");
@@ -66,7 +67,7 @@ export const communicationTools: ToolDefinition[] = [
       const userName = (input.user_name as string) || "użytkownik";
       const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
 
-      console.log("[CommunicationTools] make_call:", { phoneNumber, purpose });
+      logger.info("[CommunicationTools] make_call:", { phoneNumber, purpose });
 
       try {
         const supabase = getServiceSupabase();
@@ -139,7 +140,7 @@ export const communicationTools: ToolDefinition[] = [
       const phoneNumber = normalizePhone(input.phone_number as string);
       const message = input.message as string;
 
-      console.log("[CommunicationTools] send_sms:", {
+      logger.info("[CommunicationTools] send_sms:", {
         phoneNumber,
         messageLength: message.length,
       });
@@ -162,7 +163,7 @@ export const communicationTools: ToolDefinition[] = [
           direction: "outbound",
           source_type: "voice_session",
         }).catch((err) => {
-          console.warn(
+          logger.warn(
             "[CommunicationTools] Failed to append SMS to unified thread:",
             {
               error: err instanceof Error ? err.message : String(err),
@@ -212,7 +213,7 @@ export const communicationTools: ToolDefinition[] = [
           await import("@/lib/integrations/composio-adapter");
         const gmailConnected = await hasConnection(tenantId, "GMAIL");
         if (gmailConnected) {
-          console.log("[CommunicationTools] send_email via Composio Gmail:", {
+          logger.info("[CommunicationTools] send_email via Composio Gmail:", {
             tenantId,
             to: toEmail,
           });
@@ -231,13 +232,13 @@ export const communicationTools: ToolDefinition[] = [
             }).catch(() => {});
             return `Email wysłany do ${toEmail} z Twojego konta Gmail.`;
           }
-          console.warn(
+          logger.warn(
             "[CommunicationTools] Composio Gmail failed, falling back to Resend:",
             result.error,
           );
         }
       } catch (composioErr) {
-        console.warn(
+        logger.warn(
           "[CommunicationTools] Composio check failed, using Resend:",
           {
             error:
@@ -283,7 +284,7 @@ export const communicationTools: ToolDefinition[] = [
           direction: "outbound",
           source_type: "voice_session",
         }).catch((err) => {
-          console.warn(
+          logger.warn(
             "[CommunicationTools] Failed to append email to unified thread:",
             {
               error: err instanceof Error ? err.message : String(err),
@@ -323,7 +324,7 @@ export const communicationTools: ToolDefinition[] = [
       const phoneNumber = normalizePhone(input.phone_number as string);
       const message = input.message as string;
 
-      console.log("[CommunicationTools] send_whatsapp:", {
+      logger.info("[CommunicationTools] send_whatsapp:", {
         phoneNumber,
         messageLength: message.length,
       });
@@ -353,7 +354,7 @@ export const communicationTools: ToolDefinition[] = [
           direction: "outbound",
           source_type: "voice_session",
         }).catch((err) => {
-          console.warn(
+          logger.warn(
             "[CommunicationTools] Failed to append WhatsApp to thread:",
             { error: err instanceof Error ? err.message : String(err) },
           );
@@ -390,7 +391,7 @@ export const communicationTools: ToolDefinition[] = [
       },
     },
     execute: async (_args: Record<string, unknown>, tenantId?: string) => {
-      console.warn(
+      logger.warn(
         "[send_messenger] Not yet implemented — needs CRM contact lookup",
         {
           tenantId,

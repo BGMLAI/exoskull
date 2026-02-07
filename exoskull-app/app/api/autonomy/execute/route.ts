@@ -19,6 +19,7 @@ import {
 import { detectGaps, optimizeSystem, checkAndSpawnAgents } from "@/lib/agents";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -194,7 +195,7 @@ async function handleRunCycle(
   const trigger = (params.trigger as "cron" | "event" | "manual") || "manual";
   const triggerEvent = params.triggerEvent as string | undefined;
 
-  console.log(`[Autonomy Execute] Running MAPE-K cycle for ${tenantId}`);
+  logger.info(`[Autonomy Execute] Running MAPE-K cycle for ${tenantId}`);
 
   const result = await runAutonomyCycle(tenantId, trigger, triggerEvent);
 
@@ -221,7 +222,7 @@ async function handleExecuteAction(
     throw new Error("actionType required");
   }
 
-  console.log(
+  logger.info(
     `[Autonomy Execute] Executing action ${actionType} for ${tenantId}`,
   );
 
@@ -250,7 +251,7 @@ async function handleApprove(
     throw new Error("interventionId required");
   }
 
-  console.log(`[Autonomy Execute] Approving intervention ${interventionId}`);
+  logger.info(`[Autonomy Execute] Approving intervention ${interventionId}`);
 
   const supabase = getServiceSupabase();
   const { data, error } = await supabase.rpc("approve_intervention", {
@@ -280,7 +281,7 @@ async function handleReject(
     throw new Error("interventionId required");
   }
 
-  console.log(`[Autonomy Execute] Rejecting intervention ${interventionId}`);
+  logger.info(`[Autonomy Execute] Rejecting intervention ${interventionId}`);
 
   const supabase = getServiceSupabase();
   const { error } = await supabase
@@ -323,7 +324,7 @@ async function handleFeedback(
     );
   }
 
-  console.log(`[Autonomy Execute] Recording feedback for ${interventionId}`);
+  logger.info(`[Autonomy Execute] Recording feedback for ${interventionId}`);
 
   const supabase = getServiceSupabase();
   const { error } = await supabase.rpc("record_intervention_feedback", {
@@ -349,7 +350,7 @@ async function handleDetectGaps(
 ): Promise<Record<string, unknown>> {
   const forceRun = (params.forceRun as boolean) ?? true;
 
-  console.log(`[Autonomy Execute] Detecting gaps for ${tenantId}`);
+  logger.info(`[Autonomy Execute] Detecting gaps for ${tenantId}`);
 
   const result = await detectGaps(tenantId, forceRun);
 
@@ -366,7 +367,7 @@ async function handleOptimize(
 ): Promise<Record<string, unknown>> {
   const forceRun = (params.forceRun as boolean) ?? true;
 
-  console.log(`[Autonomy Execute] Running self-optimization for ${tenantId}`);
+  logger.info(`[Autonomy Execute] Running self-optimization for ${tenantId}`);
 
   const result = await optimizeSystem(tenantId, forceRun);
 
@@ -380,7 +381,7 @@ async function handleOptimize(
 async function handleSpawnAgents(
   tenantId: string,
 ): Promise<Record<string, unknown>> {
-  console.log(`[Autonomy Execute] Checking for agent spawning for ${tenantId}`);
+  logger.info(`[Autonomy Execute] Checking for agent spawning for ${tenantId}`);
 
   const result = await checkAndSpawnAgents(tenantId);
 

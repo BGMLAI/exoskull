@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 function getOpenAI() {
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log("[AnalyzeImage] Analyzing:", {
+    logger.info("[AnalyzeImage] Analyzing:", {
       tenantId,
       imageUrl: imageUrl.substring(0, 50) + "...",
     });

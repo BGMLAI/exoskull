@@ -22,6 +22,7 @@ import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
 import { logEmotion } from "@/lib/emotion/logger";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -110,7 +111,7 @@ export async function getOrCreateSession(
     throw new Error(`Failed to create session: ${error.message}`);
   }
 
-  console.log("[ConversationHandler] Created session:", newSession.id);
+  logger.info("[ConversationHandler] Created session:", newSession.id);
 
   return {
     id: newSession.id,
@@ -203,7 +204,7 @@ export async function endSession(sessionId: string): Promise<void> {
     console.error("[ConversationHandler] Failed to end session:", error);
   }
 
-  console.log("[ConversationHandler] Ended session:", sessionId);
+  logger.info("[ConversationHandler] Ended session:", sessionId);
 }
 
 // ============================================================================
@@ -215,7 +216,7 @@ async function executeTool(
   toolInput: Record<string, any>,
   tenantId: string,
 ): Promise<string> {
-  console.log("[ConversationHandler] Executing tool:", toolName, toolInput);
+  logger.info("[ConversationHandler] Executing tool:", toolName, toolInput);
 
   const result = await executeExtensionTool(toolName, toolInput, tenantId);
   return result ?? "Nieznane narzędzie";
@@ -278,7 +279,7 @@ export async function processUserMessage(
       return logEmotionSignal(session.tenantId, signal, session.id);
     })
     .catch((err) => {
-      console.warn(
+      logger.warn(
         "[ConversationHandler] Tau classification failed:",
         err instanceof Error ? err.message : String(err),
       );
@@ -302,7 +303,7 @@ export async function processUserMessage(
       crisisProtocolTriggered: true,
       personalityAdaptedTo: "crisis_support",
     });
-    console.log(
+    logger.info(
       `[ConversationHandler] 🚨 CRISIS MODE: ${crisis.type} (severity: ${crisis.severity})`,
     );
     // Schedule proactive follow-up chain (fire-and-forget)
@@ -389,7 +390,7 @@ export async function processUserMessage(
     messages = [...threadMessages, { role: "user", content: userMessage }];
 
     if (threadMessages.length > 0) {
-      console.log(
+      logger.info(
         `[ConversationHandler] Loaded ${threadMessages.length} messages from unified thread`,
       );
     }
@@ -586,7 +587,7 @@ async function enrichWithVoiceProsody(
       personalityAdaptedTo: adaptedTo,
     });
 
-    console.log("[ConversationHandler] Voice-enriched emotion logged:", {
+    logger.info("[ConversationHandler] Voice-enriched emotion logged:", {
       source: fusedEmotion.source,
       speechRate: voiceFeatures.speech_rate,
       pauses: voiceFeatures.pause_frequency,

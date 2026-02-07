@@ -12,6 +12,7 @@ import { createServiceClient } from "@/lib/supabase/service-client";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { runAutonomyCycle } from "@/lib/autonomy/mape-k-loop";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -86,7 +87,7 @@ async function handler(req: NextRequest) {
 
     const duration = Date.now() - startTime;
 
-    console.log("[SelfOptimization] CRON complete:", {
+    logger.info("[SelfOptimization] CRON complete:", {
       ...results,
       durationMs: duration,
     });

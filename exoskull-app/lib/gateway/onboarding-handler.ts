@@ -20,6 +20,7 @@ import { autoInstallMods } from "../builder/proactive-engine";
 import type { GatewayChannel, GatewayResponse } from "./types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY!;
@@ -240,7 +241,7 @@ async function completeOnboardingInChat(
       data: { method: "in_chat", channel },
     });
   } catch (e) {
-    console.warn("[OnboardingHandler] Session log failed (non-critical):", e);
+    logger.warn("[OnboardingHandler] Session log failed (non-critical):", e);
   }
 
   // Schedule morning check-in (non-critical)
@@ -262,7 +263,7 @@ async function completeOnboardingInChat(
       });
     }
   } catch (e) {
-    console.warn("[OnboardingHandler] Check-in scheduling failed:", e);
+    logger.warn("[OnboardingHandler] Check-in scheduling failed:", e);
   }
 
   // Auto-install Mods based on goals (fire-and-forget)
@@ -273,7 +274,7 @@ async function completeOnboardingInChat(
     }),
   );
 
-  console.log("[OnboardingHandler] Onboarding completed:", {
+  logger.info("[OnboardingHandler] Onboarding completed:", {
     tenantId,
     channel,
     preferred_name: profileData.preferred_name,
