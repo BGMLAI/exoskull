@@ -39,6 +39,7 @@ import { memoryTools } from "./memory-tools";
 import { skillGoalTools } from "./skill-goal-tools";
 import { communicationTools } from "./communication-tools";
 import { emotionTools } from "./emotion-tools";
+import { composioTools } from "./composio-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -56,6 +57,7 @@ export const IORS_EXTENSION_TOOLS: ToolDefinition[] = [
   ...skillGoalTools,
   ...communicationTools,
   ...emotionTools,
+  ...composioTools,
 ];
 
 /**
