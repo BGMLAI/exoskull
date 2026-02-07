@@ -4,6 +4,68 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-07] fix+feat: Migration conflicts + Maintenance handlers + WhatsApp + Circuit Breaker
+
+### What was done
+
+**Migration fixes (commit a064d78):**
+- Fixed table name mismatch: `exo_autonomy_interventions` → `exo_interventions` in predictions migration, loop.ts, optimization.ts
+- Fixed 3 duplicate migration numbering conflicts (20260207000003, 20260207000004, 20260209000001)
+- Added `ADD COLUMN IF NOT EXISTS` guards to IORS foundation migration (exo_emergency_contacts)
+- Added conditional `unsafe-eval` in CSP for dev mode (React Fast Refresh)
+- **12 pending migrations applied** to Supabase — canvas widgets table now exists
+
+**Maintenance sub-loop (commit 27589da):**
+- `etl_silver` → bridges to `runSilverETL()` (Bronze Parquet → Postgres)
+- `etl_gold` → bridges to `runGoldETL()` (refresh 4 materialized views)
+- `highlight_decay` → bridges to `runDecay()` (reduce stale highlight importance after 30d)
+- `skill_lifecycle` → bridges to `archiveUnusedSkills()` + `expireOldSuggestions()` + `revokeUnhealthySkills()`
+- `run_maintenance` → expire stale interventions, clean delivered predictions, prune intervention queue
+
+**WhatsApp tool:**
+- `send_whatsapp` connected to Twilio WhatsApp API (`whatsapp:+48XXX` prefix format)
+- Fallback message when Twilio not configured
+- Logs to unified thread
+
+**Circuit Breaker:**
+- New `lib/iors/circuit-breaker.ts` — centralized failure tracking per tenant/service
+- 3-state machine: closed → open → half_open
+- Configurable: 3 failures → open, 5-min cooldown, 2 successes to recover
+- In-memory store (resets on cold start — intentional for serverless)
+
+### Why
+- Canvas widgets returned 500 (table didn't exist in DB)
+- Maintenance loop handlers were logging stubs with no real logic
+- WhatsApp was a placeholder returning "nie skonfigurowany"
+- No failure protection for cascading service outages
+
+### Files changed
+- `supabase/migrations/20260207000002_predictions.sql` — table name fix
+- `supabase/migrations/20260207000005_signal_imessage_channels.sql` — renumbered
+- `supabase/migrations/20260207000006_performance_indexes.sql` — renumbered
+- `supabase/migrations/20260208000001_iors_foundation.sql` — column guards
+- `supabase/migrations/20260209000002_feedback_capture.sql` — renumbered
+- `lib/iors/loop-tasks/maintenance.ts` — 6 real handlers
+- `lib/iors/tools/communication-tools.ts` — WhatsApp implementation
+- `lib/iors/circuit-breaker.ts` — new file
+- `next.config.js` — CSP dev mode fix
+
+### How to verify
+1. `npm run build` — zero errors
+2. `/api/canvas/widgets` returns 401 (not 500)
+3. Dashboard widgets load after login
+4. `send_whatsapp` tool available in IORS tool list (31 tools)
+
+### Notes for future agents
+- Supabase migration numbering must be unique — duplicate version numbers cause `schema_migrations_pkey` conflict
+- `exo_interventions` is the correct table name (NOT `exo_autonomy_interventions`)
+- `expireOldSuggestions()` returns `number`, not object — don't destructure `.expiredCount`
+- Silver ETL summary uses `totalRecords`/`totalErrors` (not `totalProcessed`/`errors.length`)
+- CircuitBreaker is in-memory — resets on Vercel cold start, which is acceptable for serverless
+- Twilio WhatsApp requires approved sender number (`TWILIO_WHATSAPP_NUMBER` env var)
+
+---
+
 ## [2026-02-09] feat: Sprint 2 — Canvas Widget System + Dashboard Simplification
 
 ### What was done
