@@ -1,0 +1,143 @@
+/**
+ * POST /api/onboarding/birth-chat
+ *
+ * Unified birth flow endpoint for web onboarding (Voice + Chat).
+ * Uses the FULL processUserMessage pipeline with 30+ IORS tools
+ * and BIRTH_SYSTEM_PROMPT_PREFIX.
+ *
+ * Accepts: { message: string, generateAudio?: boolean }
+ * Returns: { text, toolsUsed, isComplete, audio? }
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import {
+  getOrCreateSession,
+  processUserMessage,
+  updateSession,
+} from "@/lib/voice/conversation-handler";
+import {
+  BIRTH_SYSTEM_PROMPT_PREFIX,
+  BIRTH_FIRST_MESSAGE,
+} from "@/lib/iors/birth-prompt";
+import { completeBirth } from "@/lib/iors/birth-flow";
+import { textToSpeech } from "@/lib/voice/elevenlabs-tts";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { message, generateAudio = false } = await request.json();
+
+    if (!message || typeof message !== "string") {
+      return NextResponse.json(
+        { error: "Message is required" },
+        { status: 400 },
+      );
+    }
+
+    // Special case: greeting TTS request (voice mode initial load)
+    if (message === "__birth_greeting__") {
+      let audioBase64: string | null = null;
+      if (generateAudio) {
+        try {
+          const audioBuffer = await textToSpeech(BIRTH_FIRST_MESSAGE);
+          audioBase64 = Buffer.from(audioBuffer).toString("base64");
+        } catch (ttsError) {
+          console.error("[BirthChat] Greeting TTS error:", ttsError);
+        }
+      }
+      return NextResponse.json({
+        text: BIRTH_FIRST_MESSAGE,
+        toolsUsed: [],
+        isComplete: false,
+        audio: audioBase64,
+      });
+    }
+
+    // Stable session key per user (survives page refresh)
+    const sessionKey = `birth-${user.id}`;
+    const session = await getOrCreateSession(sessionKey, user.id);
+
+    // Inject birth flow configuration
+    const birthSession = {
+      ...session,
+      systemPromptPrefix: BIRTH_SYSTEM_PROMPT_PREFIX,
+      maxTokens: 1024,
+      skipEndCallDetection: true,
+    };
+
+    // Process through Claude with ALL IORS tools
+    const result = await processUserMessage(birthSession, message);
+
+    // Check for birth completion marker
+    const birthMatch = result.text.match(
+      /###BIRTH_COMPLETE###\s*([\s\S]*?)\s*###END_BIRTH_COMPLETE###/,
+    );
+
+    let responseText = result.text;
+    let isComplete = false;
+
+    if (birthMatch) {
+      // Clean the response (remove JSON block)
+      responseText = result.text
+        .replace(/###BIRTH_COMPLETE###[\s\S]*###END_BIRTH_COMPLETE###/, "")
+        .trim();
+      isComplete = true;
+
+      // Complete birth synchronously (await — we need confirmation before redirect)
+      try {
+        await completeBirth(user.id, birthMatch[1]);
+      } catch (err) {
+        console.error("[BirthChat] completeBirth failed:", {
+          userId: user.id,
+          error: err instanceof Error ? err.message : err,
+        });
+        // Still mark as complete on client — next middleware check will redirect properly
+      }
+    }
+
+    // Persist to session + unified thread
+    await updateSession(session.id, message, responseText, {
+      tenantId: user.id,
+      channel: "web_chat",
+    });
+
+    // Optional TTS audio generation (for voice mode)
+    let audioBase64: string | null = null;
+    if (generateAudio && responseText) {
+      try {
+        const audioBuffer = await textToSpeech(responseText);
+        audioBase64 = Buffer.from(audioBuffer).toString("base64");
+      } catch (ttsError) {
+        console.error("[BirthChat] TTS error:", ttsError);
+        // Continue without audio — text response still valid
+      }
+    }
+
+    return NextResponse.json({
+      text: responseText,
+      toolsUsed: result.toolsUsed,
+      isComplete,
+      audio: audioBase64,
+    });
+  } catch (error) {
+    console.error("[BirthChat] Error:", {
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    return NextResponse.json(
+      { error: "Failed to process message" },
+      { status: 500 },
+    );
+  }
+}
