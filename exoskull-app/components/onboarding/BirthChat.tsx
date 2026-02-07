@@ -44,12 +44,14 @@ export function BirthChat() {
   const { isTTSEnabled, isSpeaking, toggleTTS, playAudio, stopAudio } =
     useTTS();
 
-  // Dictation hook
+  // Ref to sendMessageDirect so dictation can auto-send
+  const sendMessageDirectRef = useRef<(text: string) => void>(() => {});
+
+  // Dictation hook — auto-sends after transcription (like voice mode)
   const { isListening, isSupported, interimTranscript, toggleListening } =
     useDictation({
-      language: "pl-PL",
       onFinalTranscript: (text) => {
-        setInput((prev) => (prev ? prev + " " + text : text));
+        sendMessageDirectRef.current(text);
       },
       onError: (error) => {
         setDictationError(error);
@@ -109,94 +111,106 @@ export function BirthChat() {
   // SEND MESSAGE
   // --------------------------------------------------------------------------
 
-  const sendMessage = useCallback(async () => {
-    if (!input.trim() || isLoading) return;
+  // Direct send (used by dictation auto-send and manual send)
+  const sendMessageDirect = useCallback(
+    async (text: string) => {
+      if (!text.trim() || isLoading) return;
 
-    // Stop any current audio before sending
-    stopAudio();
+      // Stop any current audio before sending
+      stopAudio();
 
-    const userText = input.trim();
-    const userMsg: Message = {
-      id: `user-${Date.now()}`,
-      role: "user",
-      content: userText,
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setIsLoading(true);
-
-    try {
-      const response = await fetch("/api/onboarding/birth-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: userText,
-          generateAudio: isTTSEnabled,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      const assistantMsg: Message = {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        content: data.text,
+      const userText = text.trim();
+      const userMsg: Message = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: userText,
       };
-      setMessages((prev) => [...prev, assistantMsg]);
 
-      if (data.isComplete) {
-        // Play final audio, then redirect
-        if (data.audio && isTTSEnabled) {
-          // Play audio, redirect after it ends
-          const audioBytes = Uint8Array.from(atob(data.audio), (c) =>
-            c.charCodeAt(0),
-          );
-          const audioBlob = new Blob([audioBytes], { type: "audio/mpeg" });
-          const audioUrl = URL.createObjectURL(audioBlob);
-          const audio = new Audio(audioUrl);
-          audio.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-            window.location.href = "/dashboard";
-          };
-          audio.onerror = () => {
-            URL.revokeObjectURL(audioUrl);
-            window.location.href = "/dashboard";
-          };
-          audio.play().catch(() => {
-            window.location.href = "/dashboard";
-          });
-        } else {
-          setTimeout(() => {
-            window.location.href = "/dashboard";
-          }, 2000);
+      setMessages((prev) => [...prev, userMsg]);
+      setInput("");
+      setIsLoading(true);
+
+      try {
+        const response = await fetch("/api/onboarding/birth-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: userText,
+            generateAudio: isTTSEnabled,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
         }
-        return;
-      }
 
-      // Play TTS for non-final responses
-      if (data.audio && isTTSEnabled) {
-        playAudio(data.audio);
-      }
-    } catch (err) {
-      console.error("[BirthChat] Send error:", err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `error-${Date.now()}`,
+        const data = await response.json();
+
+        const assistantMsg: Message = {
+          id: `assistant-${Date.now()}`,
           role: "assistant",
-          content:
-            "Przepraszam, coś poszło nie tak. Napisz jeszcze raz — chcę Cię poznać!",
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [input, isLoading, isTTSEnabled, playAudio, stopAudio]);
+          content: data.text,
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+
+        if (data.isComplete) {
+          // Play final audio, then redirect
+          if (data.audio && isTTSEnabled) {
+            // Play audio, redirect after it ends
+            const audioBytes = Uint8Array.from(atob(data.audio), (c) =>
+              c.charCodeAt(0),
+            );
+            const audioBlob = new Blob([audioBytes], { type: "audio/mpeg" });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            audio.onended = () => {
+              URL.revokeObjectURL(audioUrl);
+              window.location.href = "/dashboard";
+            };
+            audio.onerror = () => {
+              URL.revokeObjectURL(audioUrl);
+              window.location.href = "/dashboard";
+            };
+            audio.play().catch(() => {
+              window.location.href = "/dashboard";
+            });
+          } else {
+            setTimeout(() => {
+              window.location.href = "/dashboard";
+            }, 2000);
+          }
+          return;
+        }
+
+        // Play TTS for non-final responses
+        if (data.audio && isTTSEnabled) {
+          playAudio(data.audio);
+        }
+      } catch (err) {
+        console.error("[BirthChat] Send error:", err);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `error-${Date.now()}`,
+            role: "assistant",
+            content:
+              "Przepraszam, coś poszło nie tak. Napisz jeszcze raz — chcę Cię poznać!",
+          },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isLoading, isTTSEnabled, playAudio, stopAudio],
+  );
+
+  // Keep ref updated for dictation auto-send
+  sendMessageDirectRef.current = sendMessageDirect;
+
+  // Wrapper for manual send (from button / Enter key)
+  const sendMessage = useCallback(() => {
+    sendMessageDirect(input);
+  }, [input, sendMessageDirect]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {

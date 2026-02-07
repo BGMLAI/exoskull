@@ -1,18 +1,12 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import {
-  createSpeechRecognition,
-  isWebSpeechSupported,
-  type WebSpeechInstance,
-} from "@/lib/voice/web-speech";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 interface UseDictationOptions {
-  language?: string;
   onFinalTranscript?: (text: string) => void;
   onError?: (error: string) => void;
 }
@@ -25,138 +19,90 @@ interface UseDictationReturn {
 }
 
 // ============================================================================
-// HOOK
+// HOOK — Always uses MediaRecorder → Groq Whisper (/api/voice/transcribe)
 // ============================================================================
 
 export function useDictation(
   options: UseDictationOptions = {},
 ): UseDictationReturn {
-  const { language = "pl-PL", onFinalTranscript, onError } = options;
+  const { onFinalTranscript, onError } = options;
 
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
 
-  const speechRef = useRef<WebSpeechInstance | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  const useGroqFallbackRef = useRef(false);
-  const lastInterimRef = useRef("");
-  const finalDeliveredRef = useRef(false);
+  const onFinalTranscriptRef = useRef(onFinalTranscript);
+  const onErrorRef = useRef(onError);
 
-  // Check support on mount
+  // Keep refs fresh to avoid stale closures
+  onFinalTranscriptRef.current = onFinalTranscript;
+  onErrorRef.current = onError;
+
+  // Check mic support on mount
   useEffect(() => {
-    const webSpeechOk = isWebSpeechSupported();
-    // Groq Whisper fallback always works if mic is available
     const hasMic = typeof navigator !== "undefined" && !!navigator.mediaDevices;
-    setIsSupported(webSpeechOk || hasMic);
-    useGroqFallbackRef.current = !webSpeechOk && hasMic;
+    setIsSupported(hasMic);
   }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      speechRef.current?.stop();
-      mediaRecorderRef.current?.stop();
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
   // --------------------------------------------------------------------------
-  // Web Speech API path
+  // Transcribe via Groq Whisper
   // --------------------------------------------------------------------------
 
-  const startWebSpeech = useCallback(() => {
-    lastInterimRef.current = "";
-    finalDeliveredRef.current = false;
+  const transcribeAudio = useCallback(async (audioBlob: Blob) => {
+    setInterimTranscript("Przetwarzam...");
+    try {
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "audio.webm");
 
-    const speech = createSpeechRecognition({
-      language,
-      continuous: false,
-      interimResults: true,
-      onResult: (transcript, isFinal) => {
-        if (isFinal) {
-          finalDeliveredRef.current = true;
-          lastInterimRef.current = "";
-          setInterimTranscript("");
-          setIsListening(false);
-          onFinalTranscript?.(transcript);
-        } else {
-          lastInterimRef.current = transcript;
-          setInterimTranscript(transcript);
-        }
-      },
-      onError: (error) => {
-        lastInterimRef.current = "";
-        setIsListening(false);
-        setInterimTranscript("");
-        onError?.(error);
-      },
-      onEnd: () => {
-        // If recognition ended without a final result, use last interim
-        if (!finalDeliveredRef.current && lastInterimRef.current.trim()) {
-          onFinalTranscript?.(lastInterimRef.current.trim());
-        }
-        lastInterimRef.current = "";
-        setIsListening(false);
-        setInterimTranscript("");
-      },
-    });
+      const response = await fetch("/api/voice/transcribe", {
+        method: "POST",
+        body: formData,
+      });
 
-    speechRef.current = speech;
-    speech.start();
-    setIsListening(true);
-  }, [language, onFinalTranscript, onError]);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(
+          errData.error || `Transcription error: ${response.status}`,
+        );
+      }
 
-  const stopWebSpeech = useCallback(() => {
-    speechRef.current?.stop();
-    // Don't clear state here — let onEnd/onResult handle it
+      const { transcript } = await response.json();
+
+      if (!transcript?.trim()) {
+        onErrorRef.current?.("Nie wykryto mowy. Spróbuj ponownie.");
+        return;
+      }
+
+      onFinalTranscriptRef.current?.(transcript.trim());
+    } catch (err) {
+      console.error("[useDictation] Groq transcription failed:", err);
+      onErrorRef.current?.(
+        err instanceof Error ? err.message : "Błąd transkrypcji",
+      );
+    } finally {
+      setInterimTranscript("");
+      setIsListening(false);
+    }
   }, []);
 
   // --------------------------------------------------------------------------
-  // Groq Whisper fallback path (MediaRecorder → /api/voice/transcribe)
+  // Start / Stop recording
   // --------------------------------------------------------------------------
 
-  const transcribeAudio = useCallback(
-    async (audioBlob: Blob) => {
-      setInterimTranscript("Przetwarzam...");
-      try {
-        const formData = new FormData();
-        formData.append("audio", audioBlob, "audio.webm");
-
-        const response = await fetch("/api/voice/transcribe", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(
-            errData.error || `Transcription error: ${response.status}`,
-          );
-        }
-
-        const { transcript } = await response.json();
-
-        if (!transcript?.trim()) {
-          onError?.("Nie wykryto mowy. Spróbuj ponownie.");
-          return;
-        }
-
-        onFinalTranscript?.(transcript.trim());
-      } catch (err) {
-        console.error("[useDictation] Groq transcription failed:", err);
-        onError?.(err instanceof Error ? err.message : "Błąd transkrypcji");
-      } finally {
-        setInterimTranscript("");
-        setIsListening(false);
-      }
-    },
-    [onFinalTranscript, onError],
-  );
-
-  const startGroqRecording = useCallback(async () => {
+  const startRecording = useCallback(async () => {
     chunksRef.current = [];
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -190,42 +136,30 @@ export function useDictation(
       setIsListening(true);
       setInterimTranscript("Nagrywam...");
     } catch {
-      onError?.("Brak dostępu do mikrofonu. Sprawdź ustawienia przeglądarki.");
+      onErrorRef.current?.(
+        "Brak dostępu do mikrofonu. Sprawdź ustawienia przeglądarki.",
+      );
       setIsListening(false);
     }
-  }, [transcribeAudio, onError]);
+  }, [transcribeAudio]);
 
-  const stopGroqRecording = useCallback(() => {
+  const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current?.state === "recording") {
       mediaRecorderRef.current.stop();
     }
   }, []);
 
   // --------------------------------------------------------------------------
-  // Toggle (main entry point)
+  // Toggle
   // --------------------------------------------------------------------------
 
   const toggleListening = useCallback(() => {
     if (isListening) {
-      if (useGroqFallbackRef.current) {
-        stopGroqRecording();
-      } else {
-        stopWebSpeech();
-      }
+      stopRecording();
     } else {
-      if (useGroqFallbackRef.current) {
-        startGroqRecording();
-      } else {
-        startWebSpeech();
-      }
+      startRecording();
     }
-  }, [
-    isListening,
-    startWebSpeech,
-    stopWebSpeech,
-    startGroqRecording,
-    stopGroqRecording,
-  ]);
+  }, [isListening, startRecording, stopRecording]);
 
   return {
     isListening,
