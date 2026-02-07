@@ -13,6 +13,7 @@ import twilio from "twilio";
 import { makeOutboundCall } from "../voice/twilio-client";
 import { appendMessage } from "../unified-thread";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { emitEvent } from "@/lib/iors/loop";
 
 function getTwilioConfig() {
   return {
@@ -116,6 +117,20 @@ export async function executeIntervention(
       .from("exo_intervention_queue")
       .delete()
       .eq("intervention_id", interventionId);
+
+    // Emit outbound_ready event for Pętla loop
+    emitEvent({
+      tenantId: intervention.tenant_id,
+      eventType: "outbound_ready",
+      priority: 1,
+      source: "executor",
+      payload: {
+        interventionId,
+        actionType: intervention.intervention_type,
+        result: result.message,
+      },
+      dedupKey: `executor:${interventionId}`,
+    }).catch((err) => console.error("[Executor] emitEvent failed:", err));
 
     // Notify user about completed action
     await notifyUser(intervention as Intervention, result);

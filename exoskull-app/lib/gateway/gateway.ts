@@ -22,6 +22,7 @@ import { classifyMessage } from "../async-tasks/classifier";
 import { createTask, getLatestPendingTask } from "../async-tasks/queue";
 import type { GatewayChannel, GatewayMessage, GatewayResponse } from "./types";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { emitEvent } from "@/lib/iors/loop";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -380,6 +381,20 @@ export async function handleInboundMessage(
       toolsUsed: result.toolsUsed,
       durationMs,
     });
+
+    // Emit data_ingested event for Pętla loop
+    emitEvent({
+      tenantId,
+      eventType: "data_ingested",
+      priority: 3,
+      source: "gateway",
+      payload: {
+        channel: msg.channel,
+        durationMs,
+        toolsUsed: result.toolsUsed,
+      },
+      dedupKey: `gateway:msg:${tenantId}:${new Date().toISOString().slice(0, 16)}`,
+    }).catch((err) => console.error("[Gateway] emitEvent failed:", err));
 
     return {
       text: result.text,

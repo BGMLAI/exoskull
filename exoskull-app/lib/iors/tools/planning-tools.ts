@@ -12,6 +12,7 @@
 import type { ToolDefinition } from "./index";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { createTask } from "@/lib/async-tasks/queue";
+import { emitEvent } from "@/lib/iors/loop";
 
 export const planningTools: ToolDefinition[] = [
   {
@@ -84,6 +85,18 @@ export const planningTools: ToolDefinition[] = [
         console.error("[PlanningTools] plan_action error:", planError);
         return `Nie udało się zaplanować akcji: ${planError.message}`;
       }
+
+      // Emit outbound_ready event for Pętla loop
+      emitEvent({
+        tenantId,
+        eventType: "outbound_ready",
+        priority: 2,
+        source: "plan_action",
+        payload: { actionType, title, priority, scheduledFor },
+        dedupKey: `plan:${tenantId}:${actionType}:${new Date().toISOString().slice(0, 13)}`,
+      }).catch((err) =>
+        console.error("[PlanningTools] emitEvent failed:", err),
+      );
 
       return `Zaplanowano: "${title}". Wykonam za ${timeoutHours}h jeśli nie anulujesz.`;
     },
