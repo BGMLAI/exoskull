@@ -46,6 +46,19 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
+interface PersonalityFormState {
+  name: string;
+  formality: number;
+  humor: number;
+  directness: number;
+  empathy: number;
+  detail_level: number;
+  proactivity: number;
+  language: string;
+  communication_hours_start: string;
+  communication_hours_end: string;
+}
+
 interface ProfileFormState {
   preferred_name: string;
   communication_style: string;
@@ -102,9 +115,24 @@ export default function SettingsPage() {
       rate_limits: { max_calls_per_day: 3, max_sms_per_day: 10 },
     });
 
+  const [personalityForm, setPersonalityForm] = useState<PersonalityFormState>({
+    name: "IORS",
+    formality: 30,
+    humor: 40,
+    directness: 70,
+    empathy: 60,
+    detail_level: 40,
+    proactivity: 50,
+    language: "auto",
+    communication_hours_start: "07:00",
+    communication_hours_end: "23:00",
+  });
+
   const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPersonality, setSavingPersonality] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [personalitySaved, setPersonalitySaved] = useState(false);
   const [notificationsSaved, setNotificationsSaved] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [exportingData, setExportingData] = useState(false);
@@ -139,6 +167,23 @@ export default function SettingsPage() {
         checkin_enabled: profile.checkin_enabled ?? true,
         email: profile.email || "",
       });
+
+      // Load IORS personality
+      const p = profile.iors_personality;
+      if (p) {
+        setPersonalityForm({
+          name: profile.iors_name || p.name || "IORS",
+          formality: p.style?.formality ?? 30,
+          humor: p.style?.humor ?? 40,
+          directness: p.style?.directness ?? 70,
+          empathy: p.style?.empathy ?? 60,
+          detail_level: p.style?.detail_level ?? 40,
+          proactivity: p.proactivity ?? 50,
+          language: p.language || "auto",
+          communication_hours_start: p.communication_hours?.start || "07:00",
+          communication_hours_end: p.communication_hours?.end || "23:00",
+        });
+      }
 
       const scheduleRes = await fetch(`/api/schedule?tenant_id=${profile.id}`);
       const scheduleJson = await scheduleRes.json();
@@ -231,6 +276,32 @@ export default function SettingsPage() {
       setError(err instanceof Error ? err.message : "Nieznany blad");
     } finally {
       setSavingProfile(false);
+    }
+  }
+
+  async function savePersonality() {
+    try {
+      setSavingPersonality(true);
+      setPersonalitySaved(false);
+
+      const response = await fetch("/api/settings/personality", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(personalityForm),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Nie udalo sie zapisac osobowosci");
+      }
+
+      setPersonalitySaved(true);
+      setTimeout(() => setPersonalitySaved(false), 2000);
+    } catch (err) {
+      console.error("[SettingsPage] Save personality error:", err);
+      setError(err instanceof Error ? err.message : "Nieznany blad");
+    } finally {
+      setSavingPersonality(false);
     }
   }
 
@@ -468,6 +539,181 @@ export default function SettingsPage() {
               {savingProfile ? "Zapisywanie..." : "Zapisz profil"}
             </Button>
             {profileSaved && (
+              <span className="text-sm text-green-600">Zapisano</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* IORS Personality */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            Twoj IORS
+          </CardTitle>
+          <CardDescription>
+            Osobowosc i styl komunikacji Twojego IORS
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="iors_name">Imie IORS</Label>
+              <Input
+                id="iors_name"
+                value={personalityForm.name}
+                onChange={(e) =>
+                  setPersonalityForm({
+                    ...personalityForm,
+                    name: e.target.value,
+                  })
+                }
+                placeholder="IORS"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Jezyk IORS</Label>
+              <Select
+                value={personalityForm.language}
+                onValueChange={(value) =>
+                  setPersonalityForm({ ...personalityForm, language: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto (dopasuj do usera)</SelectItem>
+                  <SelectItem value="pl">Polski</SelectItem>
+                  <SelectItem value="en">English</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>
+                Proaktywnosc:{" "}
+                <span className="font-normal text-muted-foreground">
+                  {personalityForm.proactivity}
+                </span>
+              </Label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={personalityForm.proactivity}
+                onChange={(e) =>
+                  setPersonalityForm({
+                    ...personalityForm,
+                    proactivity: Number(e.target.value),
+                  })
+                }
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Pasywny</span>
+                <span>Autonomiczny</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {(
+              [
+                {
+                  key: "formality" as const,
+                  label: "Formalnosc",
+                  low: "Luzny",
+                  high: "Formalny",
+                },
+                {
+                  key: "humor" as const,
+                  label: "Humor",
+                  low: "Powazny",
+                  high: "Zabawny",
+                },
+                {
+                  key: "directness" as const,
+                  label: "Bezposredniosc",
+                  low: "Delikatny",
+                  high: "Bezposredni",
+                },
+                {
+                  key: "empathy" as const,
+                  label: "Empatia",
+                  low: "Rzeczowy",
+                  high: "Empatyczny",
+                },
+                {
+                  key: "detail_level" as const,
+                  label: "Szczegolowos",
+                  low: "Krotko",
+                  high: "Dokladnie",
+                },
+              ] as const
+            ).map((axis) => (
+              <div key={axis.key} className="space-y-2">
+                <Label>
+                  {axis.label}:{" "}
+                  <span className="font-normal text-muted-foreground">
+                    {personalityForm[axis.key]}
+                  </span>
+                </Label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={personalityForm[axis.key]}
+                  onChange={(e) =>
+                    setPersonalityForm({
+                      ...personalityForm,
+                      [axis.key]: Number(e.target.value),
+                    })
+                  }
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{axis.low}</span>
+                  <span>{axis.high}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Godziny komunikacji</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="time"
+                  value={personalityForm.communication_hours_start}
+                  onChange={(e) =>
+                    setPersonalityForm({
+                      ...personalityForm,
+                      communication_hours_start: e.target.value,
+                    })
+                  }
+                />
+                <span className="text-muted-foreground">-</span>
+                <Input
+                  type="time"
+                  value={personalityForm.communication_hours_end}
+                  onChange={(e) =>
+                    setPersonalityForm({
+                      ...personalityForm,
+                      communication_hours_end: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button onClick={savePersonality} disabled={savingPersonality}>
+              {savingPersonality ? "Zapisywanie..." : "Zapisz osobowosc"}
+            </Button>
+            {personalitySaved && (
               <span className="text-sm text-green-600">Zapisano</span>
             )}
           </div>

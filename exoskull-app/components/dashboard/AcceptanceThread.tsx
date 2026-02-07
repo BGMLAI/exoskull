@@ -134,14 +134,14 @@ function StatusCards({ tenantId }: { tenantId: string }) {
       icon: Heart,
       label: "Sen",
       value: data.sleepHours !== null ? `${data.sleepHours}h` : "Brak danych",
-      href: "/dashboard/health",
+      href: "/dashboard/mods",
       color: "text-red-500",
     },
     {
       icon: FileText,
       label: "Wiedza",
       value: `${data.loopsCount} loopow`,
-      href: "/dashboard/knowledge",
+      href: "/dashboard/memory",
       color: "text-purple-500",
     },
   ];

@@ -16,10 +16,6 @@ import {
   findTenantByPhone,
 } from "../voice/conversation-handler";
 import { appendMessage } from "../unified-thread";
-import {
-  getOnboardingStatus,
-  handleOnboardingMessage,
-} from "./onboarding-handler";
 import { isBirthPending, handleBirthMessage } from "@/lib/iors/birth-flow";
 import { findOrCreateLead, handleLeadMessage } from "@/lib/iors/lead-manager";
 import { classifyMessage } from "../async-tasks/classifier";
@@ -152,7 +148,7 @@ async function autoRegisterTenant(
  * Flow:
  * 1. Resolve or auto-register tenant
  * 2. Append inbound message to unified thread
- * 3. Onboarding check (new users → discovery conversation)
+ * 3. IORS birth check (new users → birth flow with full tool access)
  * 4. Status check (if user asks about pending async task)
  * 5. Classify: sync or async?
  *    - Async → queue task, return ack, CRON processes later
@@ -249,43 +245,6 @@ export async function handleInboundMessage(
         });
 
         return birthResult;
-      }
-    }
-
-    // 3b. Legacy onboarding — route users to discovery conversation
-    // Skip for web_chat (dashboard has its own onboarding UI) and voice (synchronous)
-    if (msg.channel !== "web_chat" && msg.channel !== "voice") {
-      const onboardingStatus = await getOnboardingStatus(tenantId);
-      if (
-        onboardingStatus === "pending" ||
-        onboardingStatus === "in_progress"
-      ) {
-        const onboardingResult = await handleOnboardingMessage(
-          tenantId,
-          msg.text,
-          msg.channel,
-        );
-
-        // Append assistant response to unified thread
-        await appendMessage(tenantId, {
-          role: "assistant",
-          content: onboardingResult.text,
-          channel: unifiedChannel,
-          direction: "outbound",
-          metadata: {
-            gateway_channel: msg.channel,
-            onboarding: true,
-          },
-        });
-
-        const durationMs = Date.now() - startTime;
-        console.log("[Gateway] Onboarding message processed:", {
-          channel: msg.channel,
-          tenantId,
-          durationMs,
-        });
-
-        return onboardingResult;
       }
     }
 

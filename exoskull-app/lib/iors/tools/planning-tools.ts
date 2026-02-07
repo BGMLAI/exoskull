@@ -6,10 +6,12 @@
  * - list_planned_actions: Show pending actions
  * - cancel_planned_action: Cancel a planned action
  * - delegate_complex_task: Delegate a complex task for background processing
+ * - async_think: Queue deep analysis for later delivery
  */
 
 import type { ToolDefinition } from "./index";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { createTask } from "@/lib/async-tasks/queue";
 
 export const planningTools: ToolDefinition[] = [
   {
@@ -218,6 +220,63 @@ export const planningTools: ToolDefinition[] = [
       }
 
       return `Zajmę się tym w tle. Dam znać jak skończę.`;
+    },
+  },
+  {
+    definition: {
+      name: "async_think",
+      description:
+        'Odłóż głęboką analizę do przetwarzania w tle. Użyj gdy user zadaje pytanie wymagające rozległej analizy, wielu źródeł danych, lub głębokiego namysłu. Odpowiedz "Muszę nad tym pomyśleć" i zleć analizę do async queue.',
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          question: {
+            type: "string",
+            description: "Pytanie lub temat do głębokiej analizy",
+          },
+          context: {
+            type: "string",
+            description: "Dodatkowy kontekst zebrany z rozmowy (opcjonalny)",
+          },
+        },
+        required: ["question"],
+      },
+    },
+    execute: async (input, tenantId) => {
+      const question = input.question as string;
+      const context = (input.context as string) || "";
+
+      try {
+        // Get user's preferred channel for delivery
+        const supabase = getServiceSupabase();
+        const { data: tenant } = await supabase
+          .from("exo_tenants")
+          .select("preferred_channel")
+          .eq("id", tenantId)
+          .single();
+
+        const replyChannel = tenant?.preferred_channel || "web_chat";
+
+        const prompt = context
+          ? `[DEEP ANALYSIS REQUEST]\nPytanie: ${question}\nKontekst: ${context}\n\nPrzeanalizuj to głęboko i odpowiedz wyczerpująco.`
+          : `[DEEP ANALYSIS REQUEST]\nPytanie: ${question}\n\nPrzeanalizuj to głęboko i odpowiedz wyczerpująco.`;
+
+        await createTask({
+          tenantId,
+          channel: replyChannel,
+          channelMetadata: {},
+          replyTo: replyChannel,
+          prompt,
+        });
+
+        return `Myślę nad tym. Odpowiedź wyślę na ${replyChannel} gdy będzie gotowa.`;
+      } catch (error) {
+        console.error("[PlanningTools] async_think error:", {
+          tenantId,
+          error: error instanceof Error ? error.message : error,
+        });
+        return `Nie udało się zakolejkować analizy. Spróbuję odpowiedzieć teraz.`;
+      }
     },
   },
 ];

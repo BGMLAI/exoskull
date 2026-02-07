@@ -2,15 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Zap,
-  Mic,
-  Plus,
-  Calendar,
-  FileText,
-  Heart,
-  Settings,
-} from "lucide-react";
+import { Zap, Mic, Plus, Package, Brain, Settings } from "lucide-react";
 import Link from "next/link";
 
 export function QuickActionsWidget() {
@@ -36,22 +28,16 @@ export function QuickActionsWidget() {
               Nowe zadanie
             </Button>
           </Link>
-          <Link href="/dashboard/schedule">
+          <Link href="/dashboard/mods">
             <Button variant="outline" className="w-full justify-start gap-2">
-              <Calendar className="h-4 w-4" />
-              Harmonogram
+              <Package className="h-4 w-4" />
+              Mody
             </Button>
           </Link>
-          <Link href="/dashboard/knowledge">
+          <Link href="/dashboard/memory">
             <Button variant="outline" className="w-full justify-start gap-2">
-              <FileText className="h-4 w-4" />
-              Wiedza
-            </Button>
-          </Link>
-          <Link href="/dashboard/health">
-            <Button variant="outline" className="w-full justify-start gap-2">
-              <Heart className="h-4 w-4" />
-              Zdrowie
+              <Brain className="h-4 w-4" />
+              Pamiec
             </Button>
           </Link>
           <Link href="/dashboard/settings">
