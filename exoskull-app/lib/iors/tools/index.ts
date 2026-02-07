@@ -40,6 +40,7 @@ import { skillGoalTools } from "./skill-goal-tools";
 import { communicationTools } from "./communication-tools";
 import { emotionTools } from "./emotion-tools";
 import { composioTools } from "./composio-tools";
+import { feedbackTools } from "./feedback-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -58,6 +59,7 @@ export const IORS_EXTENSION_TOOLS: ToolDefinition[] = [
   ...communicationTools,
   ...emotionTools,
   ...composioTools,
+  ...feedbackTools,
 ];
 
 /**

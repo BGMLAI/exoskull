@@ -10,6 +10,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { dispatchReport } from "@/lib/reports/report-dispatcher";
 import { appendMessage } from "@/lib/unified-thread";
 import { completeWork, failWork } from "@/lib/iors/loop";
+import { checkPermission } from "@/lib/iors/autonomy";
 import type { PetlaWorkItem, SubLoopResult } from "@/lib/iors/loop-types";
 import type { IORSPersonality } from "@/lib/iors/types";
 import { DEFAULT_PERSONALITY } from "@/lib/iors/types";
@@ -74,7 +75,22 @@ export async function handleProactive(
       tenant?.iors_personality || DEFAULT_PERSONALITY;
     const timezone = tenant?.timezone || "Europe/Warsaw";
 
-    // 2. Check quiet hours
+    // 2. Check autonomy permission for proactive messaging
+    const perm = await checkPermission(tenant_id, "message", "*");
+    if (!perm.permitted) {
+      console.log("[Petla:Proactive] No 'message' permission, skipping:", {
+        tenantId: tenant_id,
+      });
+      if (item.id && item.status === "processing") {
+        await completeWork(item.id, {
+          skipped: true,
+          reason: "no_message_permission",
+        });
+      }
+      return { handled: true, cost_cents: 0 };
+    }
+
+    // 3. Check quiet hours
     if (!isWithinCommunicationHours(personality, timezone)) {
       console.log("[Petla:Proactive] Outside communication hours, deferring:", {
         tenantId: tenant_id,
@@ -97,7 +113,7 @@ export async function handleProactive(
       return { handled: true, cost_cents: 0, details: { deferred: true } };
     }
 
-    // 3. Get the message to send
+    // 4. Get the message to send
     const message = (params.message as string) || (params.text as string);
 
     if (!message) {
@@ -110,10 +126,10 @@ export async function handleProactive(
       return { handled: true, cost_cents: 0 };
     }
 
-    // 4. Dispatch via preferred channel
+    // 5. Dispatch via preferred channel
     const result = await dispatchReport(tenant_id, message, "insight");
 
-    // 5. Log to unified thread
+    // 6. Log to unified thread
     await appendMessage(tenant_id, {
       role: "assistant",
       content: message,

@@ -23,29 +23,30 @@ export async function handleOptimization(
 
     switch (item.handler) {
       case "run_optimization": {
-        // Analyze feedback patterns and adjust behavior
+        // Analyze intervention + feedback patterns
         const supabase = getServiceSupabase();
+        const weekAgo = new Date(
+          Date.now() - 7 * 24 * 60 * 60 * 1000,
+        ).toISOString();
 
-        // Count recent successful vs failed interventions
-        const [successCount, failCount] = await Promise.all([
+        const [successCount, failCount, feedbackData] = await Promise.all([
           supabase
-            .from("exo_autonomy_interventions")
+            .from("exo_interventions")
             .select("id", { count: "exact", head: true })
             .eq("tenant_id", tenant_id)
             .eq("status", "completed")
-            .gte(
-              "created_at",
-              new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-            ),
+            .gte("created_at", weekAgo),
           supabase
-            .from("exo_autonomy_interventions")
+            .from("exo_interventions")
             .select("id", { count: "exact", head: true })
             .eq("tenant_id", tenant_id)
             .in("status", ["failed", "cancelled"])
-            .gte(
-              "created_at",
-              new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-            ),
+            .gte("created_at", weekAgo),
+          supabase
+            .from("exo_feedback")
+            .select("rating, feedback_type")
+            .eq("tenant_id", tenant_id)
+            .gte("created_at", weekAgo),
         ]);
 
         const success = successCount.count || 0;
@@ -53,11 +54,30 @@ export async function handleOptimization(
         const total = success + fails;
         const successRate = total > 0 ? success / total : 0.5;
 
-        console.log("[Petla:Optimization] Intervention effectiveness:", {
+        const feedback = feedbackData.data || [];
+        const rated = feedback.filter(
+          (f: { rating: number | null }) => f.rating != null,
+        );
+        const avgFeedbackRating =
+          rated.length > 0
+            ? rated.reduce(
+                (s: number, f: { rating: number | null }) =>
+                  s + (f.rating || 0),
+                0,
+              ) / rated.length
+            : 0;
+
+        console.log("[Petla:Optimization] Weekly stats:", {
           tenantId: tenant_id,
-          success,
-          fails,
-          successRate: Math.round(successRate * 100),
+          interventions: {
+            success,
+            fails,
+            successRate: Math.round(successRate * 100),
+          },
+          feedback: {
+            total: feedback.length,
+            avgRating: Math.round(avgFeedbackRating * 10) / 10,
+          },
         });
 
         break;
