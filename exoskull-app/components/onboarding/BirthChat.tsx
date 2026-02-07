@@ -1,18 +1,22 @@
 "use client";
 
 /**
- * BirthChat — Text-based IORS birth flow for web onboarding.
+ * BirthChat — Unified IORS birth flow (voice + text) for web onboarding.
  *
+ * Combines text chat with dictation (mic button) and optional TTS.
  * Uses the full processUserMessage pipeline (30+ tools)
  * via /api/onboarding/birth-chat.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Send, Loader2, MessageSquare } from "lucide-react";
+import { DictationButton } from "@/components/ui/DictationButton";
+import { Send, Loader2, MessageSquare, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useDictation } from "@/lib/hooks/useDictation";
+import { useTTS } from "@/lib/hooks/useTTS";
 import { BIRTH_FIRST_MESSAGE } from "@/lib/iors/birth-prompt";
 
 interface Message {
@@ -21,11 +25,7 @@ interface Message {
   content: string;
 }
 
-interface BirthChatProps {
-  onBack: () => void;
-}
-
-export function BirthChat({ onBack }: BirthChatProps) {
+export function BirthChat() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "greeting",
@@ -35,15 +35,85 @@ export function BirthChat({ onBack }: BirthChatProps) {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [dictationError, setDictationError] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const greetingPlayedRef = useRef(false);
+
+  // TTS hook
+  const { isTTSEnabled, isSpeaking, toggleTTS, playAudio, stopAudio } =
+    useTTS();
+
+  // Dictation hook
+  const { isListening, isSupported, interimTranscript, toggleListening } =
+    useDictation({
+      language: "pl-PL",
+      onFinalTranscript: (text) => {
+        setInput((prev) => (prev ? prev + " " + text : text));
+      },
+      onError: (error) => {
+        setDictationError(error);
+        setTimeout(() => setDictationError(null), 3000);
+      },
+    });
 
   // Auto-scroll on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isLoading]);
 
-  const sendMessage = async () => {
+  // Play TTS greeting on mount (if TTS enabled)
+  useEffect(() => {
+    if (greetingPlayedRef.current) return;
+    greetingPlayedRef.current = true;
+
+    // Delay slightly to check localStorage-loaded TTS preference
+    const timer = setTimeout(async () => {
+      // Re-read from localStorage directly since state may not be settled
+      const stored = localStorage.getItem("exoskull-tts-enabled");
+      const ttsOn = stored === null || stored === "true";
+      if (!ttsOn) return;
+
+      try {
+        const response = await fetch("/api/onboarding/birth-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: "__birth_greeting__",
+            generateAudio: true,
+          }),
+        });
+
+        if (!response.ok) return;
+        const data = await response.json();
+
+        if (data.audio) {
+          // Update greeting text if API returned different text
+          if (data.text && data.text !== BIRTH_FIRST_MESSAGE) {
+            setMessages([
+              { id: "greeting", role: "assistant", content: data.text },
+            ]);
+          }
+          playAudio(data.audio);
+        }
+      } catch {
+        // Greeting audio failed — text greeting is still visible
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --------------------------------------------------------------------------
+  // SEND MESSAGE
+  // --------------------------------------------------------------------------
+
+  const sendMessage = useCallback(async () => {
     if (!input.trim() || isLoading) return;
+
+    // Stop any current audio before sending
+    stopAudio();
 
     const userText = input.trim();
     const userMsg: Message = {
@@ -60,7 +130,10 @@ export function BirthChat({ onBack }: BirthChatProps) {
       const response = await fetch("/api/onboarding/birth-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userText }),
+        body: JSON.stringify({
+          message: userText,
+          generateAudio: isTTSEnabled,
+        }),
       });
 
       if (!response.ok) {
@@ -77,10 +150,37 @@ export function BirthChat({ onBack }: BirthChatProps) {
       setMessages((prev) => [...prev, assistantMsg]);
 
       if (data.isComplete) {
-        // Brief delay so user can read final message, then redirect
-        setTimeout(() => {
-          window.location.href = "/dashboard";
-        }, 2000);
+        // Play final audio, then redirect
+        if (data.audio && isTTSEnabled) {
+          // Play audio, redirect after it ends
+          const audioBytes = Uint8Array.from(atob(data.audio), (c) =>
+            c.charCodeAt(0),
+          );
+          const audioBlob = new Blob([audioBytes], { type: "audio/mpeg" });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            window.location.href = "/dashboard";
+          };
+          audio.onerror = () => {
+            URL.revokeObjectURL(audioUrl);
+            window.location.href = "/dashboard";
+          };
+          audio.play().catch(() => {
+            window.location.href = "/dashboard";
+          });
+        } else {
+          setTimeout(() => {
+            window.location.href = "/dashboard";
+          }, 2000);
+        }
+        return;
+      }
+
+      // Play TTS for non-final responses
+      if (data.audio && isTTSEnabled) {
+        playAudio(data.audio);
       }
     } catch (err) {
       console.error("[BirthChat] Send error:", err);
@@ -96,7 +196,7 @@ export function BirthChat({ onBack }: BirthChatProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [input, isLoading, isTTSEnabled, playAudio, stopAudio]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -105,21 +205,36 @@ export function BirthChat({ onBack }: BirthChatProps) {
     }
   };
 
+  // --------------------------------------------------------------------------
+  // RENDER
+  // --------------------------------------------------------------------------
+
   return (
     <Card className="w-full max-w-2xl bg-slate-800/50 border-slate-700">
-      <CardHeader className="pb-2 flex flex-row items-center border-b border-slate-700">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onBack}
-          className="text-slate-400 hover:text-white"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
+      <CardHeader className="pb-2 flex flex-row items-center justify-between border-b border-slate-700">
         <CardTitle className="text-lg text-white flex items-center gap-2">
           <MessageSquare className="h-5 w-5 text-blue-400" />
           Rozmowa z IORS
         </CardTitle>
+
+        {/* TTS toggle */}
+        <button
+          onClick={toggleTTS}
+          className={cn(
+            "p-2 rounded-full transition-colors",
+            isTTSEnabled
+              ? "bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
+              : "bg-slate-700 text-slate-500 hover:bg-slate-600",
+          )}
+          title={isTTSEnabled ? "Wycisz głos" : "Włącz głos"}
+          aria-label={isTTSEnabled ? "Wycisz głos" : "Włącz głos"}
+        >
+          {isTTSEnabled ? (
+            <Volume2 className={cn("h-5 w-5", isSpeaking && "animate-pulse")} />
+          ) : (
+            <VolumeX className="h-5 w-5" />
+          )}
+        </button>
       </CardHeader>
 
       <CardContent className="flex flex-col h-[500px] p-0">
@@ -157,14 +272,48 @@ export function BirthChat({ onBack }: BirthChatProps) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
+        {/* Speaking indicator */}
+        {isSpeaking && (
+          <div className="px-4 py-2 bg-blue-900/30 border-t border-slate-700">
+            <button
+              onClick={stopAudio}
+              className="flex items-center gap-2 text-sm text-blue-300 hover:text-blue-200"
+            >
+              <Volume2 className="w-4 h-4 animate-pulse" />
+              IORS mówi... kliknij aby przerwać
+            </button>
+          </div>
+        )}
+
+        {/* Dictation interim transcript */}
+        {interimTranscript && isListening && (
+          <div className="px-4 py-2 bg-slate-700/50 border-t border-slate-600">
+            <p className="text-sm text-slate-300 italic">{interimTranscript}</p>
+          </div>
+        )}
+
+        {/* Dictation error */}
+        {dictationError && (
+          <div className="px-4 py-2 bg-red-900/30 border-t border-slate-600">
+            <p className="text-sm text-red-300">{dictationError}</p>
+          </div>
+        )}
+
+        {/* Input bar */}
         <div className="p-4 border-t border-slate-700">
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <DictationButton
+              isListening={isListening}
+              isSupported={isSupported}
+              onClick={toggleListening}
+              disabled={isLoading}
+              size="sm"
+            />
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Napisz coś..."
+              placeholder="Napisz lub dyktuj..."
               disabled={isLoading}
               className="flex-1 bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
             />
