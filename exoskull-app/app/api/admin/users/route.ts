@@ -41,8 +41,8 @@ export async function GET(req: NextRequest) {
     const { data: users, count } = await query;
 
     // Get engagement scores for these users
-    const userIds = (users || []).map((u: any) => u.id);
-    let engagementMap = new Map<string, any>();
+    const userIds = (users || []).map((u: { id: string }) => u.id);
+    let engagementMap = new Map<string, Record<string, unknown>>();
 
     if (userIds.length > 0) {
       const { data: engagements } = await db
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Merge
-    const enrichedUsers = (users || []).map((u: any) => ({
+    const enrichedUsers = (users || []).map((u: { id: string }) => ({
       ...u,
       engagement: engagementMap.get(u.id) || null,
     }));

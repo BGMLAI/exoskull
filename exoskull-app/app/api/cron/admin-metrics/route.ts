@@ -38,7 +38,7 @@ async function postHandler(req: NextRequest) {
     .gte("created_at", yesterday);
 
   const uniqueActive24h = new Set(
-    (activeUserData || []).map((r: any) => r.tenant_id),
+    (activeUserData || []).map((r: { tenant_id: string }) => r.tenant_id),
   ).size;
 
   // Conversations & messages
@@ -54,7 +54,7 @@ async function postHandler(req: NextRequest) {
     .gte("created_at", `${today}T00:00:00Z`);
 
   const aiTotalCost = (aiData || []).reduce(
-    (sum, r: any) => sum + (r.estimated_cost || 0),
+    (sum, r: { estimated_cost: number }) => sum + (r.estimated_cost || 0),
     0,
   );
   const aiTotalRequests = aiData?.length || 0;

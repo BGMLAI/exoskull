@@ -452,10 +452,10 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ received: true });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[VoiceTools] Handler error:", error);
     return NextResponse.json(
-      { result: { error: error.message || "Internal error" } },
+      { result: { error: "Tool execution failed" } },
       { status: 500 },
     );
   }

@@ -9,6 +9,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { logProgress, detectMomentum } from "@/lib/goals/engine";
 import type { UserGoal, MeasurableProxy } from "@/lib/goals/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
@@ -150,9 +151,8 @@ async function handler(req: NextRequest) {
 // DATA COLLECTION FROM EXISTING TABLES
 // =====================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function collectGoalValue(
-  supabase: any,
+  supabase: SupabaseClient,
   tenantId: string,
   goal: UserGoal,
 ): Promise<number | null> {
@@ -183,9 +183,8 @@ async function collectGoalValue(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function collectFromProxies(
-  supabase: any,
+  supabase: SupabaseClient,
   tenantId: string,
   proxies: MeasurableProxy[],
   frequency: string,
@@ -222,9 +221,10 @@ async function collectFromProxies(
       const { data } = await query;
       if (!data || data.length === 0) return null;
 
-      const values = data
-        .map((r: Record<string, unknown>) => Number(r[proxy.field]))
-        .filter((v: number) => !isNaN(v));
+      const rows = data as unknown as Record<string, unknown>[];
+      const values = rows
+        .map((r) => Number(r[proxy.field]))
+        .filter((v) => !isNaN(v));
 
       if (values.length === 0) return null;
 
@@ -254,9 +254,8 @@ async function collectFromProxies(
   return null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function collectHealthData(
-  supabase: any,
+  supabase: SupabaseClient,
   tenantId: string,
   goal: UserGoal,
   today: string,
@@ -302,9 +301,8 @@ async function collectHealthData(
   return null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function collectProductivityData(
-  supabase: any,
+  supabase: SupabaseClient,
   tenantId: string,
   today: string,
 ): Promise<number | null> {
@@ -321,9 +319,8 @@ async function collectProductivityData(
   return count || 0;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function collectMentalData(
-  supabase: any,
+  supabase: SupabaseClient,
   tenantId: string,
   today: string,
 ): Promise<number | null> {
@@ -339,9 +336,8 @@ async function collectMentalData(
   return data?.mood_value || null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function collectFinanceData(
-  supabase: any,
+  supabase: SupabaseClient,
   tenantId: string,
   today: string,
 ): Promise<number | null> {

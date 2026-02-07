@@ -65,7 +65,11 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
 
   if (mods && mods.length > 0) {
     const modList = mods
-      .map((m: any) => m.exo_mod_registry?.slug || "unknown")
+      .map((m) => {
+        const reg = m.exo_mod_registry;
+        if (Array.isArray(reg)) return reg[0]?.slug || "unknown";
+        return "unknown";
+      })
       .join(", ");
     context += `- Zainstalowane Mody: ${modList}\n`;
   }
@@ -75,7 +79,7 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
     const { getPersonalityPromptFragment } =
       await import("@/lib/iors/personality");
     const personalityFragment = getPersonalityPromptFragment(
-      (tenant as any)?.iors_personality ?? null,
+      (tenant as Record<string, unknown>)?.iors_personality ?? null,
     );
     if (personalityFragment) {
       context += personalityFragment;

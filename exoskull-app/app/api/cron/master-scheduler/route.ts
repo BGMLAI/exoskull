@@ -85,7 +85,7 @@ async function postHandler(req: NextRequest) {
     jobs_triggered: 0,
     users_notified: 0,
     errors: [] as string[],
-    details: [] as any[],
+    details: [] as Record<string, unknown>[],
   };
 
   // Process each job
@@ -183,10 +183,10 @@ async function postHandler(req: NextRequest) {
 
         // Small delay between users to avoid rate limiting
         await new Promise((resolve) => setTimeout(resolve, 200));
-      } catch (userError: any) {
+      } catch (userError) {
         console.error(`      ❌ Error for user ${user.tenant_id}:`, userError);
         results.errors.push(
-          `${job.job_name} for ${user.tenant_id}: ${userError.message}`,
+          `${job.job_name} for ${user.tenant_id}: ${userError instanceof Error ? userError.message : String(userError)}`,
         );
       }
     }
@@ -226,7 +226,12 @@ async function logJobExecution(
   job: ScheduledJob,
   user: UserJobConfig,
   status: string,
-  result?: any,
+  result?: {
+    channel?: string;
+    error?: string;
+    call_id?: string;
+    message_sid?: string;
+  } | null,
   errorMessage?: string,
 ) {
   try {
@@ -255,7 +260,7 @@ async function processCustomScheduledJobs(results: {
   jobs_triggered: number;
   users_notified: number;
   errors: string[];
-  details: any[];
+  details: Record<string, unknown>[];
 }) {
   try {
     const supabase = getServiceSupabase();
@@ -386,26 +391,36 @@ async function processCustomScheduledJobs(results: {
 
         // Small delay between jobs
         await new Promise((resolve) => setTimeout(resolve, 200));
-      } catch (jobError: any) {
+      } catch (jobError) {
         console.error(
           `   ❌ Error processing custom job ${customJob.display_name}:`,
           jobError,
         );
         results.errors.push(
-          `Custom ${customJob.display_name}: ${jobError.message}`,
+          `Custom ${customJob.display_name}: ${jobError instanceof Error ? jobError.message : String(jobError)}`,
         );
       }
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error("❌ Failed to process custom jobs:", error);
-    results.errors.push(`Custom jobs processing: ${error.message}`);
+    results.errors.push(
+      `Custom jobs processing: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
 /**
  * Check if a custom job should run based on schedule type and current time
  */
-function shouldCustomJobRunNow(job: any, timezone: string): boolean {
+function shouldCustomJobRunNow(
+  job: {
+    schedule_type: string;
+    days_of_week?: number[];
+    day_of_month?: number;
+    time_of_day: string;
+  },
+  timezone: string,
+): boolean {
   const dayOfWeek = getDayOfWeek(timezone);
   const dayOfMonth = getDayOfMonth(timezone);
 
@@ -431,9 +446,9 @@ function shouldCustomJobRunNow(job: any, timezone: string): boolean {
  * Log custom job execution to database
  */
 async function logCustomJobExecution(
-  job: any,
+  job: { id: string; tenant_id: string; channel: string },
   status: string,
-  result?: any,
+  result?: { channel?: string; error?: string } | null,
   errorMessage?: string,
 ) {
   try {

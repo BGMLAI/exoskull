@@ -240,18 +240,31 @@ Odpowiedz w formacie JSON:
       draft_summary: parsed.summary || "Brak podsumowania",
       mood_score: parsed.mood_score || null,
       energy_score: parsed.energy_score || null,
-      key_events: (parsed.key_events || []).map((e: any) => ({
-        event: e.event,
-        time: e.time || null,
-        sentiment: e.sentiment || "neutral",
-        importance: e.importance || 5,
-      })),
+      key_events: (parsed.key_events || []).map(
+        (e: {
+          event: string;
+          time?: string;
+          sentiment?: string;
+          importance?: number;
+        }) => ({
+          event: e.event,
+          time: e.time || null,
+          sentiment: e.sentiment || "neutral",
+          importance: e.importance || 5,
+        }),
+      ),
       key_topics: parsed.key_topics || [],
-      decisions_made: (parsed.decisions || []).map((d: any) => ({
-        decision: d.decision,
-        context: d.context || null,
-        commitment_level: d.commitment_level || "considering",
-      })),
+      decisions_made: (parsed.decisions || []).map(
+        (d: {
+          decision: string;
+          context?: string;
+          commitment_level?: string;
+        }) => ({
+          decision: d.decision,
+          context: d.context || null,
+          commitment_level: d.commitment_level || "considering",
+        }),
+      ),
     };
   } catch (error) {
     console.error("[DailySummary] AI generation failed:", error);

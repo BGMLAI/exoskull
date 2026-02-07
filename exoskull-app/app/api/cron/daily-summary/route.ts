@@ -123,7 +123,10 @@ async function getActiveTenants(): Promise<
  */
 function isRightTimeForSummary(
   timezone: string,
-  scheduleSettings: any,
+  scheduleSettings: {
+    quiet_hours?: { start?: string; end?: string };
+    preferred_summary_time?: string;
+  } | null,
 ): boolean {
   try {
     // Get current time in user's timezone

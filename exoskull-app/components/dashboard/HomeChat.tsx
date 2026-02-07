@@ -140,8 +140,8 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
       // Take top 15, then reverse for chronological order
       const recent = items.slice(0, 15).reverse();
       setTimeline(recent);
-    } catch (err: any) {
-      if (err?.name === "AbortError") return;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       console.error("[HomeChat] Fetch error:", err);
       setError("Nie udało się załadować historii");
     } finally {
@@ -252,10 +252,10 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
       }
 
       readerRef.current = null;
-    } catch (err: any) {
-      if (err?.name === "AbortError") return;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       console.error("[HomeChat] Send error:", err);
-      const errorMsg = err?.message || "Nieznany błąd";
+      const errorMsg = err instanceof Error ? err.message : "Nieznany błąd";
       setChatMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantMsgId

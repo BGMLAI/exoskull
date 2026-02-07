@@ -27,10 +27,16 @@ export async function GET() {
     );
 
     const healthMap = new Map(
-      (healthRes.data || []).map((h: any) => [h.cron_name, h]),
+      (healthRes.data || []).map((h: { cron_name: string }) => [
+        h.cron_name,
+        h,
+      ]),
     );
     const circuitMap = new Map(
-      (circuitRes.data || []).map((c: any) => [c.cron_name, c]),
+      (circuitRes.data || []).map((c: { cron_name: string }) => [
+        c.cron_name,
+        c,
+      ]),
     );
 
     // Build dependency map
@@ -48,8 +54,10 @@ export async function GET() {
     const crons = Array.from(cronNames)
       .sort()
       .map((name) => {
-        const health = healthMap.get(name) as any;
-        const cb = circuitMap.get(name) as any;
+        const health = healthMap.get(name) as
+          | Record<string, unknown>
+          | undefined;
+        const cb = circuitMap.get(name) as Record<string, unknown> | undefined;
         return {
           name,
           last_run: health

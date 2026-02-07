@@ -19,15 +19,18 @@ export async function GET() {
 
     const total = interventions?.length || 0;
     const approved =
-      interventions?.filter((i: any) => i.guardian_verdict === "approved")
-        .length || 0;
+      interventions?.filter(
+        (i: { guardian_verdict: string }) => i.guardian_verdict === "approved",
+      ).length || 0;
     const blocked =
-      interventions?.filter((i: any) => i.guardian_verdict === "blocked")
-        .length || 0;
+      interventions?.filter(
+        (i: { guardian_verdict: string }) => i.guardian_verdict === "blocked",
+      ).length || 0;
     const avgBenefit =
       total > 0
         ? (interventions || []).reduce(
-            (sum, i: any) => sum + (i.benefit_score || 0),
+            (sum, i: { benefit_score?: number }) =>
+              sum + (i.benefit_score || 0),
             0,
           ) / total
         : 0;
@@ -51,7 +54,8 @@ export async function GET() {
     const avgEffectiveness =
       (effectiveness || []).length > 0
         ? (effectiveness || []).reduce(
-            (s, e: any) => s + (e.effectiveness_score || 0),
+            (s, e: { effectiveness_score?: number }) =>
+              s + (e.effectiveness_score || 0),
             0,
           ) / effectiveness!.length
         : 0;

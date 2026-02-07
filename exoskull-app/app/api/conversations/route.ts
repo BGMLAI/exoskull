@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({ conversations });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Conversations] GET error:", error);
     return NextResponse.json(
       { error: "Failed to fetch conversations" },
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       conversation,
       tenant_id: user.id,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Conversations] POST error:", error);
     return NextResponse.json(
       { error: "Failed to create conversation" },

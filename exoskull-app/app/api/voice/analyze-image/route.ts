@@ -152,10 +152,10 @@ export async function POST(req: NextRequest) {
       analysis,
       message: analysis,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[AnalyzeImage] Error:", error);
     return NextResponse.json(
-      { error: error.message || "Internal error" },
+      { error: "Image analysis failed" },
       { status: 500 },
     );
   }

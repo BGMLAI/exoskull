@@ -35,7 +35,9 @@ export async function GET(req: NextRequest) {
       .gte("created_at", new Date(Date.now() - 86400000).toISOString())
       .order("duration_ms", { ascending: true });
 
-    const durations = (latencyData || []).map((d: any) => d.duration_ms);
+    const durations = (latencyData || []).map(
+      (d: { duration_ms: number }) => d.duration_ms,
+    );
     const p50 =
       durations.length > 0 ? durations[Math.floor(durations.length * 0.5)] : 0;
     const p95 =

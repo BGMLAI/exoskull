@@ -12,7 +12,7 @@ export async function GET() {
     });
 
     return NextResponse.json({ data: agents, error: null });
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Agents] DB query error:", error);
     return NextResponse.json(
       {

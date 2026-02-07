@@ -45,7 +45,7 @@ export async function queryDatabase<T = any>(
 
     if (error) throw error;
     return (data as T[]) || [];
-  } catch (error: any) {
+  } catch (error) {
     console.error("Admin query error:", error);
     throw error;
   }

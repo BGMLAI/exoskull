@@ -162,10 +162,10 @@ export async function GET() {
 
     // Merge definitions with health data
     const healthMap = new Map(
-      (cronHealth || []).map((h: any) => [h.cron_name, h]),
+      (cronHealth || []).map((h: { cron_name: string }) => [h.cron_name, h]),
     );
 
-    const runsMap = new Map<string, any[]>();
+    const runsMap = new Map<string, Record<string, unknown>[]>();
     for (const run of recentRuns || []) {
       if (!runsMap.has(run.cron_name)) {
         runsMap.set(run.cron_name, []);
@@ -177,7 +177,9 @@ export async function GET() {
     }
 
     const crons = CRON_DEFINITIONS.map((def) => {
-      const health = healthMap.get(def.name) as any;
+      const health = healthMap.get(def.name) as
+        | Record<string, unknown>
+        | undefined;
       return {
         ...def,
         total_runs: health?.total_runs || 0,

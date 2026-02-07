@@ -3,6 +3,30 @@ import { requireAdmin, getAdminSupabase } from "@/lib/admin/auth";
 
 export const dynamic = "force-dynamic";
 
+// DB row shapes for query results
+interface AiUsageRow {
+  tier: number;
+  estimated_cost: number;
+  success: boolean;
+}
+interface EngagementRow {
+  engagement_level: string;
+  churn_risk: number;
+}
+interface InterventionRow {
+  guardian_verdict: string;
+  user_feedback: string;
+  benefit_score: number;
+}
+interface LearningEventRow {
+  event_type: string;
+}
+interface ModRegistryRow {
+  id: string;
+  name: string;
+  is_builtin: boolean;
+}
+
 /**
  * System self-optimization insights.
  * Analyzes patterns across all metrics to generate actionable recommendations.
@@ -70,10 +94,10 @@ export async function GET() {
 
     if (aiUsage7d && aiUsage7d.length > 0) {
       const totalCost7d = aiUsage7d.reduce(
-        (s, r: any) => s + (r.estimated_cost || 0),
+        (s, r: AiUsageRow) => s + (r.estimated_cost || 0),
         0,
       );
-      const tier4Usage = aiUsage7d.filter((r: any) => r.tier === 4);
+      const tier4Usage = aiUsage7d.filter((r: AiUsageRow) => r.tier === 4);
       const tier4Pct = tier4Usage.length / aiUsage7d.length;
 
       if (tier4Pct > 0.3) {
@@ -92,14 +116,15 @@ export async function GET() {
       }
 
       const errorRate =
-        aiUsage7d.filter((r: any) => !r.success).length / aiUsage7d.length;
+        aiUsage7d.filter((r: AiUsageRow) => !r.success).length /
+        aiUsage7d.length;
       if (errorRate > 0.05) {
         insights.push({
           id: "ai-high-error-rate",
           type: "warning",
           severity: errorRate > 0.15 ? "critical" : "warning",
           title: `AI error rate: ${(errorRate * 100).toFixed(1)}% (7d)`,
-          description: `${aiUsage7d.filter((r: any) => !r.success).length} failures out of ${aiUsage7d.length} requests.`,
+          description: `${aiUsage7d.filter((r: AiUsageRow) => !r.success).length} failures out of ${aiUsage7d.length} requests.`,
           metric: "ai_error_rate",
           currentValue: errorRate,
           threshold: 0.05,
@@ -115,8 +140,8 @@ export async function GET() {
 
     if (engScores && engScores.length > 0) {
       const dormantPct =
-        engScores.filter((e: any) => e.engagement_level === "dormant").length /
-        engScores.length;
+        engScores.filter((e: EngagementRow) => e.engagement_level === "dormant")
+          .length / engScores.length;
       if (dormantPct > 0.4) {
         insights.push({
           id: "engagement-dormant-high",
@@ -133,7 +158,9 @@ export async function GET() {
         });
       }
 
-      const highChurn = engScores.filter((e: any) => e.churn_risk > 0.7);
+      const highChurn = engScores.filter(
+        (e: EngagementRow) => e.churn_risk > 0.7,
+      );
       if (highChurn.length > 0) {
         insights.push({
           id: "churn-risk-users",
@@ -157,7 +184,7 @@ export async function GET() {
 
     if (interventions && interventions.length > 10) {
       const blocked = interventions.filter(
-        (i: any) => i.guardian_verdict === "blocked",
+        (i: InterventionRow) => i.guardian_verdict === "blocked",
       );
       const blockRate = blocked.length / interventions.length;
 
@@ -178,7 +205,7 @@ export async function GET() {
       }
 
       const negFeedback = interventions.filter(
-        (i: any) =>
+        (i: InterventionRow) =>
           i.user_feedback === "not_helpful" || i.user_feedback === "harmful",
       );
       if (negFeedback.length > 3) {
@@ -230,7 +257,7 @@ export async function GET() {
 
     if (learningEvents && learningEvents.length > 0) {
       const patternDetections = learningEvents.filter(
-        (e: any) => e.event_type === "pattern_detected",
+        (e: LearningEventRow) => e.event_type === "pattern_detected",
       ).length;
       insights.push({
         id: "learning-patterns",
@@ -348,7 +375,9 @@ export async function GET() {
             topModIds.map(([id]) => id),
           );
 
-        const modNameMap = new Map((modNames || []).map((m: any) => [m.id, m]));
+        const modNameMap = new Map(
+          (modNames || []).map((m: ModRegistryRow) => [m.id, m]),
+        );
         const topModsList = topModIds
           .map(
             ([id, count]) =>
@@ -431,7 +460,8 @@ export async function GET() {
       aiUsage7d.length > 0
     ) {
       const dailyAiCost =
-        aiUsage7d.reduce((s, r: any) => s + (r.estimated_cost || 0), 0) / 7;
+        aiUsage7d.reduce((s, r: AiUsageRow) => s + (r.estimated_cost || 0), 0) /
+        7;
       const monthlyAiCost = dailyAiCost * 30;
       const mrr = bizMetrics[0].mrr_pln || 0;
 

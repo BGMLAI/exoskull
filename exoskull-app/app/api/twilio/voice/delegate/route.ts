@@ -212,7 +212,7 @@ export async function POST(req: NextRequest) {
       const systemPrompt = buildDelegatePrompt(metadata);
 
       const claudeMessages: Anthropic.MessageParam[] = messages.map(
-        (m: any) => ({
+        (m: { role: string; content: string }) => ({
           role: m.role as "user" | "assistant",
           content: m.content,
         }),
@@ -337,8 +337,8 @@ function checkDelegateEnd(
  */
 async function notifyUserAboutDelegateResult(
   tenantId: string,
-  metadata: any,
-  messages: any[],
+  metadata: Record<string, string>,
+  messages: { role: string; content: string }[],
 ): Promise<void> {
   const supabase = getServiceSupabase();
 
@@ -358,7 +358,7 @@ async function notifyUserAboutDelegateResult(
   const lastMessages = messages.slice(-4);
   const summary = lastMessages
     .map(
-      (m: any) =>
+      (m: { role: string; content: string }) =>
         `${m.role === "assistant" ? "IORS" : "Rozmówca"}: ${m.content}`,
     )
     .join("\n");
