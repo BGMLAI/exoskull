@@ -133,14 +133,35 @@ async function autoRegisterTenant(
     throw new Error(`Failed to auto-register tenant: ${error.message}`);
   }
 
+  const newTenantId = data!.id;
+
   console.log("[Gateway] Auto-registered tenant:", {
-    tenantId: data!.id,
+    tenantId: newTenantId,
     channel,
     from,
     name: senderName,
   });
 
-  return data!.id;
+  // Check if there's an existing lead to merge
+  try {
+    const { findLead, convertLeadToTenant } =
+      await import("@/lib/iors/lead-manager");
+    const lead = await findLead(channel, from);
+    if (lead) {
+      await convertLeadToTenant(lead.id, newTenantId);
+      console.log("[Gateway] Merged lead into new tenant:", {
+        leadId: lead.id,
+        tenantId: newTenantId,
+        conversations: lead.conversations?.length || 0,
+      });
+    }
+  } catch (mergeErr) {
+    console.warn("[Gateway] Lead merge failed (non-blocking):", {
+      error: mergeErr instanceof Error ? mergeErr.message : mergeErr,
+    });
+  }
+
+  return newTenantId;
 }
 
 /**

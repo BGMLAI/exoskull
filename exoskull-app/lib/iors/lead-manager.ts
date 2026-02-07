@@ -12,6 +12,8 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import type { GatewayChannel } from "@/lib/gateway/types";
 import type { LeadRecord, LeadConversationEntry } from "./types";
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
+
 const LEAD_SYSTEM_PROMPT = `Jestes IORS — osobisty asystent AI. Rozmawiasz z potencjalnym uzytkownikiem ktory jeszcze sie nie zarejestrowal.
 
 ZASADY:
@@ -19,9 +21,10 @@ ZASADY:
 2. Wyjasniaj czym jest IORS — rozszerzenie umyslu, cyfrowy blizniak
 3. NIGDY nie wymuszaj rejestracji — user sam zdecyduje
 4. Pamietaj o czym rozmawiacie — konwersacja jest ciagla
-5. Jezeli user chce sie zarejestrowac, powiedz: "Super! Wejdz na exoskull.xyz zeby zalozyc konto."
+5. Jezeli user chce sie zarejestrowac, powiedz: "Super! Wejdz na ${APP_URL} zeby zalozyc konto."
 6. Odpowiadaj krotko (2-3 zdania max)
 7. Mow w jezyku usera (po polsku lub po angielsku)
+8. Po 10+ wymianach, delikatnie zaproponuj rejestracje (raz). Nie powtarzaj.
 
 WARTOSC IORS:
 - Jeden punkt kontaktu zamiast 50 aplikacji
@@ -175,11 +178,18 @@ export async function handleLeadMessage(
       },
     ];
 
-    // Update lead status if they're engaging
-    const newStatus =
-      lead.lead_status === "new" && updatedConversations.length >= 4
-        ? "engaged"
-        : lead.lead_status;
+    // Update lead status based on engagement depth
+    const exchangeCount = updatedConversations.filter(
+      (c) => c.role === "user",
+    ).length;
+    let newStatus = lead.lead_status;
+
+    if (newStatus === "new" && exchangeCount >= 2) {
+      newStatus = "engaged";
+    }
+    if (newStatus === "engaged" && exchangeCount >= 5) {
+      newStatus = "qualified";
+    }
 
     await supabase
       .from("exo_leads")
@@ -189,6 +199,16 @@ export async function handleLeadMessage(
         updated_at: new Date().toISOString(),
       })
       .eq("id", lead.id);
+
+    // On first qualification, append signup suggestion (one-time)
+    if (newStatus === "qualified" && lead.lead_status !== "qualified") {
+      const signupHint = `\n\nPS: Jezeli chcesz zeby IORS pamietal wszystko i dzialal proaktywnie, zaloz konto: ${APP_URL}`;
+      return {
+        text: assistantText + signupHint,
+        toolsUsed: ["lead_conversation", "lead_qualified"],
+        channel,
+      };
+    }
 
     return {
       text: assistantText,
@@ -211,7 +231,7 @@ export async function handleLeadMessage(
 
 /**
  * Convert a lead to a full tenant.
- * Copies conversation history into tenant discovery data.
+ * Copies conversation history into unified thread + sets birth date.
  */
 export async function convertLeadToTenant(
   leadId: string,
@@ -249,9 +269,38 @@ export async function convertLeadToTenant(
     })
     .eq("id", tenantId);
 
+  // Copy lead conversations into unified thread (so IORS remembers pre-birth)
+  const conversations = (lead.conversations as LeadConversationEntry[]) || [];
+  if (conversations.length > 0) {
+    try {
+      const { appendMessage } = await import("@/lib/unified-thread");
+      for (const entry of conversations) {
+        await appendMessage(tenantId, {
+          role: entry.role,
+          content: entry.content,
+          channel: (entry.channel ||
+            "web_chat") as import("@/lib/unified-thread").UnifiedChannel,
+          direction: entry.role === "user" ? "inbound" : "outbound",
+          metadata: {
+            from_lead: true,
+            lead_id: leadId,
+            original_timestamp: entry.timestamp,
+          },
+        });
+      }
+    } catch (threadErr) {
+      console.warn(
+        "[LeadManager] Failed to copy lead conversations to thread:",
+        {
+          error: threadErr instanceof Error ? threadErr.message : threadErr,
+        },
+      );
+    }
+  }
+
   console.log("[LeadManager] Lead converted to tenant:", {
     leadId,
     tenantId,
-    conversationCount: (lead.conversations as any[])?.length || 0,
+    conversationsCopied: conversations.length,
   });
 }
