@@ -10,109 +10,22 @@ import {
   ActionType,
   ActionRequest,
   ActionResult,
-  ActionDefinition,
   PermissionCategory,
 } from "./types";
 import { getPermissionModel, isActionPermitted } from "./permission-model";
 import { makeOutboundCall } from "../voice/twilio-client";
+import {
+  ACTION_DEFINITIONS,
+  getActionDefinition,
+  getAllActionDefinitions,
+  getActionsByCategory,
+} from "./action-definitions";
+import {
+  buildCustomActionRegistry,
+  CustomActionEntry,
+} from "./custom-action-registry";
 
 import { logger } from "@/lib/logger";
-// ============================================================================
-// ACTION DEFINITIONS
-// ============================================================================
-
-const ACTION_DEFINITIONS: Record<ActionType, ActionDefinition> = {
-  send_sms: {
-    type: "send_sms",
-    name: "Send SMS",
-    description: "Send an SMS message",
-    requiredParams: ["to", "message"],
-    optionalParams: ["scheduledFor"],
-    category: "communication",
-    riskLevel: "medium",
-  },
-  send_email: {
-    type: "send_email",
-    name: "Send Email",
-    description: "Send an email",
-    requiredParams: ["to", "subject", "body"],
-    optionalParams: ["cc", "bcc", "replyTo"],
-    category: "communication",
-    riskLevel: "medium",
-  },
-  create_task: {
-    type: "create_task",
-    name: "Create Task",
-    description: "Create a new task",
-    requiredParams: ["title"],
-    optionalParams: ["description", "dueDate", "priority", "labels"],
-    category: "tasks",
-    riskLevel: "low",
-  },
-  complete_task: {
-    type: "complete_task",
-    name: "Complete Task",
-    description: "Mark a task as complete",
-    requiredParams: ["taskId"],
-    optionalParams: ["notes"],
-    category: "tasks",
-    riskLevel: "low",
-  },
-  create_event: {
-    type: "create_event",
-    name: "Create Calendar Event",
-    description: "Create a new calendar event",
-    requiredParams: ["title", "startTime"],
-    optionalParams: ["endTime", "description", "location", "attendees"],
-    category: "calendar",
-    riskLevel: "medium",
-  },
-  send_notification: {
-    type: "send_notification",
-    name: "Send Notification",
-    description: "Send a push notification",
-    requiredParams: ["title", "body"],
-    optionalParams: ["data", "imageUrl", "actionUrl"],
-    category: "communication",
-    riskLevel: "low",
-  },
-  log_health: {
-    type: "log_health",
-    name: "Log Health Data",
-    description: "Log health metrics",
-    requiredParams: ["metricType", "value"],
-    optionalParams: ["unit", "notes", "timestamp"],
-    category: "health",
-    riskLevel: "low",
-  },
-  trigger_checkin: {
-    type: "trigger_checkin",
-    name: "Trigger Check-in",
-    description: "Trigger a user check-in",
-    requiredParams: ["checkinType"],
-    optionalParams: ["message", "questions"],
-    category: "communication",
-    riskLevel: "low",
-  },
-  run_automation: {
-    type: "run_automation",
-    name: "Run Automation",
-    description: "Run a custom automation",
-    requiredParams: ["automationId"],
-    optionalParams: ["params"],
-    category: "other",
-    riskLevel: "high",
-  },
-  custom: {
-    type: "custom",
-    name: "Custom Action",
-    description: "Execute a custom action",
-    requiredParams: ["actionName"],
-    optionalParams: ["params"],
-    category: "other",
-    riskLevel: "high",
-  },
-};
 
 // ============================================================================
 // ACTION EXECUTOR CLASS
@@ -120,27 +33,14 @@ const ACTION_DEFINITIONS: Record<ActionType, ActionDefinition> = {
 
 export class ActionExecutor {
   private supabase: SupabaseClient;
-  private customActionRegistry: Record<
-    string,
-    {
-      description: string;
-      handler: (
-        tenantId: string,
-        params: Record<string, unknown>,
-      ) => Promise<{
-        success: boolean;
-        data?: unknown;
-        error?: string;
-      }>;
-    }
-  > = {};
+  private customActionRegistry: Record<string, CustomActionEntry>;
 
   constructor() {
     this.supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
-    this.initCustomActionRegistry();
+    this.customActionRegistry = buildCustomActionRegistry(this.supabase);
   }
 
   // ============================================================================
@@ -283,7 +183,6 @@ export class ActionExecutor {
   private async handleSendSms(request: ActionRequest): Promise<ActionResult> {
     const { to, message } = request.params as { to: string; message: string };
 
-    // Use Twilio via API route
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_APP_URL}/api/twilio/send-sms`,
@@ -328,7 +227,6 @@ export class ActionExecutor {
       body: string;
     };
 
-    // Use Google Workspace rig if connected
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_APP_URL}/api/tools`,
@@ -457,7 +355,6 @@ export class ActionExecutor {
         location?: string;
       };
 
-    // Use Google Calendar via tools API
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_APP_URL}/api/tools`,
@@ -514,7 +411,6 @@ export class ActionExecutor {
       data?: Record<string, unknown>;
     };
 
-    // Store notification in database for delivery
     const { data, error } = await this.supabase
       .from("user_impulse_state")
       .update({
@@ -606,7 +502,6 @@ export class ActionExecutor {
       questions?: string[];
     };
 
-    // Create a check-in record
     const { data, error } = await this.supabase
       .from("exo_user_checkins")
       .insert({
@@ -928,216 +823,10 @@ export class ActionExecutor {
   }
 
   // ============================================================================
-  // CUSTOM ACTION REGISTRY
-  // ============================================================================
-
-  private initCustomActionRegistry(): void {
-    this.customActionRegistry = {
-      toggle_automation: {
-        description: "Enable or disable a custom scheduled job",
-        handler: async (tenantId, params) => {
-          const { automationId, enabled } = params as {
-            automationId: string;
-            enabled: boolean;
-          };
-          if (!automationId || enabled === undefined) {
-            return {
-              success: false,
-              error: "Missing automationId or enabled parameter",
-            };
-          }
-          const { data, error } = await this.supabase
-            .from("exo_custom_scheduled_jobs")
-            .update({ is_enabled: enabled })
-            .eq("id", automationId)
-            .eq("tenant_id", tenantId)
-            .select("id, display_name, is_enabled")
-            .single();
-          if (error) return { success: false, error: error.message };
-          if (!data)
-            return {
-              success: false,
-              error: "Automation not found or not owned by tenant",
-            };
-          return {
-            success: true,
-            data: {
-              automationId: data.id,
-              displayName: data.display_name,
-              enabled: data.is_enabled,
-            },
-          };
-        },
-      },
-
-      adjust_schedule: {
-        description: "Update schedule of a custom job (time, frequency, days)",
-        handler: async (tenantId, params) => {
-          const {
-            automationId,
-            time_of_day,
-            schedule_type,
-            days_of_week,
-            day_of_month,
-          } = params as {
-            automationId: string;
-            time_of_day?: string;
-            schedule_type?: string;
-            days_of_week?: number[];
-            day_of_month?: number;
-          };
-          if (!automationId)
-            return { success: false, error: "Missing automationId" };
-
-          const updateData: Record<string, unknown> = {};
-          if (time_of_day !== undefined) updateData.time_of_day = time_of_day;
-          if (schedule_type !== undefined)
-            updateData.schedule_type = schedule_type;
-          if (days_of_week !== undefined)
-            updateData.days_of_week = days_of_week;
-          if (day_of_month !== undefined)
-            updateData.day_of_month = day_of_month;
-
-          if (Object.keys(updateData).length === 0) {
-            return { success: false, error: "No schedule changes provided" };
-          }
-
-          const { data, error } = await this.supabase
-            .from("exo_custom_scheduled_jobs")
-            .update(updateData)
-            .eq("id", automationId)
-            .eq("tenant_id", tenantId)
-            .select(
-              "id, display_name, schedule_type, time_of_day, days_of_week",
-            )
-            .single();
-          if (error) return { success: false, error: error.message };
-          if (!data)
-            return {
-              success: false,
-              error: "Automation not found or not owned by tenant",
-            };
-          return { success: true, data };
-        },
-      },
-
-      set_quiet_hours: {
-        description: "Update quiet hours in tenant schedule_settings",
-        handler: async (tenantId, params) => {
-          const { start, end } = params as { start?: string; end?: string };
-          if (!start && !end) {
-            return {
-              success: false,
-              error: "Provide start and/or end time (HH:MM format)",
-            };
-          }
-
-          const { data: tenant, error: readError } = await this.supabase
-            .from("exo_tenants")
-            .select("schedule_settings")
-            .eq("id", tenantId)
-            .single();
-          if (readError) return { success: false, error: readError.message };
-
-          const settings =
-            (tenant?.schedule_settings as Record<string, unknown>) || {};
-          const quietHours = (settings.quiet_hours as Record<
-            string,
-            string
-          >) || { start: "22:00", end: "07:00" };
-          if (start) quietHours.start = start;
-          if (end) quietHours.end = end;
-          settings.quiet_hours = quietHours;
-
-          const { error: updateError } = await this.supabase
-            .from("exo_tenants")
-            .update({ schedule_settings: settings })
-            .eq("id", tenantId);
-          if (updateError)
-            return { success: false, error: updateError.message };
-          return { success: true, data: { quiet_hours: quietHours } };
-        },
-      },
-
-      update_preference: {
-        description:
-          "Update a user preference (language, timezone, or schedule setting)",
-        handler: async (tenantId, params) => {
-          const { key, value } = params as { key: string; value: unknown };
-          if (!key) return { success: false, error: "Missing key parameter" };
-
-          const scheduleKeys = [
-            "skip_weekends",
-            "notification_channels",
-            "rate_limits",
-          ];
-          if (scheduleKeys.includes(key)) {
-            const { data: tenant } = await this.supabase
-              .from("exo_tenants")
-              .select("schedule_settings")
-              .eq("id", tenantId)
-              .single();
-            const settings =
-              (tenant?.schedule_settings as Record<string, unknown>) || {};
-            settings[key] = value;
-            const { error } = await this.supabase
-              .from("exo_tenants")
-              .update({ schedule_settings: settings })
-              .eq("id", tenantId);
-            if (error) return { success: false, error: error.message };
-            return { success: true, data: { key, value } };
-          }
-
-          const directKeys = ["language", "timezone", "name"];
-          if (directKeys.includes(key)) {
-            const { error } = await this.supabase
-              .from("exo_tenants")
-              .update({ [key]: value })
-              .eq("id", tenantId);
-            if (error) return { success: false, error: error.message };
-            return { success: true, data: { key, value } };
-          }
-
-          return { success: false, error: `Unknown preference key: ${key}` };
-        },
-      },
-
-      archive_completed_tasks: {
-        description: "Archive completed tasks older than N days",
-        handler: async (tenantId, params) => {
-          const { olderThanDays } = params as { olderThanDays?: number };
-          const cutoffDays = olderThanDays || 7;
-          const cutoffDate = new Date(
-            Date.now() - cutoffDays * 24 * 60 * 60 * 1000,
-          ).toISOString();
-
-          const { data, error } = await this.supabase
-            .from("exo_tasks")
-            .update({
-              status: "archived",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("tenant_id", tenantId)
-            .eq("status", "completed")
-            .lt("completed_at", cutoffDate)
-            .select("id");
-          if (error) return { success: false, error: error.message };
-          return {
-            success: true,
-            data: { archivedCount: data?.length || 0, cutoffDays },
-          };
-        },
-      },
-    };
-  }
-
-  // ============================================================================
   // HELPERS
   // ============================================================================
 
   private getActionPattern(request: ActionRequest): string {
-    // Build action pattern for permission check
-    // e.g., "send_sms:family" or just "create_task"
     const scope = request.params.scope as string | undefined;
     if (scope) {
       return `${request.type}:${scope}`;
@@ -1169,24 +858,22 @@ export class ActionExecutor {
   /**
    * Get action definition
    */
-  getActionDefinition(type: ActionType): ActionDefinition | undefined {
-    return ACTION_DEFINITIONS[type];
+  getActionDefinition(type: ActionType) {
+    return getActionDefinition(type);
   }
 
   /**
    * Get all action definitions
    */
-  getAllActionDefinitions(): ActionDefinition[] {
-    return Object.values(ACTION_DEFINITIONS);
+  getAllActionDefinitions() {
+    return getAllActionDefinitions();
   }
 
   /**
    * Get actions by category
    */
-  getActionsByCategory(category: PermissionCategory): ActionDefinition[] {
-    return Object.values(ACTION_DEFINITIONS).filter(
-      (a) => a.category === category,
-    );
+  getActionsByCategory(category: PermissionCategory) {
+    return getActionsByCategory(category);
   }
 }
 

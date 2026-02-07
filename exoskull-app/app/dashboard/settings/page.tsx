@@ -11,28 +11,16 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { IntegrationsWidget } from "@/components/widgets/IntegrationsWidget";
 import { EmailInboxWidget } from "@/components/widgets/EmailInboxWidget";
-import { COMMUNICATION_STYLE_LABELS, CHANNEL_LABELS } from "@/lib/types/user";
 import {
   Settings,
-  User,
-  Bell,
-  Plug,
   Shield,
   CreditCard,
   Trash2,
   Download,
   AlertTriangle,
+  Plug,
   Puzzle,
   Sparkles,
 } from "lucide-react";
@@ -45,6 +33,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { ProfileSection } from "./ProfileSection";
+import { PersonalitySection } from "./PersonalitySection";
+import { NotificationsSection } from "./NotificationsSection";
 
 interface PersonalityFormState {
   name: string;
@@ -178,7 +169,6 @@ export default function SettingsPage() {
         email: profile.email || "",
       });
 
-      // Load IORS personality
       const p = profile.iors_personality;
       if (p) {
         setPersonalityForm({
@@ -200,7 +190,6 @@ export default function SettingsPage() {
 
       if (scheduleRes.ok && scheduleJson.global_settings) {
         const settings = scheduleJson.global_settings;
-
         setNotificationForm({
           notification_channels: {
             voice: settings.notification_channels?.voice ?? true,
@@ -228,17 +217,14 @@ export default function SettingsPage() {
           .from("exo_rig_connections")
           .select("rig_slug, sync_status, last_sync_at, metadata")
           .eq("tenant_id", user.id);
-
         setConnections(rigConnections || []);
 
-        // Load active mods
         const { data: mods } = await supabase
           .from("exo_mod_installs")
           .select("id, mod_slug, mod_name, enabled, installed_at")
           .eq("tenant_id", user.id);
         setActiveMods(mods || []);
 
-        // Load active skills
         const { data: skills } = await supabase
           .from("exo_dynamic_skills")
           .select("id, name, status, created_at")
@@ -247,7 +233,6 @@ export default function SettingsPage() {
         setActiveSkills(skills || []);
       }
 
-      // Load autonomy permissions
       try {
         const autoRes = await fetch("/api/settings/autonomy");
         if (autoRes.ok) {
@@ -255,7 +240,7 @@ export default function SettingsPage() {
           setAutonomyPermissions(autoJson.permissions || []);
         }
       } catch {
-        // Non-blocking — permissions will show empty
+        // Non-blocking
       }
     } catch (err) {
       console.error("[SettingsPage] Error:", err);
@@ -269,7 +254,6 @@ export default function SettingsPage() {
     try {
       setSavingProfile(true);
       setProfileSaved(false);
-
       const response = await fetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -284,12 +268,10 @@ export default function SettingsPage() {
           checkin_enabled: profileForm.checkin_enabled,
         }),
       });
-
       if (!response.ok) {
         const result = await response.json();
         throw new Error(result.error || "Nie udalo sie zapisac profilu");
       }
-
       setProfileSaved(true);
       setTimeout(() => setProfileSaved(false), 2000);
     } catch (err) {
@@ -304,18 +286,15 @@ export default function SettingsPage() {
     try {
       setSavingPersonality(true);
       setPersonalitySaved(false);
-
       const response = await fetch("/api/settings/personality", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(personalityForm),
       });
-
       if (!response.ok) {
         const result = await response.json();
         throw new Error(result.error || "Nie udalo sie zapisac osobowosci");
       }
-
       setPersonalitySaved(true);
       setTimeout(() => setPersonalitySaved(false), 2000);
     } catch (err) {
@@ -328,11 +307,9 @@ export default function SettingsPage() {
 
   async function saveNotifications() {
     if (!tenantId) return;
-
     try {
       setSavingNotifications(true);
       setNotificationsSaved(false);
-
       const response = await fetch("/api/schedule", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -355,12 +332,10 @@ export default function SettingsPage() {
           },
         }),
       });
-
       if (!response.ok) {
         const result = await response.json();
         throw new Error(result.error || "Nie udalo sie zapisac ustawien");
       }
-
       setNotificationsSaved(true);
       setTimeout(() => setNotificationsSaved(false), 2000);
     } catch (err) {
@@ -429,494 +404,29 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Profile settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Profil
-          </CardTitle>
-          <CardDescription>
-            Podstawowe dane i preferencje komunikacji
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="preferred_name">Imie</Label>
-              <Input
-                id="preferred_name"
-                value={profileForm.preferred_name}
-                onChange={(e) =>
-                  setProfileForm({
-                    ...profileForm,
-                    preferred_name: e.target.value,
-                  })
-                }
-                placeholder="Twoje imie"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input value={profileForm.email} disabled />
-            </div>
-          </div>
+      <ProfileSection
+        form={profileForm}
+        setForm={setProfileForm}
+        onSave={saveProfile}
+        saving={savingProfile}
+        saved={profileSaved}
+      />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Styl komunikacji</Label>
-              <Select
-                value={profileForm.communication_style}
-                onValueChange={(value) =>
-                  setProfileForm({ ...profileForm, communication_style: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Wybierz styl" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(COMMUNICATION_STYLE_LABELS).map(
-                    ([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ),
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Preferowany kanal</Label>
-              <Select
-                value={profileForm.preferred_channel}
-                onValueChange={(value) =>
-                  setProfileForm({ ...profileForm, preferred_channel: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Wybierz kanal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CHANNEL_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+      <PersonalitySection
+        form={personalityForm}
+        setForm={setPersonalityForm}
+        onSave={savePersonality}
+        saving={savingPersonality}
+        saved={personalitySaved}
+      />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="timezone">Strefa czasowa</Label>
-              <Input
-                id="timezone"
-                value={profileForm.timezone}
-                onChange={(e) =>
-                  setProfileForm({ ...profileForm, timezone: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="language">Jezyk</Label>
-              <Select
-                value={profileForm.language}
-                onValueChange={(value) =>
-                  setProfileForm({ ...profileForm, language: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Jezyk" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pl">Polski</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <div className="space-y-2">
-              <Label htmlFor="morning_checkin_time">Poranny check-in</Label>
-              <Input
-                id="morning_checkin_time"
-                type="time"
-                value={profileForm.morning_checkin_time}
-                onChange={(e) =>
-                  setProfileForm({
-                    ...profileForm,
-                    morning_checkin_time: e.target.value,
-                  })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="evening_checkin_time">Wieczorny check-in</Label>
-              <Input
-                id="evening_checkin_time"
-                type="time"
-                value={profileForm.evening_checkin_time}
-                onChange={(e) =>
-                  setProfileForm({
-                    ...profileForm,
-                    evening_checkin_time: e.target.value,
-                  })
-                }
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                id="checkin_enabled"
-                type="checkbox"
-                className="h-4 w-4"
-                checked={profileForm.checkin_enabled}
-                onChange={(e) =>
-                  setProfileForm({
-                    ...profileForm,
-                    checkin_enabled: e.target.checked,
-                  })
-                }
-              />
-              <Label htmlFor="checkin_enabled">Wlaczone check-iny</Label>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button onClick={saveProfile} disabled={savingProfile}>
-              {savingProfile ? "Zapisywanie..." : "Zapisz profil"}
-            </Button>
-            {profileSaved && (
-              <span className="text-sm text-green-600">Zapisano</span>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* IORS Personality */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
-            Twoj IORS
-          </CardTitle>
-          <CardDescription>
-            Osobowosc i styl komunikacji Twojego IORS
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="iors_name">Imie IORS</Label>
-              <Input
-                id="iors_name"
-                value={personalityForm.name}
-                onChange={(e) =>
-                  setPersonalityForm({
-                    ...personalityForm,
-                    name: e.target.value,
-                  })
-                }
-                placeholder="IORS"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Jezyk IORS</Label>
-              <Select
-                value={personalityForm.language}
-                onValueChange={(value) =>
-                  setPersonalityForm({ ...personalityForm, language: value })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto (dopasuj do usera)</SelectItem>
-                  <SelectItem value="pl">Polski</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>
-                Proaktywnosc:{" "}
-                <span className="font-normal text-muted-foreground">
-                  {personalityForm.proactivity}
-                </span>
-              </Label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={personalityForm.proactivity}
-                onChange={(e) =>
-                  setPersonalityForm({
-                    ...personalityForm,
-                    proactivity: Number(e.target.value),
-                  })
-                }
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Pasywny</span>
-                <span>Autonomiczny</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {(
-              [
-                {
-                  key: "formality" as const,
-                  label: "Formalnosc",
-                  low: "Luzny",
-                  high: "Formalny",
-                },
-                {
-                  key: "humor" as const,
-                  label: "Humor",
-                  low: "Powazny",
-                  high: "Zabawny",
-                },
-                {
-                  key: "directness" as const,
-                  label: "Bezposredniosc",
-                  low: "Delikatny",
-                  high: "Bezposredni",
-                },
-                {
-                  key: "empathy" as const,
-                  label: "Empatia",
-                  low: "Rzeczowy",
-                  high: "Empatyczny",
-                },
-                {
-                  key: "detail_level" as const,
-                  label: "Szczegolowos",
-                  low: "Krotko",
-                  high: "Dokladnie",
-                },
-              ] as const
-            ).map((axis) => (
-              <div key={axis.key} className="space-y-2">
-                <Label>
-                  {axis.label}:{" "}
-                  <span className="font-normal text-muted-foreground">
-                    {personalityForm[axis.key]}
-                  </span>
-                </Label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={personalityForm[axis.key]}
-                  onChange={(e) =>
-                    setPersonalityForm({
-                      ...personalityForm,
-                      [axis.key]: Number(e.target.value),
-                    })
-                  }
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{axis.low}</span>
-                  <span>{axis.high}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Godziny komunikacji</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="time"
-                  value={personalityForm.communication_hours_start}
-                  onChange={(e) =>
-                    setPersonalityForm({
-                      ...personalityForm,
-                      communication_hours_start: e.target.value,
-                    })
-                  }
-                />
-                <span className="text-muted-foreground">-</span>
-                <Input
-                  type="time"
-                  value={personalityForm.communication_hours_end}
-                  onChange={(e) =>
-                    setPersonalityForm({
-                      ...personalityForm,
-                      communication_hours_end: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button onClick={savePersonality} disabled={savingPersonality}>
-              {savingPersonality ? "Zapisywanie..." : "Zapisz osobowosc"}
-            </Button>
-            {personalitySaved && (
-              <span className="text-sm text-green-600">Zapisano</span>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Notification preferences */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bell className="h-5 w-5" />
-            Powiadomienia
-          </CardTitle>
-          <CardDescription>Kanaly, godziny ciszy i limity</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Kanaly</Label>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
-                    checked={notificationForm.notification_channels.voice}
-                    onChange={(e) =>
-                      setNotificationForm({
-                        ...notificationForm,
-                        notification_channels: {
-                          ...notificationForm.notification_channels,
-                          voice: e.target.checked,
-                        },
-                      })
-                    }
-                  />
-                  Glos
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
-                    checked={notificationForm.notification_channels.sms}
-                    onChange={(e) =>
-                      setNotificationForm({
-                        ...notificationForm,
-                        notification_channels: {
-                          ...notificationForm.notification_channels,
-                          sms: e.target.checked,
-                        },
-                      })
-                    }
-                  />
-                  SMS
-                </label>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Godziny ciszy</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="time"
-                  value={notificationForm.quiet_hours.start}
-                  onChange={(e) =>
-                    setNotificationForm({
-                      ...notificationForm,
-                      quiet_hours: {
-                        ...notificationForm.quiet_hours,
-                        start: e.target.value,
-                      },
-                    })
-                  }
-                />
-                <span className="text-muted-foreground">-</span>
-                <Input
-                  type="time"
-                  value={notificationForm.quiet_hours.end}
-                  onChange={(e) =>
-                    setNotificationForm({
-                      ...notificationForm,
-                      quiet_hours: {
-                        ...notificationForm.quiet_hours,
-                        end: e.target.value,
-                      },
-                    })
-                  }
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <div className="space-y-2">
-              <Label htmlFor="max_calls">Limit polaczen / dzien</Label>
-              <Input
-                id="max_calls"
-                type="number"
-                min="0"
-                value={notificationForm.rate_limits.max_calls_per_day}
-                onChange={(e) =>
-                  setNotificationForm({
-                    ...notificationForm,
-                    rate_limits: {
-                      ...notificationForm.rate_limits,
-                      max_calls_per_day: Number(e.target.value),
-                    },
-                  })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="max_sms">Limit SMS / dzien</Label>
-              <Input
-                id="max_sms"
-                type="number"
-                min="0"
-                value={notificationForm.rate_limits.max_sms_per_day}
-                onChange={(e) =>
-                  setNotificationForm({
-                    ...notificationForm,
-                    rate_limits: {
-                      ...notificationForm.rate_limits,
-                      max_sms_per_day: Number(e.target.value),
-                    },
-                  })
-                }
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                id="skip_weekends"
-                type="checkbox"
-                className="h-4 w-4"
-                checked={notificationForm.skip_weekends}
-                onChange={(e) =>
-                  setNotificationForm({
-                    ...notificationForm,
-                    skip_weekends: e.target.checked,
-                  })
-                }
-              />
-              <Label htmlFor="skip_weekends">Pomin weekendy</Label>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button onClick={saveNotifications} disabled={savingNotifications}>
-              {savingNotifications ? "Zapisywanie..." : "Zapisz ustawienia"}
-            </Button>
-            {notificationsSaved && (
-              <span className="text-sm text-green-600">Zapisano</span>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <NotificationsSection
+        form={notificationForm}
+        setForm={setNotificationForm}
+        onSave={saveNotifications}
+        saving={savingNotifications}
+        saved={notificationsSaved}
+      />
 
       {/* Integrations */}
       <Card>
@@ -934,7 +444,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Active Extensions — Mods & Skills */}
+      {/* Active Extensions */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -946,7 +456,6 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Mods */}
           {activeMods.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -971,7 +480,6 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Skills */}
           {activeSkills.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -1131,8 +639,6 @@ export default function SettingsPage() {
                   <Button
                     variant="destructive"
                     onClick={() => {
-                      // Account deletion requires backend support
-                      // For now, close dialog and show message
                       setShowDeleteDialog(false);
                       setError("Aby usunac konto, skontaktuj sie z supportem.");
                     }}
@@ -1146,7 +652,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Email Inbox - shows when Google or Microsoft connected */}
+      {/* Email Inbox */}
       <EmailInboxWidget
         tenantId={tenantId}
         rigSlug={
