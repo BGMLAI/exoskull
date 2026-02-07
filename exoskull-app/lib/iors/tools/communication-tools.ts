@@ -319,8 +319,54 @@ export const communicationTools: ToolDefinition[] = [
         required: ["phone_number", "message"],
       },
     },
-    execute: async () => {
-      return "WhatsApp nie jest jeszcze skonfigurowany. Spróbuj SMS.";
+    execute: async (input, tenantId) => {
+      const phoneNumber = normalizePhone(input.phone_number as string);
+      const message = input.message as string;
+
+      console.log("[CommunicationTools] send_whatsapp:", {
+        phoneNumber,
+        messageLength: message.length,
+      });
+
+      const sid = process.env.TWILIO_ACCOUNT_SID;
+      const token = process.env.TWILIO_AUTH_TOKEN;
+      const fromNumber =
+        process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_PHONE_NUMBER;
+
+      if (!sid || !token || !fromNumber) {
+        return "WhatsApp nie jest jeszcze skonfigurowany. Spróbuj SMS.";
+      }
+
+      try {
+        const twilio = (await import("twilio")).default;
+        const twilioClient = twilio(sid, token);
+        await twilioClient.messages.create({
+          to: `whatsapp:${phoneNumber}`,
+          from: `whatsapp:${fromNumber}`,
+          body: message,
+        });
+
+        await appendMessage(tenantId, {
+          role: "assistant",
+          content: `[WhatsApp do ${input.phone_number}]: ${message}`,
+          channel: "whatsapp",
+          direction: "outbound",
+          source_type: "voice_session",
+        }).catch((err) => {
+          console.warn(
+            "[CommunicationTools] Failed to append WhatsApp to thread:",
+            { error: err instanceof Error ? err.message : String(err) },
+          );
+        });
+
+        return `WhatsApp wysłany do ${input.phone_number}`;
+      } catch (waError) {
+        console.error("[CommunicationTools] send_whatsapp error:", {
+          error: waError instanceof Error ? waError.message : String(waError),
+          phoneNumber,
+        });
+        return `Nie udało się wysłać WhatsApp do ${input.phone_number}. Spróbuj SMS.`;
+      }
     },
   },
   {

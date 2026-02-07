@@ -12,7 +12,7 @@ import type { PetlaWorkItem, SubLoopResult } from "@/lib/iors/loop-types";
 export async function handleMaintenance(
   item: PetlaWorkItem,
 ): Promise<SubLoopResult> {
-  const { tenant_id, params } = item;
+  const { tenant_id } = item;
 
   try {
     console.log("[Petla:Maintenance] Processing:", {
@@ -22,65 +22,122 @@ export async function handleMaintenance(
 
     switch (item.handler) {
       case "run_maintenance": {
-        // Generic maintenance — check for stale data, orphaned records
         const supabase = getServiceSupabase();
+        const stats = { asyncTasks: 0, interventions: 0, predictions: 0 };
 
-        // Clean up completed async tasks older than 7 days
-        const cutoff = new Date(
+        // 1. Clean up completed/failed async tasks older than 7 days
+        const taskCutoff = new Date(
           Date.now() - 7 * 24 * 60 * 60 * 1000,
         ).toISOString();
-
-        const { data: cleaned } = await supabase
+        const { data: cleanedTasks } = await supabase
           .from("exo_async_tasks")
           .delete()
           .in("status", ["completed", "failed"])
-          .lt("created_at", cutoff)
+          .lt("created_at", taskCutoff)
           .select("id");
+        stats.asyncTasks = cleanedTasks?.length || 0;
 
-        console.log("[Petla:Maintenance] Cleaned async tasks:", {
+        // 2. Expire stale interventions (past expires_at, still proposed/approved)
+        const { data: expiredInterventions } = await supabase
+          .from("exo_interventions")
+          .update({ status: "expired", updated_at: new Date().toISOString() })
+          .lt("expires_at", new Date().toISOString())
+          .in("status", ["proposed", "approved"])
+          .select("id");
+        stats.interventions = expiredInterventions?.length || 0;
+
+        // 3. Clean up old delivered predictions (expired + delivered)
+        const { data: expiredPredictions } = await supabase
+          .from("exo_predictions")
+          .delete()
+          .lt("expires_at", new Date().toISOString())
+          .not("delivered_at", "is", null)
+          .select("id");
+        stats.predictions = expiredPredictions?.length || 0;
+
+        // 4. Clean up stale intervention queue items (>7 days old, max retries hit)
+        await supabase
+          .from("exo_intervention_queue")
+          .delete()
+          .lt(
+            "last_attempt_at",
+            new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          )
+          .gte("attempts", 3);
+
+        console.log("[Petla:Maintenance] Cleanup stats:", {
           tenantId: tenant_id,
-          count: cleaned?.length || 0,
+          ...stats,
         });
-
         break;
       }
 
       case "etl_bronze": {
-        // Bridge to existing bronze ETL logic
-        console.log("[Petla:Maintenance] Bronze ETL triggered:", {
-          tenantId: tenant_id,
-        });
+        // Bronze is raw data on R2 — no transformation needed from Pętla.
+        // Bronze writes happen at ingestion time in gateway + device sync.
+        console.log(
+          "[Petla:Maintenance] Bronze ETL: no-op (writes at ingestion)",
+          {
+            tenantId: tenant_id,
+          },
+        );
         break;
       }
 
       case "etl_silver": {
-        // Bridge to existing silver ETL logic
-        console.log("[Petla:Maintenance] Silver ETL triggered:", {
+        // Bridge to existing Silver ETL (Bronze Parquet → Postgres)
+        const { runSilverETL } = await import("@/lib/datalake/silver-etl");
+        const silverResult = await runSilverETL();
+        console.log("[Petla:Maintenance] Silver ETL completed:", {
           tenantId: tenant_id,
+          records: silverResult.totalRecords,
+          errors: silverResult.totalErrors,
         });
         break;
       }
 
       case "etl_gold": {
-        // Bridge to existing gold ETL logic
-        console.log("[Petla:Maintenance] Gold ETL triggered:", {
+        // Bridge to existing Gold ETL (refresh materialized views)
+        const { runGoldETL } = await import("@/lib/datalake/gold-etl");
+        const goldResult = await runGoldETL();
+        console.log("[Petla:Maintenance] Gold ETL completed:", {
           tenantId: tenant_id,
+          views: goldResult.results.length,
+          success: goldResult.results.filter((r) => r.success).length,
         });
         break;
       }
 
       case "highlight_decay": {
-        // Reduce importance of old memory highlights
-        console.log("[Petla:Maintenance] Highlight decay triggered:", {
+        // Reduce importance of stale memory highlights (>30 days untouched)
+        const { runDecay } = await import("@/lib/learning/self-updater");
+        const decayResult = await runDecay();
+        console.log("[Petla:Maintenance] Highlight decay completed:", {
           tenantId: tenant_id,
+          decayed: decayResult.decayed,
         });
         break;
       }
 
       case "skill_lifecycle": {
-        // Archive unused skills, check skill health
-        console.log("[Petla:Maintenance] Skill lifecycle triggered:", {
+        // Archive unused skills, expire old suggestions, revoke unhealthy ones
+        const {
+          archiveUnusedSkills,
+          expireOldSuggestions,
+          revokeUnhealthySkills,
+        } = await import("@/lib/skills/registry/lifecycle-manager");
+
+        const [archived, expired, revoked] = await Promise.all([
+          archiveUnusedSkills(30),
+          expireOldSuggestions(14),
+          revokeUnhealthySkills(10, 0.3),
+        ]);
+
+        console.log("[Petla:Maintenance] Skill lifecycle completed:", {
           tenantId: tenant_id,
+          archived: archived.archivedCount,
+          expired,
+          revoked: revoked.revokedCount,
         });
         break;
       }
@@ -98,7 +155,9 @@ export async function handleMaintenance(
     const err = error as Error;
     console.error("[Petla:Maintenance] Failed:", {
       tenantId: tenant_id,
+      handler: item.handler,
       error: err.message,
+      stack: err.stack,
     });
 
     if (item.id && item.status === "processing") {
