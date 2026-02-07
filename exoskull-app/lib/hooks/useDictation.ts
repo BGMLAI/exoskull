@@ -42,6 +42,8 @@ export function useDictation(
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const useGroqFallbackRef = useRef(false);
+  const lastInterimRef = useRef("");
+  const finalDeliveredRef = useRef(false);
 
   // Check support on mount
   useEffect(() => {
@@ -66,25 +68,37 @@ export function useDictation(
   // --------------------------------------------------------------------------
 
   const startWebSpeech = useCallback(() => {
+    lastInterimRef.current = "";
+    finalDeliveredRef.current = false;
+
     const speech = createSpeechRecognition({
       language,
       continuous: false,
       interimResults: true,
       onResult: (transcript, isFinal) => {
         if (isFinal) {
+          finalDeliveredRef.current = true;
+          lastInterimRef.current = "";
           setInterimTranscript("");
           setIsListening(false);
           onFinalTranscript?.(transcript);
         } else {
+          lastInterimRef.current = transcript;
           setInterimTranscript(transcript);
         }
       },
       onError: (error) => {
+        lastInterimRef.current = "";
         setIsListening(false);
         setInterimTranscript("");
         onError?.(error);
       },
       onEnd: () => {
+        // If recognition ended without a final result, use last interim
+        if (!finalDeliveredRef.current && lastInterimRef.current.trim()) {
+          onFinalTranscript?.(lastInterimRef.current.trim());
+        }
+        lastInterimRef.current = "";
         setIsListening(false);
         setInterimTranscript("");
       },
@@ -97,8 +111,7 @@ export function useDictation(
 
   const stopWebSpeech = useCallback(() => {
     speechRef.current?.stop();
-    setIsListening(false);
-    setInterimTranscript("");
+    // Don't clear state here — let onEnd/onResult handle it
   }, []);
 
   // --------------------------------------------------------------------------
