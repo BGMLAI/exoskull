@@ -4,6 +4,111 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-08b] Fix Storage Bucket + Audit Migration
+
+### Fixed — File Upload 400 Error (Storage Bucket Constraints)
+
+**Root cause:** Supabase Storage bucket `user-documents` was created with only 6 MIME types (pdf, txt, md, jpeg, png, docx) and 10MB limit. Upload-url route allows 17 types and 500MB. Supabase enforces bucket-level constraints even for signed upload URLs → 400 on disallowed types.
+
+- Created migration `20260214000001_fix_storage_bucket.sql` — updates bucket to 17 MIME types + 500MB
+- Fixed migration `20260213000001_audit_fixes.sql`:
+  - Removed `tenant_id` references from `exo_event_triggers` RLS (table has no tenant_id — it's global config)
+  - Wrapped GHL table references in `IF EXISTS` checks (GHL schema not deployed yet)
+  - Wrapped GHL index creation in `IF EXISTS` checks
+- Both migrations pushed successfully to remote DB
+- Verified: signed URL upload works for PDF and JSON (previously blocked)
+
+### Files Changed
+
+- `supabase/migrations/20260213000001_audit_fixes.sql` — fixed broken references
+- `supabase/migrations/20260214000001_fix_storage_bucket.sql` — new, expands bucket constraints
+
+---
+
+## [2026-02-08] Fix Chat + RAG Pipeline + Presigned Upload
+
+### Fixed — Chat Message Duplication (Critical)
+
+**Root cause:** Gateway pre-appended user message to unified thread, then `processUserMessage` re-added it → consecutive same-role "user" messages → Anthropic API 400.
+
+- Added `skipThreadAppend` option to `processUserMessage()` — gateway path skips re-appending
+- Added `skipUserAppend` option to `updateSession()` — gateway path skips re-recording user message
+- Gateway passes both flags when routing through `processUserMessage`
+- Removed duplicate `appendMessage` in async-tasks CRON (was double-writing assistant message)
+- Added `enforceAlternatingRoles()` defense in `getThreadContext()` — merges consecutive same-role messages
+- Enhanced Claude API error logging: logs status, type, messageCount, lastTwoRoles, hasConsecutiveSameRole
+
+### Fixed — Thread Context Overflow
+
+**Root cause:** User pasted 3.6MB JSON dump into chat → 944K tokens in thread → exceeded Sonnet 4's 200K context window.
+
+- Added `MAX_MESSAGE_CHARS = 4000` — truncates individual oversized messages
+- Added `MAX_TOTAL_CHARS = 100,000` — drops oldest messages when total exceeds budget
+- Applied in `getThreadContext()` before role alternation enforcement
+- Manually repaired corrupted thread (removed 8 messages: 2 oversized, 4 error responses, 2 buggy)
+
+### Fixed — File Upload 413 Error
+
+**Root cause:** Vercel serverless functions have a hard 4.5MB body size limit. Files uploaded via FormData through API route hit this limit.
+
+- Created `/api/knowledge/upload-url` — generates Supabase Storage signed upload URL + DB record with "uploading" status
+- Created `/api/knowledge/confirm-upload` — verifies file in storage, updates status, triggers document processing
+- Updated HomeChat and BirthChat upload handlers to use 3-step presigned flow (get URL → PUT to Storage → confirm)
+
+### Added — Full RAG Pipeline
+
+- Created `lib/knowledge/document-processor.ts` — complete document processing pipeline:
+  - Text extraction: PDF (`pdf-parse`), DOCX (`mammoth`), TXT/MD/CSV (direct)
+  - AI summary generation via Claude Haiku
+  - Recursive text chunking (~500 words, 50 word overlap)
+  - OpenAI embeddings (`text-embedding-3-small`, 1536 dims)
+  - Chunks stored in `exo_document_chunks` with pgvector
+- Created `/api/knowledge/search` — semantic search endpoint (embed query → cosine similarity → top results)
+- Created `lib/iors/tools/knowledge-tools.ts` — IORS `search_knowledge` tool for AI-powered document search
+- Created `lib/unified-thread-repair.ts` — thread repair utility for removing corrupted messages
+- Registered knowledge tools in IORS tool index (32 total tools)
+
+### Added — TTS fullText Backup
+
+- HomeChat SSE handler now captures `fullText` from "done" event as TTS fallback
+
+### Dependencies Added
+
+- `pdf-parse` — PDF text extraction
+- `mammoth` — DOCX text extraction
+
+### Files Created
+
+| File                                        | Purpose                                  |
+| ------------------------------------------- | ---------------------------------------- |
+| `app/api/knowledge/upload-url/route.ts`     | Presigned upload URL endpoint            |
+| `app/api/knowledge/confirm-upload/route.ts` | Upload confirmation + processing trigger |
+| `app/api/knowledge/search/route.ts`         | Semantic search endpoint                 |
+| `lib/knowledge/document-processor.ts`       | RAG pipeline (extract → chunk → embed)   |
+| `lib/iors/tools/knowledge-tools.ts`         | IORS search_knowledge tool               |
+| `lib/unified-thread-repair.ts`              | Thread repair utility                    |
+
+### Files Modified
+
+| File                                  | Changes                                                                    |
+| ------------------------------------- | -------------------------------------------------------------------------- |
+| `lib/voice/conversation-handler.ts`   | skipThreadAppend, skipUserAppend, enhanced error logging                   |
+| `lib/gateway/gateway.ts`              | Pass skip flags to processUserMessage + updateSession                      |
+| `lib/unified-thread.ts`               | Token budget (MAX_MESSAGE_CHARS, MAX_TOTAL_CHARS), enforceAlternatingRoles |
+| `components/dashboard/HomeChat.tsx`   | File upload UI (Paperclip), presigned upload flow, TTS fullText backup     |
+| `components/onboarding/BirthChat.tsx` | File upload UI, presigned upload flow                                      |
+| `app/api/cron/async-tasks/route.ts`   | Removed duplicate assistant appendMessage                                  |
+| `app/api/knowledge/upload/route.ts`   | Fire-and-forget processDocument trigger                                    |
+| `lib/iors/tools/index.ts`             | Registered knowledge-tools                                                 |
+
+### Commits
+
+- `e173b4a` — fix: Fix chat duplication + add RAG file upload pipeline (14 files, +1389 lines)
+- `3beaa81` — fix: Add token budget to thread context (prevent context overflow)
+- `bb6eb99` — fix: Use presigned upload URLs for file uploads (bypass Vercel 4.5MB limit)
+
+---
+
 ## [2026-02-06] Security Audit — Phase 5: Webhook Auth + Supabase Migration
 
 ### Webhook Authentication Hardening (S5, S7, S9, S10, S11)

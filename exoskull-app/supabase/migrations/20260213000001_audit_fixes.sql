@@ -104,54 +104,51 @@ CREATE POLICY "Service role full access event_triggers"
   USING (true)
   WITH CHECK (true);
 
--- Authenticated users can view their own triggers
-CREATE POLICY "Users can view own event_triggers"
+-- Authenticated users can read triggers (global config, no tenant_id column)
+CREATE POLICY "Users can view event_triggers"
   ON exo_event_triggers FOR SELECT
   TO authenticated
-  USING (tenant_id = auth.uid());
-
--- Authenticated users can manage their own triggers
-CREATE POLICY "Users can manage own event_triggers"
-  ON exo_event_triggers FOR ALL
-  TO authenticated
-  USING (tenant_id = auth.uid())
-  WITH CHECK (tenant_id = auth.uid());
+  USING (true);
 
 -- =============================================================================
 -- D4: Fix GHL RLS policies (auth.jwt()->>'tenant_id' doesn't exist in Supabase)
 -- =============================================================================
 
--- Drop broken policies
-DROP POLICY IF EXISTS "Users can view own GHL connections" ON exo_ghl_connections;
-DROP POLICY IF EXISTS "Users can view own GHL contacts" ON exo_ghl_contacts;
-
--- Recreate with auth.uid()
-CREATE POLICY "Users can view own GHL connections" ON exo_ghl_connections
-  FOR SELECT USING (tenant_id = auth.uid());
-
-CREATE POLICY "Users can view own GHL contacts" ON exo_ghl_contacts
-  FOR SELECT USING (tenant_id = auth.uid());
-
--- Fix remaining GHL tables if they have the same pattern
+-- Fix GHL RLS policies if tables exist (GHL schema may not be deployed yet)
 DO $$
 BEGIN
-  -- exo_ghl_messages
-  IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can view own GHL messages' AND tablename = 'exo_ghl_messages') THEN
-    DROP POLICY "Users can view own GHL messages" ON exo_ghl_messages;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'exo_ghl_connections') THEN
+    DROP POLICY IF EXISTS "Users can view own GHL connections" ON exo_ghl_connections;
+    CREATE POLICY "Users can view own GHL connections" ON exo_ghl_connections
+      FOR SELECT USING (tenant_id = auth.uid());
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'exo_ghl_contacts') THEN
+    DROP POLICY IF EXISTS "Users can view own GHL contacts" ON exo_ghl_contacts;
+    CREATE POLICY "Users can view own GHL contacts" ON exo_ghl_contacts
+      FOR SELECT USING (tenant_id = auth.uid());
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'exo_ghl_messages') THEN
+    IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can view own GHL messages' AND tablename = 'exo_ghl_messages') THEN
+      DROP POLICY "Users can view own GHL messages" ON exo_ghl_messages;
+    END IF;
     CREATE POLICY "Users can view own GHL messages" ON exo_ghl_messages
       FOR SELECT USING (tenant_id = auth.uid());
   END IF;
 
-  -- exo_ghl_appointments
-  IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can view own GHL appointments' AND tablename = 'exo_ghl_appointments') THEN
-    DROP POLICY "Users can view own GHL appointments" ON exo_ghl_appointments;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'exo_ghl_appointments') THEN
+    IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can view own GHL appointments' AND tablename = 'exo_ghl_appointments') THEN
+      DROP POLICY "Users can view own GHL appointments" ON exo_ghl_appointments;
+    END IF;
     CREATE POLICY "Users can view own GHL appointments" ON exo_ghl_appointments
       FOR SELECT USING (tenant_id = auth.uid());
   END IF;
 
-  -- exo_ghl_oauth_states
-  IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can view own GHL oauth states' AND tablename = 'exo_ghl_oauth_states') THEN
-    DROP POLICY "Users can view own GHL oauth states" ON exo_ghl_oauth_states;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'exo_ghl_oauth_states') THEN
+    IF EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Users can view own GHL oauth states' AND tablename = 'exo_ghl_oauth_states') THEN
+      DROP POLICY "Users can view own GHL oauth states" ON exo_ghl_oauth_states;
+    END IF;
     CREATE POLICY "Users can view own GHL oauth states" ON exo_ghl_oauth_states
       FOR SELECT USING (tenant_id = auth.uid());
   END IF;
@@ -161,14 +158,22 @@ END $$;
 -- P1: Add missing tenant_id indexes
 -- =============================================================================
 
-CREATE INDEX IF NOT EXISTS idx_ghl_oauth_states_tenant
-  ON exo_ghl_oauth_states(tenant_id);
+-- Create indexes only if tables exist
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'exo_ghl_oauth_states') THEN
+    CREATE INDEX IF NOT EXISTS idx_ghl_oauth_states_tenant ON exo_ghl_oauth_states(tenant_id);
+  END IF;
 
-CREATE INDEX IF NOT EXISTS idx_user_installations_tenant
-  ON exo_user_installations(tenant_id);
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'exo_user_installations') THEN
+    CREATE INDEX IF NOT EXISTS idx_user_installations_tenant ON exo_user_installations(tenant_id);
+  END IF;
 
-CREATE INDEX IF NOT EXISTS idx_rig_connections_tenant
-  ON exo_rig_connections(tenant_id);
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'exo_rig_connections') THEN
+    CREATE INDEX IF NOT EXISTS idx_rig_connections_tenant ON exo_rig_connections(tenant_id);
+  END IF;
 
-CREATE INDEX IF NOT EXISTS idx_rig_sync_log_tenant
-  ON exo_rig_sync_log(tenant_id);
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'exo_rig_sync_log') THEN
+    CREATE INDEX IF NOT EXISTS idx_rig_sync_log_tenant ON exo_rig_sync_log(tenant_id);
+  END IF;
+END $$;
