@@ -209,10 +209,24 @@ export async function getRecentMessages(
 // ============================================================================
 
 /**
+ * Max characters per individual message in thread context.
+ * Messages exceeding this are truncated with a notice.
+ * Prevents single huge paste (e.g., JSON dump) from blowing up the context.
+ */
+const MAX_MESSAGE_CHARS = 4000;
+
+/**
+ * Approximate character budget for the entire thread context.
+ * ~100K chars ≈ 25K tokens — leaves room for system prompt + tools + response.
+ */
+const MAX_TOTAL_CHARS = 100_000;
+
+/**
  * Build conversation context from unified thread for Claude.
  *
  * Returns formatted messages array ready for Anthropic API.
  * Includes channel annotations so Claude knows which channel each message came from.
+ * Enforces per-message and total character budgets to prevent context overflow.
  */
 export async function getThreadContext(
   tenantId: string,
@@ -228,15 +242,31 @@ export async function getThreadContext(
       // Annotate with channel so Claude knows context source
       const channelTag = channelLabel(m.channel);
       const prefix = m.role === "user" ? `[${channelTag}] ` : "";
+      let content = prefix + m.content;
+
+      // Truncate oversized messages (e.g., pasted JSON dumps)
+      if (content.length > MAX_MESSAGE_CHARS) {
+        content =
+          content.substring(0, MAX_MESSAGE_CHARS) +
+          "\n[...wiadomość przycięta — oryginał za długi]";
+      }
 
       return {
         role: m.role as "user" | "assistant",
-        content: prefix + m.content,
+        content,
       };
     });
 
+  // Enforce total character budget — keep most recent messages, drop oldest
+  let totalChars = mapped.reduce((sum, m) => sum + m.content.length, 0);
+  const result = [...mapped];
+  while (totalChars > MAX_TOTAL_CHARS && result.length > 2) {
+    const removed = result.shift()!;
+    totalChars -= removed.content.length;
+  }
+
   // DEFENSIVE: Ensure strictly alternating roles (Anthropic API requirement)
-  return enforceAlternatingRoles(mapped);
+  return enforceAlternatingRoles(result);
 }
 
 /**
