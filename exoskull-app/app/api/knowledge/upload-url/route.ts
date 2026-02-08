@@ -14,26 +14,29 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_EXTENSIONS = [
-  "pdf",
-  "txt",
-  "md",
-  "json",
-  "csv",
-  "docx",
-  "xlsx",
-  "pptx",
-  "doc",
-  "xls",
-  "ppt",
-  "jpg",
-  "jpeg",
-  "png",
-  "webp",
-  "mp4",
-  "webm",
-  "mov",
-];
+/** Canonical extension → MIME mapping (must match bucket allowed_mime_types exactly) */
+const EXT_TO_MIME: Record<string, string> = {
+  pdf: "application/pdf",
+  txt: "text/plain",
+  md: "text/markdown",
+  json: "application/json",
+  csv: "text/csv",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  doc: "application/msword",
+  xls: "application/vnd.ms-excel",
+  ppt: "application/vnd.ms-powerpoint",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
+};
+
+const ALLOWED_EXTENSIONS = Object.keys(EXT_TO_MIME);
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB (Supabase storage limit)
 
@@ -122,6 +125,7 @@ export async function POST(req: NextRequest) {
       token: signedData.token,
       storagePath,
       documentId: document.id,
+      mimeType: EXT_TO_MIME[ext],
     });
   } catch (error) {
     console.error("[UploadURL] Error:", {

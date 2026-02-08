@@ -79,6 +79,12 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
   const { isTTSEnabled, isSpeaking, toggleTTS, playAudio, stopAudio } =
     useTTS();
 
+  // Ref to track latest TTS state (avoids stale closure in async streaming)
+  const ttsEnabledRef = useRef(isTTSEnabled);
+  useEffect(() => {
+    ttsEnabledRef.current = isTTSEnabled;
+  }, [isTTSEnabled]);
+
   const fetchTTSAndPlay = useCallback(
     async (text: string) => {
       try {
@@ -87,7 +93,11 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text }),
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          const errBody = await res.text().catch(() => "");
+          console.error("[HomeChat] TTS API error:", res.status, errBody);
+          return;
+        }
         const { audio } = await res.json();
         if (audio) playAudio(audio);
       } catch (err) {
@@ -356,13 +366,14 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
             errData.error || `Upload URL failed: ${urlRes.status}`,
           );
         }
-        const { signedUrl, token, documentId } = await urlRes.json();
+        const { signedUrl, token, documentId, mimeType } = await urlRes.json();
 
         // Step 2: Upload directly to Supabase Storage (bypasses Vercel 4.5MB limit)
+        // Use server-provided mimeType (matches bucket whitelist exactly)
         const uploadRes = await fetch(signedUrl, {
           method: "PUT",
           headers: {
-            "Content-Type": file.type,
+            "Content-Type": mimeType || file.type,
             "x-upsert": "true",
           },
           body: file,

@@ -255,12 +255,16 @@ export function BirthChat() {
             errData.error || `Upload URL failed: ${urlRes.status}`,
           );
         }
-        const { signedUrl, documentId } = await urlRes.json();
+        const { signedUrl, documentId, mimeType } = await urlRes.json();
 
         // Step 2: Upload directly to Supabase Storage
+        // Use server-provided mimeType (matches bucket whitelist exactly)
         const uploadRes = await fetch(signedUrl, {
           method: "PUT",
-          headers: { "Content-Type": file.type, "x-upsert": "true" },
+          headers: {
+            "Content-Type": mimeType || file.type,
+            "x-upsert": "true",
+          },
           body: file,
         });
 
@@ -413,7 +417,7 @@ export function BirthChat() {
               type="file"
               className="hidden"
               onChange={handleFileUpload}
-              accept=".pdf,.txt,.md,.json,.csv,.docx,.xlsx,.jpg,.jpeg,.png,.webp"
+              accept=".pdf,.txt,.md,.json,.csv,.docx,.xlsx,.pptx,.doc,.xls,.ppt,.jpg,.jpeg,.png,.webp,.mp4,.webm,.mov"
             />
             <button
               onClick={() => fileInputRef.current?.click()}
