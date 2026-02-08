@@ -4,6 +4,72 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-07] refactor: Full codebase audit — security, DB, performance, code quality
+
+### What was done
+
+**Security fixes:**
+- S1: Protected 4 unprotected CRON GET endpoints with `verifyCronAuth()`
+- S2+S3: Created `lib/api/error-response.ts` helper — sanitized error responses across 40+ routes (no more `error.stack` or `error.message` leaked to clients)
+
+**Database schema fixes (5 migrations):**
+- D1: Fixed gold views referencing nonexistent tables (`exo_silver_*` → `silver.*_clean`)
+- D2+D5: Fixed RLS policies — `exo_event_triggers` (zero policies), `exo_scheduled_jobs` (no tenant isolation)
+- D3: Dropped orphaned FK to nonexistent `user_patterns` table
+- D4: Fixed GHL RLS using nonexistent JWT claim (`auth.jwt()->>'tenant_id'` → `auth.uid()`)
+- P1: Added 4 missing `tenant_id` indexes
+
+**Performance & quality:**
+- P2: Wired `send_messenger` to Messenger adapter (was hardcoded stub)
+- P3: Added try/catch error handling to canvas tools (remove/show/hide)
+- P4: Created `lib/logger.ts` structured logger, replaced `console.log` across 139 files
+- P5: Eliminated 50+ `: any` type usages with proper type annotations across 25+ files
+
+**Code splitting (T1):**
+- `action-executor.ts`: 1229→908 LOC (extracted `action-definitions.ts` + `custom-action-registry.ts`)
+- `mape-k-loop.ts`: 1212→648 LOC (extracted `mape-k-monitor.ts` + `mape-k-analyze.ts`)
+- `settings/page.tsx`: 1181→683 LOC (extracted `ProfileSection` + `PersonalitySection` + `NotificationsSection`)
+
+### Why
+- Security: Stack traces and error messages leaked to clients, CRON endpoints accessible without auth
+- DB: Gold views broken, RLS policies missing or wrong, orphaned FK constraints
+- Quality: 64 console.log artifacts, 50+ `:any` types, 3 files over 1000 LOC
+
+### Files changed
+- 5 new migrations (`supabase/migrations/`)
+- `lib/api/error-response.ts` (new)
+- `lib/logger.ts` (new)
+- `lib/autonomy/action-definitions.ts` (new)
+- `lib/autonomy/custom-action-registry.ts` (new)
+- `lib/autonomy/mape-k-monitor.ts` (new)
+- `lib/autonomy/mape-k-analyze.ts` (new)
+- `app/dashboard/settings/ProfileSection.tsx` (new)
+- `app/dashboard/settings/PersonalitySection.tsx` (new)
+- `app/dashboard/settings/NotificationsSection.tsx` (new)
+- 40+ route files (error response sanitization)
+- 139 files (console.log → logger)
+- 25+ files (`:any` → proper types)
+
+### Commits
+- `d355c5d` docs: Update CHANGELOG with recent maintenance, audit, and circuit breaker changes
+- `3206a3f` refactor: Replace console.log/warn with structured logger across 139 files
+- `84d74f0` refactor: Replace :any types with proper type annotations across 25+ files
+- `9430873` refactor: Split 3 largest files (action-executor, mape-k-loop, settings page)
+
+### How to verify
+1. `npm run build` — zero errors
+2. CRON GET endpoints return 401 without `CRON_SECRET` header
+3. Error responses contain generic "Internal server error" (no stack traces)
+4. No `console.log` in production code (only `logger.*`)
+
+### Notes for future agents
+- `lib/logger.ts` wraps console with structured prefixes — use `logger.info/warn/error/debug`
+- Error response helper: `import { safeErrorResponse } from "@/lib/api/error-response"`
+- Split files maintain identical exports — barrel `lib/autonomy/index.ts` unchanged
+- Gold views now reference `silver.conversations_clean` / `silver.messages_clean` (NOT `exo_silver_*`)
+
+---
+
 ## [2026-02-07] fix+feat: Migration conflicts + Maintenance handlers + WhatsApp + Circuit Breaker
 
 ### What was done

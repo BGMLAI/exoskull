@@ -62,7 +62,15 @@ export interface ConversationResult {
 // TOOL DEFINITIONS — all from IORS registry
 // ============================================================================
 
-const IORS_TOOLS: Anthropic.Tool[] = getExtensionToolDefinitions();
+const IORS_TOOLS_RAW: Anthropic.Tool[] = getExtensionToolDefinitions();
+
+// Add cache_control to last tool — Anthropic caches everything up to and including
+// the cache breakpoint. This caches all 31 tools (~3-4K tokens) for 5 minutes.
+const IORS_TOOLS: Anthropic.Tool[] = IORS_TOOLS_RAW.map((tool, i, arr) =>
+  i === arr.length - 1
+    ? { ...tool, cache_control: { type: "ephemeral" as const } }
+    : tool,
+);
 
 // ============================================================================
 // SESSION MANAGEMENT
@@ -292,13 +300,19 @@ export async function processUserMessage(
   // Crisis check (blocks if detected — safety requirement)
   const crisis = await detectCrisis(userMessage, emotionState);
 
-  let fullSystemPrompt: string;
+  let systemBlocks: Anthropic.TextBlockParam[];
   let maxTokensOverride: number | undefined;
 
   if (crisis.detected && crisis.protocol) {
     // CRISIS MODE — protocol overrides everything
-    fullSystemPrompt =
-      crisis.protocol.prompt_override + "\n\n" + dynamicContext;
+    systemBlocks = [
+      {
+        type: "text",
+        text: crisis.protocol.prompt_override,
+        cache_control: { type: "ephemeral" },
+      },
+      { type: "text", text: dynamicContext },
+    ];
     maxTokensOverride = 400; // Longer crisis responses
     // Log synchronously for legal safety
     await logEmotion(session.tenantId, emotionState, userMessage, {
@@ -346,13 +360,26 @@ export async function processUserMessage(
         });
     }
   } else {
-    // Normal: emotion-adaptive prompt
+    // Normal: emotion-adaptive prompt (split into cacheable blocks)
     const adaptive = getAdaptivePrompt(emotionState);
-    fullSystemPrompt =
-      (session.systemPromptPrefix || "") +
-      STATIC_SYSTEM_PROMPT +
+
+    systemBlocks = [];
+    if (session.systemPromptPrefix) {
+      systemBlocks.push({ type: "text", text: session.systemPromptPrefix });
+    }
+    // Static prompt (~2500 tokens) — identical across all turns → CACHE
+    systemBlocks.push({
+      type: "text",
+      text: STATIC_SYSTEM_PROMPT,
+      cache_control: { type: "ephemeral" },
+    });
+    // Dynamic context (user profile, time, mood) — changes per turn
+    const dynamicPart =
       dynamicContext +
       (adaptive.mode !== "neutral" ? "\n\n" + adaptive.instruction : "");
+    if (dynamicPart) {
+      systemBlocks.push({ type: "text", text: dynamicPart });
+    }
     // Fire-and-forget logging
     logEmotion(session.tenantId, emotionState, userMessage, {
       sessionId: session.id,
@@ -411,10 +438,11 @@ export async function processUserMessage(
 
   try {
     // First API call (max_tokens low for voice = short, fast responses)
+    // system + tools use cache_control for ~6K cached tokens (90% input savings)
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
       max_tokens: session.maxTokens || maxTokensOverride || 200,
-      system: fullSystemPrompt,
+      system: systemBlocks,
       messages,
       tools: IORS_TOOLS,
     });
@@ -444,11 +472,11 @@ export async function processUserMessage(
         toolsUsed.push(toolUse.name);
       }
 
-      // Second API call with tool results (reuse emotion-adapted prompt)
+      // Second API call with tool results (reuse cached system + tools)
       const followUpResponse = await anthropic.messages.create({
         model: CLAUDE_MODEL,
         max_tokens: session.maxTokens || maxTokensOverride || 150,
-        system: fullSystemPrompt,
+        system: systemBlocks,
         messages: [
           ...messages,
           { role: "assistant", content: response.content },
