@@ -29,9 +29,12 @@ import {
   AlertCircle,
   Shield,
   Smartphone,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useTTS } from "@/lib/hooks/useTTS";
 
 interface HomeChatProps {
   tenantId: string;
@@ -68,6 +71,27 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader | null>(null);
+
+  const { isTTSEnabled, isSpeaking, toggleTTS, playAudio, stopAudio } =
+    useTTS();
+
+  const fetchTTSAndPlay = useCallback(
+    async (text: string) => {
+      try {
+        const res = await fetch("/api/voice/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        if (!res.ok) return;
+        const { audio } = await res.json();
+        if (audio) playAudio(audio);
+      } catch (err) {
+        console.error("[HomeChat] TTS fetch error:", err);
+      }
+    },
+    [playAudio],
+  );
 
   // Cleanup on unmount
   useEffect(() => {
@@ -212,6 +236,7 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
       // Track reader for cleanup on unmount
       readerRef.current = reader;
       let buffer = "";
+      let fullText = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -229,6 +254,7 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
             if (data.type === "session" && data.conversationId) {
               setConversationId(data.conversationId);
             } else if (data.type === "delta") {
+              fullText += data.text;
               setChatMessages((prev) =>
                 prev.map((msg) =>
                   msg.id === assistantMsgId
@@ -252,6 +278,13 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
       }
 
       readerRef.current = null;
+
+      // TTS: read aloud after stream completes
+      if (isTTSEnabled && fullText.trim()) {
+        fetchTTSAndPlay(fullText).catch((err) => {
+          console.error("[HomeChat] TTS failed:", err);
+        });
+      }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       console.error("[HomeChat] Send error:", err);
@@ -328,17 +361,46 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
           <Bot className="w-5 h-5 text-primary" />
           <span className="font-medium">Chat z {assistantName}</span>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={fetchTimeline}
-          disabled={loadingTimeline}
-          className="h-8 w-8 p-0"
-        >
-          <RefreshCw
-            className={cn("w-4 h-4", loadingTimeline && "animate-spin")}
-          />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (isSpeaking) {
+                stopAudio();
+              } else {
+                toggleTTS();
+              }
+            }}
+            className="h-8 w-8 p-0"
+            title={
+              isSpeaking
+                ? "Stop"
+                : isTTSEnabled
+                  ? "Wyłącz czytanie"
+                  : "Włącz czytanie"
+            }
+          >
+            {isTTSEnabled ? (
+              <Volume2
+                className={cn("w-4 h-4", isSpeaking && "text-green-500")}
+              />
+            ) : (
+              <VolumeX className="w-4 h-4 text-muted-foreground" />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={fetchTimeline}
+            disabled={loadingTimeline}
+            className="h-8 w-8 p-0"
+          >
+            <RefreshCw
+              className={cn("w-4 h-4", loadingTimeline && "animate-spin")}
+            />
+          </Button>
+        </div>
       </div>
 
       {/* Messages area */}
