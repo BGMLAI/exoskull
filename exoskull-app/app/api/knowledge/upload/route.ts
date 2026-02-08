@@ -126,15 +126,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // TODO: Trigger background processing job
-    // For now, processing happens on-demand or via cron
+    // Trigger document processing (text extraction, chunking, embeddings)
+    // Fire-and-forget — don't block the upload response
+    import("@/lib/knowledge/document-processor")
+      .then(({ processDocument }) => processDocument(document.id, tenantId))
+      .then((result) => {
+        if (result.success) {
+          console.log(
+            `[KnowledgeUpload] Processed ${document.original_name}: ${result.chunks} chunks`,
+          );
+        } else {
+          console.error(
+            `[KnowledgeUpload] Processing failed for ${document.original_name}:`,
+            result.error,
+          );
+        }
+      })
+      .catch((err) => {
+        console.error("[KnowledgeUpload] Processing trigger failed:", err);
+      });
 
     return NextResponse.json({
       success: true,
       document: {
         id: document.id,
         filename: document.original_name,
-        status: document.status,
+        status: "processing",
         category: document.category,
       },
     });

@@ -41,6 +41,7 @@ import { communicationTools } from "./communication-tools";
 import { emotionTools } from "./emotion-tools";
 import { composioTools } from "./composio-tools";
 import { feedbackTools } from "./feedback-tools";
+import { knowledgeTools } from "./knowledge-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -60,6 +61,7 @@ export const IORS_EXTENSION_TOOLS: ToolDefinition[] = [
   ...emotionTools,
   ...composioTools,
   ...feedbackTools,
+  ...knowledgeTools,
 ];
 
 /**

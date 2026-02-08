@@ -13,7 +13,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DictationButton } from "@/components/ui/DictationButton";
-import { Send, Loader2, MessageSquare, Volume2, VolumeX } from "lucide-react";
+import {
+  Send,
+  Loader2,
+  MessageSquare,
+  Volume2,
+  VolumeX,
+  Paperclip,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDictation } from "@/lib/hooks/useDictation";
 import { useTTS } from "@/lib/hooks/useTTS";
@@ -36,9 +43,11 @@ export function BirthChat() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [dictationError, setDictationError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const greetingPlayedRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // TTS hook
   const { isTTSEnabled, isSpeaking, toggleTTS, playAudio, stopAudio } =
@@ -212,6 +221,56 @@ export function BirthChat() {
     sendMessageDirect(input);
   }, [input, sendMessageDirect]);
 
+  // File upload handler
+  const handleFileUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setIsUploading(true);
+
+      try {
+        const type = file.type.toLowerCase();
+        const category = type.startsWith("image/")
+          ? "photos"
+          : type.includes("pdf") || type.includes("document")
+            ? "documents"
+            : "other";
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("category", category);
+
+        const res = await fetch("/api/knowledge/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+        const data = await res.json();
+
+        // Auto-send message so IORS knows about the file
+        sendMessageDirect(
+          `Przesłałem plik "${file.name}" (typ: ${file.type}, kategoria: ${category}, id: ${data.document?.id}). Skataloguj go.`,
+        );
+      } catch (err) {
+        console.error("[BirthChat] Upload error:", err);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `error-${Date.now()}`,
+            role: "assistant",
+            content: `Błąd przesyłania pliku: ${err instanceof Error ? err.message : "Nieznany błąd"}`,
+          },
+        ]);
+      } finally {
+        setIsUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    },
+    [sendMessageDirect],
+  );
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -323,11 +382,31 @@ export function BirthChat() {
               disabled={isLoading}
               size="sm"
             />
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileUpload}
+              accept=".pdf,.txt,.md,.json,.csv,.docx,.xlsx,.jpg,.jpeg,.png,.webp"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading || isUploading}
+              className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white disabled:opacity-50 transition-colors"
+              title="Prześlij plik"
+            >
+              {isUploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Paperclip className="h-4 w-4" />
+              )}
+            </button>
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Napisz lub dyktuj..."
+              placeholder="Napisz, dyktuj lub prześlij plik..."
               disabled={isLoading}
               className="flex-1 bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
             />

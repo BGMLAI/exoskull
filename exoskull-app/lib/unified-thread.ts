@@ -222,7 +222,7 @@ export async function getThreadContext(
 
   if (messages.length === 0) return [];
 
-  return messages
+  const mapped = messages
     .filter((m) => m.role === "user" || m.role === "assistant")
     .map((m) => {
       // Annotate with channel so Claude knows context source
@@ -234,6 +234,39 @@ export async function getThreadContext(
         content: prefix + m.content,
       };
     });
+
+  // DEFENSIVE: Ensure strictly alternating roles (Anthropic API requirement)
+  return enforceAlternatingRoles(mapped);
+}
+
+/**
+ * Enforce strictly alternating user/assistant roles.
+ * - Merges consecutive same-role messages (separated by newline)
+ * - Ensures the array starts with a "user" role message
+ * - Returns a clean array safe for Anthropic API
+ */
+function enforceAlternatingRoles(
+  messages: { role: "user" | "assistant"; content: string }[],
+): { role: "user" | "assistant"; content: string }[] {
+  if (messages.length === 0) return [];
+
+  // Step 1: Merge consecutive same-role messages
+  const merged: { role: "user" | "assistant"; content: string }[] = [];
+  for (const msg of messages) {
+    const last = merged[merged.length - 1];
+    if (last && last.role === msg.role) {
+      last.content += "\n" + msg.content;
+    } else {
+      merged.push({ ...msg });
+    }
+  }
+
+  // Step 2: Ensure first message is "user" (Anthropic requirement)
+  while (merged.length > 0 && merged[0].role !== "user") {
+    merged.shift();
+  }
+
+  return merged;
 }
 
 /**

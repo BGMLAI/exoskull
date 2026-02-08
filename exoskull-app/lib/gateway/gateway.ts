@@ -342,7 +342,7 @@ export async function handleInboundMessage(
 
     const SYNC_TIMEOUT_MS = 40_000; // 40s — leaves 20s buffer before Vercel's 60s
     const result = await Promise.race([
-      processUserMessage(session, msg.text),
+      processUserMessage(session, msg.text, { skipThreadAppend: true }),
       new Promise<null>((resolve) =>
         setTimeout(() => resolve(null), SYNC_TIMEOUT_MS),
       ),
@@ -394,6 +394,7 @@ export async function handleInboundMessage(
       msg.channel === "voice" ? "voice" : "web_chat";
     await updateSession(session.id, msg.text, result.text, {
       channel: sessionChannel,
+      skipUserAppend: true, // Gateway already wrote user message at step 2
     });
 
     const durationMs = Date.now() - startTime;

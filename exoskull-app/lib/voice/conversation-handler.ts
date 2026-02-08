@@ -143,7 +143,12 @@ export async function updateSession(
   sessionId: string,
   userMessage: string,
   assistantMessage: string,
-  options?: { tenantId?: string; channel?: "voice" | "web_chat" },
+  options?: {
+    tenantId?: string;
+    channel?: "voice" | "web_chat";
+    /** Gateway already wrote the user message to unified thread — skip user append */
+    skipUserAppend?: boolean;
+  },
 ): Promise<void> {
   const supabase = getServiceSupabase();
   const channel = options?.channel || "voice";
@@ -175,13 +180,16 @@ export async function updateSession(
   const resolvedTenantId = options?.tenantId || session?.tenant_id;
   if (resolvedTenantId) {
     try {
-      await appendMessage(resolvedTenantId, {
-        role: "user",
-        content: userMessage,
-        channel,
-        source_type: sourceType,
-        source_id: sessionId,
-      });
+      // Only append user message if caller hasn't already done it (e.g., gateway)
+      if (!options?.skipUserAppend) {
+        await appendMessage(resolvedTenantId, {
+          role: "user",
+          content: userMessage,
+          channel,
+          source_type: sourceType,
+          source_id: sessionId,
+        });
+      }
       await appendMessage(resolvedTenantId, {
         role: "assistant",
         content: assistantMessage,
@@ -265,7 +273,11 @@ function shouldEndCall(userText: string): boolean {
 export async function processUserMessage(
   session: VoiceSession,
   userMessage: string,
-  options?: { recordingUrl?: string },
+  options?: {
+    recordingUrl?: string;
+    /** Gateway already wrote the user message to unified thread — don't re-add */
+    skipThreadAppend?: boolean;
+  },
 ): Promise<ConversationResult> {
   const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
@@ -416,13 +428,27 @@ export async function processUserMessage(
   let messages: Anthropic.MessageParam[];
   try {
     const threadMessages = await getThreadContext(session.tenantId, 50);
-    // ZAWSZE używaj unified thread - nawet jeśli puste (nowy user)
-    // Nie fallback do session.messages (per-session, unreliable)
-    messages = [...threadMessages, { role: "user", content: userMessage }];
+
+    if (options?.skipThreadAppend && threadMessages.length > 0) {
+      // Gateway already appended this user message to the thread.
+      // threadMessages already contains it — don't add again.
+      messages = threadMessages;
+    } else {
+      // Direct callers (voice, birth-chat) haven't written to thread yet.
+      messages = [...threadMessages, { role: "user", content: userMessage }];
+    }
+
+    // Safety: ensure messages end with a user message
+    if (
+      messages.length === 0 ||
+      messages[messages.length - 1].role !== "user"
+    ) {
+      messages = [...messages, { role: "user", content: userMessage }];
+    }
 
     if (threadMessages.length > 0) {
       logger.info(
-        `[ConversationHandler] Loaded ${threadMessages.length} messages from unified thread`,
+        `[ConversationHandler] Loaded ${threadMessages.length} messages from unified thread (skipThreadAppend=${!!options?.skipThreadAppend})`,
       );
     }
   } catch (error) {
@@ -506,7 +532,24 @@ export async function processUserMessage(
       shouldEndCall: false,
     };
   } catch (error) {
-    console.error("[ConversationHandler] Claude API error:", error);
+    const err = error as Error & {
+      status?: number;
+      error?: { type?: string; message?: string };
+    };
+    console.error("[ConversationHandler] Claude API error:", {
+      status: err.status,
+      type: err.error?.type,
+      message: err.message,
+      anthropicMessage: err.error?.message,
+      tenantId: session.tenantId,
+      sessionId: session.id,
+      messageCount: messages.length,
+      lastTwoRoles: messages.slice(-2).map((m) => m.role),
+      hasConsecutiveSameRole: messages.some(
+        (m, i) => i > 0 && m.role === messages[i - 1].role,
+      ),
+      stack: err.stack?.split("\n").slice(0, 3).join("\n"),
+    });
     return {
       text: "Przepraszam, wystąpił problem. Spróbuj ponownie.",
       toolsUsed: [],

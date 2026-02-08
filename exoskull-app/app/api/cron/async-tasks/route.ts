@@ -154,26 +154,13 @@ async function processTask(task: AsyncTask): Promise<void> {
     // 2. Process through full AI pipeline (28 tools)
     const result = await processUserMessage(session, task.prompt);
 
-    // 3. Update session
+    // 3. Update session (writes both user+assistant to unified thread)
     const sessionChannel: "voice" | "web_chat" =
       task.channel === "voice" ? "voice" : "web_chat";
     await updateSession(session.id, task.prompt, result.text, {
       channel: sessionChannel,
     });
-
-    // 4. Append outbound to unified thread
-    await appendMessage(task.tenant_id, {
-      role: "assistant",
-      content: result.text,
-      channel: task.channel as Parameters<typeof appendMessage>[1]["channel"],
-      direction: "outbound",
-      source_type: "web_chat",
-      metadata: {
-        async_task_id: task.id,
-        tools_used: result.toolsUsed,
-        processing_time_ms: Date.now() - startTime,
-      },
-    });
+    // Note: updateSession already appends assistant to unified thread — no duplicate appendMessage needed
 
     // 5. Mark complete in DB
     await completeTask(task.id, result.text, result.toolsUsed);

@@ -31,6 +31,8 @@ import {
   Smartphone,
   Volume2,
   VolumeX,
+  Paperclip,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -68,9 +70,11 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
 
+  const [isUploading, setIsUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { isTTSEnabled, isSpeaking, toggleTTS, playAudio, stopAudio } =
     useTTS();
@@ -185,121 +189,201 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
     });
   }, [timeline, chatMessages]);
 
-  const sendMessage = async () => {
-    const messageText = input.trim();
-    if (!messageText || isLoading) return;
+  const sendMessageDirect = useCallback(
+    async (messageText: string) => {
+      if (!messageText || isLoading) return;
 
-    const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: "user",
-      content: messageText,
-      timestamp: new Date(),
-    };
-
-    setChatMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setIsLoading(true);
-
-    const assistantMsgId = `assistant-${Date.now()}`;
-    setChatMessages((prev) => [
-      ...prev,
-      {
-        id: assistantMsgId,
-        role: "assistant",
-        content: "",
+      const userMsg: ChatMessage = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: messageText,
         timestamp: new Date(),
-      },
-    ]);
+      };
 
-    // Cancel any in-flight request
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
+      setChatMessages((prev) => [...prev, userMsg]);
+      setIsLoading(true);
 
-    try {
-      const res = await fetch("/api/chat/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: messageText,
-          conversationId,
-        }),
-        signal: abortRef.current.signal,
-      });
+      const assistantMsgId = `assistant-${Date.now()}`;
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: assistantMsgId,
+          role: "assistant",
+          content: "",
+          timestamp: new Date(),
+        },
+      ]);
 
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      // Cancel any in-flight request
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
 
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
+      try {
+        const res = await fetch("/api/chat/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: messageText,
+            conversationId,
+          }),
+          signal: abortRef.current.signal,
+        });
 
-      if (!reader) throw new Error("No response body");
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
 
-      // Track reader for cleanup on unmount
-      readerRef.current = reader;
-      let buffer = "";
-      let fullText = "";
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        if (!reader) throw new Error("No response body");
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() || "";
+        // Track reader for cleanup on unmount
+        readerRef.current = reader;
+        let buffer = "";
+        let fullText = "";
 
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const data = JSON.parse(line.slice(6));
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-            if (data.type === "session" && data.conversationId) {
-              setConversationId(data.conversationId);
-            } else if (data.type === "delta") {
-              fullText += data.text;
-              setChatMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMsgId
-                    ? { ...msg, content: msg.content + data.text }
-                    : msg,
-                ),
-              );
-            } else if (data.type === "error") {
-              setChatMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMsgId
-                    ? { ...msg, content: data.message }
-                    : msg,
-                ),
-              );
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.type === "session" && data.conversationId) {
+                setConversationId(data.conversationId);
+              } else if (data.type === "delta") {
+                fullText += data.text;
+                setChatMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMsgId
+                      ? { ...msg, content: msg.content + data.text }
+                      : msg,
+                  ),
+                );
+              } else if (data.type === "done" && data.fullText) {
+                // Backup: use server's fullText if tracking missed some deltas
+                fullText = data.fullText;
+              } else if (data.type === "error") {
+                setChatMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMsgId
+                      ? { ...msg, content: data.message }
+                      : msg,
+                  ),
+                );
+              }
+            } catch {
+              // Skip malformed JSON
             }
-          } catch {
-            // Skip malformed JSON
           }
         }
+
+        readerRef.current = null;
+
+        // TTS: read aloud after stream completes
+        if (isTTSEnabled && fullText.trim()) {
+          fetchTTSAndPlay(fullText).catch((err) => {
+            console.error("[HomeChat] TTS failed:", err);
+          });
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error("[HomeChat] Send error:", err);
+        const errorMsg = err instanceof Error ? err.message : "Nieznany błąd";
+        setChatMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMsgId
+              ? { ...msg, content: `Błąd: ${errorMsg}` }
+              : msg,
+          ),
+        );
+      } finally {
+        setIsLoading(false);
       }
+    },
+    [isLoading, conversationId, isTTSEnabled, fetchTTSAndPlay],
+  );
 
-      readerRef.current = null;
+  const sendMessage = useCallback(() => {
+    const messageText = input.trim();
+    if (!messageText) return;
+    setInput("");
+    sendMessageDirect(messageText);
+  }, [input, sendMessageDirect]);
 
-      // TTS: read aloud after stream completes
-      if (isTTSEnabled && fullText.trim()) {
-        fetchTTSAndPlay(fullText).catch((err) => {
-          console.error("[HomeChat] TTS failed:", err);
+  // File upload handler
+  const handleFileUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setIsUploading(true);
+
+      const uploadMsgId = `upload-${Date.now()}`;
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: uploadMsgId,
+          role: "assistant" as const,
+          content: `Przesyłam plik: ${file.name}...`,
+          timestamp: new Date(),
+        },
+      ]);
+
+      try {
+        const category = detectFileCategory(file);
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("category", category);
+
+        const res = await fetch("/api/knowledge/upload", {
+          method: "POST",
+          body: formData,
         });
+
+        if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+        const data = await res.json();
+
+        setChatMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === uploadMsgId
+              ? {
+                  ...msg,
+                  content: `Plik "${file.name}" przesłany (${category}). Przetwarzam...`,
+                }
+              : msg,
+          ),
+        );
+
+        // Auto-send message so IORS catalogs the file
+        await sendMessageDirect(
+          `Przesłałem plik "${file.name}" (typ: ${file.type}, kategoria: ${category}, id: ${data.document?.id}). Skataloguj go i potwierdź co zawiera.`,
+        );
+      } catch (err) {
+        console.error("[HomeChat] Upload error:", err);
+        setChatMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === uploadMsgId
+              ? {
+                  ...msg,
+                  content: `Błąd przesyłania: ${err instanceof Error ? err.message : "Nieznany błąd"}`,
+                }
+              : msg,
+          ),
+        );
+      } finally {
+        setIsUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
       }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      console.error("[HomeChat] Send error:", err);
-      const errorMsg = err instanceof Error ? err.message : "Nieznany błąd";
-      setChatMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMsgId
-            ? { ...msg, content: `Błąd: ${errorMsg}` }
-            : msg,
-        ),
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    [sendMessageDirect],
+  );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -337,6 +421,31 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
       default:
         return <Clock className="w-3.5 h-3.5 text-muted-foreground" />;
     }
+  };
+
+  const detectFileCategory = (file: File): string => {
+    const type = file.type.toLowerCase();
+    if (type.startsWith("image/")) return "photos";
+    if (
+      type.includes("pdf") ||
+      type.includes("document") ||
+      type.includes("word")
+    )
+      return "documents";
+    if (
+      type.includes("spreadsheet") ||
+      type.includes("csv") ||
+      type.includes("excel")
+    )
+      return "finance";
+    if (type.startsWith("video/")) return "media";
+    if (
+      type.includes("text") ||
+      type.includes("json") ||
+      type.includes("markdown")
+    )
+      return "documents";
+    return "other";
   };
 
   const formatTime = (date: Date) => {
@@ -562,12 +671,35 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
       {/* Input */}
       <div className="p-3 border-t bg-muted/30">
         <div className="flex gap-2">
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleFileUpload}
+            accept=".pdf,.txt,.md,.json,.csv,.docx,.xlsx,.pptx,.jpg,.jpeg,.png,.webp,.mp4,.webm"
+          />
+          {/* File upload button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full shrink-0"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading || isUploading}
+            title="Prześlij plik"
+          >
+            {isUploading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Paperclip className="w-4 h-4" />
+            )}
+          </Button>
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Napisz do IORS..."
+            placeholder="Napisz lub prześlij plik..."
             className="flex-1 px-4 py-2 text-sm border rounded-full bg-background focus:outline-none focus:ring-2 focus:ring-primary"
             disabled={isLoading}
           />
