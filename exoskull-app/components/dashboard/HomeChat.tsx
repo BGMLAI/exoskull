@@ -338,17 +338,48 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
       try {
         const category = detectFileCategory(file);
 
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("category", category);
-
-        const res = await fetch("/api/knowledge/upload", {
+        // Step 1: Get signed upload URL (small JSON request — no file body)
+        const urlRes = await fetch("/api/knowledge/upload-url", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: file.name,
+            contentType: file.type,
+            fileSize: file.size,
+            category,
+          }),
         });
 
-        if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
-        const data = await res.json();
+        if (!urlRes.ok) {
+          const errData = await urlRes.json().catch(() => ({}));
+          throw new Error(
+            errData.error || `Upload URL failed: ${urlRes.status}`,
+          );
+        }
+        const { signedUrl, token, documentId } = await urlRes.json();
+
+        // Step 2: Upload directly to Supabase Storage (bypasses Vercel 4.5MB limit)
+        const uploadRes = await fetch(signedUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": file.type,
+            "x-upsert": "true",
+          },
+          body: file,
+        });
+
+        if (!uploadRes.ok)
+          throw new Error(`Storage upload failed: ${uploadRes.status}`);
+
+        // Step 3: Confirm upload and trigger processing
+        const confirmRes = await fetch("/api/knowledge/confirm-upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ documentId }),
+        });
+
+        if (!confirmRes.ok) throw new Error("Failed to confirm upload");
+        const data = await confirmRes.json();
 
         setChatMessages((prev) =>
           prev.map((msg) =>
@@ -363,7 +394,7 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
 
         // Auto-send message so IORS catalogs the file
         await sendMessageDirect(
-          `Przesłałem plik "${file.name}" (typ: ${file.type}, kategoria: ${category}, id: ${data.document?.id}). Skataloguj go i potwierdź co zawiera.`,
+          `Przesłałem plik "${file.name}" (typ: ${file.type}, kategoria: ${category}, id: ${data.document?.id || documentId}). Skataloguj go i potwierdź co zawiera.`,
         );
       } catch (err) {
         console.error("[HomeChat] Upload error:", err);

@@ -237,21 +237,46 @@ export function BirthChat() {
             ? "documents"
             : "other";
 
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("category", category);
-
-        const res = await fetch("/api/knowledge/upload", {
+        // Step 1: Get signed upload URL
+        const urlRes = await fetch("/api/knowledge/upload-url", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: file.name,
+            contentType: file.type,
+            fileSize: file.size,
+            category,
+          }),
         });
 
-        if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
-        const data = await res.json();
+        if (!urlRes.ok) {
+          const errData = await urlRes.json().catch(() => ({}));
+          throw new Error(
+            errData.error || `Upload URL failed: ${urlRes.status}`,
+          );
+        }
+        const { signedUrl, documentId } = await urlRes.json();
+
+        // Step 2: Upload directly to Supabase Storage
+        const uploadRes = await fetch(signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type, "x-upsert": "true" },
+          body: file,
+        });
+
+        if (!uploadRes.ok)
+          throw new Error(`Storage upload failed: ${uploadRes.status}`);
+
+        // Step 3: Confirm upload and trigger processing
+        await fetch("/api/knowledge/confirm-upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ documentId }),
+        });
 
         // Auto-send message so IORS knows about the file
         sendMessageDirect(
-          `Przesłałem plik "${file.name}" (typ: ${file.type}, kategoria: ${category}, id: ${data.document?.id}). Skataloguj go.`,
+          `Przesłałem plik "${file.name}" (typ: ${file.type}, kategoria: ${category}, id: ${documentId}). Skataloguj go.`,
         );
       } catch (err) {
         console.error("[BirthChat] Upload error:", err);
