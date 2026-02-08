@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     groqForm.append("language", "pl");
     groqForm.append("response_format", "verbose_json");
     groqForm.append("temperature", "0.0");
-    groqForm.append("prompt", "Rozmowa po polsku z asystentem AI ExoSkull.");
+    // No prompt — explicit prompts bias Whisper toward hallucinations on short audio
 
     const response = await fetch(
       "https://api.groq.com/openai/v1/audio/transcriptions",
@@ -90,10 +90,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ transcript: "" });
     }
 
-    // Filter segments with high no_speech_prob
+    // Filter segments with high no_speech_prob (0.6 threshold)
     if (result.segments?.length) {
       const realSegments = result.segments.filter(
-        (s: { no_speech_prob?: number }) => (s.no_speech_prob || 0) < 0.8,
+        (s: { no_speech_prob?: number }) => (s.no_speech_prob || 0) < 0.6,
       );
       if (realSegments.length === 0) {
         logger.info("[Transcribe] All segments have high no_speech_prob");

@@ -93,7 +93,7 @@ async function transcribeWithGroq(
   formData.append("language", language);
   formData.append("response_format", "verbose_json");
   formData.append("temperature", "0.0");
-  formData.append("prompt", "Rozmowa po polsku z asystentem AI ExoSkull.");
+  // No prompt — reduces hallucinations on short/noisy audio
 
   const response = await fetch(
     "https://api.groq.com/openai/v1/audio/transcriptions",
@@ -123,10 +123,10 @@ async function transcribeWithGroq(
     return "";
   }
 
-  // Filter segments with high no_speech_prob
+  // Filter segments with high no_speech_prob (0.6 threshold)
   if (result.segments?.length) {
     const realSegments = result.segments.filter(
-      (s: { no_speech_prob?: number }) => (s.no_speech_prob || 0) < 0.8,
+      (s: { no_speech_prob?: number }) => (s.no_speech_prob || 0) < 0.6,
     );
     if (realSegments.length === 0) {
       logger.info("[TranscribeLib] All segments have high no_speech_prob");

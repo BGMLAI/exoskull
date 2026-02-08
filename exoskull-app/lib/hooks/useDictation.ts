@@ -34,6 +34,7 @@ export function useDictation(
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const recordStartRef = useRef<number>(0);
   const onFinalTranscriptRef = useRef(onFinalTranscript);
   const onErrorRef = useRef(onError);
 
@@ -123,18 +124,26 @@ export function useDictation(
         stream.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
 
+        const duration = Date.now() - recordStartRef.current;
         const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
-        if (audioBlob.size > 0) {
-          transcribeAudio(audioBlob);
-        } else {
+
+        // Require at least 1s of recording for meaningful audio
+        if (duration < 1000 || audioBlob.size < 1000) {
+          onErrorRef.current?.(
+            "Za krótkie nagranie. Przytrzymaj dłużej i mów wyraźnie.",
+          );
           setIsListening(false);
           setInterimTranscript("");
+          return;
         }
+
+        transcribeAudio(audioBlob);
       };
 
       mediaRecorder.start(250);
+      recordStartRef.current = Date.now();
       setIsListening(true);
-      setInterimTranscript("Nagrywam...");
+      setInterimTranscript("Nagrywam... (mów wyraźnie)");
     } catch {
       onErrorRef.current?.(
         "Brak dostępu do mikrofonu. Sprawdź ustawienia przeglądarki.",
