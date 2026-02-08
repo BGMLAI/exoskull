@@ -3,7 +3,7 @@
  *
  * POST /api/voice/transcribe - Transcribe audio to text
  *
- * Uses Groq Whisper for fast, accurate Polish transcription.
+ * 2-tier: OpenAI Whisper (primary) → Groq Whisper (fallback)
  * Includes hallucination detection (Whisper repeats phrases on silence/noise).
  */
 
@@ -13,6 +13,139 @@ import { isHallucination } from "@/lib/voice/transcribe-voice-note";
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
+// ---------------------------------------------------------------------------
+// Transcribe with OpenAI Whisper
+// ---------------------------------------------------------------------------
+async function tryOpenAI(
+  audio: File,
+): Promise<{ transcript: string; provider: string } | null> {
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) return null;
+
+  try {
+    const form = new FormData();
+    form.append("file", audio, "audio.webm");
+    form.append("model", "whisper-1");
+    form.append("language", "pl");
+    form.append("response_format", "verbose_json");
+    form.append("temperature", "0.0");
+
+    const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${openaiKey}` },
+      body: form,
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[Transcribe] OpenAI error:", res.status, errText);
+      return null;
+    }
+
+    const result = await res.json();
+    const text = (result.text || "").trim();
+
+    logger.info(
+      "[Transcribe] OpenAI raw:",
+      JSON.stringify({
+        text,
+        duration: result.duration,
+        segments: result.segments?.length,
+      }),
+    );
+
+    // Filter hallucinations
+    if (isHallucination(text)) {
+      logger.info("[Transcribe] OpenAI hallucination filtered:", text);
+      return null; // Fall through to Groq
+    }
+
+    // Filter segments with high no_speech_prob
+    if (result.segments?.length) {
+      const real = result.segments.filter(
+        (s: { no_speech_prob?: number }) => (s.no_speech_prob || 0) < 0.6,
+      );
+      if (real.length === 0) {
+        logger.info("[Transcribe] OpenAI all segments no_speech");
+        return null;
+      }
+    }
+
+    return { transcript: text, provider: "openai" };
+  } catch (err) {
+    console.error("[Transcribe] OpenAI exception:", err);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Transcribe with Groq Whisper
+// ---------------------------------------------------------------------------
+async function tryGroq(
+  audio: File,
+): Promise<{ transcript: string; provider: string } | null> {
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey) return null;
+
+  try {
+    const form = new FormData();
+    form.append("file", audio, "audio.webm");
+    form.append("model", "whisper-large-v3-turbo");
+    form.append("language", "pl");
+    form.append("response_format", "verbose_json");
+    form.append("temperature", "0.0");
+
+    const res = await fetch(
+      "https://api.groq.com/openai/v1/audio/transcriptions",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${groqKey}` },
+        body: form,
+      },
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[Transcribe] Groq error:", res.status, errText);
+      return null;
+    }
+
+    const result = await res.json();
+    const text = (result.text || "").trim();
+
+    logger.info(
+      "[Transcribe] Groq raw:",
+      JSON.stringify({
+        text,
+        duration: result.duration,
+        segments: result.segments?.length,
+      }),
+    );
+
+    if (isHallucination(text)) {
+      logger.info("[Transcribe] Groq hallucination filtered:", text);
+      return { transcript: "", provider: "groq" };
+    }
+
+    if (result.segments?.length) {
+      const real = result.segments.filter(
+        (s: { no_speech_prob?: number }) => (s.no_speech_prob || 0) < 0.6,
+      );
+      if (real.length === 0) {
+        return { transcript: "", provider: "groq" };
+      }
+    }
+
+    return { transcript: text, provider: "groq" };
+  } catch (err) {
+    console.error("[Transcribe] Groq exception:", err);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// MAIN HANDLER
+// ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -26,82 +159,43 @@ export async function POST(req: NextRequest) {
     }
 
     // Reject too-small files (likely just noise/clicks)
-    if (audio.size < 5000) {
+    if (audio.size < 3000) {
       logger.info("[Transcribe] Audio too small:", audio.size, "bytes");
       return NextResponse.json({ transcript: "" });
     }
 
-    const groqKey = process.env.GROQ_API_KEY;
-    if (!groqKey) {
-      console.error("[Transcribe] GROQ_API_KEY not configured");
+    // Tier 1: OpenAI Whisper (more accurate, original model)
+    const openaiResult = await tryOpenAI(audio);
+    if (openaiResult && openaiResult.transcript) {
+      logger.info(
+        "[Transcribe] OpenAI succeeded:",
+        openaiResult.transcript.length,
+        "chars",
+      );
+      return NextResponse.json({ transcript: openaiResult.transcript });
+    }
+
+    // Tier 2: Groq Whisper (fast, free)
+    const groqResult = await tryGroq(audio);
+    if (groqResult && groqResult.transcript) {
+      logger.info(
+        "[Transcribe] Groq succeeded:",
+        groqResult.transcript.length,
+        "chars",
+      );
+      return NextResponse.json({ transcript: groqResult.transcript });
+    }
+
+    // Both failed or returned empty
+    if (!process.env.OPENAI_API_KEY && !process.env.GROQ_API_KEY) {
       return NextResponse.json(
-        {
-          error:
-            "Transcription service unavailable — GROQ_API_KEY not configured",
-        },
+        { error: "No transcription API keys configured" },
         { status: 503 },
       );
     }
 
-    // Build FormData for Groq API
-    const groqForm = new FormData();
-    groqForm.append("file", audio, "audio.webm");
-    groqForm.append("model", "whisper-large-v3-turbo");
-    groqForm.append("language", "pl");
-    groqForm.append("response_format", "verbose_json");
-    groqForm.append("temperature", "0.0");
-    // No prompt — explicit prompts bias Whisper toward hallucinations on short audio
-
-    const response = await fetch(
-      "https://api.groq.com/openai/v1/audio/transcriptions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${groqKey}`,
-        },
-        body: groqForm,
-      },
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[Transcribe] Groq API error:", response.status, errorText);
-      return NextResponse.json(
-        { error: "Transcription failed", details: errorText },
-        { status: 500 },
-      );
-    }
-
-    const result = await response.json();
-    const transcript = (result.text || "").trim();
-
-    logger.info(
-      "[Transcribe] Raw result:",
-      JSON.stringify({
-        text: transcript,
-        duration: result.duration,
-        segments: result.segments?.length,
-      }),
-    );
-
-    // Filter hallucinations
-    if (isHallucination(transcript)) {
-      logger.info("[Transcribe] Filtered hallucination:", transcript);
-      return NextResponse.json({ transcript: "" });
-    }
-
-    // Filter segments with high no_speech_prob (0.6 threshold)
-    if (result.segments?.length) {
-      const realSegments = result.segments.filter(
-        (s: { no_speech_prob?: number }) => (s.no_speech_prob || 0) < 0.6,
-      );
-      if (realSegments.length === 0) {
-        logger.info("[Transcribe] All segments have high no_speech_prob");
-        return NextResponse.json({ transcript: "" });
-      }
-    }
-
-    return NextResponse.json({ transcript });
+    logger.info("[Transcribe] Both providers returned empty/filtered");
+    return NextResponse.json({ transcript: "" });
   } catch (error) {
     console.error("[Transcribe] Error:", error);
     return NextResponse.json(
