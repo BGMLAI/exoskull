@@ -41,6 +41,20 @@ export function isHallucination(text: string): boolean {
     /^(hej[.\s!]*)+$/i,
     /^(cześć[.\s!]*)+$/i,
     /^\.+$/,
+    // Classic Whisper Polish hallucinations on silence/noise/short audio
+    /wszelkie prawa zastrzeżone/i,
+    /dziękuję za uwagę/i,
+    /dziękuję za obejrzenie/i,
+    /zapraszam do subskrypcji/i,
+    /podoba ci się ten film/i,
+    /tłumaczenie:/i,
+    /redakcja i korekta/i,
+    /^www\.\S+$/i,
+    /społeczność amara/i,
+    /proszę o subskrypcję/i,
+    /dziękuję za wysłuchanie/i,
+    /prosimy o subskrybowanie/i,
+    /^to (jest|był[ao]?) (wszystko|tyle)/i,
   ];
 
   for (const pattern of hallucinations) {
