@@ -499,9 +499,11 @@ export async function processUserMessage(
       }
 
       // Second API call with tool results (reuse cached system + tools)
+      // Use same max_tokens as first call (not lower) so web chat gets full responses
+      const followUpMaxTokens = session.maxTokens || maxTokensOverride || 150;
       const followUpResponse = await anthropic.messages.create({
         model: CLAUDE_MODEL,
-        max_tokens: session.maxTokens || maxTokensOverride || 150,
+        max_tokens: followUpMaxTokens,
         system: systemBlocks,
         messages: [
           ...messages,

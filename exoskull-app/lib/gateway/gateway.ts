@@ -23,6 +23,7 @@ import { createTask, getLatestPendingTask } from "../async-tasks/queue";
 import type { GatewayChannel, GatewayMessage, GatewayResponse } from "./types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { emitEvent } from "@/lib/iors/loop";
+import { WEB_CHAT_SYSTEM_OVERRIDE } from "../voice/system-prompt";
 
 import { logger } from "@/lib/logger";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -339,6 +340,14 @@ export async function handleInboundMessage(
 
     // 6. Sync path: process with timeout safety net
     const session = await getOrCreateSession(sessionId, tenantId);
+
+    // Channel-aware settings: voice = short (200), text channels = rich (1500)
+    const isTextChannel = msg.channel !== "voice";
+    if (isTextChannel) {
+      session.maxTokens = 1500;
+      session.systemPromptPrefix = WEB_CHAT_SYSTEM_OVERRIDE;
+      session.skipEndCallDetection = true;
+    }
 
     const SYNC_TIMEOUT_MS = 40_000; // 40s — leaves 20s buffer before Vercel's 60s
     const result = await Promise.race([
