@@ -2,35 +2,53 @@
  * POST /api/knowledge/reprocess — Reprocess stuck/failed documents
  *
  * Finds documents stuck in "processing" or "failed" status and reprocesses them.
- * Auth: requires authenticated user (reprocesses own documents only).
+ * Auth: authenticated user (own docs) OR CRON_SECRET + tenant_id query param.
+ * Supports ?limit=N for batching (default: 10, max: 20).
  */
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { processDocument } from "@/lib/knowledge/document-processor";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300; // 5 min for Pro plan
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    let tenantId: string;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Auth: CRON_SECRET header + tenant_id param OR user session
+    const cronSecret = request.headers.get("x-cron-secret");
+    const { searchParams } = new URL(request.url);
+
+    if (
+      cronSecret === process.env.CRON_SECRET &&
+      searchParams.get("tenant_id")
+    ) {
+      tenantId = searchParams.get("tenant_id")!;
+    } else {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      tenantId = user.id;
     }
 
+    const limit = Math.min(Number(searchParams.get("limit") || 10), 20);
     const service = getServiceSupabase();
 
     // Find stuck or failed documents for this user
     const { data: docs, error } = await service
       .from("exo_user_documents")
       .select("id, original_name, status, error_message")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .in("status", ["processing", "failed", "uploaded"])
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(limit);
 
     if (error) {
       console.error("[Reprocess] Query failed:", error.message);
@@ -71,7 +89,7 @@ export async function POST() {
           .delete()
           .eq("document_id", doc.id);
 
-        const result = await processDocument(doc.id, user.id);
+        const result = await processDocument(doc.id, tenantId);
         results.push({
           id: doc.id,
           name: doc.original_name,
