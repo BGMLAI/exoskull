@@ -504,26 +504,105 @@ export async function processUserMessage(
         })),
       );
 
-      // Second API call with tool results (reuse cached system + tools)
-      // Use same max_tokens as first call (not lower) so web chat gets full responses
+      // Multi-turn tool loop: allow Claude to call additional tools (max 3 rounds)
       const followUpMaxTokens = session.maxTokens || maxTokensOverride || 150;
-      const followUpResponse = await anthropic.messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: followUpMaxTokens,
-        system: systemBlocks,
-        messages: [
-          ...messages,
-          { role: "assistant", content: response.content },
-          { role: "user", content: toolResults },
-        ],
-      });
+      let currentMessages: Anthropic.MessageParam[] = [
+        ...messages,
+        { role: "assistant" as const, content: response.content },
+        { role: "user" as const, content: toolResults },
+      ];
 
-      const textContent = followUpResponse.content.find(
+      const MAX_TOOL_ROUNDS = 3;
+      let finalResponse: Anthropic.Message | null = null;
+
+      for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+        const followUp = await anthropic.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: followUpMaxTokens,
+          system: systemBlocks,
+          messages: currentMessages,
+          tools: IORS_TOOLS,
+        });
+
+        const newToolBlocks = followUp.content.filter(
+          (c): c is Anthropic.ToolUseBlock => c.type === "tool_use",
+        );
+
+        // No more tool calls or last round — use this as final response
+        if (newToolBlocks.length === 0 || round === MAX_TOOL_ROUNDS - 1) {
+          finalResponse = followUp;
+          break;
+        }
+
+        // Execute additional tool calls
+        const newResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+          newToolBlocks.map(async (toolUse) => {
+            const result = await executeTool(
+              toolUse.name,
+              toolUse.input as Record<string, unknown>,
+              session.tenantId,
+            );
+            toolsUsed.push(toolUse.name);
+            return {
+              type: "tool_result" as const,
+              tool_use_id: toolUse.id,
+              content: result,
+            };
+          }),
+        );
+
+        // Log additional tool executions
+        logActivities(
+          newToolBlocks.map((toolUse) => ({
+            tenantId: session.tenantId,
+            actionType: "tool_call" as const,
+            actionName: toolUse.name,
+            description: `Narzedzie: ${toolUse.name}`,
+            source: "conversation",
+            metadata: {
+              toolInput: Object.keys(toolUse.input as Record<string, unknown>),
+            },
+          })),
+        );
+
+        currentMessages = [
+          ...currentMessages,
+          { role: "assistant" as const, content: followUp.content },
+          { role: "user" as const, content: newResults },
+        ];
+      }
+
+      // Extract text from final response
+      const textContent = finalResponse?.content.find(
         (c): c is Anthropic.TextBlock => c.type === "text",
       );
+      const text = textContent?.text?.trim();
+
+      if (!text) {
+        logger.warn(
+          "[ConversationHandler] Follow-up has no text — smart fallback:",
+          {
+            contentTypes: finalResponse?.content.map((c) => c.type),
+            stopReason: finalResponse?.stop_reason,
+            toolsUsed,
+            tenantId: session.tenantId,
+          },
+        );
+      }
+
+      // Smart fallback: describe what was done instead of generic "Zrobione!"
+      let responseText: string;
+      if (text) {
+        responseText = text;
+      } else if (toolsUsed.length > 0) {
+        responseText = `Gotowe. Użyłem: ${toolsUsed.join(", ")}.`;
+      } else {
+        responseText =
+          "Przepraszam, nie mogłem przetworzyć tej wiadomości. Spróbuj ponownie.";
+      }
 
       return {
-        text: textContent?.text || "Zrobione!",
+        text: responseText,
         toolsUsed,
         shouldEndCall: false,
       };
