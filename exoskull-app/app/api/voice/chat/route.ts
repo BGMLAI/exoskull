@@ -15,6 +15,8 @@ import {
 } from "@/lib/voice/conversation-handler";
 import { textToSpeech } from "@/lib/voice/elevenlabs-tts";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
+import { WEB_CHAT_SYSTEM_OVERRIDE } from "@/lib/voice/system-prompt";
+import { appendMessage } from "@/lib/unified-thread";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
@@ -56,12 +58,28 @@ export async function POST(request: NextRequest) {
 
     // Get or create voice session
     // WAŻNE: Stały session ID per user (nie per request) dla ciągłości kontekstu
-    // Jeśli frontend przekazuje sessionId - użyj go, inaczej użyj stałego ID usera
     const callSid = sessionId || `web-chat-${user.id}`;
     const session = await getOrCreateSession(callSid, user.id);
 
+    // Web voice widget = web_chat context (not phone call)
+    session.maxTokens = 1500;
+    session.systemPromptPrefix = WEB_CHAT_SYSTEM_OVERRIDE;
+    session.skipEndCallDetection = true;
+
+    // Append user message to unified thread (before processing)
+    await appendMessage(user.id, {
+      role: "user",
+      content: message,
+      channel: "web_chat",
+      direction: "inbound",
+      source_type: "web_chat",
+      metadata: { source: "voice_widget" },
+    });
+
     // Process through Claude with tools
-    const result = await processUserMessage(session, message);
+    const result = await processUserMessage(session, message, {
+      skipThreadAppend: true,
+    });
 
     // Track usage
     await incrementUsage(user.id, "voice_minutes").catch((err) => {
@@ -71,8 +89,12 @@ export async function POST(request: NextRequest) {
       );
     });
 
-    // Update session with conversation
-    await updateSession(session.id, message, result.text);
+    // Update session with conversation (skip user append — already in unified thread)
+    await updateSession(session.id, message, result.text, {
+      tenantId: user.id,
+      channel: "web_chat",
+      skipUserAppend: true,
+    });
 
     // End session if user said goodbye
     if (result.shouldEndCall) {
