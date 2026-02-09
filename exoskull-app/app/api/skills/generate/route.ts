@@ -13,9 +13,12 @@ export const maxDuration = 60; // Skill generation can take 10-30s
 
 export async function POST(request: NextRequest) {
   try {
+    console.info("[Skills API] Generate request received");
+
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
     const tenantId = auth.tenantId;
+    console.info("[Skills API] Auth OK, tenant:", tenantId);
 
     const body = await request.json();
     const { description, model } = body as {
@@ -40,6 +43,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.info("[Skills API] Starting generation:", {
+      description: description.trim().slice(0, 80),
+      model: model || "auto",
+    });
+
     // Generate the skill (AI code generation + validation + smoke test + DB insert)
     const result = await generateSkill({
       tenant_id: tenantId,
@@ -51,6 +59,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (!result.success || !result.skill) {
+      console.error("[Skills API] Generation failed:", {
+        error: result.error,
+        validationErrors: result.validationErrors,
+      });
       return NextResponse.json(
         {
           error: result.error || "Failed to generate skill",
@@ -59,6 +71,8 @@ export async function POST(request: NextRequest) {
         { status: 422 },
       );
     }
+
+    console.info("[Skills API] Generation OK, initiating approval");
 
     // Initiate approval flow
     const approvalResult = await initiateApproval(result.skill);
@@ -82,7 +96,10 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[Skills API] Generate error:", error);
+    console.error("[Skills API] Generate error:", {
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
     return NextResponse.json(
       { error: "Failed to generate skill", details: (error as Error).message },
       { status: 500 },

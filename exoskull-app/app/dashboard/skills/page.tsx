@@ -176,33 +176,48 @@ export default function SkillsPage() {
     setGenerating(true);
     setGenerateError(null);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 55000);
+
     try {
       const res = await fetch("/api/skills/generate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description: generateDescription.trim() }),
+        signal: controller.signal,
       });
 
-      const data = await res.json();
+      clearTimeout(timeout);
 
       if (!res.ok) {
-        setGenerateError(data.error || "Generowanie nie powiodlo sie");
+        let errorMsg = `Blad serwera (${res.status})`;
+        try {
+          const data = await res.json();
+          errorMsg = data.error || data.details || errorMsg;
+        } catch {
+          /* non-JSON response */
+        }
+        setGenerateError(errorMsg);
         return;
       }
+
+      const data = await res.json();
 
       setIsGenerateOpen(false);
       setGenerateDescription("");
       await loadSkills(userId);
 
-      // Navigate to the new skill
       if (data.skill?.id) {
         router.push(`/dashboard/skills/${data.skill.id}`);
       }
     } catch (error) {
+      clearTimeout(timeout);
       console.error("[Skills] Generate error:", error);
-      setGenerateError("Blad polaczenia z serwerem");
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setGenerateError("Generowanie trwa zbyt dlugo. Sprobuj ponownie.");
+      } else {
+        setGenerateError("Blad polaczenia z serwerem");
+      }
     } finally {
       setGenerating(false);
     }

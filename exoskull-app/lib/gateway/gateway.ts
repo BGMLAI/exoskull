@@ -66,14 +66,14 @@ export async function resolveTenant(
   if (column) {
     const { data } = await supabase
       .from("exo_tenants")
-      .select("id, first_name")
+      .select("id, name")
       .eq(column, from)
       .single();
 
     if (data) {
       return {
         tenantId: data.id,
-        name: data.first_name || senderName || "User",
+        name: data.name || senderName || "User",
       };
     }
   }
@@ -111,7 +111,7 @@ async function autoRegisterTenant(
   };
 
   const insertData: Record<string, unknown> = {
-    first_name: senderName || "New User",
+    name: senderName || "New User",
     preferred_channel: channel,
     onboarding_status: "pending",
   };
