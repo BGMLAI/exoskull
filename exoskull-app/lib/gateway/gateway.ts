@@ -476,6 +476,7 @@ export async function handleInboundMessage(
         toolsUsed: result.toolsUsed,
       },
       dedupKey: `gateway:msg:${tenantId}:${new Date().toISOString().slice(0, 16)}`,
+      expiresMinutes: 360, // 6 hours — prevent premature expiry
     }).catch((err) => console.error("[Gateway] emitEvent failed:", err));
 
     return {

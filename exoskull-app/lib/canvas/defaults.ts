@@ -177,14 +177,10 @@ export async function ensureEssentialWidgets(
 
   const supabase = getServiceSupabase();
 
-  // Find the max position_y to place new widgets below existing ones
-  const maxY = 100;
-
-  const rows = missing.map((w, i) => ({
+  // Use original default positions from DEFAULT_WIDGETS
+  const rows = missing.map((w) => ({
     tenant_id: tenantId,
     ...w,
-    position_y: maxY + i * 2,
-    sort_order: ESSENTIAL_TYPES.indexOf(w.widget_type) + 100,
   }));
 
   for (const row of rows) {

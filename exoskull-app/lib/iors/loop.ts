@@ -449,6 +449,50 @@ export async function pruneOldEvents(daysOld = 7): Promise<number> {
 }
 
 /**
+ * Backfill missing loop configs for tenants created outside the gateway.
+ */
+export async function backfillMissingConfigs(): Promise<number> {
+  const supabase = getServiceSupabase();
+
+  // Find tenants without loop config
+  const { data: tenants, error: findErr } = await supabase
+    .from("exo_tenants")
+    .select("id, timezone");
+
+  if (findErr || !tenants?.length) return 0;
+
+  const { data: configs } = await supabase
+    .from("exo_tenant_loop_config")
+    .select("tenant_id");
+
+  const existingIds = new Set(
+    (configs || []).map((c: { tenant_id: string }) => c.tenant_id),
+  );
+  const missing = tenants.filter((t: { id: string }) => !existingIds.has(t.id));
+
+  if (missing.length === 0) return 0;
+
+  let backfilled = 0;
+  for (const tenant of missing) {
+    const { error } = await supabase.from("exo_tenant_loop_config").insert({
+      tenant_id: tenant.id,
+      timezone: (tenant as { timezone?: string }).timezone || "Europe/Warsaw",
+      next_eval_at: new Date(Date.now() + 60_000).toISOString(),
+    });
+
+    if (!error) backfilled++;
+    else if (error.code !== "23505") {
+      console.error("[Petla] Backfill failed for tenant:", {
+        tenantId: tenant.id,
+        error: error.message,
+      });
+    }
+  }
+
+  return backfilled;
+}
+
+/**
  * Prune completed/failed work items from queue (older than N days).
  */
 export async function pruneOldWorkItems(daysOld = 7): Promise<number> {

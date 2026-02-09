@@ -16,6 +16,7 @@ import {
   reclassifyTenants,
   pruneOldEvents,
   pruneOldWorkItems,
+  backfillMissingConfigs,
   emitEvent,
 } from "@/lib/iors/loop";
 import { getServiceSupabase } from "@/lib/supabase/service";
@@ -40,6 +41,12 @@ async function handler(req: NextRequest) {
     // Step 2: Reclassify all tenants
     const reclassified = await reclassifyTenants();
     logger.info("[LoopDaily] Reclassified tenants:", reclassified);
+
+    // Step 2.5: Backfill missing loop configs for tenants created outside gateway
+    const backfilled = await backfillMissingConfigs();
+    if (backfilled > 0) {
+      logger.info("[LoopDaily] Backfilled missing loop configs:", backfilled);
+    }
 
     // Step 3: Seed maintenance tasks for off-peak execution
     const supabase = getServiceSupabase();
@@ -75,17 +82,16 @@ async function handler(req: NextRequest) {
       }
     }
 
-    // Step 4: Process one P4/P5 work item if time allows
+    // Step 4: Process ALL queued maintenance/optimization items (time permitting)
     let workProcessed = 0;
-    if (Date.now() - startTime < TIMEOUT_MS - 15_000) {
+    while (Date.now() - startTime < TIMEOUT_MS - 15_000) {
       const workItem = await claimQueuedWork(workerId, [
         "optimization",
         "maintenance",
       ]);
-      if (workItem) {
-        await dispatchToHandler(workItem);
-        workProcessed = 1;
-      }
+      if (!workItem) break;
+      await dispatchToHandler(workItem);
+      workProcessed++;
     }
 
     // Step 5: Prune old events and work items
