@@ -54,9 +54,10 @@ type TextChannel =
   | "signal"
   | "imessage"
   | "sms"
-  | "email";
+  | "email"
+  | "web_chat";
 
-// Fallback order for text-based reports (no voice, no web_chat)
+// Fallback order — web_chat is last resort (saves to unified thread, visible in dashboard)
 const FALLBACK_CHAIN: TextChannel[] = [
   "telegram",
   "whatsapp",
@@ -66,6 +67,7 @@ const FALLBACK_CHAIN: TextChannel[] = [
   "imessage",
   "sms",
   "email",
+  "web_chat",
 ];
 
 // ============================================================================
@@ -98,6 +100,8 @@ function canSendVia(channel: TextChannel, tenant: TenantChannelInfo): boolean {
       return !!tenant.phone && !!process.env.TWILIO_ACCOUNT_SID;
     case "email":
       return !!tenant.email && !!process.env.RESEND_API_KEY;
+    case "web_chat":
+      return true; // Always available — writes to unified thread (visible in dashboard)
     default:
       return false;
   }
@@ -241,6 +245,10 @@ async function sendToChannel(
       break;
     case "email":
       await sendViaEmail(tenant.email!, text, reportType, tenant.language);
+      break;
+    case "web_chat":
+      // No external send needed — message will be logged to unified thread below
+      // User sees it next time they open the dashboard chat
       break;
     default:
       throw new Error(`Unsupported channel: ${channel}`);
