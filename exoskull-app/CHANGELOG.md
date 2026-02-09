@@ -4,6 +4,37 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-09] Fix TTS Read-Aloud Not Working
+
+### Fixed — Cartesia TTS Silent Failure
+
+**Root cause:** `CARTESIA_API_KEY` was missing from `.env.local` — Cartesia API threw `Missing CARTESIA_API_KEY`, TTS route returned 500, but `fetchTTSAndPlay` silently swallowed the error (`if (!res.ok) return;` with no logging).
+
+- Added `CARTESIA_API_KEY` to `.env.local` (copied from `.env.vercel-check`, stripped trailing `\n`)
+- Added error logging to `fetchTTSAndPlay` — now logs status + response body on failure
+- Fixed stale closure bug: `isTTSEnabled` captured at callback creation could be stale during long streaming; replaced with `ttsEnabledRef.current` (useRef + useEffect sync)
+- Verified: build passes, deployed to production (commit `32b5fc7`)
+
+### Files Changed
+
+- `components/dashboard/HomeChat.tsx` — error logging + stale closure fix (ttsEnabledRef)
+- `.env.local` — added `CARTESIA_API_KEY`
+
+---
+
+## [2026-02-09] Canvas Widget System
+
+### Added — Drag-and-drop widget grid for dashboard canvas
+
+- `exo_canvas_widgets` table with per-tenant grid positions, pinned flag, config JSONB
+- react-grid-layout v2.2.2 with Responsive layout
+- Widget registry: 12 built-in types in `lib/canvas/widget-registry.ts`
+- Self-fetching wrappers: CanvasHealthWidget, CanvasTasksWidget
+- Default seeding: 6 widgets on first visit (voice_hero pinned)
+- `manage_canvas` IORS tool: add/remove/show/hide widgets (31 total tools)
+
+---
+
 ## [2026-02-08b] Fix Storage Bucket + Audit Migration
 
 ### Fixed — File Upload 400 Error (Storage Bucket Constraints)

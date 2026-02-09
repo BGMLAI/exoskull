@@ -7,7 +7,11 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import type { HealthSummary, DataPoint } from "@/lib/dashboard/types";
+import type {
+  HealthSummary,
+  HealthPrediction,
+  DataPoint,
+} from "@/lib/dashboard/types";
 
 export const dynamic = "force-dynamic";
 
@@ -48,11 +52,31 @@ export async function GET() {
       value: r.sleep_minutes ? Math.round((r.sleep_minutes / 60) * 10) / 10 : 0,
     }));
 
+    // Fetch active predictions (not expired, recent)
+    const { data: predRows } = await supabase
+      .from("exo_predictions")
+      .select(
+        "metric, probability, confidence, severity, message_pl, message_en",
+      )
+      .eq("tenant_id", user.id)
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+      .order("created_at", { ascending: false })
+      .limit(4);
+
+    const predictions: HealthPrediction[] = (predRows || []).map((p) => ({
+      metric: p.metric,
+      probability: p.probability,
+      confidence: p.confidence,
+      severity: p.severity,
+      message: p.message_pl || p.message_en || p.metric,
+    }));
+
     const summary: HealthSummary = {
       steps: healthData?.steps ?? null,
       sleepMinutes: healthData?.sleep_minutes ?? null,
       hrv: healthData?.hrv_avg ?? null,
       sleepSeries,
+      predictions: predictions.length > 0 ? predictions : undefined,
     };
 
     return NextResponse.json(summary);

@@ -1,7 +1,14 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Heart, Activity, Moon } from "lucide-react";
+import {
+  Heart,
+  Activity,
+  Moon,
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+} from "lucide-react";
 import Link from "next/link";
 import { HealthSummary } from "@/lib/dashboard/types";
 import { AreaChartWrapper } from "@/components/charts/AreaChartWrapper";
@@ -71,6 +78,46 @@ export function HealthWidget({ summary }: HealthWidgetProps) {
             height={90}
             showXAxis
           />
+        )}
+
+        {summary.predictions && summary.predictions.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Prognozy
+            </p>
+            {summary.predictions.map((pred, i) => {
+              const severityColors = {
+                low: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+                medium:
+                  "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
+                high: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+                critical:
+                  "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+              };
+              const SeverityIcon =
+                pred.severity === "critical" || pred.severity === "high"
+                  ? AlertTriangle
+                  : pred.severity === "medium"
+                    ? TrendingDown
+                    : TrendingUp;
+
+              return (
+                <div
+                  key={`${pred.metric}-${i}`}
+                  className={`flex items-start gap-2 p-2 rounded-lg text-xs ${severityColors[pred.severity]}`}
+                >
+                  <SeverityIcon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-medium leading-tight">{pred.message}</p>
+                    <p className="opacity-70 mt-0.5">
+                      {Math.round(pred.probability * 100)}% prawdop. ·{" "}
+                      {Math.round(pred.confidence * 100)}% pewnosc
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </CardContent>
     </Card>

@@ -13,7 +13,15 @@ exoskull-app/README.md
 
 # Agent artifacts
 AGENT_DONE_*.md
-AGENT_PROMPTS.md
+AGENT_PROMPTS*.md
+AGENT_PROMPT_*.md
+
+# IDE
+.vscode/
+
+# Env check files
+*.env.vercel-check
+exoskull-app/.env.vercel-check
 
 # Windows artifacts
 nul

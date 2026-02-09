@@ -4,6 +4,39 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-09] feat: Add Composio SaaS apps to integrations UI
+
+### What was done
+- New API route `GET/POST /api/integrations/composio` — list 10 toolkits with connection status + initiate OAuth
+- New API route `POST /api/integrations/composio/disconnect` — server-side disconnect
+- Updated integrations page (`/dashboard/settings/integrations`) with "Aplikacje SaaS (Composio)" section
+- 10 apps: Gmail, Google Calendar, Notion, Todoist, Slack, GitHub, Google Drive, Outlook, Trello, Linear
+- Connect/disconnect buttons with loading states, lucide icons per toolkit
+- Stats (connected/available) now sum Rigs + Composio
+- Callback auto-redirects to integrations page after OAuth completion
+
+### Why
+- Composio backend was fully implemented (adapter, 4 IORS tools, callback) but had zero UI access
+- Users could only connect Composio apps via chat commands — no dashboard visibility
+
+### Files changed
+- `app/api/integrations/composio/route.ts` (new)
+- `app/api/integrations/composio/disconnect/route.ts` (new)
+- `app/dashboard/settings/integrations/page.tsx` (modified)
+- `app/api/integrations/composio/callback/route.ts` (modified)
+
+### How to verify
+1. Go to `/dashboard/settings/integrations` — scroll down to "Aplikacje SaaS" section
+2. 10 Composio app cards should render with "Polacz" buttons
+3. Stats should show combined Rigs + Composio counts
+
+### Notes for future agents
+- Composio manages connections on their side (no DB migration needed)
+- `COMPOSIO_API_KEY` env var required for real connections
+- Reuses `COMPOSIO_TOOLKITS`, `listConnections()`, `initiateConnection()`, `disconnectAccount()` from `lib/integrations/composio-adapter.ts`
+
+---
+
 ## [2026-02-07] refactor: Full codebase audit — security, DB, performance, code quality
 
 ### What was done
