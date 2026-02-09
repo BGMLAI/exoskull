@@ -10,6 +10,7 @@
 import { useState, useEffect } from "react";
 import { Mic, Zap, Brain, CheckSquare, Phone } from "lucide-react";
 import { VoiceInterface } from "@/components/voice/VoiceInterface";
+import { createClient } from "@/lib/supabase/client";
 
 interface VoiceHeroProps {
   tenantId: string;
@@ -39,16 +40,19 @@ export function VoiceHero({
   useEffect(() => {
     async function loadStats() {
       try {
-        const res = await fetch("/api/pulse");
-        if (res.ok) {
-          const data = await res.json();
-          setStats({
-            energy: data.lastCheckin?.energy ?? null,
-            mood: data.lastCheckin?.mood ?? null,
-            pendingTasks: data.pendingTasks ?? 0,
-            nextAction: data.nextAction ?? null,
-          });
-        }
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { count } = await supabase
+          .from("exo_tasks")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", user.id)
+          .eq("status", "pending");
+
+        setStats((prev) => ({ ...prev, pendingTasks: count ?? 0 }));
       } catch {
         // Stats are optional — don't block UI
       }

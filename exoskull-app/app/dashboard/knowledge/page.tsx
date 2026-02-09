@@ -23,9 +23,8 @@ type Document = {
   file_type: string;
   file_size: number;
   category: string;
-  status: "uploading" | "uploaded" | "processing" | "succeeded" | "failed";
+  status: "uploading" | "uploaded" | "processing" | "ready" | "failed";
   created_at: string;
-  chunk_count?: number;
 };
 
 const STATUS_CONFIG = {
@@ -44,7 +43,7 @@ const STATUS_CONFIG = {
     color: "bg-blue-100 text-blue-800",
     icon: Loader2,
   },
-  succeeded: {
+  ready: {
     label: "Gotowe",
     color: "bg-green-100 text-green-800",
     icon: CheckCircle2,
@@ -89,7 +88,7 @@ export default function KnowledgePage() {
       const { data, error } = await supabase
         .from("exo_user_documents")
         .select(
-          "id, original_name, file_type, file_size, category, status, created_at, chunk_count",
+          "id, original_name, file_type, file_size, category, status, created_at",
         )
         .order("created_at", { ascending: false });
 
@@ -218,7 +217,7 @@ export default function KnowledgePage() {
 
   const stats = {
     total: documents.length,
-    succeeded: documents.filter((d) => d.status === "succeeded").length,
+    ready: documents.filter((d) => d.status === "ready").length,
     processing: documents.filter(
       (d) =>
         d.status === "processing" ||
@@ -254,7 +253,7 @@ export default function KnowledgePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {stats.succeeded}
+              {stats.ready}
             </div>
           </CardContent>
         </Card>
@@ -374,11 +373,6 @@ export default function KnowledgePage() {
                         <span className="text-xs text-muted-foreground">
                           {new Date(doc.created_at).toLocaleDateString("pl-PL")}
                         </span>
-                        {doc.chunk_count && doc.chunk_count > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            {doc.chunk_count} fragmentow
-                          </span>
-                        )}
                       </div>
                     </div>
 
