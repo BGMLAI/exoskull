@@ -23,6 +23,7 @@ import { logEmotion } from "@/lib/emotion/logger";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
+import { logActivities } from "@/lib/activity-log";
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -497,6 +498,20 @@ export async function processUserMessage(
 
         toolsUsed.push(toolUse.name);
       }
+
+      // Log all tool executions to activity feed
+      logActivities(
+        toolUseBlocks.map((toolUse) => ({
+          tenantId: session.tenantId,
+          actionType: "tool_call" as const,
+          actionName: toolUse.name,
+          description: `Narzedzie: ${toolUse.name}`,
+          source: "conversation",
+          metadata: {
+            toolInput: Object.keys(toolUse.input as Record<string, unknown>),
+          },
+        })),
+      );
 
       // Second API call with tool results (reuse cached system + tools)
       // Use same max_tokens as first call (not lower) so web chat gets full responses

@@ -108,6 +108,14 @@ export const WIDGET_REGISTRY: Record<string, WidgetMeta> = {
     minSize: { w: 1, h: 1 },
     category: "iors",
   },
+  activity_feed: {
+    type: "activity_feed",
+    label: "Aktywnosc IORS",
+    icon: "Activity",
+    defaultSize: { w: 2, h: 3 },
+    minSize: { w: 2, h: 2 },
+    category: "iors",
+  },
 };
 
 /** Get metadata for a widget type. Falls back to a generic entry for dynamic_mod types. */

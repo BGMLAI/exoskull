@@ -16,6 +16,7 @@ import {
   markEventDispatched,
 } from "@/lib/iors/loop";
 import { isUrgent } from "@/lib/iors/loop-classifier";
+import { logActivity } from "@/lib/activity-log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -83,6 +84,19 @@ async function handler(req: NextRequest) {
       }
 
       await markEventDispatched(urgentEvent.id);
+
+      logActivity({
+        tenantId: urgentEvent.tenant_id,
+        actionType: "loop_eval",
+        actionName: `petla_${urgentEvent.event_type}`,
+        description: `Petla: zdarzenie P${urgentEvent.priority} (${urgentEvent.event_type})`,
+        source: "petla",
+        metadata: {
+          eventId: urgentEvent.id,
+          priority: urgentEvent.priority,
+          eventType: urgentEvent.event_type,
+        },
+      });
 
       return NextResponse.json({
         ok: true,

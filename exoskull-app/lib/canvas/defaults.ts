@@ -93,6 +93,18 @@ const DEFAULT_WIDGETS: DefaultWidget[] = [
     sort_order: 5,
     created_by: "system_default",
   },
+  {
+    widget_type: "activity_feed",
+    position_x: 0,
+    position_y: 6,
+    size_w: 2,
+    size_h: 3,
+    min_w: 2,
+    min_h: 2,
+    pinned: false,
+    sort_order: 6,
+    created_by: "system_default",
+  },
 ];
 
 /**

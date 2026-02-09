@@ -4,6 +4,58 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-09] Session: Console Errors Fix + Database Security Hardening
+
+### What was done
+
+**Console errors fixed (commit 7cc494e):**
+- Knowledge page 400: Removed `chunk_count` from Supabase select (column never existed in `exo_user_documents`)
+- Status mismatch: Aligned UI to use `"ready"` (what DB stores) instead of `"succeeded"`
+- VoiceHero pulse 401: Replaced broken `GET /api/pulse` (requires CRON_SECRET) with direct Supabase query for pending tasks count
+
+**Health predictions in widget (commit 539dc47):**
+- Added `HealthPrediction` interface to dashboard types
+- Health API now fetches active predictions from `exo_predictions` table
+- HealthWidget shows predictions with severity-colored badges (green/yellow/orange/red)
+
+**Database security — RLS hardening (commits f9665f6, ded4a60):**
+- Enabled RLS on 53 legacy public tables (all unused, pre-`exo_*` naming)
+- Added `service_role` full access policy on each (backend keeps working)
+- Fixed 3 tables with policies but RLS disabled
+- Fixed 6 `SECURITY DEFINER` views → `SECURITY INVOKER`
+- Fixed `get_tyrolka_context`: `is_active` → `expires_at` check
+- Fixed `get_ai_usage_summary`: ensured `estimated_cost` column exists
+- Fixed `get_tyrolka_context`: GROUP BY error (wrapped in subquery)
+- **Result: 0 linter errors (was ~60)**
+
+### Why
+- User reported console errors on deployed app (Knowledge 400, VoiceHero 401)
+- Supabase Database Linter flagged ~60 security ERRORs on legacy tables
+- Health predictions were implemented but not displayed in UI
+
+### Files changed
+- `exoskull-app/app/dashboard/knowledge/page.tsx`
+- `exoskull-app/components/dashboard/VoiceHero.tsx`
+- `exoskull-app/components/widgets/HealthWidget.tsx`
+- `exoskull-app/lib/dashboard/types.ts`
+- `exoskull-app/app/api/canvas/data/health/route.ts`
+- `exoskull-app/supabase/migrations/20260210000002_enable_rls_legacy_tables.sql`
+- `exoskull-app/supabase/migrations/20260210000003_fix_linter_errors.sql`
+- `exoskull-app/supabase/migrations/20260210000004_fix_tyrolka_groupby.sql`
+
+### How to verify
+- Open Knowledge page → no 400 errors, documents load
+- Dashboard → VoiceHero shows pending tasks count (no 401)
+- Run `supabase db lint --linked` → 0 errors
+
+### Notes for future agents
+- Legacy tables (53) are all `exo_*`-less names from early dev. None referenced in TS code.
+- `exo_user_documents` status flow: uploading → uploaded → processing → ready → failed
+- VoiceHero stats are optional — if Supabase query fails, UI still works
+- Google OAuth redirect_uri_mismatch requires manual config in Google Cloud Console + Supabase Dashboard
+
+---
+
 ## [2026-02-09] feat: Add Composio SaaS apps to integrations UI
 
 ### What was done

@@ -26,6 +26,7 @@ import { emitEvent } from "@/lib/iors/loop";
 import { WEB_CHAT_SYSTEM_OVERRIDE } from "../voice/system-prompt";
 
 import { logger } from "@/lib/logger";
+import { logActivity } from "@/lib/activity-log";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
@@ -136,6 +137,22 @@ async function autoRegisterTenant(
   }
 
   const newTenantId = data!.id;
+
+  // Ensure loop config exists for the new tenant
+  try {
+    await supabase.from("exo_tenant_loop_config").upsert(
+      {
+        tenant_id: newTenantId,
+        timezone: "Europe/Warsaw",
+        next_eval_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      },
+      { onConflict: "tenant_id" },
+    );
+  } catch (loopErr) {
+    logger.warn("[Gateway] Loop config creation failed (non-blocking):", {
+      error: loopErr instanceof Error ? loopErr.message : loopErr,
+    });
+  }
 
   logger.info("[Gateway] Auto-registered tenant:", {
     tenantId: newTenantId,
@@ -268,6 +285,15 @@ export async function handleInboundMessage(
           durationMs,
         });
 
+        logActivity({
+          tenantId,
+          actionType: "chat_message",
+          actionName: "birth_flow",
+          description: `Narodziny IORS — krok via ${msg.channel}`,
+          source: "gateway",
+          metadata: { channel: msg.channel, durationMs },
+        });
+
         return birthResult;
       }
     }
@@ -313,6 +339,16 @@ export async function handleInboundMessage(
         taskId,
         channel: msg.channel,
         reason: classification.reason,
+      });
+
+      logActivity({
+        tenantId,
+        actionType: "cron_action",
+        actionName: "async_queue",
+        description: `Zadanie w kolejce (${classification.reason})`,
+        status: "pending",
+        source: "gateway",
+        metadata: { taskId, channel: msg.channel },
       });
 
       // Fire-and-forget wakeup call to CRON worker for immediate processing
@@ -412,6 +448,20 @@ export async function handleInboundMessage(
       tenantId,
       toolsUsed: result.toolsUsed,
       durationMs,
+    });
+
+    // Log activity for observability
+    logActivity({
+      tenantId,
+      actionType: "chat_message",
+      actionName: "conversation",
+      description: `Odpowiedz via ${msg.channel}${result.toolsUsed.length > 0 ? ` (uzyto: ${result.toolsUsed.join(", ")})` : ""}`,
+      source: "gateway",
+      metadata: {
+        channel: msg.channel,
+        toolsUsed: result.toolsUsed,
+        durationMs,
+      },
     });
 
     // Emit data_ingested event for Pętla loop

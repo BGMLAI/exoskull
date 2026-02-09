@@ -1,17 +1,13 @@
 /**
  * POST /api/chat/send - Send a message in the unified chat
  *
- * Uses the same Claude + IORS_TOOLS pipeline as voice,
- * but returns text (no TTS audio by default).
+ * Routes through the Unified Message Gateway (same pipeline as WhatsApp/Telegram/etc.)
+ * for consistent tool access, unified thread, and Petla event emission.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import {
-  getOrCreateSession,
-  processUserMessage,
-  updateSession,
-  endSession,
-} from "@/lib/voice/conversation-handler";
+import { handleInboundMessage } from "@/lib/gateway/gateway";
+import type { GatewayMessage } from "@/lib/gateway/types";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 
 import { logger } from "@/lib/logger";
@@ -46,14 +42,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get or create session
-    const sessionKey =
-      conversationId ||
-      `chat-${user.id}-${new Date().toISOString().slice(0, 10)}`;
-    const session = await getOrCreateSession(sessionKey, user.id);
+    // Route through Unified Message Gateway (full AI pipeline with 31 tools)
+    const gatewayMsg: GatewayMessage = {
+      channel: "web_chat",
+      from: user.id,
+      text: message.trim(),
+      tenantId: user.id,
+      senderName: user.user_metadata?.first_name || "User",
+      metadata: { conversationId },
+    };
 
-    // Process through Claude with IORS tools
-    const result = await processUserMessage(session, message);
+    const result = await handleInboundMessage(gatewayMsg);
 
     // Track usage
     await incrementUsage(user.id, "conversations").catch((err) => {
@@ -63,20 +62,12 @@ export async function POST(request: NextRequest) {
       );
     });
 
-    // Save to session + unified thread
-    await updateSession(session.id, message, result.text, {
-      tenantId: user.id,
-      channel: "web_chat",
-    });
-
-    if (result.shouldEndCall) {
-      await endSession(session.id);
-    }
-
     return NextResponse.json({
       text: result.text,
       toolsUsed: result.toolsUsed,
-      conversationId: session.id,
+      conversationId:
+        conversationId ||
+        `chat-${user.id}-${new Date().toISOString().slice(0, 10)}`,
     });
   } catch (error) {
     console.error("[Chat Send] Error:", error);

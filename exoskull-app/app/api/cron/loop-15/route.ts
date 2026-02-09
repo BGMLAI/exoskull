@@ -23,6 +23,7 @@ import {
 import { dispatchToHandler } from "@/lib/iors/loop-tasks";
 import type { TenantLoopConfig, ActivityClass } from "@/lib/iors/loop-types";
 import { ModelRouter } from "@/lib/ai/model-router";
+import { logActivity } from "@/lib/activity-log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -185,6 +186,17 @@ async function handler(req: NextRequest) {
           action,
         });
         evaluated++;
+
+        if (action !== "none") {
+          logActivity({
+            tenantId: tenant.tenant_id,
+            actionType: "loop_eval",
+            actionName: `loop15_${action}`,
+            description: `Ewaluacja: ${activityClass}, akcja: ${action}`,
+            source: "loop-15",
+            metadata: { activityClass, action },
+          });
+        }
       } catch (evalErr) {
         console.error("[Loop15] Tenant evaluation failed:", {
           tenantId: tenant.tenant_id,

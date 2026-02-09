@@ -24,6 +24,7 @@ import { EmotionalWidget } from "@/components/widgets/EmotionalWidget";
 import { GuardianWidget } from "@/components/widgets/GuardianWidget";
 import { QuickActionsWidget } from "@/components/widgets/QuickActionsWidget";
 import { IORSStatusWidget } from "@/components/widgets/IORSStatusWidget";
+import { ActivityFeedWidget } from "@/components/widgets/ActivityFeedWidget";
 
 import type {
   HealthSummary,
@@ -247,6 +248,8 @@ export function CanvasGrid({
         return <QuickActionsWidget />;
       case "iors_status":
         return <IORSStatusWidget />;
+      case "activity_feed":
+        return <ActivityFeedWidget />;
       default:
         return (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground p-4">
