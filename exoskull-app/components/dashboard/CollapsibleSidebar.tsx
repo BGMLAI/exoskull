@@ -9,19 +9,27 @@ import {
   Brain,
   Plug,
   Settings,
+  CheckSquare,
+  Target,
+  FileUp,
+  Sparkles,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 // ============================================================================
-// NAVIGATION CONFIG — Canvas-first: 5 screens
+// NAVIGATION CONFIG
 // ============================================================================
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
+  { href: "/dashboard/tasks", label: "Zadania", icon: CheckSquare },
+  { href: "/dashboard/goals", label: "Cele", icon: Target },
+  { href: "/dashboard/knowledge", label: "Wiedza", icon: FileUp },
   { href: "/dashboard/mods", label: "Mody", icon: Package },
-  { href: "/dashboard/settings/integrations", label: "Integracje", icon: Plug },
+  { href: "/dashboard/skills", label: "Skille", icon: Sparkles },
   { href: "/dashboard/memory", label: "Pamiec", icon: Brain },
+  { href: "/dashboard/settings/integrations", label: "Integracje", icon: Plug },
   { href: "/dashboard/settings", label: "Ustawienia", icon: Settings },
 ];
 
