@@ -25,8 +25,9 @@ export async function POST() {
 
     const service = getServiceSupabase();
 
-    // Find assistant messages with false "lite mode" / "basic mode" claims
+    // Find assistant messages with poisoned content (false claims, broken fallbacks)
     const poisonPatterns = [
+      // Old "lite mode" false claims
       "trybie podstawowym",
       "tryb podstawowy",
       "lite version",
@@ -37,6 +38,10 @@ export async function POST() {
       "NIE MAM proaktywnej",
       "nie mam dostępu do Twoich systemów",
       "nie mam połączenia",
+      // Broken fallback responses
+      "Zrobione!",
+      "Gotowe. Użyłem:",
+      "Przepraszam, nie mogłem przetworzyć",
     ];
 
     const { data: messages, error: fetchError } = await service

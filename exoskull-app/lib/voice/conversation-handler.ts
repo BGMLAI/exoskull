@@ -290,14 +290,35 @@ export async function processUserMessage(
   }
 
   // Build dynamic context + emotion + thread context — ALL parallel
-  const [dynamicContext, emotionState, threadMessages] = await Promise.all([
+  const [dynamicContext, emotionState, rawThreadMessages] = await Promise.all([
     buildDynamicContext(session.tenantId),
     analyzeEmotion(userMessage),
     getThreadContext(session.tenantId, 50).catch((err) => {
       console.error("[ConversationHandler] Thread context failed:", err);
-      return [] as Anthropic.MessageParam[];
+      return [] as { role: "user" | "assistant"; content: string }[];
     }),
   ]);
+
+  // Filter out poisoned assistant messages from thread context
+  // (old "Zrobione!" fallback, broken responses that Claude would copy)
+  const POISON_PATTERNS = [
+    "Zrobione!",
+    "Gotowe. Użyłem:",
+    "Przepraszam, nie mogłem przetworzyć",
+    "trybie podstawowym",
+    "tryb podstawowy",
+    "nie mam dostępu do Twoich systemów",
+  ];
+  const threadMessages = rawThreadMessages.filter((msg) => {
+    if (msg.role === "assistant") {
+      const text =
+        typeof msg.content === "string"
+          ? msg.content
+          : JSON.stringify(msg.content);
+      return !POISON_PATTERNS.some((p) => text.includes(p));
+    }
+    return true;
+  });
 
   // Tau Matrix — fire-and-forget 4-quadrant emotion classification
   import("@/lib/iors/emotion-matrix")
@@ -452,12 +473,27 @@ export async function processUserMessage(
   try {
     // First API call (max_tokens low for voice = short, fast responses)
     // system + tools use cache_control for ~6K cached tokens (90% input savings)
+    logger.info("[ConversationHandler] Calling Claude API:", {
+      model: CLAUDE_MODEL,
+      maxTokens: session.maxTokens || maxTokensOverride || 200,
+      messageCount: messages.length,
+      threadFiltered:
+        rawThreadMessages.length - threadMessages.length + " poisoned removed",
+      tenantId: session.tenantId,
+    });
+
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
       max_tokens: session.maxTokens || maxTokensOverride || 200,
       system: systemBlocks,
       messages,
       tools: IORS_TOOLS,
+    });
+
+    logger.info("[ConversationHandler] First response:", {
+      stopReason: response.stop_reason,
+      contentTypes: response.content.map((c) => c.type),
+      tenantId: session.tenantId,
     });
 
     // Check for tool use
