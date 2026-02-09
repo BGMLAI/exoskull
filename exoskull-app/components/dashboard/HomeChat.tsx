@@ -37,6 +37,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTTS } from "@/lib/hooks/useTTS";
+import { MarkdownContent } from "@/components/ui/markdown-content";
 
 interface HomeChatProps {
   tenantId: string;
@@ -645,7 +646,11 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
                 {item.subject && (
                   <div className="font-medium text-xs mb-1">{item.subject}</div>
                 )}
-                <p className="whitespace-pre-wrap">{item.content}</p>
+                {item.role === "assistant" ? (
+                  <MarkdownContent content={item.content} />
+                ) : (
+                  <p className="whitespace-pre-wrap">{item.content}</p>
+                )}
               </div>
 
               <div className="text-xs text-muted-foreground mt-1">
@@ -691,7 +696,13 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
                     : "bg-muted text-foreground",
                 )}
               >
-                {msg.content || (
+                {msg.content ? (
+                  msg.role === "assistant" ? (
+                    <MarkdownContent content={msg.content} />
+                  ) : (
+                    <span className="whitespace-pre-wrap">{msg.content}</span>
+                  )
+                ) : (
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 bg-current rounded-full animate-bounce" />
                     <span

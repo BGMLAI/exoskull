@@ -1,42 +1,43 @@
-'use client'
+"use client";
 
-import { useEffect, useRef } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
-import { MessageSquare, Mic, Volume2 } from 'lucide-react'
+import { useEffect, useRef } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { MessageSquare, Mic, Volume2 } from "lucide-react";
+import { MarkdownContent } from "@/components/ui/markdown-content";
 
 export interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  timestamp: Date
-  isInterim?: boolean
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp: Date;
+  isInterim?: boolean;
 }
 
 interface ChatPanelProps {
-  messages: ChatMessage[]
-  isUserSpeaking?: boolean
-  isAgentSpeaking?: boolean
-  className?: string
+  messages: ChatMessage[];
+  isUserSpeaking?: boolean;
+  isAgentSpeaking?: boolean;
+  className?: string;
 }
 
 export function ChatPanel({
   messages,
   isUserSpeaking = false,
   isAgentSpeaking = false,
-  className
+  className,
 }: ChatPanelProps) {
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isUserSpeaking, isAgentSpeaking])
+  }, [messages, isUserSpeaking, isAgentSpeaking]);
 
   return (
-    <Card className={cn('flex flex-col h-full', className)}>
+    <Card className={cn("flex flex-col h-full", className)}>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <MessageSquare className="h-5 w-5" />
@@ -79,12 +80,12 @@ export function ChatPanel({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {
-  const isUser = message.role === 'user'
-  const isSystem = message.role === 'system'
+  const isUser = message.role === "user";
+  const isSystem = message.role === "system";
 
   if (isSystem) {
     return (
@@ -93,37 +94,41 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           {message.content}
         </span>
       </div>
-    )
+    );
   }
 
   return (
-    <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
+    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          'max-w-[80%] px-4 py-2 rounded-2xl',
+          "max-w-[80%] px-4 py-2 rounded-2xl",
           isUser
-            ? 'bg-blue-500 text-white rounded-br-md'
-            : 'bg-gray-100 dark:bg-gray-800 text-foreground rounded-bl-md',
-          message.isInterim && 'opacity-60'
+            ? "bg-blue-500 text-white rounded-br-md"
+            : "bg-gray-100 dark:bg-gray-800 text-foreground rounded-bl-md",
+          message.isInterim && "opacity-60",
         )}
       >
-        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        {message.role === "assistant" ? (
+          <MarkdownContent content={message.content} />
+        ) : (
+          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        )}
         <p
           className={cn(
-            'text-xs mt-1',
-            isUser ? 'text-blue-100' : 'text-muted-foreground'
+            "text-xs mt-1",
+            isUser ? "text-blue-100" : "text-muted-foreground",
           )}
         >
           {formatTime(message.timestamp)}
         </p>
       </div>
     </div>
-  )
+  );
 }
 
 function formatTime(date: Date): string {
-  return date.toLocaleTimeString('pl-PL', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  return date.toLocaleTimeString("pl-PL", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

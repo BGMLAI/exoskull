@@ -8,6 +8,7 @@ import {
   type WebSpeechInstance,
 } from "@/lib/voice/web-speech";
 import { cn } from "@/lib/utils";
+import { MarkdownContent } from "@/components/ui/markdown-content";
 
 // ============================================================================
 // TYPES
@@ -263,7 +264,11 @@ export function ConversationPanel({
                   : "bg-muted text-foreground",
               )}
             >
-              <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+              {msg.role === "assistant" ? (
+                <MarkdownContent content={msg.content} />
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+              )}
               {msg.type === "voice_transcript" && (
                 <span className="text-xs opacity-60 mt-1 block">
                   <Mic className="w-3 h-3 inline mr-1" />
