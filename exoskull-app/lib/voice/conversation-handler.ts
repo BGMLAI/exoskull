@@ -250,13 +250,11 @@ async function executeTool(
 const END_PHRASES = [
   "do widzenia",
   "pa pa",
-  "koniec",
   "dziękuję to wszystko",
-  "to wszystko",
-  "cześć",
+  "to wszystko na dziś",
   "nara",
-  "trzymaj się",
   "do usłyszenia",
+  "dobranoc",
 ];
 
 function shouldEndCall(userText: string): boolean {
