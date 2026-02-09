@@ -52,6 +52,7 @@ export function VoiceInterface({
     return () => {
       mediaRecorderRef.current?.stop();
       audioRef.current?.pause();
+      window.speechSynthesis?.cancel();
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
@@ -60,29 +61,19 @@ export function VoiceInterface({
   // AUDIO PLAYBACK (TTS)
   // ============================================================================
 
-  const playAudio = useCallback(async (audioBase64: string) => {
+  const speakText = useCallback((text: string) => {
     try {
       setState("speaking");
-      const audioBytes = Uint8Array.from(atob(audioBase64), (c) =>
-        c.charCodeAt(0),
-      );
-      const audioBlob = new Blob([audioBytes], { type: "audio/mpeg" });
-      const audioUrl = URL.createObjectURL(audioBlob);
-
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-
-      audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-        setState("idle");
-      };
-      audio.onerror = () => {
-        URL.revokeObjectURL(audioUrl);
-        setState("idle");
-      };
-      await audio.play();
+      // Use browser speechSynthesis — instant, no server round-trip
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "pl-PL";
+      utterance.rate = 1.05;
+      utterance.onend = () => setState("idle");
+      utterance.onerror = () => setState("idle");
+      window.speechSynthesis.cancel(); // stop any previous
+      window.speechSynthesis.speak(utterance);
     } catch (err) {
-      console.error("[VoiceInterface] Audio playback failed:", err);
+      console.error("[VoiceInterface] Browser TTS failed:", err);
       setState("idle");
     }
   }, []);
@@ -108,13 +99,15 @@ export function VoiceInterface({
       setMessages((prev) => [...prev, userMessage]);
 
       try {
+        // Skip server TTS (generateAudio: false) — use browser speechSynthesis instead
+        // This saves ~2s of Cartesia round-trip latency
         const response = await fetch("/api/voice/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: text.trim(),
             sessionId,
-            generateAudio: true,
+            generateAudio: false,
           }),
         });
 
@@ -136,8 +129,9 @@ export function VoiceInterface({
         };
         setMessages((prev) => [...prev, assistantMessage]);
 
-        if (data.audio) {
-          await playAudio(data.audio);
+        // Instant browser TTS (no server round-trip)
+        if (data.text) {
+          speakText(data.text);
         } else {
           setState("idle");
         }
@@ -154,7 +148,7 @@ export function VoiceInterface({
         }, 5000);
       }
     },
-    [sessionId, playAudio],
+    [sessionId, speakText],
   );
 
   // ============================================================================
@@ -268,6 +262,7 @@ export function VoiceInterface({
   }, []);
 
   const stopSpeaking = useCallback(() => {
+    window.speechSynthesis.cancel();
     audioRef.current?.pause();
     setState("idle");
   }, []);

@@ -289,10 +289,14 @@ export async function processUserMessage(
     };
   }
 
-  // Build dynamic context + emotion analysis (parallel)
-  const [dynamicContext, emotionState] = await Promise.all([
+  // Build dynamic context + emotion + thread context — ALL parallel
+  const [dynamicContext, emotionState, threadMessages] = await Promise.all([
     buildDynamicContext(session.tenantId),
     analyzeEmotion(userMessage),
+    getThreadContext(session.tenantId, 50).catch((err) => {
+      console.error("[ConversationHandler] Thread context failed:", err);
+      return [] as Anthropic.MessageParam[];
+    }),
   ]);
 
   // Tau Matrix — fire-and-forget 4-quadrant emotion classification
@@ -422,41 +426,25 @@ export async function processUserMessage(
     }
   }
 
-  // Build messages array - ZAWSZE używaj unified thread (cross-channel context)
-  // Limit 50 wiadomości + przyszłe digests dla długoterminowej pamięci
+  // Build messages array from pre-fetched thread context (loaded in parallel above)
   let messages: Anthropic.MessageParam[];
-  try {
-    const threadMessages = await getThreadContext(session.tenantId, 50);
 
-    if (options?.skipThreadAppend && threadMessages.length > 0) {
-      // Gateway already appended this user message to the thread.
-      // threadMessages already contains it — don't add again.
-      messages = threadMessages;
-    } else {
-      // Direct callers (voice, birth-chat) haven't written to thread yet.
-      messages = [...threadMessages, { role: "user", content: userMessage }];
-    }
+  if (options?.skipThreadAppend && threadMessages.length > 0) {
+    // Gateway already appended this user message to the thread.
+    messages = threadMessages;
+  } else {
+    messages = [...threadMessages, { role: "user", content: userMessage }];
+  }
 
-    // Safety: ensure messages end with a user message
-    if (
-      messages.length === 0 ||
-      messages[messages.length - 1].role !== "user"
-    ) {
-      messages = [...messages, { role: "user", content: userMessage }];
-    }
+  // Safety: ensure messages end with a user message
+  if (messages.length === 0 || messages[messages.length - 1].role !== "user") {
+    messages = [...messages, { role: "user", content: userMessage }];
+  }
 
-    if (threadMessages.length > 0) {
-      logger.info(
-        `[ConversationHandler] Loaded ${threadMessages.length} messages from unified thread (skipThreadAppend=${!!options?.skipThreadAppend})`,
-      );
-    }
-  } catch (error) {
-    console.error(
-      "[ConversationHandler] Failed to load thread context:",
-      error,
+  if (threadMessages.length > 0) {
+    logger.info(
+      `[ConversationHandler] Loaded ${threadMessages.length} messages from unified thread (skipThreadAppend=${!!options?.skipThreadAppend})`,
     );
-    // Nawet przy błędzie - nie fallback do session.messages, użyj pustej historii
-    messages = [{ role: "user", content: userMessage }];
   }
 
   const toolsUsed: string[] = [];
@@ -478,22 +466,27 @@ export async function processUserMessage(
     );
 
     if (toolUseBlocks.length > 0) {
-      // Execute all tool calls
-      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+      // Execute all tool calls in PARALLEL (was sequential)
+      const toolExecutions = await Promise.all(
+        toolUseBlocks.map(async (toolUse) => {
+          const result = await executeTool(
+            toolUse.name,
+            toolUse.input as Record<string, any>,
+            session.tenantId,
+          );
+          return { toolUse, result };
+        }),
+      );
 
-      for (const toolUse of toolUseBlocks) {
-        const result = await executeTool(
-          toolUse.name,
-          toolUse.input as Record<string, any>,
-          session.tenantId,
-        );
-
-        toolResults.push({
-          type: "tool_result",
+      const toolResults: Anthropic.ToolResultBlockParam[] = toolExecutions.map(
+        ({ toolUse, result }) => ({
+          type: "tool_result" as const,
           tool_use_id: toolUse.id,
           content: result,
-        });
+        }),
+      );
 
+      for (const { toolUse } of toolExecutions) {
         toolsUsed.push(toolUse.name);
       }
 
