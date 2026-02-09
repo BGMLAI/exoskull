@@ -46,10 +46,26 @@ export function VoiceInterface({
   const chunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const polishVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
 
-  // Cleanup on unmount
+  // Pick best Polish voice + cleanup on unmount
   useEffect(() => {
+    function pickVoice() {
+      const voices = window.speechSynthesis?.getVoices() || [];
+      const polish = voices.filter(
+        (v) => v.lang === "pl-PL" || v.lang.startsWith("pl"),
+      );
+      polishVoiceRef.current =
+        polish.find((v) => v.name.includes("Google")) ||
+        polish.find((v) => !v.localService) ||
+        polish[0] ||
+        null;
+    }
+    pickVoice();
+    window.speechSynthesis?.addEventListener("voiceschanged", pickVoice);
+
     return () => {
+      window.speechSynthesis?.removeEventListener("voiceschanged", pickVoice);
       mediaRecorderRef.current?.stop();
       audioRef.current?.pause();
       window.speechSynthesis?.cancel();
@@ -64,13 +80,27 @@ export function VoiceInterface({
   const speakText = useCallback((text: string) => {
     try {
       setState("speaking");
-      // Use browser speechSynthesis — instant, no server round-trip
-      const utterance = new SpeechSynthesisUtterance(text);
+      // Strip markdown for cleaner speech
+      const clean = text
+        .replace(/[*_~`#>\[\]()!|]/g, "")
+        .replace(/\n+/g, ". ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!clean) {
+        setState("idle");
+        return;
+      }
+
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(clean);
       utterance.lang = "pl-PL";
       utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      if (polishVoiceRef.current) {
+        utterance.voice = polishVoiceRef.current;
+      }
       utterance.onend = () => setState("idle");
       utterance.onerror = () => setState("idle");
-      window.speechSynthesis.cancel(); // stop any previous
       window.speechSynthesis.speak(utterance);
     } catch (err) {
       console.error("[VoiceInterface] Browser TTS failed:", err);

@@ -79,10 +79,15 @@ const config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "wave-bar": {
+          "0%, 100%": { height: "8px" },
+          "50%": { height: "24px" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "wave-bar": "wave-bar 1s ease-in-out infinite",
       },
     },
   },

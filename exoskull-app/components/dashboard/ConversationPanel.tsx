@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Mic, MicOff, Loader2 } from "lucide-react";
+import { Send, Mic, MicOff, Loader2, Volume2, VolumeX } from "lucide-react";
 import {
   createSpeechRecognition,
   isWebSpeechSupported,
@@ -43,18 +43,77 @@ export function ConversationPanel({
   const [transcript, setTranscript] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const speechRef = useRef<WebSpeechInstance | null>(null);
+  const polishVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
 
   useEffect(() => {
     setIsSpeechSupported(isWebSpeechSupported());
+
+    // Find best Polish voice — prefer Google voices (much better quality)
+    function pickVoice() {
+      const voices = window.speechSynthesis?.getVoices() || [];
+      const polish = voices.filter(
+        (v) => v.lang === "pl-PL" || v.lang.startsWith("pl"),
+      );
+      // Prefer Google voices (higher quality), then any remote, then any Polish
+      polishVoiceRef.current =
+        polish.find((v) => v.name.includes("Google")) ||
+        polish.find((v) => !v.localService) ||
+        polish[0] ||
+        null;
+    }
+    pickVoice();
+    window.speechSynthesis?.addEventListener("voiceschanged", pickVoice);
+    return () => {
+      window.speechSynthesis?.removeEventListener("voiceschanged", pickVoice);
+      window.speechSynthesis?.cancel();
+    };
   }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // ============================================================================
+  // TTS — Read AI responses aloud
+  // ============================================================================
+
+  const speakText = useCallback(
+    (text: string) => {
+      if (!ttsEnabled || !window.speechSynthesis) return;
+      // Strip markdown formatting for cleaner speech
+      const clean = text
+        .replace(/[*_~`#>\[\]()!|]/g, "")
+        .replace(/\n+/g, ". ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!clean) return;
+
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(clean);
+      utterance.lang = "pl-PL";
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      if (polishVoiceRef.current) {
+        utterance.voice = polishVoiceRef.current;
+      }
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    },
+    [ttsEnabled],
+  );
+
+  const stopSpeaking = useCallback(() => {
+    window.speechSynthesis?.cancel();
+    setIsSpeaking(false);
+  }, []);
 
   // ============================================================================
   // SEND MESSAGE
@@ -138,6 +197,9 @@ export function ConversationPanel({
                       : msg,
                   ),
                 );
+              } else if (data.type === "done" && data.fullText) {
+                // Auto-read AI response aloud
+                speakText(data.fullText);
               } else if (data.type === "error") {
                 setMessages((prev) =>
                   prev.map((msg) =>
@@ -172,7 +234,7 @@ export function ConversationPanel({
         setIsLoading(false);
       }
     },
-    [conversationId, isLoading],
+    [conversationId, isLoading, speakText],
   );
 
   // ============================================================================
@@ -265,7 +327,18 @@ export function ConversationPanel({
               )}
             >
               {msg.role === "assistant" ? (
-                <MarkdownContent content={msg.content} />
+                <>
+                  <MarkdownContent content={msg.content} />
+                  {msg.content && (
+                    <button
+                      onClick={() => speakText(msg.content)}
+                      className="mt-1 p-1 rounded hover:bg-background/20 transition-colors inline-flex items-center gap-1 text-xs opacity-50 hover:opacity-100"
+                      title="Odczytaj na glos"
+                    >
+                      <Volume2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </>
               ) : (
                 <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
               )}
@@ -305,7 +378,7 @@ export function ConversationPanel({
       {/* Input area */}
       <div className="p-3 border-t bg-card">
         <div className="flex items-center gap-2">
-          {/* Voice toggle */}
+          {/* Voice input toggle */}
           {isSpeechSupported && (
             <button
               onClick={isListening ? stopListening : startListening}
@@ -324,6 +397,38 @@ export function ConversationPanel({
               )}
             </button>
           )}
+
+          {/* TTS toggle / stop */}
+          <button
+            onClick={() => {
+              if (isSpeaking) {
+                stopSpeaking();
+              } else {
+                setTtsEnabled((prev) => !prev);
+              }
+            }}
+            className={cn(
+              "p-2.5 rounded-full transition-colors shrink-0",
+              isSpeaking
+                ? "bg-primary text-primary-foreground animate-pulse"
+                : ttsEnabled
+                  ? "bg-muted text-foreground hover:bg-accent"
+                  : "bg-muted text-muted-foreground hover:bg-accent",
+            )}
+            title={
+              isSpeaking
+                ? "Zatrzymaj czytanie"
+                : ttsEnabled
+                  ? "Wylacz czytanie na glos"
+                  : "Wlacz czytanie na glos"
+            }
+          >
+            {ttsEnabled ? (
+              <Volume2 className="w-4 h-4" />
+            ) : (
+              <VolumeX className="w-4 h-4" />
+            )}
+          </button>
 
           {/* Text input */}
           <input

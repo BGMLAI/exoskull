@@ -59,6 +59,13 @@ export interface ConversationResult {
   shouldEndCall: boolean;
 }
 
+/** Callback for real-time processing events (used by SSE stream) */
+export interface ProcessingCallback {
+  onThinkingStep?: (step: string, status: "running" | "done") => void;
+  onToolStart?: (toolName: string) => void;
+  onToolEnd?: (toolName: string, durationMs: number) => void;
+}
+
 // ============================================================================
 // TOOL DEFINITIONS — all from IORS registry
 // ============================================================================
@@ -276,6 +283,8 @@ export async function processUserMessage(
     recordingUrl?: string;
     /** Gateway already wrote the user message to unified thread — don't re-add */
     skipThreadAppend?: boolean;
+    /** Optional callback for real-time processing events (SSE stream) */
+    callback?: ProcessingCallback;
   },
 ): Promise<ConversationResult> {
   const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
@@ -288,6 +297,9 @@ export async function processUserMessage(
       shouldEndCall: true,
     };
   }
+
+  // Fire thinking step: loading context
+  options?.callback?.onThinkingStep?.("Ładuję kontekst", "running");
 
   // Build dynamic context + emotion + thread context — ALL parallel
   const [dynamicContext, emotionState, rawThreadMessages] = await Promise.all([
@@ -471,6 +483,10 @@ export async function processUserMessage(
   const toolsUsed: string[] = [];
 
   try {
+    // Fire thinking step: context loaded, generating response
+    options?.callback?.onThinkingStep?.("Ładuję kontekst", "done");
+    options?.callback?.onThinkingStep?.("Generuję odpowiedź", "running");
+
     // First API call (max_tokens low for voice = short, fast responses)
     // system + tools use cache_control for ~6K cached tokens (90% input savings)
     logger.info("[ConversationHandler] Calling Claude API:", {
@@ -502,14 +518,20 @@ export async function processUserMessage(
     );
 
     if (toolUseBlocks.length > 0) {
+      // Fire thinking step: tools detected
+      options?.callback?.onThinkingStep?.("Generuję odpowiedź", "done");
+
       // Execute all tool calls in PARALLEL (was sequential)
       const toolExecutions = await Promise.all(
         toolUseBlocks.map(async (toolUse) => {
+          options?.callback?.onToolStart?.(toolUse.name);
+          const toolStart = Date.now();
           const result = await executeTool(
             toolUse.name,
             toolUse.input as Record<string, any>,
             session.tenantId,
           );
+          options?.callback?.onToolEnd?.(toolUse.name, Date.now() - toolStart);
           return { toolUse, result };
         }),
       );
@@ -573,12 +595,18 @@ export async function processUserMessage(
         // Execute additional tool calls
         const newResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
           newToolBlocks.map(async (toolUse) => {
+            options?.callback?.onToolStart?.(toolUse.name);
+            const toolStart = Date.now();
             const result = await executeTool(
               toolUse.name,
               toolUse.input as Record<string, unknown>,
               session.tenantId,
             );
             toolsUsed.push(toolUse.name);
+            options?.callback?.onToolEnd?.(
+              toolUse.name,
+              Date.now() - toolStart,
+            );
             return {
               type: "tool_result" as const,
               tool_use_id: toolUse.id,
@@ -643,6 +671,9 @@ export async function processUserMessage(
         shouldEndCall: false,
       };
     }
+
+    // No tool use — mark generating as done
+    options?.callback?.onThinkingStep?.("Generuję odpowiedź", "done");
 
     // No tool use, return text directly
     const textContent = response.content.find(
