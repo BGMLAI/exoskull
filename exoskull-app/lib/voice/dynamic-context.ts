@@ -8,6 +8,7 @@
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { getThreadSummary } from "../unified-thread";
 import { getPendingSuggestions } from "../skills/detector";
+import { listConnections } from "@/lib/integrations/composio-adapter";
 
 import { logger } from "@/lib/logger";
 /**
@@ -26,6 +27,8 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
     threadResult,
     goalsResult,
     suggestionsResult,
+    docsResult,
+    connectionsResult,
   ] = await Promise.allSettled([
     // 1. User profile
     supabase
@@ -55,6 +58,13 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
       .catch(() => []),
     // 6. Skill suggestions
     getPendingSuggestions(tenantId, 3).catch(() => []),
+    // 7. Knowledge base document count
+    supabase
+      .from("exo_user_documents")
+      .select("status", { count: "exact" })
+      .eq("tenant_id", tenantId),
+    // 8. Composio connected integrations
+    listConnections(tenantId).catch(() => []),
   ]);
 
   // ── Extract results safely ──
@@ -82,6 +92,11 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
           description: string;
           confidence: number;
         }>)
+      : [];
+  const docsData = docsResult.status === "fulfilled" ? docsResult.value : null;
+  const connections =
+    connectionsResult.status === "fulfilled"
+      ? (connectionsResult.value as Array<{ toolkit: string; status: string }>)
       : [];
 
   // ── Build context string ──
@@ -155,6 +170,23 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
       context += `- ${s.goal.name}: ${Math.round(s.progress_percent)}% [${status}]${days}\n`;
     }
     context += `Gdy user pyta o cele, użyj "check_goals". Gdy raportuje postęp, użyj "log_goal_progress".\n`;
+  }
+
+  // Knowledge base
+  if (docsData && "count" in docsData && (docsData.count ?? 0) > 0) {
+    const totalDocs = docsData.count ?? 0;
+    const readyDocs = (docsData.data ?? []).filter(
+      (d: { status: string }) => d.status === "ready",
+    ).length;
+    context += `- Baza wiedzy: ${totalDocs} dokumentow (${readyDocs} gotowych do przeszukania)\n`;
+    context += `  → Gdy user pyta o COKOLWIEK co mogl wgrac w plikach, ZAWSZE uzyj "search_knowledge" ZANIM powiesz "nie wiem".\n`;
+  }
+
+  // Connected integrations (Composio)
+  if (connections.length > 0) {
+    const connList = connections.map((c) => c.toolkit).join(", ");
+    context += `- Podlaczone integracje: ${connList}\n`;
+    context += `  → Mozesz uzywac tych uslug (np. wyslij email przez Gmail, sprawdz kalendarz). Uzyj "composio_action".\n`;
   }
 
   // Skill suggestions
