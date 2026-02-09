@@ -19,6 +19,52 @@
 
 ---
 
+## **Available Skills (Slash Commands)**
+
+20 plugins installed. Use these skills proactively when relevant:
+
+**Git & Code Quality:**
+| Skill | When to use |
+|-------|-------------|
+| `/commit` | Create a git commit (auto-analyzes changes, matches repo style) |
+| `/commit-push-pr` | Full workflow: commit → push → create PR in one step |
+| `/clean_gone` | Clean up local branches deleted on remote |
+| `/code-review` | Review a pull request with 4 parallel agents (confidence ≥80) |
+| `/review-pr` | Comprehensive PR review with 6 specialized agents |
+
+**Feature Development:**
+| Skill | When to use |
+|-------|-------------|
+| `/feature-dev` | 7-phase guided workflow: Discovery → Explore → Questions → Architecture → Implement → Review → Summary |
+| `/frontend-design` | Create distinctive, production-grade UI (auto-activates for frontend work) |
+| `/new-sdk-app` | Scaffold new Claude Agent SDK application (Python or TypeScript) |
+
+**Automation & Hooks:**
+| Skill | When to use |
+|-------|-------------|
+| `/hookify` | Create hooks from conversation analysis or explicit instructions |
+| `/hookify:list` | List all active hookify rules |
+| `/hookify:configure` | Enable/disable hookify rules interactively |
+| `/hookify:writing-rules` | Guidance on hookify rule syntax and patterns |
+
+**CLAUDE.md & Setup:**
+| Skill | When to use |
+|-------|-------------|
+| `/revise-claude-md` | Capture session learnings into CLAUDE.md |
+| `/claude-md-improver` | Audit and improve CLAUDE.md quality against codebase |
+| `/claude-automation-recommender` | Analyze codebase → recommend hooks, skills, MCP servers, subagents |
+
+**Autonomous Loops:**
+| Skill | When to use |
+|-------|-------------|
+| `/ralph-loop` | Start autonomous while-true dev loop (Claude works until task complete) |
+| `/cancel-ralph` | Cancel active Ralph Loop |
+
+**Installed Plugins (active):**
+typescript-lsp, pyright-lsp, playwright, supabase, context7, github, code-simplifier, security-guidance, explanatory-output-style, learning-output-style, agent-sdk-dev, claude-code-setup, claude-md-management, code-review, commit-commands, feature-dev, frontend-design, hookify, pr-review-toolkit, ralph-loop
+
+---
+
 ## **The GOTCHA Framework**
 
 This system uses the **GOTCHA Framework** — a 6-layer architecture for agentic systems:

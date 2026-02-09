@@ -25,11 +25,16 @@ import { GuardianWidget } from "@/components/widgets/GuardianWidget";
 import { QuickActionsWidget } from "@/components/widgets/QuickActionsWidget";
 import { IORSStatusWidget } from "@/components/widgets/IORSStatusWidget";
 import { ActivityFeedWidget } from "@/components/widgets/ActivityFeedWidget";
+import { OptimizationWidget } from "@/components/widgets/OptimizationWidget";
+import { InterventionInboxWidget } from "@/components/widgets/InterventionInboxWidget";
+import { InsightHistoryWidget } from "@/components/widgets/InsightHistoryWidget";
 
 import type {
   HealthSummary,
   TaskStats,
   DataPoint,
+  OptimizationStats,
+  InterventionInboxData,
 } from "@/lib/dashboard/types";
 
 // ============================================================================
@@ -75,7 +80,16 @@ function CanvasTasksWidget() {
 }
 
 function CanvasCalendarWidget() {
-  return <CalendarWidget items={[]} />;
+  const [items, setItems] = useState<
+    import("@/lib/dashboard/types").CalendarItem[]
+  >([]);
+  useEffect(() => {
+    fetch("/api/canvas/data/calendar")
+      .then((r) => r.json())
+      .then((d) => setItems(d.items || []))
+      .catch((e) => console.error("[CanvasCalendar] Fetch error:", e));
+  }, []);
+  return <CalendarWidget items={items} />;
 }
 
 function CanvasConversationsWidget() {
@@ -84,11 +98,91 @@ function CanvasConversationsWidget() {
     totalWeek: number;
     avgDuration: number;
   } | null>(null);
+  const [series, setSeries] = useState<DataPoint[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   useEffect(() => {
-    setStats({ totalToday: 0, totalWeek: 0, avgDuration: 0 });
+    fetch("/api/canvas/data/conversations")
+      .then((r) => r.json())
+      .then((d) => {
+        setStats({
+          totalToday: d.totalToday || 0,
+          totalWeek: d.totalWeek || 0,
+          avgDuration: d.avgDuration || 0,
+        });
+        setSeries(d.series || []);
+        setLastUpdated(d.lastUpdated || null);
+      })
+      .catch((e) => console.error("[CanvasConversations] Fetch error:", e));
   }, []);
   if (!stats) return <WidgetSkeleton />;
-  return <ConversationsWidget stats={stats} />;
+  return (
+    <ConversationsWidget
+      stats={stats}
+      series={series}
+      lastUpdated={lastUpdated}
+    />
+  );
+}
+
+function CanvasOptimizationWidget() {
+  const [stats, setStats] = useState<OptimizationStats | null>(null);
+  useEffect(() => {
+    const load = () =>
+      fetch("/api/canvas/data/optimization")
+        .then((r) => r.json())
+        .then(setStats)
+        .catch((e) => console.error("[CanvasOptimization] Fetch error:", e));
+    load();
+    const interval = setInterval(load, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+  if (!stats) return <WidgetSkeleton />;
+  return <OptimizationWidget stats={stats} />;
+}
+
+function CanvasInterventionInboxWidget() {
+  const [data, setData] = useState<InterventionInboxData | null>(null);
+  useEffect(() => {
+    const load = () =>
+      fetch("/api/canvas/data/interventions")
+        .then((r) => r.json())
+        .then(setData)
+        .catch((e) =>
+          console.error("[CanvasInterventionInbox] Fetch error:", e),
+        );
+    load();
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, []);
+  if (!data) return <WidgetSkeleton />;
+  return (
+    <InterventionInboxWidget
+      pending={data.pending}
+      needsFeedback={data.needsFeedback}
+    />
+  );
+}
+
+function CanvasInsightHistoryWidget() {
+  const [insights, setInsights] = useState<
+    Array<{
+      id: string;
+      insight_summary: string;
+      delivery_channel: string;
+      delivered_at: string;
+      source_type: "intervention" | "highlight" | "learning" | "unknown";
+    }>
+  >([]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    fetch("/api/canvas/data/insights")
+      .then((r) => r.json())
+      .then((d) => setInsights(d.insights || []))
+      .catch((e) => console.error("[CanvasInsightHistory] Fetch error:", e))
+      .finally(() => setLoaded(true));
+  }, []);
+  if (!loaded) return <WidgetSkeleton />;
+  return <InsightHistoryWidget insights={insights} />;
 }
 
 // ============================================================================
@@ -250,6 +344,12 @@ export function CanvasGrid({
         return <IORSStatusWidget />;
       case "activity_feed":
         return <ActivityFeedWidget />;
+      case "optimization":
+        return <CanvasOptimizationWidget />;
+      case "intervention_inbox":
+        return <CanvasInterventionInboxWidget />;
+      case "insight_history":
+        return <CanvasInsightHistoryWidget />;
       default:
         return (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground p-4">

@@ -4,6 +4,248 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-09] Cleanup: Project root declutter — move archives to D drive
+
+### What was done
+- Moved 13 items to `D:\EXO\backups\exoskull-cleanup-20260209\`:
+  - `ovh_manager/` — old OVH VPS infrastructure scripts (no longer used, on Vercel now)
+  - `IORS_*.md` (6 files, ~160KB) — design-phase documentation superseded by `ARCHITECTURE.md`
+  - `AGENT_PROMPT*.md` (2 files, ~53KB) — old agent prompts (were gitignored)
+  - `voices.json` (124KB) — voice ID mappings, not referenced anywhere in codebase
+  - `config/` (3 files) — old OVH/local-node server configs
+  - `Windows-MCP/` — separate MCP server project, shouldn't live inside exoskull repo
+- Deleted artifacts with zero value:
+  - `nul` — Windows device file artifact
+  - `exoskull-app/.env.vercel-check` — one-time Vercel env validation
+  - `exoskull-app/.tmp/` — old temp directory with stale SQL
+- Security: removed `ovh_credentials.json` (plaintext API credentials) from backup
+
+### Why
+- Project root had 20+ files/dirs, many unused since architecture pivot to Vercel/Supabase
+- Old IORS design docs superseded by consolidated `ARCHITECTURE.md` (126KB)
+- `Windows-MCP` is a separate git repo that was incorrectly nested
+
+### Files changed
+- Moved to D: 13 items
+- Deleted: 3 artifacts
+- No source code changes
+
+### How to verify
+- `ls c:/Users/bogum/exoskull/` shows only: ARCHITECTURE.md, args, build_app.md, CHANGELOG.md, CLAUDE.md, context, docs, exoskull-app, goals, hardprompts, tools
+- `ls D:/EXO/backups/exoskull-cleanup-20260209/` shows all archived items
+
+### Notes for future agents
+- Archived files are on `D:\EXO\backups\exoskull-cleanup-20260209\` if ever needed
+- `voices.json` was never imported in code — if voice ID mappings needed, restore from D drive
+- `Windows-MCP` has its own `.git` repo — can be cloned independently
+
+---
+
+## [2026-02-09] Feature: Self-Optimization Dashboard — Visible, Interactive IORS Learning
+
+### What was done
+
+**Fixed 2 broken widgets:**
+- ConversationsWidget: was hardcoded to zeros, now fetches real data from `exo_unified_messages` + `exo_voice_sessions` (today/week counts, avg duration, 7-day series)
+- CalendarWidget: was always empty, now aggregates scheduled jobs + task deadlines + upcoming interventions
+
+**Created 3 new widgets:**
+- **OptimizationWidget** (crown jewel): shows IORS learning progress (highlights extracted, patterns detected, skills created), intervention success rate bar, user satisfaction rating, week-over-week trend, last MAPE-K cycle status. Auto-refreshes every 60s.
+- **InterventionInboxWidget**: approve/dismiss pending interventions from dashboard (not just chat), give thumbs-up/down feedback on completed ones. Auto-refreshes every 30s.
+- **InsightHistoryWidget**: shows proactive insights IORS pushed to user, enriched from source tables (interventions, highlights, learning events), with inline feedback buttons.
+
+**Created 6 new API endpoints:**
+- `GET /api/canvas/data/conversations` — real conversation stats
+- `GET /api/canvas/data/calendar` — upcoming events from 3 sources
+- `GET /api/canvas/data/optimization` — self-optimization metrics (8 parallel queries)
+- `GET /api/canvas/data/interventions` — pending + needs-feedback interventions
+- `GET /api/canvas/data/insights` — enriched insight delivery history
+- `POST /api/interventions/[id]/respond` — approve/dismiss/feedback from dashboard
+
+**Closed optimization feedback loop:**
+- `optimization.ts` no longer just logs stats — now auto-tunes:
+  - Low satisfaction (avg <2.5/5 over 5+ ratings) → diagnoses failing intervention types, pivots communication style (formal→empathetic, direct→detailed), does NOT reduce proactivity
+  - High satisfaction (avg >=4.0/5) → boosts proactivity by 10 points (reinforces what works)
+  - Low success rate (<40% over 10+ interventions) → logs approach escalation
+  - All decisions logged to `system_optimizations` with before/after state + failingTypes/succeedingTypes
+
+**Updated defaults:**
+- New users get OptimizationWidget + CalendarWidget in default canvas layout
+- 3 new widget types registered: optimization, intervention_inbox, insight_history
+
+### Why
+Dashboard existed as 60% functional / 40% placeholder. The core promise — visible continuous self-optimization — was invisible to users. Backend loops (MAPE-K, highlights, predictions) ran but had no UI. Users couldn't approve interventions or give feedback from the dashboard.
+
+### Files changed
+- `app/api/canvas/data/conversations/route.ts` (new)
+- `app/api/canvas/data/calendar/route.ts` (new)
+- `app/api/canvas/data/optimization/route.ts` (new)
+- `app/api/canvas/data/interventions/route.ts` (new)
+- `app/api/canvas/data/insights/route.ts` (new)
+- `app/api/interventions/[id]/respond/route.ts` (new)
+- `components/widgets/OptimizationWidget.tsx` (new)
+- `components/widgets/InterventionInboxWidget.tsx` (new)
+- `components/widgets/InsightHistoryWidget.tsx` (new)
+- `components/canvas/CanvasGrid.tsx` (modified — 5 wrappers + 3 render cases)
+- `lib/canvas/widget-registry.ts` (modified — 3 new entries)
+- `lib/canvas/defaults.ts` (modified — optimization + calendar in defaults)
+- `lib/dashboard/types.ts` (modified — 6 new type interfaces)
+- `lib/iors/loop-tasks/optimization.ts` (modified — auto-tuning logic)
+
+### How to verify
+1. Build: `cd exoskull-app && npm run build` — passes with 0 errors
+2. Open dashboard — OptimizationWidget shows learning/intervention stats
+3. CalendarWidget shows upcoming check-ins + task deadlines
+4. ConversationsWidget shows real message counts
+5. Add InterventionInboxWidget via picker — approve/dismiss interventions
+6. Add InsightHistoryWidget via picker — see proactive insights with feedback buttons
+
+### Notes for future agents
+- `learning_events` table (NOT `exo_learning_events`) — event_types: highlight_added, highlight_boosted, pattern_detected, etc.
+- `exo_insight_deliveries` has no `insight_summary` column — must join on `source_table` + `source_id`
+- Optimization auto-tuning modifies `iors_personality.proactivity` (0-100) on `exo_tenants`
+- All new widget wrappers follow the CanvasHealthWidget pattern (self-fetching, skeleton loading)
+- Widget count: 16 types registered (was 13)
+
+---
+
+## [2026-02-09] Fix: Thread poisoning — IORS still returning "Zrobione!" after tool loop fix
+
+### What was done
+
+**Thread poison filter + diagnostic logging (commit 878e731):**
+- Root cause: old "Zrobione!" assistant messages in `exo_unified_messages` were loaded by `getThreadContext()` → Claude copied the pattern from its own history
+- Fix 1: Runtime poison filter in `conversation-handler.ts` — strips known-bad assistant messages before passing thread to Claude
+- Fix 2: Extended `/api/admin/thread-reset` with additional poison patterns ("Zrobione!", "Gotowe. Użyłem:", "Przepraszam, nie mogłem przetworzyć")
+- Fix 3: Diagnostic logging on first Claude API call (model, messageCount, filtered count, contentTypes, stopReason)
+
+**Previous: Multi-turn tool loop fix (commit 65badbe):**
+- Root cause: follow-up API call (po tool execution) nie zawierał `tools: IORS_TOOLS`
+- Claude nie mógł wywołać kolejnych narzędzi w follow-up → zwracał pusty response → fallback `"Zrobione!"`
+- Fix: multi-turn tool loop (max 3 rund) z `tools: IORS_TOOLS` w każdym follow-up call
+- Smart fallback zamiast hardcoded "Zrobione!": lista użytych narzędzi lub error message
+
+### Why
+- After multi-turn loop fix deployed, chat STILL returned "Zrobione!" — thread context poisoning was the second root cause
+- Old bad messages in unified thread taught Claude to repeat them
+
+### Files changed
+- `lib/voice/conversation-handler.ts` — poison filter + diagnostic logging + multi-turn tool loop
+- `app/api/admin/thread-reset/route.ts` — extended poison patterns
+
+### How to verify
+1. Reset thread: `fetch('/api/admin/thread-reset', {method:'POST'}).then(r=>r.json()).then(console.log)`
+2. Open exoskull.xyz/dashboard/chat
+3. Send "cześć" → should get normal greeting, NOT "Zrobione!"
+4. Check Vercel Logs for `[ConversationHandler] Calling Claude API` entries
+
+### Notes for future agents
+- **Thread context poisoning**: If AI once said something wrong, those messages stay in unified thread → AI repeats them. Always filter known-bad patterns before passing history to Claude.
+- Anthropic API: follow-up calls after tool_results MUST include `tools` param
+- Empty string `""` is falsy in JS — use `?.trim()` + explicit check instead of `||` fallback
+- Multi-turn loop: max 3 rounds prevents infinite tool calling
+- Use `/api/admin/thread-reset` to clean poisoned messages from DB
+
+---
+
+## [2026-02-09] Session: IORS Pipeline Fix + Performance Optimization
+
+### What was done
+
+**IORS "lite mode" fix (commits b949cb9, 7d0133e):**
+- Root cause: System prompt listed only 15/42 tools → IORS told users "jestem w trybie podstawowym"
+- Updated `system-prompt.ts` to list all 42 tools in 11 categories
+- Old "lite mode" messages in unified thread poisoned context → created `/api/admin/thread-reset` endpoint
+- Removed "cześć" from END_PHRASES (both greeting AND goodbye in Polish → false end-call)
+
+**Voice widget fix (commits 740b31f, 7d0133e):**
+- `/api/voice/chat` was bypassing gateway entirely — no web_chat config, no skipEndCallDetection
+- Added: maxTokens=1500, WEB_CHAT_SYSTEM_OVERRIDE, skipEndCallDetection, unified thread
+- Added 40s timeout via Promise.race, fire-and-forget for non-critical ops
+- Added detailed error messages (API returns `detail` field, UI shows actual error)
+
+**Performance optimization (commit 8ae5e3a) — ~4-5s faster:**
+- `buildDynamicContext()`: 7 sequential DB queries → `Promise.allSettled` (~500ms saved)
+- `processUserMessage()`: `getThreadContext` now runs parallel with dynamic context + emotion (~200ms saved)
+- Tool execution: sequential `for` loop → `Promise.all` (variable savings)
+- Voice widget: Cartesia server TTS → browser `speechSynthesis` (~2s saved)
+
+**Activity Feed & Observability (previous session commits):**
+- New `exo_activity_log` table with RLS + indexes
+- `logActivity()` fire-and-forget helper in `lib/activity-log.ts`
+- `ActivityFeedWidget` on canvas: color-coded by type, auto-refresh 30s
+- Gateway, conversation handler, CRONs all log to activity feed
+
+**Bug fixes (commit f5056c8):**
+- `autoRegisterTenant()` and `resolveTenant()` used `first_name` but column is `name`
+- Skills generate: added structured error logging + 55s AbortController timeout
+
+### Why
+- User reported IORS was "doing nothing" — claiming lite mode, ending calls on greetings
+- Voice widget showing "Nie udało się przetworzyć" errors
+- User reported "generalnie bardzo wolny ten iors"
+- No observability into what IORS was actually doing
+
+### Files changed
+- `lib/voice/system-prompt.ts` — 42 tools in 11 categories
+- `lib/voice/conversation-handler.ts` — parallel pipeline + parallel tools
+- `lib/voice/dynamic-context.ts` — Promise.allSettled for all queries
+- `app/api/voice/chat/route.ts` — web_chat config + timeout + error details
+- `app/api/admin/thread-reset/route.ts` — new endpoint
+- `components/voice/VoiceInterface.tsx` — browser speechSynthesis + error display
+- `lib/gateway/gateway.ts` — first_name → name column fix
+- `lib/activity-log.ts` — new file
+- `app/api/canvas/activity-feed/route.ts` — new endpoint
+- `components/widgets/ActivityFeedWidget.tsx` — new widget
+- `lib/canvas/widget-registry.ts` — added activity_feed
+- `components/canvas/CanvasGrid.tsx` — added ActivityFeedWidget case
+
+### How to verify
+- Chat with IORS → should list capabilities, use tools proactively
+- Voice widget → should respond (browser TTS), show errors if any
+- Activity Feed widget → shows real-time tool calls, gateway events
+
+### Notes for future agents
+- `END_PHRASES` is very sensitive in Polish — "cześć" is both hi and bye
+- Thread poisoning: old IORS messages claiming "lite mode" get loaded as context → IORS repeats them
+- Use `/api/admin/thread-reset` to clean poisoned messages
+- Remaining latency: Claude API = 3-8s per call, x2 when tools used (irreducible)
+- `exoskull.xyz` domain: DNS points to OVH (178.182.200.76), needs A record → 76.76.21.193 (Vercel)
+
+---
+
+## [2026-02-09] Claude Code Plugins — 20 Plugins Installed
+
+### What was done
+- Installed 20 official plugins from `anthropics/claude-plugins-official` (user + project scope)
+- Added "Available Skills (Slash Commands)" section to CLAUDE.md with full reference table
+
+### Why
+- Automate git workflow (`/commit`, `/commit-push-pr`), code review (`/code-review`, `/review-pr`), feature dev (`/feature-dev`), security checks, and autonomous dev loops (`/ralph-loop`)
+- LSP plugins (typescript-lsp, pyright-lsp) give Claude accurate type info — fewer hallucinations
+- MCP plugins (supabase, playwright, github, context7) give Claude direct tool access to infrastructure
+
+### Plugins installed
+- **Must-install (8):** typescript-lsp, playwright, supabase, code-review, security-guidance, commit-commands, hookify, context7
+- **Recommended (8):** feature-dev, pr-review-toolkit, claude-md-management, ralph-loop, claude-code-setup, frontend-design, code-simplifier, github
+- **Extra (4):** pyright-lsp, agent-sdk-dev, explanatory-output-style, learning-output-style
+
+### Files changed
+- CLAUDE.md (added Skills section)
+- SESSION_LOG.md (logged task)
+
+### How to verify
+- `claude plugin list` — should show 40 entries (20 plugins x 2 scopes)
+- Type `/` in Claude Code session — new skills should appear
+
+### Notes for future agents
+- Marketplace name is `claude-plugins-official` (NOT `claude-plugin-directory`)
+- Plugins installed at both `user` and `project` scope
+- Some plugins require external tools (e.g., typescript-lsp needs `typescript-language-server` npm package)
+- Restart session after installation for hooks/MCP to activate
+
+---
+
 ## [2026-02-09] Session: Console Errors Fix + Database Security Hardening
 
 ### What was done

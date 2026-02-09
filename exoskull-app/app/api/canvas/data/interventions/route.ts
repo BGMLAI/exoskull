@@ -1,0 +1,61 @@
+/**
+ * Canvas Interventions Data API
+ *
+ * GET /api/canvas/data/interventions — Returns pending + needs-feedback interventions.
+ */
+
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+    const [pendingResult, feedbackResult] = await Promise.all([
+      // Pending interventions awaiting approval
+      supabase
+        .from("exo_interventions")
+        .select(
+          "id, title, description, intervention_type, priority, created_at",
+        )
+        .eq("tenant_id", user.id)
+        .eq("status", "proposed")
+        .eq("requires_approval", true)
+        .order("created_at", { ascending: false })
+        .limit(5),
+
+      // Recently completed without feedback
+      supabase
+        .from("exo_interventions")
+        .select("id, title, intervention_type, completed_at")
+        .eq("tenant_id", user.id)
+        .eq("status", "completed")
+        .is("user_feedback", null)
+        .gte("completed_at", twoDaysAgo)
+        .order("completed_at", { ascending: false })
+        .limit(3),
+    ]);
+
+    return NextResponse.json({
+      pending: pendingResult.data || [],
+      needsFeedback: feedbackResult.data || [],
+    });
+  } catch (error) {
+    console.error("[Canvas] Interventions data error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}

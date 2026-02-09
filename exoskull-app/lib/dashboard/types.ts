@@ -82,3 +82,62 @@ export interface MiniSeriesData {
   label: string;
   data: DataPoint[];
 }
+
+export interface OptimizationStats {
+  learningProgress: {
+    highlightsExtracted: number;
+    patternsDetected: number;
+    skillsCreated: number;
+  };
+  interventionSuccess: {
+    successful: number;
+    failed: number;
+    guardianBlocked: number;
+    total: number;
+    successRate: number;
+  };
+  userSatisfaction: {
+    avgRating: number;
+    positive: number;
+    negative: number;
+    totalRated: number;
+  };
+  weekOverWeek: {
+    thisWeek: number;
+    lastWeek: number;
+    percentChange: number;
+  };
+  lastCycle: {
+    ranAt: string | null;
+    issuesFound: number;
+  };
+}
+
+export interface PendingIntervention {
+  id: string;
+  title: string;
+  description: string | null;
+  intervention_type: string;
+  priority: string;
+  created_at: string;
+}
+
+export interface CompletedIntervention {
+  id: string;
+  title: string;
+  intervention_type: string;
+  completed_at: string;
+}
+
+export interface InterventionInboxData {
+  pending: PendingIntervention[];
+  needsFeedback: CompletedIntervention[];
+}
+
+export interface InsightDelivery {
+  id: string;
+  insight_summary: string;
+  delivery_channel: string;
+  delivered_at: string;
+  data: Record<string, unknown> | null;
+}

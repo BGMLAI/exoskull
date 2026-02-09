@@ -116,6 +116,30 @@ export const WIDGET_REGISTRY: Record<string, WidgetMeta> = {
     minSize: { w: 2, h: 2 },
     category: "iors",
   },
+  optimization: {
+    type: "optimization",
+    label: "Optymalizacja",
+    icon: "TrendingUp",
+    defaultSize: { w: 2, h: 2 },
+    minSize: { w: 2, h: 2 },
+    category: "iors",
+  },
+  intervention_inbox: {
+    type: "intervention_inbox",
+    label: "Skrzynka interwencji",
+    icon: "Inbox",
+    defaultSize: { w: 2, h: 3 },
+    minSize: { w: 2, h: 2 },
+    category: "iors",
+  },
+  insight_history: {
+    type: "insight_history",
+    label: "Historia insightow",
+    icon: "Lightbulb",
+    defaultSize: { w: 2, h: 3 },
+    minSize: { w: 2, h: 2 },
+    category: "iors",
+  },
 };
 
 /** Get metadata for a widget type. Falls back to a generic entry for dynamic_mod types. */
