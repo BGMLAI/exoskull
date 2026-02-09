@@ -23,6 +23,7 @@ import {
 import { dispatchToHandler } from "@/lib/iors/loop-tasks";
 import type { TenantLoopConfig, ActivityClass } from "@/lib/iors/loop-types";
 import { ModelRouter } from "@/lib/ai/model-router";
+import { CircuitBreaker } from "@/lib/iors/circuit-breaker";
 import { logActivity } from "@/lib/activity-log";
 
 export const dynamic = "force-dynamic";
@@ -95,9 +96,11 @@ async function handler(req: NextRequest) {
         let action = "none";
         let aiCostCents = 0;
 
+        const breaker = CircuitBreaker.for(tenant.tenant_id, "loop15_haiku");
         if (
           state.needsEval &&
-          tenant.daily_ai_spent_cents < tenant.daily_ai_budget_cents
+          tenant.daily_ai_spent_cents < tenant.daily_ai_budget_cents &&
+          breaker.isAllowed()
         ) {
           try {
             const response = await router.route({
@@ -124,6 +127,7 @@ async function handler(req: NextRequest) {
             });
 
             aiCostCents = 1; // ~$0.01 per Haiku evaluation
+            breaker.recordSuccess();
 
             // Parse AI response
             try {
@@ -166,9 +170,13 @@ async function handler(req: NextRequest) {
               action = "none";
             }
           } catch (aiErr) {
+            breaker.recordFailure(
+              aiErr instanceof Error ? aiErr.message : String(aiErr),
+            );
             console.error("[Loop15] AI evaluation failed:", {
               tenantId: tenant.tenant_id,
               error: aiErr instanceof Error ? aiErr.message : aiErr,
+              circuitState: breaker.getState().state,
             });
           }
         }

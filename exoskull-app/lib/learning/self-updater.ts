@@ -300,22 +300,31 @@ export class SelfUpdater {
   /**
    * Run decay cycle for unused highlights
    */
-  async runDecayCycle(): Promise<{ decayed: number }> {
+  async runDecayCycle(tenantId?: string): Promise<{ decayed: number }> {
     let decayed = 0;
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - CONFIG.DECAY_AFTER_DAYS);
 
     logger.info(
-      `[SelfUpdater] Running decay cycle (cutoff: ${cutoffDate.toISOString()})`,
+      `[SelfUpdater] Running decay cycle (cutoff: ${cutoffDate.toISOString()}, tenant: ${tenantId || "all"})`,
     );
 
     try {
       // Find highlights that haven't been boosted recently
-      const { data: staleHighlights, error } = await this.supabase
+      // Scoped to specific tenant when provided; limited to prevent unbounded queries
+      let query = this.supabase
         .from("user_memory_highlights")
         .select("id, user_id, content, importance")
         .lt("updated_at", cutoffDate.toISOString())
-        .gt("importance", CONFIG.MIN_IMPORTANCE);
+        .gt("importance", CONFIG.MIN_IMPORTANCE)
+        .order("updated_at", { ascending: true })
+        .limit(500);
+
+      if (tenantId) {
+        query = query.eq("user_id", tenantId);
+      }
+
+      const { data: staleHighlights, error } = await query;
 
       if (error) {
         console.error("[SelfUpdater] Error fetching stale highlights:", error);
@@ -575,10 +584,13 @@ export async function runSelfUpdate(): Promise<SelfUpdateResult> {
 
 /**
  * Run the decay cycle (called by CRON, daily)
+ * @param tenantId Optional — scope decay to a single tenant for isolation
  */
-export async function runDecay(): Promise<{ decayed: number }> {
+export async function runDecay(
+  tenantId?: string,
+): Promise<{ decayed: number }> {
   const updater = getSelfUpdater();
-  return updater.runDecayCycle();
+  return updater.runDecayCycle(tenantId);
 }
 
 /**

@@ -35,19 +35,34 @@ export const modTools: ToolDefinition[] = [
       },
     },
     execute: async (input, tenantId) => {
+      const modSlug = input.mod_slug as string;
+      const data = input.data;
+
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        return `Błąd: dane muszą być obiektem (np. {hours: 7, quality: 8}), otrzymano: ${typeof data}`;
+      }
+
+      if (Object.keys(data as Record<string, unknown>).length === 0) {
+        return `Błąd: dane nie mogą być pustym obiektem`;
+      }
+
       const supabase = getServiceSupabase();
       const { error } = await supabase.from("exo_mod_data").insert({
         tenant_id: tenantId,
-        mod_slug: input.mod_slug as string,
-        data: input.data,
+        mod_slug: modSlug,
+        data,
       });
 
       if (error) {
-        console.error("[ModTools] log_mod_data error:", error);
-        return `Błąd: nie udało się zapisać danych`;
+        console.error("[ModTools] log_mod_data error:", {
+          error,
+          modSlug,
+          tenantId,
+        });
+        return `Błąd: nie udało się zapisać danych do ${modSlug}: ${error.message}`;
       }
 
-      return `Zapisano dane do ${input.mod_slug}`;
+      return `Zapisano dane do ${modSlug}`;
     },
   },
   {

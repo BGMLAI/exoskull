@@ -45,8 +45,6 @@ export const skillGoalTools: ToolDefinition[] = [
       });
 
       try {
-        await updateSuggestionStatus(suggestionId, "accepted");
-
         const supabase = getServiceSupabase();
         const { data: suggestion } = await supabase
           .from("exo_skill_suggestions")
@@ -57,6 +55,9 @@ export const skillGoalTools: ToolDefinition[] = [
         if (!suggestion) {
           return "Nie znaleziono sugestii o podanym ID.";
         }
+
+        // Mark accepted first
+        await updateSuggestionStatus(suggestionId, "accepted");
 
         const { generateSkill } =
           await import("@/lib/skills/generator/skill-generator");
@@ -74,9 +75,17 @@ export const skillGoalTools: ToolDefinition[] = [
           );
           return `Skill "${suggestion.description}" został wygenerowany! Status: oczekuje na zatwierdzenie. Dostaniesz SMS z kodem potwierdzającym.`;
         } else {
+          // Generation failed — mark rejected so user can request again
+          await updateSuggestionStatus(suggestionId, "rejected").catch((e) =>
+            console.error("[SkillGoalTools] Status rollback failed:", e),
+          );
           return `Nie udało się wygenerować skilla: ${result.error || "nieznany błąd"}. Spróbuję ponownie później.`;
         }
       } catch (error) {
+        // Unexpected error — mark rejected to avoid stuck "accepted" state
+        await updateSuggestionStatus(suggestionId, "rejected").catch((e) =>
+          console.error("[SkillGoalTools] Status rollback failed:", e),
+        );
         console.error("[SkillGoalTools] accept_skill_suggestion error:", error);
         return "Nie udało się zaakceptować sugestii. Spróbuj ponownie.";
       }

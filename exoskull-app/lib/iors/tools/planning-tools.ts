@@ -82,8 +82,20 @@ export const planningTools: ToolDefinition[] = [
       });
 
       if (planError) {
-        console.error("[PlanningTools] plan_action error:", planError);
-        return `Nie udało się zaplanować akcji: ${planError.message}`;
+        console.error("[PlanningTools] plan_action error:", {
+          code: planError.code,
+          message: planError.message,
+          details: planError.details,
+          tenantId,
+          actionType,
+        });
+        const reason =
+          planError.code === "PGRST301"
+            ? "brak uprawnień"
+            : planError.code === "23503"
+              ? "nieprawidłowy typ akcji"
+              : planError.message;
+        return `Nie udało się zaplanować akcji (${reason}). Spróbuj ponownie.`;
       }
 
       // Emit outbound_ready event for Pętla loop

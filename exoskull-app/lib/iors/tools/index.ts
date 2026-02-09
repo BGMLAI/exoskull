@@ -76,6 +76,8 @@ export function getExtensionToolDefinitions(): Anthropic.Tool[] {
  * Execute an extension tool by name.
  * Returns null if the tool is not found (not an extension tool).
  */
+const TOOL_TIMEOUT_MS = 10_000; // 10s per tool max
+
 export async function executeExtensionTool(
   toolName: string,
   input: Record<string, unknown>,
@@ -85,7 +87,21 @@ export async function executeExtensionTool(
   if (!tool) return null;
 
   try {
-    return await tool.execute(input, tenantId);
+    const result = await Promise.race([
+      tool.execute(input, tenantId),
+      new Promise<string>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                `Tool ${toolName} timed out after ${TOOL_TIMEOUT_MS}ms`,
+              ),
+            ),
+          TOOL_TIMEOUT_MS,
+        ),
+      ),
+    ]);
+    return result;
   } catch (error) {
     console.error(`[IORSTools] Tool ${toolName} failed:`, {
       tenantId,

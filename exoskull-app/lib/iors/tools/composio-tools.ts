@@ -163,7 +163,11 @@ export const composioTools: ToolDefinition[] = [
         const result = await executeAction(toolSlug, tenantId, args);
 
         if (result.success) {
-          return `Wykonano ${toolSlug}. Wynik: ${JSON.stringify(result.data).slice(0, 500)}`;
+          const dataStr =
+            result.data != null
+              ? JSON.stringify(result.data).slice(0, 500)
+              : "OK";
+          return `Wykonano ${toolSlug}. Wynik: ${dataStr}`;
         }
         return `Nie udało się wykonać ${toolSlug}: ${result.error}`;
       } catch (err) {

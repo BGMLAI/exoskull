@@ -114,7 +114,15 @@ export const memoryTools: ToolDefinition[] = [
           .single();
 
         if (!summary) {
-          const newSummary = await createDailySummary(tenantId);
+          let newSummary;
+          try {
+            newSummary = await createDailySummary(tenantId);
+          } catch (createErr) {
+            console.error("[MemoryTools] createDailySummary failed:", {
+              tenantId,
+              error: createErr instanceof Error ? createErr.message : createErr,
+            });
+          }
           if (!newSummary) {
             return "Nie mam jeszcze podsumowania do poprawienia. Poczekaj na wieczorne podsumowanie.";
           }

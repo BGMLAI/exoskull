@@ -15,6 +15,9 @@ import { makeOutboundCall } from "@/lib/voice/twilio-client";
 import { appendMessage } from "@/lib/unified-thread";
 
 import { logger } from "@/lib/logger";
+
+const E164_REGEX = /^\+?[1-9]\d{1,14}$/;
+
 /** Normalize phone number to E.164 format */
 function normalizePhone(phone: string): string {
   let cleaned = phone.replace(/[\s\-\(\)]/g, "");
@@ -26,6 +29,11 @@ function normalizePhone(phone: string): string {
     }
   }
   return cleaned;
+}
+
+/** Validate phone number looks like E.164 after normalization */
+function isValidPhone(phone: string): boolean {
+  return E164_REGEX.test(phone.replace(/[\s\-\(\)]/g, ""));
 }
 
 export const communicationTools: ToolDefinition[] = [
@@ -61,7 +69,11 @@ export const communicationTools: ToolDefinition[] = [
       },
     },
     execute: async (input, tenantId) => {
-      const phoneNumber = normalizePhone(input.phone_number as string);
+      const rawPhone = input.phone_number as string;
+      if (!rawPhone || !isValidPhone(rawPhone)) {
+        return `Nieprawidłowy numer telefonu: "${rawPhone}". Podaj numer w formacie +48XXXXXXXXX.`;
+      }
+      const phoneNumber = normalizePhone(rawPhone);
       const purpose = input.purpose as string;
       const instructions = input.instructions as string;
       const userName = (input.user_name as string) || "użytkownik";
@@ -390,15 +402,59 @@ export const communicationTools: ToolDefinition[] = [
         required: ["contact_name", "message"],
       },
     },
-    execute: async (_args: Record<string, unknown>, tenantId?: string) => {
-      logger.warn(
-        "[send_messenger] Not yet implemented — needs CRM contact lookup",
-        {
+    execute: async (input: Record<string, unknown>, tenantId?: string) => {
+      const contactName = input.contact_name as string;
+      const message = input.message as string;
+
+      if (!tenantId) {
+        return "Błąd: brak identyfikatora użytkownika.";
+      }
+
+      logger.info("[CommunicationTools] send_messenger:", {
+        tenantId,
+        contact: contactName,
+        messageLength: message.length,
+      });
+
+      try {
+        const { hasConnection, executeAction } =
+          await import("@/lib/integrations/composio-adapter");
+        const fbConnected = await hasConnection(tenantId, "FACEBOOK");
+
+        if (!fbConnected) {
+          return "Messenger wymaga połączenia z Facebook. Powiedz 'połącz Facebook' albo użyj connect_rig.";
+        }
+
+        const result = await executeAction("FACEBOOK_SEND_MESSAGE", tenantId, {
+          recipient_name: contactName,
+          message,
+        });
+
+        if (result.success) {
+          await appendMessage(tenantId, {
+            role: "assistant",
+            content: `[Messenger do ${contactName}]: ${message}`,
+            channel: "messenger",
+            direction: "outbound",
+            source_type: "voice_session",
+          }).catch((err) => {
+            logger.warn(
+              "[CommunicationTools] Failed to append Messenger to thread:",
+              { error: err instanceof Error ? err.message : String(err) },
+            );
+          });
+          return `Messenger wysłany do ${contactName}.`;
+        }
+
+        return `Nie udało się wysłać Messengera do ${contactName}: ${result.error || "nieznany błąd"}`;
+      } catch (err) {
+        console.error("[CommunicationTools] send_messenger error:", {
           tenantId,
-          contact: _args.contact_name,
-        },
-      );
-      return "Wysyłanie przez Messenger wymaga skonfigurowania integracji z Facebook Pages. Użyj 'connect_rig' aby połączyć konto Facebook.";
+          contact: contactName,
+          error: err instanceof Error ? err.message : err,
+        });
+        return `Błąd wysyłania Messengera: ${err instanceof Error ? err.message : "nieznany"}`;
+      }
     },
   },
 ];
