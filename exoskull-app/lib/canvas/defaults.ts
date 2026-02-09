@@ -131,6 +131,9 @@ const DEFAULT_WIDGETS: DefaultWidget[] = [
   },
 ];
 
+/** Essential widget types that every user should have */
+const ESSENTIAL_TYPES = DEFAULT_WIDGETS.map((w) => w.widget_type);
+
 /**
  * Seed default widgets for a tenant.
  * Uses ON CONFLICT to avoid duplicates (idempotent).
@@ -156,4 +159,43 @@ export async function seedDefaultWidgets(tenantId: string): Promise<void> {
       error: error.message,
     });
   }
+}
+
+/**
+ * Ensure existing users have all essential widgets.
+ * Inserts missing ones at high position_y so they appear below existing layout.
+ */
+export async function ensureEssentialWidgets(
+  tenantId: string,
+  existingTypes: string[],
+): Promise<number> {
+  const missing = DEFAULT_WIDGETS.filter(
+    (w) => !existingTypes.includes(w.widget_type),
+  );
+
+  if (missing.length === 0) return 0;
+
+  const supabase = getServiceSupabase();
+
+  // Find the max position_y to place new widgets below existing ones
+  const maxY = 100;
+
+  const rows = missing.map((w, i) => ({
+    tenant_id: tenantId,
+    ...w,
+    position_y: maxY + i * 2,
+    sort_order: ESSENTIAL_TYPES.indexOf(w.widget_type) + 100,
+  }));
+
+  for (const row of rows) {
+    const { error } = await supabase.from("exo_canvas_widgets").insert(row);
+    if (error && error.code !== "23505") {
+      console.error("[Canvas] Failed to insert missing widget:", {
+        type: row.widget_type,
+        error: error.message,
+      });
+    }
+  }
+
+  return missing.length;
 }

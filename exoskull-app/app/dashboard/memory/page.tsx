@@ -300,7 +300,7 @@ export default function MemoryPage() {
               <CardContent className="p-8 text-center">
                 <Brain className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-medium mb-2">
-                  Brak podsumowandla tego okresu
+                  Brak podsumowania dla tego okresu
                 </h3>
                 <p className="text-muted-foreground">
                   Podsumowania generuja sie automatycznie codziennie o 21:00

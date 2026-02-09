@@ -37,10 +37,10 @@ export async function GET(
 
     // Check mod is installed for this user
     const { data: installation } = await supabase
-      .from("exo_user_installations")
-      .select("*, registry:exo_registry(*)")
+      .from("exo_tenant_mods")
+      .select("*, mod:exo_mod_registry(*)")
       .eq("tenant_id", tenantId)
-      .eq("enabled", true)
+      .eq("active", true)
       .single();
 
     // Allow access even without installation for now (development)

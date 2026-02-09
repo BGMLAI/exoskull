@@ -320,21 +320,15 @@ export default function GoalsPage() {
 
     setLogSaving(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
+      const res = await fetch(`/api/goals/${logGoalId}/log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: Number(logValue) }),
+      });
 
-      const { error } = await supabase.from("exo_goal_checkpoints").upsert(
-        {
-          tenant_id: userId,
-          goal_id: logGoalId,
-          checkpoint_date: today,
-          value: Number(logValue),
-          data_source: "manual_dashboard",
-        },
-        { onConflict: "goal_id,checkpoint_date" },
-      );
-
-      if (error) {
-        console.error("[Goals] Log progress error:", error);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        console.error("[Goals] Log progress error:", errData);
         return;
       }
 
@@ -693,14 +687,40 @@ export default function GoalsPage() {
                       {/* Target */}
                       {goal.target_value && (
                         <span>
-                          Cel: {goal.target_value} {goal.target_unit || ""}
+                          Cel: {goal.target_value}{" "}
+                          {goal.target_unit === "currency"
+                            ? "PLN"
+                            : goal.target_unit === "weight"
+                              ? "kg"
+                              : goal.target_unit === "percent"
+                                ? "%"
+                                : goal.target_unit === "distance"
+                                  ? "km"
+                                  : goal.target_unit === "time"
+                                    ? "min"
+                                    : goal.target_unit === "calories"
+                                      ? "kcal"
+                                      : goal.target_unit || ""}
                         </span>
                       )}
 
                       {/* Current value */}
                       {cp?.value !== undefined && (
                         <span>
-                          Aktualnie: {cp.value} {goal.target_unit || ""}
+                          Aktualnie: {cp.value}{" "}
+                          {goal.target_unit === "currency"
+                            ? "PLN"
+                            : goal.target_unit === "weight"
+                              ? "kg"
+                              : goal.target_unit === "percent"
+                                ? "%"
+                                : goal.target_unit === "distance"
+                                  ? "km"
+                                  : goal.target_unit === "time"
+                                    ? "min"
+                                    : goal.target_unit === "calories"
+                                      ? "kcal"
+                                      : goal.target_unit || ""}
                         </span>
                       )}
 

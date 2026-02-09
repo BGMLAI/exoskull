@@ -76,6 +76,48 @@ const REFRESH_INTERVAL_MS = 30_000; // 30 seconds
 // HELPERS
 // ============================================================================
 
+/** Map raw descriptions to human-readable Polish labels */
+function humanizeDescription(desc: string): string {
+  // Strip "(uzyto: ...)" suffix
+  let clean = desc.replace(/\s*\(uzyto:.*?\)\s*$/, "").trim();
+
+  // Channel labels
+  const channelMap: Record<string, string> = {
+    web_chat: "czacie",
+    voice: "rozmowie glosowej",
+    sms: "SMS",
+    whatsapp: "WhatsApp",
+    telegram: "Telegram",
+    email: "e-mail",
+    messenger: "Messenger",
+    slack: "Slack",
+    discord: "Discord",
+  };
+  for (const [key, label] of Object.entries(channelMap)) {
+    clean = clean.replace(`via ${key}`, `na ${label}`);
+    clean = clean.replace(`Odpowiedz via ${key}`, `Rozmowa na ${label}`);
+  }
+
+  // Tool labels
+  const toolMap: Record<string, string> = {
+    grant_autonomy: "Przyznano autonomie",
+    check_goals: "Sprawdzono cele",
+    search_knowledge: "Przeszukano baze wiedzy",
+    manage_canvas: "Zarzadzanie widgetami",
+    check_health: "Sprawdzono zdrowie",
+    create_task: "Utworzono zadanie",
+    update_task: "Zaktualizowano zadanie",
+    send_email: "Wyslano e-mail",
+    manage_schedule: "Zarzadzanie kalendarzem",
+    propose_intervention: "Zaproponowano interwencje",
+  };
+  for (const [key, label] of Object.entries(toolMap)) {
+    if (clean === `Narzedzie: ${key}`) return label;
+  }
+
+  return clean;
+}
+
 function relativeTime(dateStr: string): string {
   const now = Date.now();
   const date = new Date(dateStr).getTime();
@@ -208,7 +250,7 @@ export function ActivityFeedWidget() {
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-foreground leading-tight truncate">
-                    {entry.description}
+                    {humanizeDescription(entry.description)}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-[10px] text-muted-foreground">

@@ -7,7 +7,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { seedDefaultWidgets } from "@/lib/canvas/defaults";
+import {
+  seedDefaultWidgets,
+  ensureEssentialWidgets,
+} from "@/lib/canvas/defaults";
 import type { CanvasWidget } from "@/lib/canvas/types";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +63,26 @@ export async function GET() {
         .order("position_x");
 
       return NextResponse.json({ widgets: seeded || [] });
+    }
+
+    // Ensure existing users have all essential widgets
+    const existingTypes = widgets.map(
+      (w: { widget_type: string }) => w.widget_type,
+    );
+    const added = await ensureEssentialWidgets(user.id, existingTypes);
+
+    if (added > 0) {
+      // Re-fetch to include newly added widgets
+      const { data: updated } = await supabase
+        .from("exo_canvas_widgets")
+        .select("*")
+        .eq("tenant_id", user.id)
+        .eq("visible", true)
+        .order("sort_order")
+        .order("position_y")
+        .order("position_x");
+
+      return NextResponse.json({ widgets: updated || widgets });
     }
 
     return NextResponse.json({ widgets });

@@ -118,26 +118,34 @@ export default function ModDetailPage() {
 
       if (!user) return;
 
-      // Fetch installation info
-      const { data: instData } = await supabase
-        .from("exo_tenant_mods")
-        .select(
-          `
-          id,
-          active,
-          installed_at,
-          config_overrides,
-          mod:exo_mod_registry (
-            id, slug, name, description, icon, category, config
-          )
-        `,
-        )
-        .eq("tenant_id", user.id)
-        .eq("mod.slug", slug)
+      // Fetch installation info: first get mod_id from registry by slug
+      const { data: modReg } = await supabase
+        .from("exo_mod_registry")
+        .select("id")
+        .eq("slug", slug)
         .single();
 
-      if (instData) {
-        setInstallation(instData as unknown as InstalledMod);
+      if (modReg) {
+        const { data: instData } = await supabase
+          .from("exo_tenant_mods")
+          .select(
+            `
+            id,
+            active,
+            installed_at,
+            config_overrides,
+            mod:exo_mod_registry (
+              id, slug, name, description, icon, category, config
+            )
+          `,
+          )
+          .eq("tenant_id", user.id)
+          .eq("mod_id", modReg.id)
+          .single();
+
+        if (instData) {
+          setInstallation(instData as unknown as InstalledMod);
+        }
       }
 
       // Fetch recent data entries

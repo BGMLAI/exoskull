@@ -100,7 +100,12 @@ export function ConversationPanel({
           }),
         });
 
-        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(
+            errBody.error || errBody.message || `Blad serwera (${res.status})`,
+          );
+        }
 
         const reader = res.body?.getReader();
         const decoder = new TextDecoder();
@@ -148,12 +153,16 @@ export function ConversationPanel({
         }
       } catch (err) {
         console.error("[ConversationPanel] Send error:", err);
+        const errorMsg =
+          err instanceof Error && err.message !== "Failed to fetch"
+            ? err.message
+            : "Przepraszam, wystapil blad. Sprobuj ponownie.";
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMsgId
               ? {
                   ...msg,
-                  content: "Przepraszam, wystapil blad. Sprobuj ponownie.",
+                  content: errorMsg,
                 }
               : msg,
           ),
@@ -206,7 +215,7 @@ export function ConversationPanel({
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center">
+            <div className="text-center max-w-md">
               <h2
                 className={cn(
                   "font-semibold text-muted-foreground mb-2",
@@ -215,9 +224,27 @@ export function ConversationPanel({
               >
                 Czesc! Jestem IORS.
               </h2>
-              <p className="text-sm text-muted-foreground/70">
+              <p className="text-sm text-muted-foreground/70 mb-4">
                 Napisz wiadomosc lub kliknij mikrofon, zeby porozmawiac.
               </p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {[
+                  "Co wiesz o mnie?",
+                  "Jaki mam plan na dzis?",
+                  "Sprawdz moje zdrowie",
+                  "Zaplanuj moj tydzien",
+                  "Jakie mam cele?",
+                  "Co nowego sie nauczyles?",
+                ].map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => sendMessage(prompt)}
+                    className="px-3 py-1.5 text-xs rounded-full border border-border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}

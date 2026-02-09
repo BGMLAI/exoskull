@@ -4,6 +4,35 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-09] UX Audit Fixes — P0 + P1 (12 fixes)
+
+### P0 Critical Fixes
+- **Goals progress bar**: Replaced inline upsert with `/api/goals/[id]/log` endpoint wrapping `logProgress()` engine (calculates progress_percent, momentum, trajectory)
+- **Mods detail page 406**: Fixed `.eq("mod.slug", slug)` — now queries `exo_mod_registry` by slug first, then `exo_tenant_mods` by `mod_id`
+- **Mods API 404**: Fixed `exo_user_installations` → `exo_tenant_mods` in `/api/mods/[slug]`
+- **Chat 429 error**: Frontend now parses response body for rate limit messages instead of showing generic error
+- **Settings 4 console errors**: Fixed wrong table names `exo_mod_installs` → `exo_tenant_mods`, `exo_dynamic_skills` → `exo_generated_skills`
+- **Widget re-seeding**: Added `ensureEssentialWidgets()` — existing users get missing essential widgets auto-added on dashboard load
+
+### P1 UX Improvements
+- **Chat empty state**: Added 6 clickable prompt chips ("Co wiesz o mnie?", "Jaki mam plan na dzis?", etc.)
+- **Goals unit display**: "currency" → "PLN", "weight" → "kg", "distance" → "km", etc.
+- **Activity feed**: `humanizeDescription()` maps raw tool names to Polish labels, strips `(uzyto: ...)` suffixes
+- **Memory page typo**: "Brak podsumowandla tego okresu" → "Brak podsumowania dla tego okresu"
+
+### Google OAuth Config
+- Added 9 redirect URIs (4 prod + 4 localhost + 1 Supabase) to GCP Console
+- Added 2 JavaScript Origins (exoskull.xyz + localhost:3000)
+
+### Files changed
+- New: `app/api/goals/[id]/log/route.ts`
+- Modified: `app/dashboard/goals/page.tsx`, `app/dashboard/mods/[slug]/page.tsx`, `app/dashboard/settings/page.tsx`, `app/dashboard/memory/page.tsx`
+- Modified: `app/api/canvas/widgets/route.ts`, `app/api/mods/[slug]/route.ts`
+- Modified: `components/dashboard/ConversationPanel.tsx`, `components/widgets/ActivityFeedWidget.tsx`
+- Modified: `lib/canvas/defaults.ts`
+
+---
+
 ## [2026-02-09] Cleanup: Project root declutter — move archives to D drive
 
 ### What was done

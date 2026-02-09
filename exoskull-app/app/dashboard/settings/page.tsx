@@ -220,13 +220,13 @@ export default function SettingsPage() {
         setConnections(rigConnections || []);
 
         const { data: mods } = await supabase
-          .from("exo_mod_installs")
-          .select("id, mod_slug, mod_name, enabled, installed_at")
+          .from("exo_tenant_mods")
+          .select("id, mod_slug, mod_name, active, installed_at")
           .eq("tenant_id", user.id);
         setActiveMods(mods || []);
 
         const { data: skills } = await supabase
-          .from("exo_dynamic_skills")
+          .from("exo_generated_skills")
           .select("id, name, status, created_at")
           .eq("tenant_id", user.id)
           .eq("status", "active");
