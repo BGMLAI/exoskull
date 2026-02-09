@@ -66,34 +66,51 @@ export async function POST(request: NextRequest) {
     session.systemPromptPrefix = WEB_CHAT_SYSTEM_OVERRIDE;
     session.skipEndCallDetection = true;
 
-    // Append user message to unified thread (before processing)
-    await appendMessage(user.id, {
+    // Append user message to unified thread (fire-and-forget, don't block)
+    appendMessage(user.id, {
       role: "user",
       content: message,
       channel: "web_chat",
       direction: "inbound",
       source_type: "web_chat",
       metadata: { source: "voice_widget" },
+    }).catch((err) => {
+      logger.warn(
+        "[VoiceChat] appendMessage failed:",
+        err instanceof Error ? err.message : String(err),
+      );
     });
 
-    // Process through Claude with tools
-    const result = await processUserMessage(session, message, {
-      skipThreadAppend: true,
-    });
+    // Process through Claude with tools (40s timeout like gateway)
+    const TIMEOUT_MS = 40_000;
+    const result = await Promise.race([
+      processUserMessage(session, message, { skipThreadAppend: true }),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Voice chat timeout after 40s")),
+          TIMEOUT_MS,
+        ),
+      ),
+    ]);
 
-    // Track usage
-    await incrementUsage(user.id, "voice_minutes").catch((err) => {
+    // Track usage (fire-and-forget)
+    incrementUsage(user.id, "voice_minutes").catch((err) => {
       logger.warn(
         "[VoiceChat] Usage tracking failed:",
         err instanceof Error ? err.message : String(err),
       );
     });
 
-    // Update session with conversation (skip user append — already in unified thread)
-    await updateSession(session.id, message, result.text, {
+    // Update session (fire-and-forget to speed up response)
+    updateSession(session.id, message, result.text, {
       tenantId: user.id,
       channel: "web_chat",
       skipUserAppend: true,
+    }).catch((err) => {
+      logger.warn(
+        "[VoiceChat] updateSession failed:",
+        err instanceof Error ? err.message : String(err),
+      );
     });
 
     // End session if user said goodbye
@@ -121,9 +138,14 @@ export async function POST(request: NextRequest) {
       sessionId: session.id,
     });
   } catch (error) {
-    console.error("[Voice Chat] Error:", error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : undefined;
+    console.error("[Voice Chat] Error:", {
+      message: errMsg,
+      stack: errStack,
+    });
     return NextResponse.json(
-      { error: "Failed to process voice message" },
+      { error: "Failed to process voice message", detail: errMsg },
       { status: 500 },
     );
   }

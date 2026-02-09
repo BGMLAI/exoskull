@@ -119,7 +119,10 @@ export function VoiceInterface({
         });
 
         if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
+          const errBody = await response.json().catch(() => ({}));
+          throw new Error(
+            `API ${response.status}: ${errBody.detail || errBody.error || "unknown"}`,
+          );
         }
 
         const data = await response.json();
@@ -139,13 +142,16 @@ export function VoiceInterface({
           setState("idle");
         }
       } catch (err) {
-        console.error("[VoiceInterface] Send error:", err);
-        setError("Nie udało się przetworzyć. Spróbuj ponownie.");
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error("[VoiceInterface] Send error:", errMsg);
+        setError(
+          errMsg.length > 100 ? "Blad przetwarzania. Sprawdz konsole." : errMsg,
+        );
         setState("error");
         setTimeout(() => {
           setError(null);
           setState("idle");
-        }, 3000);
+        }, 5000);
       }
     },
     [sessionId, playAudio],
