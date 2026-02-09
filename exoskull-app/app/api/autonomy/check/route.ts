@@ -5,11 +5,22 @@
  * Used by agents before taking autonomous actions.
  */
 
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
+
+/** Constant-time comparison to prevent timing attacks on secrets */
+function safeTokenEquals(header: string | null, secret: string): boolean {
+  const token = (header ?? "").replace(/^Bearer\s+/i, "");
+  if (!token || !secret) return false;
+  const a = Buffer.from(token);
+  const b = Buffer.from(secret);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -20,7 +31,10 @@ export async function POST(request: NextRequest) {
   try {
     // Auth: verify caller is the user or a service (CRON)
     const authHeader = request.headers.get("authorization");
-    const isCronCall = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+    const isCronCall = safeTokenEquals(
+      authHeader,
+      process.env.CRON_SECRET || "",
+    );
 
     const body = await request.json();
     const { userId, action, recordError } = body;
@@ -107,7 +121,10 @@ export async function PATCH(request: NextRequest) {
   try {
     // Auth: verify caller
     const authHeader = request.headers.get("authorization");
-    const isCronCall = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+    const isCronCall = safeTokenEquals(
+      authHeader,
+      process.env.CRON_SECRET || "",
+    );
 
     if (!isCronCall) {
       const authSupabase = await createAuthClient();

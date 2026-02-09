@@ -11,7 +11,11 @@ import { logger } from "@/lib/logger";
  *   const breaker = CircuitBreaker.for(tenantId, 'composio');
  *   if (!breaker.isAllowed()) return fallback();
  *   try { await action(); breaker.recordSuccess(); }
- *   catch (e) { breaker.recordFailure(e.message); throw e; }
+ *   catch (e) {
+ *     console.error('[MyService] Failed:', { error: e.message, tenantId });
+ *     breaker.recordFailure(e.message);
+ *     throw e;
+ *   }
  */
 
 type CircuitState = "closed" | "open" | "half_open";

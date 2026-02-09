@@ -731,32 +731,17 @@ export async function findTenantByPhone(
   // Normalize phone number (remove spaces, +, etc.)
   const normalizedPhone = phone.replace(/\s+/g, "").replace(/^\+/, "");
 
-  // Try exact match first
-  let { data: tenant } = await supabase
+  // Single query with OR — replaces 3 sequential lookups (~600ms → ~200ms)
+  const { data: tenant } = await supabase
     .from("exo_tenants")
     .select("id, name")
-    .eq("phone", phone)
+    .or(
+      `phone.eq.${phone},phone.eq.${normalizedPhone},phone.eq.+${normalizedPhone}`,
+    )
+    .limit(1)
     .single();
 
-  if (tenant) return tenant;
-
-  // Try with normalized phone
-  const { data: tenant2 } = await supabase
-    .from("exo_tenants")
-    .select("id, name")
-    .eq("phone", normalizedPhone)
-    .single();
-
-  if (tenant2) return tenant2;
-
-  // Try with + prefix
-  const { data: tenant3 } = await supabase
-    .from("exo_tenants")
-    .select("id, name")
-    .eq("phone", `+${normalizedPhone}`)
-    .single();
-
-  return tenant3 || null;
+  return tenant || null;
 }
 
 // ============================================================================

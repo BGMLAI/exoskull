@@ -164,14 +164,22 @@ export async function appendMessage(
     throw new Error(`Failed to append unified message: ${error.message}`);
   }
 
-  // Update thread metadata
-  await supabase
+  // Fire-and-forget thread metadata update (non-critical, saves 1 round-trip)
+  supabase
     .from("exo_unified_threads")
     .update({
       last_message_at: new Date().toISOString(),
       last_channel: params.channel,
     })
-    .eq("id", threadId);
+    .eq("id", threadId)
+    .then(({ error: updateErr }) => {
+      if (updateErr) {
+        console.error("[UnifiedThread] Metadata update failed:", {
+          threadId,
+          error: updateErr.message,
+        });
+      }
+    });
 
   return data!.id;
 }

@@ -8,12 +8,23 @@
  * Returns insights or PULSE_OK if nothing needs attention.
  */
 
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getRigDefinition } from "@/lib/rigs";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
+
+/** Constant-time comparison to prevent timing attacks on secrets */
+function safeTokenEquals(header: string | null, secret: string): boolean {
+  const token = (header ?? "").replace(/^Bearer\s+/i, "");
+  if (!token || !secret) return false;
+  const a = Buffer.from(token);
+  const b = Buffer.from(secret);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
 export const dynamic = "force-dynamic";
 
 // Check types
@@ -42,9 +53,9 @@ export async function GET(request: NextRequest) {
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
-  // Verify CRON secret
+  // Verify CRON secret (constant-time comparison)
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!safeTokenEquals(authHeader, process.env.CRON_SECRET || "")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -67,36 +78,45 @@ export async function GET(request: NextRequest) {
     }
 
     const results: { userId: string; result: PulseResult }[] = [];
+    const BATCH_SIZE = 10;
+    const allUsers = users || [];
 
-    for (const user of users || []) {
-      try {
-        const result = await runPulseForUser(
-          user.user_id,
-          user.enabled_checks || ["health", "tasks", "calendar"],
-        );
-        results.push({ userId: user.user_id, result });
+    // Process users in parallel batches to avoid Vercel 60s timeout
+    for (let i = 0; i < allUsers.length; i += BATCH_SIZE) {
+      const batch = allUsers.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map(async (user) => {
+          const result = await runPulseForUser(
+            user.user_id,
+            user.enabled_checks || ["health", "tasks", "calendar"],
+          );
 
-        // Store pending alerts
-        if (result.alerts.length > 0) {
+          // Store pending alerts / update timestamp
+          const now = new Date().toISOString();
           await supabase
             .from("user_impulse_state")
             .update({
-              pending_alerts: result.alerts,
-              last_impulse_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
+              pending_alerts: result.alerts.length > 0 ? result.alerts : [],
+              last_impulse_at: now,
+              updated_at: now,
             })
             .eq("user_id", user.user_id);
+
+          return { userId: user.user_id, result };
+        }),
+      );
+
+      for (const settled of batchResults) {
+        if (settled.status === "fulfilled") {
+          results.push(settled.value);
         } else {
-          await supabase
-            .from("user_impulse_state")
-            .update({
-              last_impulse_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("user_id", user.user_id);
+          console.error("[PULSE] Batch user error:", {
+            error:
+              settled.reason instanceof Error
+                ? settled.reason.message
+                : String(settled.reason),
+          });
         }
-      } catch (err) {
-        console.error(`[PULSE] Error for user ${user.user_id}:`, err);
       }
     }
 
@@ -128,8 +148,10 @@ export async function POST(request: NextRequest) {
 
     // Verify auth: service role (internal) or user JWT
     const authHeader = request.headers.get("authorization");
-    const isServiceRole =
-      authHeader === `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`;
+    const isServiceRole = safeTokenEquals(
+      authHeader,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+    );
 
     let userId: string;
 

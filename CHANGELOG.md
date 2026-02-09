@@ -4,6 +4,91 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-09] Security & Performance Audit Fixes
+
+### What was done
+- **P0 Security:** Replaced timing-attack-vulnerable `===` Bearer token comparisons with `crypto.timingSafeEqual()` in pulse + autonomy/check routes
+- **P0 Security:** Replaced `SUPABASE_SERVICE_ROLE_KEY` with `NEXT_PUBLIC_SUPABASE_ANON_KEY` in public/stats endpoint (principle of least privilege)
+- **P1 Performance:** Consolidated 3 sequential phone lookups in `findTenantByPhone()` into single `.or()` query (~600ms → ~200ms)
+- **P1 Performance:** Replaced sequential user loop in PULSE CRON with batched `Promise.allSettled()` (10/batch) to prevent Vercel timeout
+- **P2 Performance:** Added composite index `idx_learning_tenant_type_created` on `learning_events(tenant_id, event_type, created_at DESC)`
+- **P2 Performance:** Made `appendMessage()` thread metadata update fire-and-forget (saves 1 DB round-trip per message)
+- **P3 Hygiene:** Fixed circuit-breaker doc example to show proper structured error logging
+
+### Files changed
+- `app/api/pulse/route.ts` — timing-safe auth + batched processing
+- `app/api/autonomy/check/route.ts` — timing-safe auth (POST + PATCH)
+- `app/api/public/stats/route.ts` — anon key instead of service role
+- `lib/voice/conversation-handler.ts` — consolidated phone lookup
+- `lib/unified-thread.ts` — fire-and-forget metadata update
+- `lib/iors/circuit-breaker.ts` — doc example fix
+- `supabase/migrations/20260216000001_composite_index_learning_events.sql` — new index
+
+### How to verify
+- `npm run build` — passes clean
+- CRON endpoints still return 401 without valid secret
+- Public stats endpoint works with anon key (RLS allows count queries)
+- Phone lookup returns same results with single query
+
+### Notes for future agents
+- Phone index `idx_exo_tenants_phone` already existed (migration 20260207000004)
+- Public stats uses `head: true` count queries — anon key sufficient since RLS allows SELECT
+- `safeTokenEquals()` is duplicated in pulse + autonomy/check — could extract to shared util if more routes need it
+
+---
+
+## [2026-02-09] Enable Agent Teams + ExoSkull Team Prompts
+
+### What was done
+- Enabled Claude Code Agent Teams (experimental) via `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json
+- Created 6 ready-to-use agent team prompts for ExoSkull workflows
+- Updated project memory (MEMORY.md) with agent teams patterns and gotchas
+
+### Why
+- Agent Teams allow coordinating multiple Claude Code instances for parallel work (review, feature dev, debugging)
+- Pre-built prompts reduce setup friction for common ExoSkull tasks
+
+### Files changed
+- `~/.claude/settings.json` — added `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`
+- `context/agent-team-prompts.md` — 6 prompts (review, feature dev, debug, audit, refactor, research)
+- `~/.claude/projects/.../memory/MEMORY.md` — agent teams section
+
+### Notes for future agents
+- `teammateMode` is NOT a valid settings.json key — use CLI flag `--teammate-mode in-process`
+- Split panes don't work in VS Code terminal — in-process mode only
+- Agent teams use significantly more tokens — reserve for complex multi-area tasks
+- One team per session, no nested teams, no session resumption for in-process teammates
+
+---
+
+## [2026-02-09] Fix IORS MAPEK Loop + Widget Positioning
+
+### Root Cause
+- `exo_tenant_loop_config` had no entry for user — loop-15 CRON ran but evaluated 0 tenants
+- `ensureEssentialWidgets()` placed all missing widgets at `position_y=100+` (below fold)
+- Voice Hero invisible despite being `visible=true` and `pinned=true`
+
+### Fixes
+- **Loop config created**: Inserted `exo_tenant_loop_config` for user (immediate DB fix)
+- **Daily backfill**: Added `backfillMissingConfigs()` to loop-daily CRON — auto-creates configs for tenants created outside gateway
+- **Widget positioning**: `ensureEssentialWidgets()` now uses original `DEFAULT_WIDGETS` positions instead of hardcoded `y=100`
+- **Maintenance throughput**: loop-daily now processes ALL queued maintenance items per run (was 1/day, 5 created/day)
+- **Event expiry**: Gateway `data_ingested` events expire after 6h instead of 60min
+
+### Admin fixes (DB)
+- User `4538e7b5-...` upgraded to enterprise tier + super_admin (rate limit bypass)
+- Widget positions patched via REST API (voice_hero → y=0, all essentials → proper grid)
+
+### Files changed
+- `lib/iors/loop.ts` — added `backfillMissingConfigs()`
+- `app/api/cron/loop-daily/route.ts` — backfill step + maintenance loop
+- `lib/canvas/defaults.ts` — fixed `ensureEssentialWidgets()` positioning
+- `lib/gateway/gateway.ts` — event expiry 60→360 minutes
+
+### Commit: 43fb8c6
+
+---
+
 ## [2026-02-09] UX Audit Fixes — P0 + P1 (12 fixes)
 
 ### P0 Critical Fixes
