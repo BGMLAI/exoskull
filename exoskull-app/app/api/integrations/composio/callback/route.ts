@@ -37,8 +37,9 @@ export async function GET() {
   <div class="card">
     <div class="icon">&#10004;</div>
     <h1>Połączono!</h1>
-    <p>Możesz zamknąć tę stronę i wrócić do rozmowy.</p>
+    <p>Przekierowanie do integracji...</p>
   </div>
+  <script>setTimeout(function(){window.location.href='/dashboard/settings/integrations';},2000);</script>
 </body>
 </html>`;
 
