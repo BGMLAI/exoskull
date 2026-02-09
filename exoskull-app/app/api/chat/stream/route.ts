@@ -12,6 +12,8 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 import type { GatewayMessage } from "@/lib/gateway/types";
+import type { ProcessingCallback } from "@/lib/voice/conversation-handler";
+import { getToolLabel } from "@/lib/stream/tool-labels";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 
 import { logger } from "@/lib/logger";
@@ -91,8 +93,36 @@ export async function POST(request: NextRequest) {
             },
           };
 
+          // Build processing callback to pipe events through SSE
+          const processingCallback: ProcessingCallback = {
+            onThinkingStep: (step, status) => {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ type: "thinking_step", step, status })}\n\n`,
+                ),
+              );
+            },
+            onToolStart: (toolName) => {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ type: "tool_start", tool: toolName, label: getToolLabel(toolName) })}\n\n`,
+                ),
+              );
+            },
+            onToolEnd: (toolName, durationMs) => {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ type: "tool_end", tool: toolName, durationMs })}\n\n`,
+                ),
+              );
+            },
+          };
+
           // Process through full pipeline (28 tools, memory, emotion detection)
-          const result = await handleInboundMessage(gatewayMsg);
+          const result = await handleInboundMessage(
+            gatewayMsg,
+            processingCallback,
+          );
 
           // Send response in chunks for smoother UX
           const responseText = result.text;

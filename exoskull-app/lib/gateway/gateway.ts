@@ -15,6 +15,7 @@ import {
   updateSession,
   findTenantByPhone,
 } from "../voice/conversation-handler";
+import type { ProcessingCallback } from "../voice/conversation-handler";
 import { appendMessage } from "../unified-thread";
 import { isBirthPending, handleBirthMessage } from "@/lib/iors/birth-flow";
 import { findOrCreateLead, handleLeadMessage } from "@/lib/iors/lead-manager";
@@ -200,6 +201,7 @@ async function autoRegisterTenant(
  */
 export async function handleInboundMessage(
   msg: GatewayMessage,
+  callback?: ProcessingCallback,
 ): Promise<GatewayResponse> {
   const startTime = Date.now();
 
@@ -387,7 +389,10 @@ export async function handleInboundMessage(
 
     const SYNC_TIMEOUT_MS = 40_000; // 40s — leaves 20s buffer before Vercel's 60s
     const result = await Promise.race([
-      processUserMessage(session, msg.text, { skipThreadAppend: true }),
+      processUserMessage(session, msg.text, {
+        skipThreadAppend: true,
+        callback,
+      }),
       new Promise<null>((resolve) =>
         setTimeout(() => resolve(null), SYNC_TIMEOUT_MS),
       ),
