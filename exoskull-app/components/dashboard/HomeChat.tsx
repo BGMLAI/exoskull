@@ -295,8 +295,8 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
 
         readerRef.current = null;
 
-        // TTS: read aloud after stream completes
-        if (isTTSEnabled && fullText.trim()) {
+        // TTS: read aloud after stream completes (use ref to avoid stale closure)
+        if (ttsEnabledRef.current && fullText.trim()) {
           fetchTTSAndPlay(fullText).catch((err) => {
             console.error("[HomeChat] TTS failed:", err);
           });
@@ -316,7 +316,7 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
         setIsLoading(false);
       }
     },
-    [isLoading, conversationId, isTTSEnabled, fetchTTSAndPlay],
+    [isLoading, conversationId, fetchTTSAndPlay],
   );
 
   const sendMessage = useCallback(() => {
