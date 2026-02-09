@@ -4,6 +4,52 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-09] Full E2E Browser Audit — 5 fixes across P0-P1 bugs
+
+### What was done
+
+- **P0 Fix: EmotionalWidget** — Queried non-existent `mood`, `stress_level` columns from `exo_emotion_log` (table was restructured in migration 20260206000004). Fixed to use `primary_emotion`, `intensity`. Updated MOOD_CONFIG to match 7 PrimaryEmotion types (happy/sad/angry/fearful/disgusted/surprised/neutral).
+- **P0 Fix: WellbeingHero** — Queried non-existent `mood_score`, `mood_label` columns. Fixed to use `primary_emotion`, `intensity`, `valence`. Maps valence (-1..1) to 1-10 mood score.
+- **P0 Fix: DailyReadinessCard** — Queried non-existent `mood_score` column. Fixed to use `intensity`, `valence` with proper mapping.
+- **P1 Fix: Settings page mods** — Queried `mod_slug`, `mod_name` columns that don't exist on `exo_tenant_mods` (they're on `exo_mod_registry`). Fixed with Supabase foreign key join: `mod:exo_mod_registry(slug, name)`. Also fixed `mod.enabled` → `mod.active`.
+- **P1 Fix: Settings page skills** — Queried `status` column that doesn't exist on `exo_generated_skills`. Fixed to `approval_status`. Changed filter from `.eq("status", "active")` to `.eq("approval_status", "approved")`.
+
+### Audit Summary (22 pages tested)
+
+- **Landing/Auth**: OK — redirects to /dashboard when logged in
+- **Dashboard Home**: 9 widgets rendered, 1 console error (fixed)
+- **Dashboard Pages** (13 routes): All rendered, Settings had 2 console errors (fixed)
+- **Admin Panel** (10 routes): All rendered with real data
+- **Mobile** (390x844): Widgets stack correctly, bottom nav positioned fixed, voice hero text slightly truncated
+
+### Files changed
+
+- components/widgets/EmotionalWidget.tsx
+- components/dashboard/WellbeingHero.tsx
+- components/dashboard/DailyReadinessCard.tsx
+- app/dashboard/settings/page.tsx
+
+### Remaining P2 UX observations (no fix needed)
+
+- Admin Users page: Engagement/Churn Risk/Last Active show "—" (no user activity data yet)
+- Health widget shows "—" for all metrics (no health device connected)
+- Voice hero label truncated on very narrow mobile ("Pon..." for "Porozmawiaj z IORS")
+
+---
+
+## [2026-02-09] Add E2E Browser Audit Agent Team Prompt
+
+### What was done
+- Added prompt #7 "Full E2E Browser Audit" to context/agent-team-prompts.md
+- 5 teammates: Auth/Onboarding, Canvas/Widgets, Dashboard Pages (all 13), Chat/Voice Flows, Admin Panel + UX
+- Each teammate uses Playwright MCP for real browser testing
+- Covers: 30 pages, 16 widgets, auth flows, chat/voice, mobile responsive, dark/light mode, WCAG
+
+### Files changed
+- `context/agent-team-prompts.md` — added prompt #7
+
+---
+
 ## [2026-02-09] Security & Performance Audit Fixes
 
 ### What was done

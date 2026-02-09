@@ -9,19 +9,56 @@ import { cn } from "@/lib/utils";
 // ============================================================================
 
 interface EmotionData {
-  currentMood: string | null;
-  moodHistory: { date: string; mood: string; stress: number | null }[];
+  currentEmotion: string | null;
+  emotionHistory: { date: string; emotion: string; intensity: number | null }[];
 }
 
-const MOOD_CONFIG: Record<
+const EMOTION_CONFIG: Record<
   string,
-  { emoji: string; label: string; color: string }
+  { emoji: string; label: string; color: string; bgColor: string }
 > = {
-  positive: { emoji: "😊", label: "Pozytywny", color: "text-green-500" },
-  calm: { emoji: "😌", label: "Spokojny", color: "text-blue-500" },
-  stressed: { emoji: "😰", label: "Zestresowany", color: "text-red-500" },
-  low: { emoji: "😔", label: "Przygnebiony", color: "text-gray-500" },
-  focused: { emoji: "🎯", label: "Skupiony", color: "text-purple-500" },
+  happy: {
+    emoji: "😊",
+    label: "Szczesliwy",
+    color: "text-green-500",
+    bgColor: "bg-green-500",
+  },
+  sad: {
+    emoji: "😔",
+    label: "Smutny",
+    color: "text-blue-400",
+    bgColor: "bg-blue-400",
+  },
+  angry: {
+    emoji: "😤",
+    label: "Zly",
+    color: "text-red-500",
+    bgColor: "bg-red-500",
+  },
+  fearful: {
+    emoji: "😰",
+    label: "Przestraszony",
+    color: "text-yellow-500",
+    bgColor: "bg-yellow-500",
+  },
+  disgusted: {
+    emoji: "😖",
+    label: "Zniesmaczony",
+    color: "text-orange-500",
+    bgColor: "bg-orange-500",
+  },
+  surprised: {
+    emoji: "😲",
+    label: "Zaskoczony",
+    color: "text-purple-500",
+    bgColor: "bg-purple-500",
+  },
+  neutral: {
+    emoji: "😐",
+    label: "Neutralny",
+    color: "text-gray-500",
+    bgColor: "bg-gray-400",
+  },
 };
 
 // ============================================================================
@@ -35,8 +72,8 @@ interface EmotionalWidgetProps {
 
 export function EmotionalWidget({ tenantId, className }: EmotionalWidgetProps) {
   const [data, setData] = useState<EmotionData>({
-    currentMood: null,
-    moodHistory: [],
+    currentEmotion: null,
+    emotionHistory: [],
   });
 
   useEffect(() => {
@@ -49,7 +86,7 @@ export function EmotionalWidget({ tenantId, className }: EmotionalWidgetProps) {
 
         const { data: logs } = await supabase
           .from("exo_emotion_log")
-          .select("mood, stress_level, created_at")
+          .select("primary_emotion, intensity, created_at")
           .eq("tenant_id", tenantId)
           .gte("created_at", weekAgo.toISOString())
           .order("created_at", { ascending: false })
@@ -57,11 +94,11 @@ export function EmotionalWidget({ tenantId, className }: EmotionalWidgetProps) {
 
         if (logs && logs.length > 0) {
           setData({
-            currentMood: logs[0].mood,
-            moodHistory: logs.map((l) => ({
+            currentEmotion: logs[0].primary_emotion,
+            emotionHistory: logs.map((l) => ({
               date: l.created_at,
-              mood: l.mood,
-              stress: l.stress_level,
+              emotion: l.primary_emotion,
+              intensity: l.intensity,
             })),
           });
         }
@@ -73,16 +110,18 @@ export function EmotionalWidget({ tenantId, className }: EmotionalWidgetProps) {
     loadEmotions();
   }, [tenantId]);
 
-  const config = data.currentMood ? MOOD_CONFIG[data.currentMood] : null;
-  const moodCounts = data.moodHistory.reduce(
+  const config = data.currentEmotion
+    ? EMOTION_CONFIG[data.currentEmotion]
+    : null;
+  const emotionCounts = data.emotionHistory.reduce(
     (acc, h) => {
-      acc[h.mood] = (acc[h.mood] || 0) + 1;
+      acc[h.emotion] = (acc[h.emotion] || 0) + 1;
       return acc;
     },
     {} as Record<string, number>,
   );
 
-  const dominantMood = Object.entries(moodCounts).sort(
+  const dominantEmotion = Object.entries(emotionCounts).sort(
     ([, a], [, b]) => b - a,
   )[0];
 
@@ -100,33 +139,30 @@ export function EmotionalWidget({ tenantId, className }: EmotionalWidgetProps) {
 
             {/* Mini sparkline using dots */}
             <div className="flex items-center gap-0.5 mt-2">
-              {data.moodHistory
+              {data.emotionHistory
                 .slice(0, 7)
                 .reverse()
                 .map((h, i) => {
-                  const mc = MOOD_CONFIG[h.mood];
+                  const ec = EMOTION_CONFIG[h.emotion];
                   return (
                     <div
                       key={i}
                       className={cn(
                         "w-2 h-2 rounded-full",
-                        h.mood === "positive" && "bg-green-500",
-                        h.mood === "calm" && "bg-blue-500",
-                        h.mood === "stressed" && "bg-red-500",
-                        h.mood === "low" && "bg-gray-400",
-                        h.mood === "focused" && "bg-purple-500",
+                        ec?.bgColor || "bg-gray-400",
                       )}
-                      title={mc?.label}
+                      title={ec?.label}
                     />
                   );
                 })}
               <span className="text-[10px] text-muted-foreground ml-1">7d</span>
             </div>
 
-            {dominantMood && (
+            {dominantEmotion && (
               <p className="text-[10px] text-muted-foreground mt-1">
                 Dominujacy:{" "}
-                {MOOD_CONFIG[dominantMood[0]]?.label || dominantMood[0]}
+                {EMOTION_CONFIG[dominantEmotion[0]]?.label ||
+                  dominantEmotion[0]}
               </p>
             )}
           </>

@@ -36,7 +36,7 @@ export function DailyReadinessCard() {
             .limit(2),
           supabase
             .from("exo_emotion_log")
-            .select("mood_score")
+            .select("intensity, valence")
             .eq("tenant_id", user.id)
             .order("created_at", { ascending: false })
             .limit(1)
@@ -52,7 +52,15 @@ export function DailyReadinessCard() {
           (h) => h.metric_type === "sleep",
         )?.value;
         const hrv = healthRes.data?.find((h) => h.metric_type === "hrv")?.value;
-        const mood = moodRes.data?.mood_score;
+        // Map intensity (0-100) + valence (-1 to 1) to a 1-10 mood score
+        const rawIntensity = moodRes.data?.intensity;
+        const rawValence = moodRes.data?.valence;
+        const mood =
+          rawIntensity != null
+            ? rawValence != null
+              ? Math.round(((rawValence + 1) / 2) * 10) // valence-based: -1→0, 0→5, 1→10
+              : Math.round(rawIntensity / 10) // fallback: intensity 0-100 → 0-10
+            : null;
         const pendingTasks = taskRes.count || 0;
 
         // Composite readiness: sleep quality 30% + HRV trend 25% + mood 25% + task load 20%

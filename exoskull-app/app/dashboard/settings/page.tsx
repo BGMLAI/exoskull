@@ -221,15 +221,23 @@ export default function SettingsPage() {
 
         const { data: mods } = await supabase
           .from("exo_tenant_mods")
-          .select("id, mod_slug, mod_name, active, installed_at")
+          .select("id, active, installed_at, mod:exo_mod_registry(slug, name)")
           .eq("tenant_id", user.id);
-        setActiveMods(mods || []);
+        setActiveMods(
+          (mods || []).map((m: any) => ({
+            id: m.id,
+            mod_slug: m.mod?.slug,
+            mod_name: m.mod?.name,
+            active: m.active,
+            installed_at: m.installed_at,
+          })),
+        );
 
         const { data: skills } = await supabase
           .from("exo_generated_skills")
-          .select("id, name, status, created_at")
+          .select("id, name, approval_status, created_at")
           .eq("tenant_id", user.id)
-          .eq("status", "active");
+          .eq("approval_status", "approved");
         setActiveSkills(skills || []);
       }
 
@@ -472,8 +480,8 @@ export default function SettingsPage() {
                       {mod.mod_name || mod.mod_slug}
                     </span>
                   </div>
-                  <Badge variant={mod.enabled ? "default" : "secondary"}>
-                    {mod.enabled ? "Aktywny" : "Wylaczony"}
+                  <Badge variant={mod.active ? "default" : "secondary"}>
+                    {mod.active ? "Aktywny" : "Wylaczony"}
                   </Badge>
                 </div>
               ))}

@@ -17,17 +17,14 @@ interface WellbeingData {
   stress: string | null;
 }
 
-const MOOD_MAP: Record<number, { label: string; emoji: string }> = {
-  1: { label: "Bardzo zle", emoji: "😢" },
-  2: { label: "Zle", emoji: "😞" },
-  3: { label: "Slabo", emoji: "😕" },
-  4: { label: "Ponizej sredniej", emoji: "😐" },
-  5: { label: "Neutralnie", emoji: "🙂" },
-  6: { label: "OK", emoji: "😊" },
-  7: { label: "Dobrze", emoji: "😄" },
-  8: { label: "Bardzo dobrze", emoji: "😁" },
-  9: { label: "Swietnie", emoji: "🤩" },
-  10: { label: "Fantastycznie", emoji: "🥳" },
+const EMOTION_DISPLAY: Record<string, { label: string; emoji: string }> = {
+  happy: { label: "Szczesliwy", emoji: "😊" },
+  sad: { label: "Smutny", emoji: "😢" },
+  angry: { label: "Zly", emoji: "😤" },
+  fearful: { label: "Przestraszony", emoji: "😰" },
+  disgusted: { label: "Zniesmaczony", emoji: "😖" },
+  surprised: { label: "Zaskoczony", emoji: "😲" },
+  neutral: { label: "Neutralnie", emoji: "🙂" },
 };
 
 // ============================================================================
@@ -48,10 +45,10 @@ export function WellbeingHero() {
 
         if (!user) return;
 
-        // Fetch latest mood
+        // Fetch latest mood from emotion log (new schema: primary_emotion, intensity, valence)
         const { data: moodData } = await supabase
           .from("exo_emotion_log")
-          .select("mood_score, mood_label")
+          .select("primary_emotion, intensity, valence")
           .eq("tenant_id", user.id)
           .order("created_at", { ascending: false })
           .limit(1)
@@ -66,9 +63,18 @@ export function WellbeingHero() {
           .order("recorded_at", { ascending: false })
           .limit(5);
 
-        const moodScore = moodData?.mood_score ?? null;
-        const moodInfo = moodScore
-          ? MOOD_MAP[Math.round(moodScore)] || { label: "—", emoji: "➖" }
+        // Map valence (-1 to 1) to 1-10 scale, or use intensity as fallback
+        const valence = moodData?.valence;
+        const intensity = moodData?.intensity;
+        const moodScore =
+          valence != null
+            ? Math.round(((valence + 1) / 2) * 9 + 1) // -1→1, 0→5, 1→10
+            : intensity != null
+              ? Math.max(1, Math.round(intensity / 10))
+              : null;
+        const emotionKey = moodData?.primary_emotion ?? null;
+        const moodInfo = emotionKey
+          ? EMOTION_DISPLAY[emotionKey] || { label: emotionKey, emoji: "➖" }
           : { label: "Brak danych", emoji: "➖" };
 
         const sleepMetric = healthData?.find((h) => h.metric_type === "sleep");
@@ -76,8 +82,8 @@ export function WellbeingHero() {
 
         setData({
           mood: { score: moodScore, ...moodInfo },
-          energy: moodData?.mood_score
-            ? Math.round(moodData.mood_score * 0.8 + Math.random() * 2)
+          energy: moodScore
+            ? Math.round(moodScore * 0.8 + Math.random() * 2)
             : null,
           sleep: {
             hours: sleepMetric?.value ?? null,
