@@ -83,7 +83,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/gateway/") || // External messaging webhooks (Telegram, Discord, Slack, Signal, iMessage)
     pathname.startsWith("/api/rigs/") || // OAuth connect/callback + sync (routes verify JWT internally)
     pathname.startsWith("/api/meta/") || // Meta deauth/pages (routes verify JWT internally)
-    pathname === "/api/pulse";
+    pathname === "/api/pulse" ||
+    pathname === "/api/knowledge/reprocess"; // Has own CRON_SECRET auth
 
   // ============================================================================
   // AUTH GUARD: Redirect unauthenticated users to login
