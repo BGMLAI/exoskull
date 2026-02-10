@@ -33,6 +33,11 @@ const EVENT_TYPE_MAP: Record<PetlaEventType, ClassificationResult> = {
     handler: "deliver_proactive",
     priority: 2,
   },
+  coaching_trigger: {
+    sub_loop: "proactive",
+    handler: "deliver_proactive",
+    priority: 2,
+  },
   data_ingested: {
     sub_loop: "observation",
     handler: "process_data",

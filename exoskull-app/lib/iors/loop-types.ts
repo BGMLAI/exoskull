@@ -13,6 +13,7 @@ export type PetlaEventType =
   | "crisis" // P0
   | "outbound_ready" // P1
   | "proactive_trigger" // P2
+  | "coaching_trigger" // P2-P3 (coaching engine)
   | "data_ingested" // P3
   | "optimization_signal" // P4
   | "maintenance_due"; // P5

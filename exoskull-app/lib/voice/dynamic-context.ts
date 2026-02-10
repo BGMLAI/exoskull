@@ -11,11 +11,50 @@ import { getPendingSuggestions } from "../skills/detector";
 import { listConnections } from "@/lib/integrations/composio-adapter";
 
 import { logger } from "@/lib/logger";
+/** Per-user AI configuration from iors_ai_config JSONB */
+export interface TenantAIConfig {
+  temperature: number;
+  tts_speed: number;
+  tts_voice_id: string | null;
+  model_preferences: {
+    chat: string;
+    analysis: string;
+    coding: string;
+    creative: string;
+    crisis: string;
+  };
+  permissions: Record<string, { with_approval: boolean; autonomous: boolean }>;
+}
+
+/** Result from buildDynamicContext — includes context string + per-user overrides */
+export interface DynamicContextResult {
+  context: string;
+  systemPromptOverride: string | null;
+  aiConfig: TenantAIConfig | null;
+}
+
+const DEFAULT_AI_CONFIG: TenantAIConfig = {
+  temperature: 0.7,
+  tts_speed: 1.0,
+  tts_voice_id: null,
+  model_preferences: {
+    chat: "auto",
+    analysis: "auto",
+    coding: "auto",
+    creative: "auto",
+    crisis: "auto",
+  },
+  permissions: {},
+};
+
 /**
  * Build dynamic context string for the IORS system prompt.
  * Runs 6+ DB queries in parallel where possible.
+ * Returns context string + system prompt override + AI config for per-user customization.
  */
-export async function buildDynamicContext(tenantId: string): Promise<string> {
+export async function buildDynamicContext(
+  tenantId: string,
+): Promise<DynamicContextResult> {
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
@@ -30,11 +69,11 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
     docsResult,
     connectionsResult,
   ] = await Promise.allSettled([
-    // 1. User profile + custom instructions + presets + AI config
+    // 1. User profile + custom instructions + presets + AI config + prompt override
     supabase
       .from("exo_tenants")
       .select(
-        "name, preferred_name, communication_style, iors_personality, iors_name, iors_custom_instructions, iors_behavior_presets, iors_system_prompt_override",
+        "name, preferred_name, communication_style, iors_personality, iors_name, iors_custom_instructions, iors_behavior_presets, iors_system_prompt_override, iors_ai_config",
       )
       .eq("id", tenantId)
       .single(),
@@ -221,6 +260,17 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
     context += `Gdy odmówi, użyj "dismiss_skill_suggestion". NIE naciskaj - zaproponuj raz, naturalnie.\n`;
   }
 
+  // Extract system prompt override + AI config from tenant
+  const systemPromptOverride =
+    ((tenant as Record<string, unknown>)?.iors_system_prompt_override as
+      | string
+      | null) ?? null;
+  const rawAiConfig = (tenant as Record<string, unknown>)?.iors_ai_config;
+  const aiConfig: TenantAIConfig =
+    rawAiConfig && typeof rawAiConfig === "object"
+      ? { ...DEFAULT_AI_CONFIG, ...(rawAiConfig as Partial<TenantAIConfig>) }
+      : DEFAULT_AI_CONFIG;
+
   logger.info(`[DynamicContext] Built in ${Date.now() - startTime}ms`);
-  return context;
+  return { context, systemPromptOverride, aiConfig };
 }

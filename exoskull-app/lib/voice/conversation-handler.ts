@@ -30,7 +30,15 @@ import { logActivities } from "@/lib/activity-log";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY!;
 
-const CLAUDE_MODEL = "claude-sonnet-4-20250514"; // Fast + capable
+const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514"; // Fast + capable
+
+/** Map user model preference string to actual Anthropic model ID */
+const CHAT_MODEL_MAP: Record<string, string> = {
+  auto: "claude-sonnet-4-20250514",
+  haiku: "claude-3-5-haiku-20241022",
+  sonnet: "claude-sonnet-4-20250514",
+  opus: "claude-opus-4-20250514",
+};
 
 // ============================================================================
 // TYPES
@@ -302,14 +310,23 @@ export async function processUserMessage(
   options?.callback?.onThinkingStep?.("Ładuję kontekst", "running");
 
   // Build dynamic context + emotion + thread context — ALL parallel
-  const [dynamicContext, emotionState, rawThreadMessages] = await Promise.all([
-    buildDynamicContext(session.tenantId),
-    analyzeEmotion(userMessage),
-    getThreadContext(session.tenantId, 50).catch((err) => {
-      console.error("[ConversationHandler] Thread context failed:", err);
-      return [] as { role: "user" | "assistant"; content: string }[];
-    }),
-  ]);
+  const [dynamicContextResult, emotionState, rawThreadMessages] =
+    await Promise.all([
+      buildDynamicContext(session.tenantId),
+      analyzeEmotion(userMessage),
+      getThreadContext(session.tenantId, 50).catch((err) => {
+        console.error("[ConversationHandler] Thread context failed:", err);
+        return [] as { role: "user" | "assistant"; content: string }[];
+      }),
+    ]);
+
+  // Extract per-user config from dynamic context result
+  const dynamicContext = dynamicContextResult.context;
+  const systemPromptOverride = dynamicContextResult.systemPromptOverride;
+  const aiConfig = dynamicContextResult.aiConfig;
+  const userTemperature = aiConfig?.temperature ?? 0.7;
+  const chatModelPref = aiConfig?.model_preferences?.chat ?? "auto";
+  const resolvedModel = CHAT_MODEL_MAP[chatModelPref] || DEFAULT_CLAUDE_MODEL;
 
   // Filter out poisoned assistant messages from thread context
   // (old "Zrobione!" fallback, broken responses that Claude would copy)
@@ -415,10 +432,12 @@ export async function processUserMessage(
     if (session.systemPromptPrefix) {
       systemBlocks.push({ type: "text", text: session.systemPromptPrefix });
     }
-    // Static prompt (~2500 tokens) — identical across all turns → CACHE
+    // Static prompt (~2500 tokens) — or user's custom override if set
+    // When user sets a system prompt override in Settings, it replaces the default STATIC_SYSTEM_PROMPT
+    const effectiveSystemPrompt = systemPromptOverride || STATIC_SYSTEM_PROMPT;
     systemBlocks.push({
       type: "text",
-      text: STATIC_SYSTEM_PROMPT,
+      text: effectiveSystemPrompt,
       cache_control: { type: "ephemeral" },
     });
     // Dynamic context (user profile, time, mood) — changes per turn
@@ -490,17 +509,21 @@ export async function processUserMessage(
     // First API call (max_tokens low for voice = short, fast responses)
     // system + tools use cache_control for ~6K cached tokens (90% input savings)
     logger.info("[ConversationHandler] Calling Claude API:", {
-      model: CLAUDE_MODEL,
+      model: resolvedModel,
+      temperature: userTemperature,
       maxTokens: session.maxTokens || maxTokensOverride || 200,
       messageCount: messages.length,
       threadFiltered:
         rawThreadMessages.length - threadMessages.length + " poisoned removed",
       tenantId: session.tenantId,
+      modelPreference: chatModelPref,
+      hasPromptOverride: !!systemPromptOverride,
     });
 
     const response = await anthropic.messages.create({
-      model: CLAUDE_MODEL,
+      model: resolvedModel,
       max_tokens: session.maxTokens || maxTokensOverride || 200,
+      temperature: userTemperature,
       system: systemBlocks,
       messages,
       tools: IORS_TOOLS,
@@ -575,8 +598,9 @@ export async function processUserMessage(
 
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         const followUp = await anthropic.messages.create({
-          model: CLAUDE_MODEL,
+          model: resolvedModel,
           max_tokens: followUpMaxTokens,
+          temperature: userTemperature,
           system: systemBlocks,
           messages: currentMessages,
           tools: IORS_TOOLS,

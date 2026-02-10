@@ -10,6 +10,17 @@ import type { ToolDefinition } from "./index";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { parsePersonalityFromDB } from "../personality";
 import type { IORSPersonality } from "../types";
+import { checkSelfModifyConsent, logSelfModification } from "./consent-gate";
+
+/** Permission key mapping for personality parameters */
+const PERSONALITY_PERM_MAP: Record<string, string> = {
+  formality: "style_formality",
+  humor: "style_humor",
+  directness: "style_directness",
+  empathy: "style_empathy",
+  detail_level: "style_detail",
+  proactivity: "proactivity",
+};
 
 export const personalityTools: ToolDefinition[] = [
   {
@@ -61,6 +72,7 @@ export const personalityTools: ToolDefinition[] = [
     },
     execute: async (input, tenantId) => {
       const supabase = getServiceSupabase();
+      const isDirectRequest = (input._direct_request as boolean) ?? true; // personality changes via chat are direct
 
       // Load current personality
       const { data: tenant } = await supabase
@@ -70,64 +82,114 @@ export const personalityTools: ToolDefinition[] = [
         .single();
 
       const current = parsePersonalityFromDB(tenant?.iors_personality);
-
-      // Apply changes
-      const updated: IORSPersonality = {
-        ...current,
-        name: (input.name as string) ?? current.name,
-        language:
-          (input.language as IORSPersonality["language"]) ?? current.language,
-        proactivity: clamp(input.proactivity as number, current.proactivity),
-        style: {
-          formality: clamp(input.formality as number, current.style.formality),
-          humor: clamp(input.humor as number, current.style.humor),
-          directness: clamp(
-            input.directness as number,
-            current.style.directness,
-          ),
-          empathy: clamp(input.empathy as number, current.style.empathy),
-          detail_level: clamp(
-            input.detail_level as number,
-            current.style.detail_level,
-          ),
-        },
-      };
-
-      // Save to DB
-      const { error } = await supabase
-        .from("exo_tenants")
-        .update({
-          iors_personality: updated,
-          iors_name: updated.name,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", tenantId);
-
-      if (error) {
-        console.error("[PersonalityTools] Failed to update:", {
-          tenantId,
-          error: error.message,
-        });
-        return "Nie udalo sie zaktualizowac osobowosci. Sprobuj ponownie.";
-      }
-
-      // Build confirmation of what changed
       const changes: string[] = [];
+      const proposed: string[] = [];
+      const denied: string[] = [];
+
+      // Check consent for each parameter being changed
+      const updated: IORSPersonality = { ...current };
+      updated.style = { ...current.style };
+
+      // Name + language don't need consent (cosmetic)
+      updated.name = (input.name as string) ?? current.name;
+      updated.language =
+        (input.language as IORSPersonality["language"]) ?? current.language;
       if (input.name) changes.push(`imie: ${input.name}`);
-      if (input.formality !== undefined)
-        changes.push(`formalnosc: ${input.formality}/100`);
-      if (input.humor !== undefined) changes.push(`humor: ${input.humor}/100`);
-      if (input.directness !== undefined)
-        changes.push(`bezposredniosc: ${input.directness}/100`);
-      if (input.empathy !== undefined)
-        changes.push(`empatia: ${input.empathy}/100`);
-      if (input.detail_level !== undefined)
-        changes.push(`szczegoly: ${input.detail_level}/100`);
-      if (input.proactivity !== undefined)
-        changes.push(`proaktywnosc: ${input.proactivity}/100`);
       if (input.language) changes.push(`jezyk: ${input.language}`);
 
-      return `Zaktualizowano: ${changes.join(", ")}. Zmiana obowiazuje od nastepnej wiadomosci.`;
+      // Style axes + proactivity — check consent per parameter
+      for (const [inputKey, permKey] of Object.entries(PERSONALITY_PERM_MAP)) {
+        const newVal = input[inputKey] as number | undefined;
+        if (newVal === undefined) continue;
+
+        const consent = await checkSelfModifyConsent(
+          tenantId,
+          permKey,
+          isDirectRequest,
+        );
+
+        const currentVal =
+          inputKey === "proactivity"
+            ? current.proactivity
+            : current.style[inputKey as keyof typeof current.style];
+
+        if (consent.mode === "denied") {
+          denied.push(inputKey);
+          continue;
+        }
+
+        if (consent.mode === "needs_approval") {
+          await logSelfModification({
+            tenantId,
+            parameterName: inputKey,
+            permissionKey: permKey,
+            beforeState: currentVal,
+            afterState: newVal,
+            status: "proposed",
+          });
+          proposed.push(`${inputKey}: ${currentVal} → ${newVal}`);
+          continue;
+        }
+
+        // Allowed — apply
+        const clamped = clamp(newVal, currentVal);
+        if (inputKey === "proactivity") {
+          updated.proactivity = clamped;
+        } else {
+          (updated.style as Record<string, number>)[inputKey] = clamped;
+        }
+        changes.push(`${inputKey}: ${clamped}/100`);
+
+        await logSelfModification({
+          tenantId,
+          parameterName: inputKey,
+          permissionKey: permKey,
+          beforeState: currentVal,
+          afterState: clamped,
+          status: "applied",
+        });
+      }
+
+      // Save to DB (only if there are actual changes)
+      if (changes.length > 0) {
+        const { error } = await supabase
+          .from("exo_tenants")
+          .update({
+            iors_personality: updated,
+            iors_name: updated.name,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", tenantId);
+
+        if (error) {
+          console.error("[PersonalityTools] Failed to update:", {
+            tenantId,
+            error: error.message,
+          });
+          return "Nie udalo sie zaktualizowac osobowosci. Sprobuj ponownie.";
+        }
+      }
+
+      // Build response
+      const parts: string[] = [];
+      if (changes.length > 0) {
+        parts.push(`Zaktualizowano: ${changes.join(", ")}.`);
+      }
+      if (proposed.length > 0) {
+        parts.push(
+          `Zaproponowano (czeka na zatwierdzenie): ${proposed.join(", ")}.`,
+        );
+      }
+      if (denied.length > 0) {
+        parts.push(
+          `Odmowa (brak uprawnien): ${denied.join(", ")}. Wlacz w Ustawienia → Optymalizacja.`,
+        );
+      }
+      if (parts.length === 0) {
+        return "Nie zmieniono zadnych parametrow.";
+      }
+
+      return parts.join(" ") + " Zmiana obowiazuje od nastepnej wiadomosci.";
     },
   },
 ];

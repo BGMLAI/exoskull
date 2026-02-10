@@ -36,6 +36,15 @@ import {
 import { ProfileSection } from "./ProfileSection";
 import { PersonalitySection } from "./PersonalitySection";
 import { NotificationsSection } from "./NotificationsSection";
+import { InstructionsSection } from "./InstructionsSection";
+import { BehaviorPresetsSection } from "./BehaviorPresetsSection";
+import { AIConfigSection } from "./AIConfigSection";
+import { LoopControlSection } from "./LoopControlSection";
+import { SelfOptimizeSection } from "./SelfOptimizeSection";
+import { DataPipelineSection } from "./DataPipelineSection";
+import { AutonomySection } from "./AutonomySection";
+import { MyDataSection } from "./MyDataSection";
+import { SystemPromptSection } from "./SystemPromptSection";
 
 interface PersonalityFormState {
   name: string;
@@ -127,16 +136,6 @@ export default function SettingsPage() {
   const [notificationsSaved, setNotificationsSaved] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [exportingData, setExportingData] = useState(false);
-  const [autonomyPermissions, setAutonomyPermissions] = useState<
-    Array<{
-      action_type: string;
-      domain: string;
-      granted: boolean;
-      requires_confirmation: boolean;
-      threshold_amount?: number;
-    }>
-  >([]);
-  const [autonomyLoading, setAutonomyLoading] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -239,16 +238,6 @@ export default function SettingsPage() {
           .eq("tenant_id", user.id)
           .eq("approval_status", "approved");
         setActiveSkills(skills || []);
-      }
-
-      try {
-        const autoRes = await fetch("/api/settings/autonomy");
-        if (autoRes.ok) {
-          const autoJson = await autoRes.json();
-          setAutonomyPermissions(autoJson.permissions || []);
-        }
-      } catch {
-        // Non-blocking
       }
     } catch (err) {
       console.error("[SettingsPage] Error:", err);
@@ -354,34 +343,6 @@ export default function SettingsPage() {
     }
   }
 
-  async function toggleAutonomy(
-    actionType: string,
-    granted: boolean,
-    requiresConfirmation: boolean = false,
-  ) {
-    setAutonomyLoading(true);
-    try {
-      const res = await fetch("/api/settings/autonomy", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action_type: actionType,
-          domain: "*",
-          granted,
-          requires_confirmation: requiresConfirmation,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAutonomyPermissions(data.permissions || []);
-      }
-    } catch (err) {
-      console.error("[Settings] Autonomy toggle error:", err);
-    } finally {
-      setAutonomyLoading(false);
-    }
-  }
-
   if (loading) {
     return (
       <div className="p-4 md:p-8">
@@ -402,7 +363,7 @@ export default function SettingsPage() {
           Ustawienia
         </h1>
         <p className="text-muted-foreground">
-          Zarzadzaj profilem i preferencjami powiadomien
+          Centrum kontroli — profil, osobowosc, AI, autonomia, petla, dane
         </p>
       </div>
 
@@ -435,6 +396,33 @@ export default function SettingsPage() {
         saving={savingNotifications}
         saved={notificationsSaved}
       />
+
+      {/* Custom Instructions */}
+      <InstructionsSection />
+
+      {/* Behavior Presets */}
+      <BehaviorPresetsSection />
+
+      {/* AI Config — Models, Temperature, Voice, Usage */}
+      <AIConfigSection />
+
+      {/* Loop Control — MAPEK status, frequency, budget */}
+      <LoopControlSection />
+
+      {/* Self-Optimization — Permissions + History */}
+      <SelfOptimizeSection />
+
+      {/* Autonomy — moved from admin */}
+      {tenantId && <AutonomySection />}
+
+      {/* My Data — MITs, Patterns, Learning Events */}
+      <MyDataSection />
+
+      {/* Data Pipeline — sync status per-user */}
+      <DataPipelineSection />
+
+      {/* System Prompt Editor — Advanced */}
+      <SystemPromptSection />
 
       {/* Integrations */}
       <Card>

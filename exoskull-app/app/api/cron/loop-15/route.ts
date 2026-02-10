@@ -25,6 +25,11 @@ import type { TenantLoopConfig, ActivityClass } from "@/lib/iors/loop-types";
 import { ModelRouter } from "@/lib/ai/model-router";
 import { CircuitBreaker } from "@/lib/iors/circuit-breaker";
 import { logActivity } from "@/lib/activity-log";
+import { collectCoachingSignals } from "@/lib/iors/coaching/signal-collector";
+import {
+  triageCoachingDecision,
+  formatCoachingMessage,
+} from "@/lib/iors/coaching/decision-engine";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -181,7 +186,48 @@ async function handler(req: NextRequest) {
           }
         }
 
-        // 2d. Update loop state
+        // 2d. Coaching Engine — rule-based triage (free, no AI cost)
+        let coachingAction = "none";
+        try {
+          if (
+            action === "none" &&
+            Date.now() - startTime < TIMEOUT_MS - 15_000
+          ) {
+            const signals = await collectCoachingSignals(tenant.tenant_id);
+            const decision = triageCoachingDecision(signals);
+
+            if (decision.type !== "none") {
+              coachingAction = decision.type;
+              const message = await formatCoachingMessage(
+                decision,
+                null, // tenant name could be fetched but adds latency
+              );
+              if (message) {
+                await emitEvent({
+                  tenantId: tenant.tenant_id,
+                  eventType: "coaching_trigger",
+                  priority: decision.priority,
+                  source: "coaching-engine",
+                  payload: {
+                    message,
+                    type: decision.type,
+                    reason: decision.reason,
+                    handler: "deliver_proactive",
+                    data: decision.data,
+                  },
+                  dedupKey: `coaching:${decision.type}:${tenant.tenant_id}:${new Date().toISOString().slice(0, 13)}`,
+                });
+              }
+            }
+          }
+        } catch (coachErr) {
+          console.error("[Loop15] Coaching engine failed:", {
+            tenantId: tenant.tenant_id,
+            error: coachErr instanceof Error ? coachErr.message : coachErr,
+          });
+        }
+
+        // 2e. Update loop state
         await updateTenantLoopState(
           tenant.tenant_id,
           activityClass,
@@ -191,7 +237,8 @@ async function handler(req: NextRequest) {
         evaluationResults.push({
           tenantId: tenant.tenant_id,
           class: activityClass,
-          action,
+          action:
+            coachingAction !== "none" ? `coaching:${coachingAction}` : action,
         });
         evaluated++;
 
