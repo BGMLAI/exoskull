@@ -33,10 +33,10 @@ export function HealthWidget({ summary }: HealthWidgetProps) {
             Zdrowie
           </span>
           <Link
-            href="/dashboard/mods"
+            href="/dashboard/skills?tab=active"
             className="text-sm font-normal text-muted-foreground hover:text-foreground"
           >
-            Mody zdrowia
+            Trackery zdrowia
           </Link>
         </CardTitle>
       </CardHeader>

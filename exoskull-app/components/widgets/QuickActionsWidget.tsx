@@ -28,10 +28,10 @@ export function QuickActionsWidget() {
               Nowe zadanie
             </Button>
           </Link>
-          <Link href="/dashboard/mods">
+          <Link href="/dashboard/skills">
             <Button variant="outline" className="w-full justify-start gap-2">
               <Package className="h-4 w-4" />
-              Mody
+              Skills
             </Button>
           </Link>
           <Link href="/dashboard/memory">

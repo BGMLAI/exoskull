@@ -168,7 +168,7 @@ export async function buildDynamicContext(
         return "unknown";
       })
       .join(", ");
-    context += `- Zainstalowane Mody: ${modList}\n`;
+    context += `- Zainstalowane trackery: ${modList}\n`;
   }
 
   // IORS Personality + Custom Instructions + Behavior Presets

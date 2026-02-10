@@ -19,6 +19,7 @@ import {
   generateErrorTwiML,
 } from "@/lib/voice/twilio-client";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { appendMessage } from "@/lib/unified-thread";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
@@ -319,7 +320,7 @@ const END_PHRASES = [
   "to wszystko",
   "do zobaczenia",
   "pa",
-  "cześć",
+  // "cześć" removed — in Polish it's BOTH greeting AND goodbye
   "trzymaj się",
 ];
 
@@ -333,7 +334,7 @@ function checkDelegateEnd(
 
 /**
  * After delegate call ends, notify the user about the result.
- * Uses SMS for now (could also call back).
+ * Uses multi-channel dispatch (preferred → whatsapp → telegram → sms → email → web_chat).
  */
 async function notifyUserAboutDelegateResult(
   tenantId: string,
@@ -342,17 +343,12 @@ async function notifyUserAboutDelegateResult(
 ): Promise<void> {
   const supabase = getServiceSupabase();
 
-  // Get user's phone
+  // Get user's preferred name
   const { data: tenant } = await supabase
     .from("exo_tenants")
-    .select("phone, preferred_name")
+    .select("preferred_name")
     .eq("id", tenantId)
     .single();
-
-  if (!tenant?.phone) {
-    logger.info("[Delegate] No phone for tenant, skipping notification");
-    return;
-  }
 
   // Build summary from last few messages
   const lastMessages = messages.slice(-4);
@@ -363,22 +359,41 @@ async function notifyUserAboutDelegateResult(
     )
     .join("\n");
 
-  const smsBody = `${tenant.preferred_name || "Hej"}, zadzwoniłem w sprawie: ${metadata.purpose}.\n\nPodsumowanie:\n${summary}`;
+  const notificationBody = `${tenant?.preferred_name || "Hej"}, zadzwoniłem w sprawie: ${metadata.purpose}.\n\nPodsumowanie:\n${summary}`;
 
-  // Send SMS notification
+  // Log to unified thread
+  await appendMessage(tenantId, {
+    role: "assistant",
+    content: `[Rozmowa delegowana — ${metadata.purpose}]\n${summary}`,
+    channel: "voice",
+    direction: "outbound",
+    source_type: "voice_session",
+  }).catch((err) =>
+    logger.warn("[Delegate] Failed to append to thread:", {
+      error: err instanceof Error ? err.message : String(err),
+    }),
+  );
+
+  // Dispatch via multi-channel fallback
   try {
-    const twilioClient = (await import("twilio")).default(
-      process.env.TWILIO_ACCOUNT_SID!,
-      process.env.TWILIO_AUTH_TOKEN!,
+    const { dispatchReport } = await import("@/lib/reports/report-dispatcher");
+    const result = await dispatchReport(
+      tenantId,
+      notificationBody,
+      "proactive",
     );
-    await twilioClient.messages.create({
-      to: tenant.phone,
-      from: process.env.TWILIO_PHONE_NUMBER!,
-      body: smsBody.substring(0, 1600), // SMS limit
+    logger.info("[Delegate] Notification dispatched:", {
+      channel: result.channel,
+      success: result.success,
     });
-    logger.info("[Delegate] SMS notification sent to", tenant.phone);
-  } catch (smsError) {
-    console.error("[Delegate] SMS notification failed:", smsError);
+  } catch (dispatchError) {
+    console.error("[Delegate] Notification dispatch failed:", {
+      error:
+        dispatchError instanceof Error
+          ? dispatchError.message
+          : String(dispatchError),
+      tenantId,
+    });
   }
 }
 

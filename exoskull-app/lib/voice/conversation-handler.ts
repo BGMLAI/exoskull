@@ -728,8 +728,22 @@ export async function processUserMessage(
       ),
       stack: err.stack?.split("\n").slice(0, 3).join("\n"),
     });
+
+    // Provide specific user-facing error messages based on API response
+    let userMessage = "Przepraszam, wystąpił problem. Spróbuj ponownie.";
+    if (err.status === 400 && err.error?.message?.includes("credit balance")) {
+      userMessage =
+        "Serwis AI jest chwilowo niedostępny (problem z kontem API). Administrator został powiadomiony.";
+    } else if (err.status === 429) {
+      userMessage =
+        "Zbyt wiele zapytań jednocześnie. Odczekaj chwilę i spróbuj ponownie.";
+    } else if (err.status === 529 || err.status === 503) {
+      userMessage =
+        "Serwis AI jest chwilowo przeciążony. Spróbuj ponownie za minutę.";
+    }
+
     return {
-      text: "Przepraszam, wystąpił problem. Spróbuj ponownie.",
+      text: userMessage,
       toolsUsed: [],
       shouldEndCall: false,
     };

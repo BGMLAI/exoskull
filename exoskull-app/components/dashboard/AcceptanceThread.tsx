@@ -134,7 +134,7 @@ function StatusCards({ tenantId }: { tenantId: string }) {
       icon: Heart,
       label: "Sen",
       value: data.sleepHours !== null ? `${data.sleepHours}h` : "Brak danych",
-      href: "/dashboard/mods",
+      href: "/dashboard/skills?tab=active",
       color: "text-red-500",
     },
     {

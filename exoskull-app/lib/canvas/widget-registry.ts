@@ -78,7 +78,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetMeta> = {
   },
   integrations: {
     type: "integrations",
-    label: "Integracje",
+    label: "Polaczone serwisy",
     icon: "Link",
     defaultSize: { w: 2, h: 2 },
     minSize: { w: 1, h: 1 },
