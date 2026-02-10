@@ -4,7 +4,7 @@
  * Upload → Extract text → Chunk → Generate embeddings → Store in pgvector
  *
  * Supported formats: TXT, MD, CSV, JSON, PDF, DOCX
- * Uses: pdf-parse (PDF), mammoth (DOCX), OpenAI text-embedding-3-small (embeddings)
+ * Uses: unpdf (PDF), mammoth (DOCX), OpenAI text-embedding-3-small (embeddings)
  */
 
 import { getServiceSupabase } from "@/lib/supabase/service";
@@ -189,23 +189,12 @@ export async function processDocument(
 // ============================================================================
 
 async function extractPDF(fileData: Blob): Promise<string> {
-  // pdf-parse uses pdfjs-dist which requires DOMMatrix in newer versions.
-  // Vercel serverless doesn't have DOM APIs — polyfill before importing.
-  if (typeof globalThis.DOMMatrix === "undefined") {
-    // Minimal polyfill: pdfjs only checks for existence, doesn't use it for text extraction
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (globalThis as any).DOMMatrix = class DOMMatrix {
-      constructor() {
-        return Object.create(null);
-      }
-    };
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse");
+  // unpdf: serverless-optimized PDF.js wrapper (no native deps, no canvas)
+  const { extractText, getDocumentProxy } = await import("unpdf");
   const buffer = Buffer.from(await fileData.arrayBuffer());
-  const result = await pdfParse(buffer);
-  return result.text;
+  const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  const { text } = await extractText(pdf, { mergePages: true });
+  return text;
 }
 
 async function extractDOCX(fileData: Blob): Promise<string> {
