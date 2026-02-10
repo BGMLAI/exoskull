@@ -4,6 +4,126 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-10] MAPEK Loop + Document Reprocessing + Google Integration Fix
+
+### What was done
+
+**1. MAPEK Loop Diagnostics & Verification**
+- Verified all 3 CRON tiers working: petla (1min), loop-15 (15min), loop-daily (24h)
+- Loop-daily processed 26 maintenance items, loop-15 evaluated 3 tenants
+- All CRONs return 200 OK with proper CRON_SECRET auth
+
+**2. Document Reprocessing Pipeline**
+- Created `/api/knowledge/reprocess` endpoint with dual auth (user session OR CRON_SECRET + tenant_id)
+- Added batching support (?limit=N, max 20) and maxDuration=300s
+- Whitelisted reprocess endpoint in middleware (was blocked by auth guard)
+- Reprocessed 39 stuck documents: 32 MD/DOCX/TXT + 7 PDFs
+
+**3. PDF Extraction Fix (unpdf)**
+- Replaced `pdf-parse` v2.4.5 with `unpdf` for serverless PDF extraction
+- pdf-parse depended on `@napi-rs/canvas` (native binary) — fails on Vercel serverless
+- `unpdf` is serverless-optimized (zero native deps, bundled PDF.js worker)
+- All 7 PDFs now extract successfully (185 total new chunks)
+- Added fallback with error logging for any future extraction failures
+
+**4. Dynamic Context — AI Awareness**
+- Added document count + Composio integration status to `buildDynamicContext()`
+- AI now knows about user's uploaded documents and connected integrations
+- Instructs AI to use `search_knowledge` before saying "nie wiem"
+
+**5. Composio API Key Fix**
+- `COMPOSIO_API_KEY` was missing from Vercel production environment
+- Added via `vercel env add` — Google integration now reachable
+
+### Files changed
+- `exoskull-app/app/api/knowledge/reprocess/route.ts` (new — reprocess endpoint)
+- `exoskull-app/lib/knowledge/document-processor.ts` (pdf-parse → unpdf)
+- `exoskull-app/lib/supabase/middleware.ts` (whitelist reprocess route)
+- `exoskull-app/lib/voice/dynamic-context.ts` (doc count + integrations context)
+- `exoskull-app/package.json` (+unpdf, -pdf-parse)
+
+### How to verify
+- `POST /api/knowledge/reprocess?tenant_id=X&limit=10` with `x-cron-secret` header
+- Chat: ask "co wiesz o moich dokumentach?" — should use search_knowledge tool
+- Admin: `/admin/cron` — should show recent petla/loop-15/loop-daily runs
+
+### Notes for future agents
+- `unpdf` is the correct PDF library for Vercel serverless (NOT pdf-parse)
+- Middleware auth guard blocks ALL `/api/` routes not in `isPublicApi` list
+- Any new API route with own auth needs to be added to middleware whitelist
+- COMPOSIO_API_KEY must be set in BOTH .env.local AND Vercel env vars
+
+---
+
+## [2026-02-09] Unified Voice+Chat Activity Stream — Full rebuild (4 phases)
+
+### What was done
+
+Complete replacement of the old ConversationPanel with a new **Unified Activity Stream** where ALL events (text, voice, AI responses, tool actions, thinking steps, emotions, insights) flow in one chronological thread.
+
+**Phase 1 — MVP (9 files)**
+- `lib/stream/types.ts` — 9 discriminated union event types (user_message, ai_message, agent_action, thinking_step, emotion_reading, insight_card, session_summary, system_notification, user_voice)
+- `lib/hooks/useStreamState.ts` — useReducer with 9 actions (ADD_EVENT, UPDATE_AI_MESSAGE, FINALIZE, LOAD_HISTORY, etc.)
+- `components/stream/UnifiedStream.tsx` — Main container: SSE streaming, smart scroll, history loading, time separators (>1h gap)
+- `components/stream/StreamEventRouter.tsx` — Type-safe switch routing to 8 sub-components
+- `components/stream/VoiceInputBar.tsx` — Merged text+voice input (useDictation + Whisper STT, waveform animation, TTS toggle)
+- `components/stream/EmptyState.tsx` — "Czesc! Jestem IORS." with 6 quick action chips
+- `components/stream/events/UserMessage.tsx` — Right-aligned bubble with voice variant (mic badge)
+- `components/stream/events/AIMessage.tsx` — Left-aligned bubble, MarkdownContent, browser speechSynthesis TTS, tools used badge
+- `components/stream/events/SystemNotification.tsx` — Centered, severity-colored (info/success/warning)
+
+**Phase 2 — AI Transparency (6 files)**
+- `components/stream/events/ThinkingIndicator.tsx` — Perplexity-style progressive disclosure (expand/collapse, auto-collapse 2s after done)
+- `components/stream/events/AgentAction.tsx` — Tool execution: spinner→checkmark+duration badge
+- `lib/stream/tool-labels.ts` — 31 IORS tool→Polish label mappings (e.g. recall_memory→"Przeszukuje pamiec...")
+- `lib/voice/conversation-handler.ts` — Added `ProcessingCallback` interface with 6 callback points (context loading, API call, tool start/end)
+- `lib/gateway/gateway.ts` — Optional `callback?: ProcessingCallback` parameter threaded to processUserMessage
+- `app/api/chat/stream/route.ts` — SSE now pipes `thinking_step`, `tool_start`, `tool_end` events in real-time
+
+**Phase 3 — Context Enrichment (4 files)**
+- `components/stream/events/EmotionCard.tsx` — Tau quadrant emotion with colored dot + expandable valence/arousal detail
+- `components/stream/events/InsightCard.tsx` — Cross-session insight card (border-l-4, dismissible)
+- `components/stream/events/SessionSummary.tsx` — Collapsible session divider (topics, tools, duration)
+- `app/api/stream/events/route.ts` — Historical events API: parallel queries (activity_log + emotion_signals + insight_deliveries) with 3s timeout each
+
+**Phase 4 — Desktop Panel + Polish (2 files)**
+- `components/stream/ContextPanel.tsx` — Right panel (320px, desktop only): profile, task count, emotion trend bar, TTS toggle
+- `components/stream/ChatLayout.tsx` — Split-pane layout: UnifiedStream (flex-1) + ContextPanel (hidden lg:block)
+
+### Why
+- Old ConversationPanel was basic chat bubbles — no tool transparency, no voice integration, no progressive disclosure
+- Users couldn't see what IORS was doing (tool calls, thinking steps) — felt like a black box
+- Voice and text were completely separate UIs with no unified history
+- No emotion, insight, or session summary visibility in the chat
+
+### Files created (19)
+- `lib/stream/types.ts`, `lib/stream/tool-labels.ts`
+- `lib/hooks/useStreamState.ts`
+- `components/stream/UnifiedStream.tsx`, `StreamEventRouter.tsx`, `VoiceInputBar.tsx`, `EmptyState.tsx`, `ChatLayout.tsx`, `ContextPanel.tsx`
+- `components/stream/events/UserMessage.tsx`, `AIMessage.tsx`, `SystemNotification.tsx`, `AgentAction.tsx`, `ThinkingIndicator.tsx`, `EmotionCard.tsx`, `InsightCard.tsx`, `SessionSummary.tsx`
+- `app/api/stream/events/route.ts`
+
+### Files modified (4)
+- `app/dashboard/chat/page.tsx` — ConversationPanel → ChatLayout
+- `app/api/chat/stream/route.ts` — ProcessingCallback piped through SSE
+- `lib/gateway/gateway.ts` — Optional callback parameter
+- `lib/voice/conversation-handler.ts` — ProcessingCallback interface + 6 callback firings
+
+### How to verify
+1. Open `/dashboard/chat` — empty state with quick actions appears
+2. Send a message — ThinkingIndicator shows "Laduje kontekst..." → tool actions → AI response streams
+3. Click mic — waveform animation, Whisper transcription, voice message sent
+4. Desktop (>1024px) — ContextPanel visible on right with profile/tasks/emotions
+5. Historical messages load on mount from unified thread + stream events API
+
+### Notes for future agents
+- ConversationPanel.tsx + VoiceInterface.tsx are NOT deleted — VoiceInterface still used by DashboardShell on non-chat pages
+- No new DB tables — events composed from existing exo_unified_messages, exo_activity_log, exo_emotion_signals, exo_insight_deliveries
+- ProcessingCallback is backward compatible — all existing gateway callers (WhatsApp, Telegram, etc.) unaffected (callback is optional)
+- tailwindcss-animate provides all animations (no framer-motion)
+
+---
+
 ## [2026-02-09] Full E2E Browser Audit — 5 fixes across P0-P1 bugs
 
 ### What was done
