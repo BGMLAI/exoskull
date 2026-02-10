@@ -28,6 +28,7 @@ import { ActivityFeedWidget } from "@/components/widgets/ActivityFeedWidget";
 import { OptimizationWidget } from "@/components/widgets/OptimizationWidget";
 import { InterventionInboxWidget } from "@/components/widgets/InterventionInboxWidget";
 import { InsightHistoryWidget } from "@/components/widgets/InsightHistoryWidget";
+import { AppWidget } from "@/components/widgets/AppWidget";
 
 import type {
   HealthSummary,
@@ -351,6 +352,11 @@ export function CanvasGrid({
       case "insight_history":
         return <CanvasInsightHistoryWidget />;
       default:
+        // Generated app widgets (app:slug-name)
+        if (widget.widget_type.startsWith("app:")) {
+          const appSlug = widget.widget_type.replace("app:", "");
+          return <AppWidget appSlug={appSlug} />;
+        }
         return (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground p-4">
             <p>Widget: {widget.widget_type}</p>

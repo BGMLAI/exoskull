@@ -161,6 +161,19 @@ export function getWidgetMeta(widgetType: string): WidgetMeta | null {
     };
   }
 
+  // Generated app widget
+  if (widgetType.startsWith("app:")) {
+    const slug = widgetType.replace("app:", "");
+    return {
+      type: widgetType,
+      label: slug.replace(/-/g, " "),
+      icon: "LayoutGrid",
+      defaultSize: { w: 2, h: 3 },
+      minSize: { w: 2, h: 2 },
+      category: "mod",
+    };
+  }
+
   return null;
 }
 
