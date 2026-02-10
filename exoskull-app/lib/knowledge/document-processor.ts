@@ -189,12 +189,29 @@ export async function processDocument(
 // ============================================================================
 
 async function extractPDF(fileData: Blob): Promise<string> {
-  // unpdf: serverless-optimized PDF.js wrapper (no native deps, no canvas)
-  const { extractText, getDocumentProxy } = await import("unpdf");
-  const buffer = Buffer.from(await fileData.arrayBuffer());
-  const pdf = await getDocumentProxy(new Uint8Array(buffer));
-  const { text } = await extractText(pdf, { mergePages: true });
-  return text;
+  try {
+    // unpdf: serverless-optimized PDF.js wrapper (no native deps, no canvas)
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const buffer = Buffer.from(await fileData.arrayBuffer());
+    const pdf = await getDocumentProxy(new Uint8Array(buffer));
+    const { text } = await extractText(pdf, { mergePages: true });
+    return text;
+  } catch (err) {
+    logger.error("[extractPDF] unpdf failed, trying fallback:", {
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+    // Fallback: try raw text extraction from buffer
+    const buffer = Buffer.from(await fileData.arrayBuffer());
+    const raw = buffer.toString("utf-8");
+    // If buffer contains readable text (not just binary), return it
+    const textContent = raw
+      .replace(/[^\x20-\x7E\xA0-\xFF\u0100-\u024F\u0400-\u04FF]/g, " ")
+      .replace(/\s{3,}/g, " ")
+      .trim();
+    if (textContent.length > 100) return textContent;
+    throw err;
+  }
 }
 
 async function extractDOCX(fileData: Blob): Promise<string> {
