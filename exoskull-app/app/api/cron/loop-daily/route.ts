@@ -23,6 +23,9 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { dispatchToHandler } from "@/lib/iors/loop-tasks";
 import { claimQueuedWork } from "@/lib/iors/loop";
 
+import { analyzeHealthTrends } from "@/lib/iors/coaching/health-trends";
+import { analyzeCrossDomain } from "@/lib/iors/coaching/cross-domain";
+import { measureEffectiveness } from "@/lib/iors/coaching/effectiveness";
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -48,8 +51,96 @@ async function handler(req: NextRequest) {
       logger.info("[LoopDaily] Backfilled missing loop configs:", backfilled);
     }
 
-    // Step 3: Seed maintenance tasks for off-peak execution
+    // Step 2.6: Run daily coaching analytics for active tenants
     const supabase = getServiceSupabase();
+    let coachingAnalyzed = 0;
+    if (Date.now() - startTime < TIMEOUT_MS - 30_000) {
+      const { data: activeTenants } = await supabase
+        .from("exo_tenant_loop_config")
+        .select("tenant_id")
+        .in("activity_class", ["active", "normal"])
+        .limit(20);
+
+      if (activeTenants && activeTenants.length > 0) {
+        for (const t of activeTenants) {
+          if (Date.now() - startTime > TIMEOUT_MS - 20_000) break;
+          try {
+            const [healthResult, crossResult, effectResult] =
+              await Promise.allSettled([
+                analyzeHealthTrends(t.tenant_id),
+                analyzeCrossDomain(t.tenant_id),
+                measureEffectiveness(t.tenant_id),
+              ]);
+
+            // Store insights for the coaching engine (emit events for significant findings)
+            if (
+              healthResult.status === "fulfilled" &&
+              healthResult.value.alerts.length > 0
+            ) {
+              await emitEvent({
+                tenantId: t.tenant_id,
+                eventType: "coaching_trigger",
+                priority: 2,
+                source: "loop-daily/health-trends",
+                payload: {
+                  handler: "deliver_proactive",
+                  alerts: healthResult.value.alerts,
+                  summary: healthResult.value.summary,
+                },
+                dedupKey: `health-trends-${new Date().toISOString().slice(0, 10)}`,
+              });
+            }
+
+            if (
+              crossResult.status === "fulfilled" &&
+              crossResult.value.topInsight
+            ) {
+              await emitEvent({
+                tenantId: t.tenant_id,
+                eventType: "coaching_trigger",
+                priority: 3,
+                source: "loop-daily/cross-domain",
+                payload: {
+                  handler: "deliver_proactive",
+                  insight: crossResult.value.topInsight,
+                },
+                dedupKey: `cross-domain-${new Date().toISOString().slice(0, 10)}`,
+              });
+            }
+
+            // Feed effectiveness recommendations into optimization
+            if (
+              effectResult.status === "fulfilled" &&
+              effectResult.value.recommendations.length > 0
+            ) {
+              await emitEvent({
+                tenantId: t.tenant_id,
+                eventType: "optimization_signal",
+                priority: 4,
+                source: "loop-daily/effectiveness",
+                payload: {
+                  recommendations: effectResult.value.recommendations,
+                  ackRate: effectResult.value.ackRate,
+                  actionRate: effectResult.value.actionRate,
+                  avgRating: effectResult.value.avgRating,
+                },
+                dedupKey: `effectiveness-${new Date().toISOString().slice(0, 10)}`,
+              });
+            }
+
+            coachingAnalyzed++;
+          } catch (err) {
+            logger.warn("[LoopDaily] Coaching analytics failed for tenant:", {
+              tenantId: t.tenant_id,
+              error: err instanceof Error ? err.message : err,
+            });
+          }
+        }
+      }
+    }
+    logger.info("[LoopDaily] Coaching analytics:", { coachingAnalyzed });
+
+    // Step 3: Seed maintenance tasks for off-peak execution
 
     // Emit maintenance events for ETL pipeline
     const maintenanceTasks = [
@@ -107,6 +198,7 @@ async function handler(req: NextRequest) {
       ok: true,
       budgetResets,
       reclassified,
+      coachingAnalyzed,
       maintenanceSeeded,
       workProcessed,
       prunedEvents,
