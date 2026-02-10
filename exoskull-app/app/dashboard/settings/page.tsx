@@ -46,6 +46,7 @@ import { DataPipelineSection } from "./DataPipelineSection";
 import { AutonomySection } from "./AutonomySection";
 import { MyDataSection } from "./MyDataSection";
 import { SystemPromptSection } from "./SystemPromptSection";
+import { SectionErrorBoundary } from "./SectionErrorBoundary";
 
 interface PersonalityFormState {
   name: string;
@@ -374,59 +375,75 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <ProfileSection
-        form={profileForm}
-        setForm={setProfileForm}
-        onSave={saveProfile}
-        saving={savingProfile}
-        saved={profileSaved}
-      />
+      <SectionErrorBoundary sectionName="Profil">
+        <ProfileSection
+          form={profileForm}
+          setForm={setProfileForm}
+          onSave={saveProfile}
+          saving={savingProfile}
+          saved={profileSaved}
+        />
+      </SectionErrorBoundary>
 
-      <PersonalitySection
-        form={personalityForm}
-        setForm={setPersonalityForm}
-        onSave={savePersonality}
-        saving={savingPersonality}
-        saved={personalitySaved}
-      />
+      <SectionErrorBoundary sectionName="Osobowosc IORS">
+        <PersonalitySection
+          form={personalityForm}
+          setForm={setPersonalityForm}
+          onSave={savePersonality}
+          saving={savingPersonality}
+          saved={personalitySaved}
+        />
+      </SectionErrorBoundary>
 
-      <NotificationsSection
-        form={notificationForm}
-        setForm={setNotificationForm}
-        onSave={saveNotifications}
-        saving={savingNotifications}
-        saved={notificationsSaved}
-      />
+      <SectionErrorBoundary sectionName="Powiadomienia">
+        <NotificationsSection
+          form={notificationForm}
+          setForm={setNotificationForm}
+          onSave={saveNotifications}
+          saving={savingNotifications}
+          saved={notificationsSaved}
+        />
+      </SectionErrorBoundary>
 
-      {/* Custom Instructions */}
-      <InstructionsSection />
+      <SectionErrorBoundary sectionName="Instrukcje">
+        <InstructionsSection />
+      </SectionErrorBoundary>
 
-      {/* Behavior Presets */}
-      <BehaviorPresetsSection />
+      <SectionErrorBoundary sectionName="Tryby zachowania">
+        <BehaviorPresetsSection />
+      </SectionErrorBoundary>
 
-      {/* AI Config — Models, Temperature, Voice, Usage */}
-      <AIConfigSection />
+      <SectionErrorBoundary sectionName="Konfiguracja AI">
+        <AIConfigSection />
+      </SectionErrorBoundary>
 
-      {/* AI Providers — Multi-provider keys, fallback chain */}
-      <AIProvidersSection />
+      <SectionErrorBoundary sectionName="Dostawcy AI">
+        <AIProvidersSection />
+      </SectionErrorBoundary>
 
-      {/* Loop Control — MAPEK status, frequency, budget */}
-      <LoopControlSection />
+      <SectionErrorBoundary sectionName="Kontrola petli">
+        <LoopControlSection />
+      </SectionErrorBoundary>
 
-      {/* Self-Optimization — Permissions + History */}
-      <SelfOptimizeSection />
+      <SectionErrorBoundary sectionName="Samooptymalizacja">
+        <SelfOptimizeSection />
+      </SectionErrorBoundary>
 
-      {/* Autonomy — moved from admin */}
-      {tenantId && <AutonomySection />}
+      <SectionErrorBoundary sectionName="Autonomia">
+        {tenantId && <AutonomySection />}
+      </SectionErrorBoundary>
 
-      {/* My Data — MITs, Patterns, Learning Events */}
-      <MyDataSection />
+      <SectionErrorBoundary sectionName="Moje dane">
+        <MyDataSection />
+      </SectionErrorBoundary>
 
-      {/* Data Pipeline — sync status per-user */}
-      <DataPipelineSection />
+      <SectionErrorBoundary sectionName="Pipeline danych">
+        <DataPipelineSection />
+      </SectionErrorBoundary>
 
-      {/* System Prompt Editor — Advanced */}
-      <SystemPromptSection />
+      <SectionErrorBoundary sectionName="Prompt systemowy">
+        <SystemPromptSection />
+      </SectionErrorBoundary>
 
       {/* Integrations */}
       <Card>
