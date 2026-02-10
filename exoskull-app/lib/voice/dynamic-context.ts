@@ -11,6 +11,13 @@ import { getPendingSuggestions } from "../skills/detector";
 import { listConnections } from "@/lib/integrations/composio-adapter";
 
 import { logger } from "@/lib/logger";
+/** Per-provider configuration stored in iors_ai_config.providers */
+export interface ProviderConfig {
+  api_key?: string;
+  enabled?: boolean;
+  model?: string; // e.g. "gpt-4o" for OpenAI
+}
+
 /** Per-user AI configuration from iors_ai_config JSONB */
 export interface TenantAIConfig {
   temperature: number;
@@ -24,6 +31,12 @@ export interface TenantAIConfig {
     crisis: string;
   };
   permissions: Record<string, { with_approval: boolean; autonomous: boolean }>;
+  providers?: {
+    anthropic?: ProviderConfig;
+    openai?: ProviderConfig;
+    gemini?: ProviderConfig;
+  };
+  default_provider?: "anthropic" | "openai" | "gemini";
 }
 
 /** Result from buildDynamicContext — includes context string + per-user overrides */
@@ -45,6 +58,12 @@ const DEFAULT_AI_CONFIG: TenantAIConfig = {
     crisis: "auto",
   },
   permissions: {},
+  providers: {
+    anthropic: { enabled: true },
+    openai: { enabled: true },
+    gemini: { enabled: true },
+  },
+  default_provider: "anthropic",
 };
 
 /**

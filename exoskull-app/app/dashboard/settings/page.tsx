@@ -39,6 +39,7 @@ import { NotificationsSection } from "./NotificationsSection";
 import { InstructionsSection } from "./InstructionsSection";
 import { BehaviorPresetsSection } from "./BehaviorPresetsSection";
 import { AIConfigSection } from "./AIConfigSection";
+import { AIProvidersSection } from "./AIProvidersSection";
 import { LoopControlSection } from "./LoopControlSection";
 import { SelfOptimizeSection } from "./SelfOptimizeSection";
 import { DataPipelineSection } from "./DataPipelineSection";
@@ -405,6 +406,9 @@ export default function SettingsPage() {
 
       {/* AI Config — Models, Temperature, Voice, Usage */}
       <AIConfigSection />
+
+      {/* AI Providers — Multi-provider keys, fallback chain */}
+      <AIProvidersSection />
 
       {/* Loop Control — MAPEK status, frequency, budget */}
       <LoopControlSection />

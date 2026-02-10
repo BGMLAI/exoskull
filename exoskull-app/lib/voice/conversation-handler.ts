@@ -21,6 +21,7 @@ import { detectCrisis } from "@/lib/emotion/crisis-detector";
 import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
 import { logEmotion } from "@/lib/emotion/logger";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { callOpenAIChatWithTools } from "./openai-chat-provider";
 
 import { logger } from "@/lib/logger";
 import { logActivities } from "@/lib/activity-log";
@@ -295,7 +296,7 @@ export async function processUserMessage(
     callback?: ProcessingCallback;
   },
 ): Promise<ConversationResult> {
-  const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+  let anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
   // Check for end call phrases (skip during birth flow etc.)
   if (!session.skipEndCallDetection && shouldEndCall(userMessage)) {
@@ -327,6 +328,13 @@ export async function processUserMessage(
   const userTemperature = aiConfig?.temperature ?? 0.7;
   const chatModelPref = aiConfig?.model_preferences?.chat ?? "auto";
   const resolvedModel = CHAT_MODEL_MAP[chatModelPref] || DEFAULT_CLAUDE_MODEL;
+
+  // Override Anthropic client with tenant's own key if configured
+  const tenantAnthropicKey = aiConfig?.providers?.anthropic?.api_key;
+  if (tenantAnthropicKey) {
+    anthropic = new Anthropic({ apiKey: tenantAnthropicKey });
+    logger.info("[ConversationHandler] Using tenant's own Anthropic API key");
+  }
 
   // Filter out poisoned assistant messages from thread context
   // (old "Zrobione!" fallback, broken responses that Claude would copy)
@@ -729,11 +737,74 @@ export async function processUserMessage(
       stack: err.stack?.split("\n").slice(0, 3).join("\n"),
     });
 
-    // Provide specific user-facing error messages based on API response
+    // ── OpenAI fallback when Anthropic fails ──
+    const canFallback =
+      err.status === 400 ||
+      err.status === 401 ||
+      err.status === 403 ||
+      err.status === 429 ||
+      err.status === 503 ||
+      err.status === 529;
+
+    if (canFallback) {
+      const openaiKey =
+        aiConfig?.providers?.openai?.api_key || process.env.OPENAI_API_KEY;
+      const openaiEnabled = aiConfig?.providers?.openai?.enabled !== false;
+
+      if (openaiKey && openaiEnabled) {
+        try {
+          logger.info(
+            "[ConversationHandler] Anthropic failed, falling back to OpenAI",
+            { anthropicStatus: err.status, tenantId: session.tenantId },
+          );
+          options?.callback?.onThinkingStep?.(
+            "Przełączam na zapasowy model AI",
+            "running",
+          );
+
+          const result = await callOpenAIChatWithTools(
+            {
+              apiKey: openaiKey,
+              model: aiConfig?.providers?.openai?.model || "gpt-4o",
+              systemBlocks,
+              messages,
+              tools: IORS_TOOLS,
+              maxTokens: session.maxTokens || maxTokensOverride || 200,
+              temperature: userTemperature,
+            },
+            executeTool,
+            session.tenantId,
+            options?.callback?.onToolStart,
+            options?.callback?.onToolEnd,
+          );
+
+          options?.callback?.onThinkingStep?.(
+            "Przełączam na zapasowy model AI",
+            "done",
+          );
+
+          return {
+            text: result.text || "Przepraszam, nie zrozumiałem.",
+            toolsUsed: result.toolsUsed,
+            shouldEndCall: false,
+          };
+        } catch (openaiError) {
+          console.error("[ConversationHandler] OpenAI fallback also failed:", {
+            error:
+              openaiError instanceof Error
+                ? openaiError.message
+                : String(openaiError),
+            tenantId: session.tenantId,
+          });
+        }
+      }
+    }
+
+    // All providers failed — show specific error message
     let userMessage = "Przepraszam, wystąpił problem. Spróbuj ponownie.";
     if (err.status === 400 && err.error?.message?.includes("credit balance")) {
       userMessage =
-        "Serwis AI jest chwilowo niedostępny (problem z kontem API). Administrator został powiadomiony.";
+        "Serwis AI jest chwilowo niedostępny (problem z kontem API). Sprawdź dostawców w Ustawienia → Dostawcy AI.";
     } else if (err.status === 429) {
       userMessage =
         "Zbyt wiele zapytań jednocześnie. Odczekaj chwilę i spróbuj ponownie.";
