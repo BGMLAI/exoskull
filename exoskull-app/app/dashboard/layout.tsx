@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Home, MessageSquare, Package, Settings } from "lucide-react";
+import { Home, MessageSquare, Sparkles, Settings } from "lucide-react";
 
 export const metadata: Metadata = {
   title: {
@@ -24,7 +24,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 const MOBILE_TAB_ITEMS = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
-  { href: "/dashboard/mods", label: "Mody", icon: Package },
+  { href: "/dashboard/skills", label: "Skills", icon: Sparkles },
   { href: "/dashboard/settings", label: "Ustawienia", icon: Settings },
 ];
 

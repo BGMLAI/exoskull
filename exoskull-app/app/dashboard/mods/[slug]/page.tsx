@@ -325,7 +325,7 @@ export default function ModDetailPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => router.push("/dashboard/mods")}
+          onClick={() => router.push("/dashboard/skills?tab=active")}
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Wrocdo modow
@@ -354,7 +354,7 @@ export default function ModDetailPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => router.push("/dashboard/mods")}
+          onClick={() => router.push("/dashboard/skills?tab=active")}
           className="mb-4"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />

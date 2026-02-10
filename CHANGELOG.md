@@ -4,6 +4,89 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-10] Dashboard UX — Unified Skills Page (Mods + Skills + Apps)
+
+### What was done
+- Merged 3 overlapping nav items (Mody, Skille, Integracje) into single "Skills" page
+- Dashboard nav reduced from 10 to 8 items (Hick's law — fewer choices, faster decisions)
+- New unified page with 4 Radix Tabs: Aktywne | Marketplace | Generuj AI | Oczekujace
+- Created unified type system (`lib/extensions/types.ts`) normalizing Mods, Skills, Apps
+- Created `useExtensions()` hook with parallel data fetching via `Promise.allSettled`
+- 8 new shared components in `components/extensions/`
+- Permanent redirect `/dashboard/mods` → `/dashboard/skills?tab=marketplace`
+- URL deep-linking via `?tab=` search param
+- Back-navigation from detail pages updated to route to new unified page
+- "Zarzadzaj Skills" link added to Settings page
+
+### Why
+- User identified that "skille i mody i integracje to w zasadzie to samo"
+- Three separate pages created cognitive overhead and confusion
+- Integrations was already redirecting to Settings — redundant nav item
+- Unified view gives better overview of all extensions in one place
+
+### Files changed
+- `lib/extensions/types.ts` (NEW) — Unified type system with converters
+- `lib/extensions/hooks.ts` (NEW) — useExtensions() parallel fetch hook
+- `components/extensions/*.tsx` (NEW, 8 files) — ExtensionCard, Stats, Dialogs, Tabs
+- `app/dashboard/skills/page.tsx` — Rewritten with Radix Tabs
+- `components/dashboard/CollapsibleSidebar.tsx` — 8 nav items, "Skills" label
+- `app/dashboard/layout.tsx` — Mobile nav updated
+- `next.config.js` — /dashboard/mods redirect
+- `app/dashboard/mods/[slug]/page.tsx` — Back nav updated
+- `app/dashboard/skills/[id]/page.tsx` — Back nav updated
+- `app/dashboard/settings/page.tsx` — Skills link added
+
+### How to verify
+1. Navigate to `/dashboard/skills` — 4 tabs visible, stats bar shows counts
+2. Click Marketplace tab — 12 mod templates with Install buttons
+3. Click Generuj AI — Skill + App generation dialogs
+4. Visit `/dashboard/mods` — redirects to `/dashboard/skills?tab=marketplace`
+5. Sidebar shows 8 items (no Mody, no Integracje)
+
+### Notes for future agents
+- Old `/dashboard/mods` page still exists (for [slug] detail views) — only nav item removed
+- Integracje was already aliased to `/dashboard/settings/integrations` — no code removed
+- Widget registry types `app:{slug}` still reference apps separately on canvas
+- `useExtensions()` uses `Promise.allSettled` — partial data OK if one source fails
+
+---
+
+## [2026-02-10] Outbound Contact Pipeline Fix — 7 Blockers Resolved
+
+### What was done
+- Fixed 7 blockers preventing outbound contact (text + voice) from working
+- Default autonomy permissions (message + call) now granted at tenant registration
+- Permission backfill for existing tenants via loop-daily CRON
+- Escalation chain: multi-channel fallback when phone missing (was: silently return [])
+- Prediction engine: emitEvent() after propose_intervention() + scheduled_for=NOW
+- Executor: WhatsApp handler wired to real WhatsAppClient (was returning stub error)
+- Executor: handleProactiveMessage() now uses dispatchReport() 9-channel fallback
+- Report dispatcher: "proactive" report type + web_chat-only warning
+- Insight-push CRON: response.success reflects actual delivery status
+
+### Why
+- System had full outbound architecture but 0 proactive contacts were reaching users
+- Root causes: missing permissions, phone-only escalation, stale interventions in DB
+
+### Files changed
+- `lib/gateway/gateway.ts` — default permissions at registration
+- `app/api/cron/loop-daily/route.ts` — permission backfill
+- `lib/autonomy/escalation-manager.ts` — multi-channel fallback
+- `lib/predictions/prediction-engine.ts` — emitEvent + scheduled_for
+- `lib/autonomy/executor.ts` — WhatsApp + proactive dispatch
+- `lib/reports/report-dispatcher.ts` — proactive type + web_chat warning
+- `app/api/cron/insight-push/route.ts` — correct success status
+
+### How to verify
+1. Check DB: `SELECT * FROM exo_autonomy_permissions WHERE action_type = 'message'`
+2. Trigger outbound-monitor CRON manually
+3. Trigger intervention-executor CRON manually
+4. Verify no more `[Petla:Proactive] No 'message' permission` in Vercel logs
+
+### Commit: 5016e0c
+
+---
+
 ## [2026-02-10] App Builder + Settings Self-Modify
 
 ### What was done

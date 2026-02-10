@@ -5,9 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Home,
   MessageSquare,
-  Package,
   Brain,
-  Plug,
   Settings,
   CheckSquare,
   Target,
@@ -26,10 +24,8 @@ const NAV_ITEMS = [
   { href: "/dashboard/tasks", label: "Zadania", icon: CheckSquare },
   { href: "/dashboard/goals", label: "Cele", icon: Target },
   { href: "/dashboard/knowledge", label: "Wiedza", icon: FileUp },
-  { href: "/dashboard/mods", label: "Mody", icon: Package },
-  { href: "/dashboard/skills", label: "Skille", icon: Sparkles },
+  { href: "/dashboard/skills", label: "Skills", icon: Sparkles },
   { href: "/dashboard/memory", label: "Pamiec", icon: Brain },
-  { href: "/dashboard/settings/integrations", label: "Integracje", icon: Plug },
   { href: "/dashboard/settings", label: "Ustawienia", icon: Settings },
 ];
 

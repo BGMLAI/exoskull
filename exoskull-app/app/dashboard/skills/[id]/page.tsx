@@ -188,7 +188,7 @@ export default function SkillDetailPage() {
       const res = await fetch(`/api/skills/${id}`);
 
       if (!res.ok) {
-        router.push("/dashboard/skills");
+        router.push("/dashboard/skills?tab=active");
         return;
       }
 
@@ -357,7 +357,7 @@ export default function SkillDetailPage() {
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => router.push("/dashboard/skills")}
+        onClick={() => router.push("/dashboard/skills?tab=active")}
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
         Powrot do listy

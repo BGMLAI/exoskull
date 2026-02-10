@@ -502,6 +502,12 @@ export default function SettingsPage() {
               skille na podstawie Twoich potrzeb.
             </p>
           )}
+          <a
+            href="/dashboard/skills"
+            className="text-sm text-primary hover:underline inline-block mt-2"
+          >
+            Zarzadzaj Skills &rarr;
+          </a>
         </CardContent>
       </Card>
 

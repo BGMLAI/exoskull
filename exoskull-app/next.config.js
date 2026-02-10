@@ -15,6 +15,15 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/dashboard/mods',
+        destination: '/dashboard/skills?tab=marketplace',
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {
