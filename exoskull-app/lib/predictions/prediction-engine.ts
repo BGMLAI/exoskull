@@ -15,6 +15,7 @@ import {
   predictFitnessTrajectory,
 } from "./health-models";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { emitEvent } from "@/lib/iors/loop";
 
 import { logger } from "@/lib/logger";
 // ============================================================================
@@ -142,7 +143,7 @@ export async function createInterventionsFromPredictions(
           p_priority: severityToPriority(p.severity),
           p_source_agent: "prediction-engine",
           p_requires_approval: requiresApproval,
-          p_scheduled_for: null,
+          p_scheduled_for: new Date().toISOString(),
         },
       );
 
@@ -165,6 +166,25 @@ export async function createInterventionsFromPredictions(
           .is("intervention_id", null)
           .order("created_at", { ascending: false })
           .limit(1);
+
+        // Emit event so the Petla loop picks up the intervention for delivery
+        emitEvent({
+          tenantId: p.tenantId,
+          eventType: "outbound_ready",
+          priority: 1,
+          source: "prediction-engine",
+          payload: {
+            interventionId,
+            metric: p.metric,
+            severity: p.severity,
+          },
+          dedupKey: `prediction:${p.tenantId}:${p.metric}:${new Date().toISOString().slice(0, 10)}`,
+        }).catch((err) =>
+          console.error("[Predictions] emitEvent failed:", {
+            tenantId: p.tenantId,
+            error: err instanceof Error ? err.message : String(err),
+          }),
+        );
       }
 
       created++;

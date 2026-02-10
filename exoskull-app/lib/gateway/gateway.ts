@@ -24,6 +24,7 @@ import { createTask, getLatestPendingTask } from "../async-tasks/queue";
 import type { GatewayChannel, GatewayMessage, GatewayResponse } from "./types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { emitEvent } from "@/lib/iors/loop";
+import { grantPermission } from "@/lib/iors/autonomy";
 import { WEB_CHAT_SYSTEM_OVERRIDE } from "../voice/system-prompt";
 
 import { logger } from "@/lib/logger";
@@ -152,6 +153,28 @@ async function autoRegisterTenant(
   } catch (loopErr) {
     logger.warn("[Gateway] Loop config creation failed (non-blocking):", {
       error: loopErr instanceof Error ? loopErr.message : loopErr,
+    });
+  }
+
+  // Grant default autonomy permissions (message + call = auto, log = auto)
+  try {
+    await Promise.all([
+      grantPermission(newTenantId, "log", "*", {
+        requires_confirmation: false,
+        granted_via: "birth",
+      }),
+      grantPermission(newTenantId, "message", "*", {
+        requires_confirmation: false,
+        granted_via: "birth",
+      }),
+      grantPermission(newTenantId, "call", "*", {
+        requires_confirmation: false,
+        granted_via: "birth",
+      }),
+    ]);
+  } catch (permErr) {
+    logger.warn("[Gateway] Default permissions grant failed (non-blocking):", {
+      error: permErr instanceof Error ? permErr.message : permErr,
     });
   }
 

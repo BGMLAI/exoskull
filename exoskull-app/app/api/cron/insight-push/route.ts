@@ -84,7 +84,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   });
 
   return NextResponse.json({
-    success: true,
+    success: results.errors.length === 0,
     timestamp: new Date().toISOString(),
     duration_ms: durationMs,
     results: {

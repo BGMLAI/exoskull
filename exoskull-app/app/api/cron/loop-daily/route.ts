@@ -26,6 +26,7 @@ import { claimQueuedWork } from "@/lib/iors/loop";
 import { analyzeHealthTrends } from "@/lib/iors/coaching/health-trends";
 import { analyzeCrossDomain } from "@/lib/iors/coaching/cross-domain";
 import { measureEffectiveness } from "@/lib/iors/coaching/effectiveness";
+import { grantPermission } from "@/lib/iors/autonomy";
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -49,6 +50,56 @@ async function handler(req: NextRequest) {
     const backfilled = await backfillMissingConfigs();
     if (backfilled > 0) {
       logger.info("[LoopDaily] Backfilled missing loop configs:", backfilled);
+    }
+
+    // Step 2.7: Backfill missing autonomy permissions (message + call)
+    let permissionsBackfilled = 0;
+    try {
+      const supabasePerms = getServiceSupabase();
+
+      // Get all tenant IDs
+      const { data: allTenants } = await supabasePerms
+        .from("exo_tenants")
+        .select("id");
+
+      // Get tenant IDs that already have 'message' permission
+      const { data: tenantsWithMessage } = await supabasePerms
+        .from("exo_autonomy_permissions")
+        .select("tenant_id")
+        .eq("action_type", "message")
+        .eq("granted", true)
+        .is("revoked_at", null);
+
+      const hasMessageSet = new Set(
+        (tenantsWithMessage || []).map((r) => r.tenant_id),
+      );
+
+      const tenantsNeedingPerms = (allTenants || []).filter(
+        (t) => !hasMessageSet.has(t.id),
+      );
+
+      for (const t of tenantsNeedingPerms) {
+        await grantPermission(t.id, "message", "*", {
+          requires_confirmation: false,
+          granted_via: "birth",
+        });
+        await grantPermission(t.id, "call", "*", {
+          requires_confirmation: false,
+          granted_via: "birth",
+        });
+        permissionsBackfilled++;
+      }
+
+      if (permissionsBackfilled > 0) {
+        logger.info(
+          "[LoopDaily] Backfilled autonomy permissions:",
+          permissionsBackfilled,
+        );
+      }
+    } catch (permErr) {
+      logger.warn("[LoopDaily] Permission backfill failed (non-blocking):", {
+        error: permErr instanceof Error ? permErr.message : permErr,
+      });
     }
 
     // Step 2.6: Run daily coaching analytics for active tenants

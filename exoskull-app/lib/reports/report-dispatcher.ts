@@ -24,7 +24,7 @@ import { logger } from "@/lib/logger";
 // TYPES
 // ============================================================================
 
-export type ReportType = "weekly" | "monthly" | "insight";
+export type ReportType = "weekly" | "monthly" | "insight" | "proactive";
 
 export interface DispatchReportResult {
   success: boolean;
@@ -187,6 +187,10 @@ async function sendViaEmail(
       pl: "Dzisiejsze spostrzeżenia od ExoSkull",
       en: "Today's insights from ExoSkull",
     },
+    proactive: {
+      pl: "Wiadomość od ExoSkull",
+      en: "A message from ExoSkull",
+    },
   };
 
   const subject = subjects[reportType]?.[language] || subjects[reportType]?.pl;
@@ -331,9 +335,16 @@ export async function dispatchReport(
         });
       }
 
-      logger.info(
-        `[ReportDispatcher] ${reportType} report sent to ${tenantId} via ${channel}`,
-      );
+      if (channel === "web_chat") {
+        logger.warn(
+          `[ReportDispatcher] Only web_chat available for ${tenantId} — user won't see until dashboard visit`,
+          { tenantId, reportType },
+        );
+      } else {
+        logger.info(
+          `[ReportDispatcher] ${reportType} report sent to ${tenantId} via ${channel}`,
+        );
+      }
       return { success: true, channel };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);

@@ -443,7 +443,45 @@ async function handleSendEmail(
 async function handleSendWhatsApp(
   intervention: Intervention,
 ): Promise<ExecutionResult> {
-  return { success: false, message: "WhatsApp not configured" };
+  const { phone, message, to } = intervention.action_payload as {
+    phone?: string;
+    message?: string;
+    to?: string;
+  };
+  const targetPhone = phone || to;
+
+  if (!targetPhone || !message) {
+    return { success: false, message: "Missing phone or message in payload" };
+  }
+
+  const { getWhatsAppClient } = await import("@/lib/channels/whatsapp/client");
+  const client = getWhatsAppClient();
+  if (!client) {
+    return {
+      success: false,
+      message:
+        "WhatsApp not configured (missing META_WHATSAPP_TOKEN or META_PHONE_NUMBER_ID)",
+    };
+  }
+
+  await client.sendTextMessage(targetPhone, message as string);
+
+  await appendMessage(intervention.tenant_id, {
+    role: "assistant",
+    content: `[Autonomiczna akcja] WhatsApp do ${targetPhone}: ${message}`,
+    channel: "whatsapp",
+    direction: "outbound",
+    source_type: "intervention",
+    source_id: intervention.id,
+  }).catch((err) => {
+    console.error("[Executor] Failed to log WhatsApp message:", {
+      error: err instanceof Error ? err.message : String(err),
+      tenantId: intervention.tenant_id,
+      interventionId: intervention.id,
+    });
+  });
+
+  return { success: true, message: `WhatsApp wysłany do ${targetPhone}` };
 }
 
 async function handleMakeCall(
@@ -520,48 +558,30 @@ async function handleCreateTask(
 async function handleProactiveMessage(
   intervention: Intervention,
 ): Promise<ExecutionResult> {
-  const { message, channel } = intervention.action_payload as {
+  const payload = intervention.action_payload as {
     message?: string;
-    channel?: string;
+    params?: { message?: string; message_pl?: string };
   };
+  const message = payload.message || payload.params?.message;
 
   if (!message) {
     return { success: false, message: "Missing message" };
   }
 
-  // Determine preferred channel for this tenant
-  const supabase = getServiceSupabase();
-  const { data: tenant } = await supabase
-    .from("exo_tenants")
-    .select("phone, email")
-    .eq("id", intervention.tenant_id)
-    .single();
+  // Use multi-channel dispatchReport (9-channel fallback chain)
+  const { dispatchReport } = await import("@/lib/reports/report-dispatcher");
+  const result = await dispatchReport(
+    intervention.tenant_id,
+    message,
+    "proactive",
+  );
 
-  const preferredChannel = channel || (tenant?.phone ? "sms" : "email");
-
-  // Route through the appropriate channel
-  const fakeIntervention = {
-    ...intervention,
-    action_payload: {
-      phone: tenant?.phone,
-      email: tenant?.email,
-      message,
-    },
+  return {
+    success: result.success,
+    message: result.success
+      ? `Wiadomość wysłana via ${result.channel}`
+      : `Nie udało się wysłać: ${result.error || "brak dostępnych kanałów"}`,
   };
-
-  if (preferredChannel === "sms" && tenant?.phone) {
-    return handleSendSms(fakeIntervention);
-  } else if (preferredChannel === "email" && tenant?.email) {
-    return handleSendEmail({
-      ...fakeIntervention,
-      action_payload: {
-        ...fakeIntervention.action_payload,
-        subject: intervention.title,
-      },
-    });
-  }
-
-  return { success: false, message: "No contact method available for tenant" };
 }
 
 async function handleRunAutomationFromIntervention(
