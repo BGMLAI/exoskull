@@ -30,11 +30,11 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
     docsResult,
     connectionsResult,
   ] = await Promise.allSettled([
-    // 1. User profile
+    // 1. User profile + custom instructions + presets + AI config
     supabase
       .from("exo_tenants")
       .select(
-        "name, preferred_name, communication_style, iors_personality, iors_name",
+        "name, preferred_name, communication_style, iors_personality, iors_name, iors_custom_instructions, iors_behavior_presets, iors_system_prompt_override",
       )
       .eq("id", tenantId)
       .single(),
@@ -132,15 +132,36 @@ export async function buildDynamicContext(tenantId: string): Promise<string> {
     context += `- Zainstalowane Mody: ${modList}\n`;
   }
 
-  // IORS Personality
+  // IORS Personality + Custom Instructions + Behavior Presets
   try {
-    const { getPersonalityPromptFragment } =
-      await import("@/lib/iors/personality");
+    const {
+      getPersonalityPromptFragment,
+      getBehaviorPresetsFragment,
+      getCustomInstructionsFragment,
+    } = await import("@/lib/iors/personality");
     const personalityFragment = getPersonalityPromptFragment(
       (tenant as Record<string, unknown>)?.iors_personality ?? null,
     );
     if (personalityFragment) {
       context += personalityFragment;
+    }
+    // Behavior presets
+    const presetsFragment = getBehaviorPresetsFragment(
+      (tenant as Record<string, unknown>)?.iors_behavior_presets as
+        | string[]
+        | null,
+    );
+    if (presetsFragment) {
+      context += presetsFragment;
+    }
+    // Custom instructions (highest priority)
+    const instructionsFragment = getCustomInstructionsFragment(
+      (tenant as Record<string, unknown>)?.iors_custom_instructions as
+        | string
+        | null,
+    );
+    if (instructionsFragment) {
+      context += instructionsFragment;
     }
   } catch (err) {
     logger.warn(

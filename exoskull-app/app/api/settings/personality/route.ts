@@ -11,6 +11,54 @@ import { DEFAULT_PERSONALITY } from "@/lib/iors/types";
 
 export const dynamic = "force-dynamic";
 
+export async function GET() {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { data: tenant, error } = await supabase
+      .from("exo_tenants")
+      .select(
+        "iors_personality, iors_name, iors_custom_instructions, iors_behavior_presets, iors_system_prompt_override",
+      )
+      .eq("id", user.id)
+      .single();
+
+    if (error) {
+      console.error("[PersonalityAPI] GET failed:", {
+        userId: user.id,
+        error: error.message,
+      });
+      return NextResponse.json(
+        { error: "Failed to load personality" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      personality: tenant?.iors_personality ?? null,
+      customInstructions: tenant?.iors_custom_instructions ?? null,
+      behaviorPresets: tenant?.iors_behavior_presets ?? [],
+      systemPromptOverride: tenant?.iors_system_prompt_override ?? null,
+    });
+  } catch (error) {
+    console.error("[PersonalityAPI] GET Error:", {
+      error: error instanceof Error ? error.message : error,
+    });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function PATCH(req: NextRequest) {
   try {
     const supabase = await createClient();
@@ -25,10 +73,12 @@ export async function PATCH(req: NextRequest) {
 
     const body = await req.json();
 
-    // Load current personality
+    // Load current personality + new fields
     const { data: tenant } = await supabase
       .from("exo_tenants")
-      .select("iors_personality, iors_name")
+      .select(
+        "iors_personality, iors_name, iors_custom_instructions, iors_behavior_presets, iors_system_prompt_override",
+      )
       .eq("id", user.id)
       .single();
 
@@ -82,13 +132,69 @@ export async function PATCH(req: NextRequest) {
       updatedPersonality.language = DEFAULT_PERSONALITY.language;
     }
 
+    // Build update payload
+    const updatePayload: Record<string, unknown> = {
+      iors_personality: updatedPersonality,
+      iors_name: updatedPersonality.name,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Custom instructions (max 2000 chars, strip HTML)
+    if (body.custom_instructions !== undefined) {
+      if (
+        body.custom_instructions === null ||
+        body.custom_instructions === ""
+      ) {
+        updatePayload.iors_custom_instructions = null;
+      } else {
+        const sanitized = String(body.custom_instructions)
+          .replace(/<[^>]*>/g, "")
+          .slice(0, 2000);
+        updatePayload.iors_custom_instructions = sanitized;
+      }
+    }
+
+    // Behavior presets (array of preset keys)
+    if (body.behavior_presets !== undefined) {
+      const validPresets = [
+        "motivator",
+        "coach",
+        "analyst",
+        "friend",
+        "plan_day",
+        "monitor_health",
+        "track_goals",
+        "find_gaps",
+        "no_meditation",
+        "no_finance",
+        "no_calls",
+        "weekend_quiet",
+      ];
+      const presets = Array.isArray(body.behavior_presets)
+        ? body.behavior_presets.filter(
+            (p: unknown) => typeof p === "string" && validPresets.includes(p),
+          )
+        : [];
+      updatePayload.iors_behavior_presets = presets;
+    }
+
+    // System prompt override
+    if (body.system_prompt_override !== undefined) {
+      if (
+        body.system_prompt_override === null ||
+        body.system_prompt_override === ""
+      ) {
+        updatePayload.iors_system_prompt_override = null;
+      } else {
+        updatePayload.iors_system_prompt_override = String(
+          body.system_prompt_override,
+        ).slice(0, 10000);
+      }
+    }
+
     const { error } = await supabase
       .from("exo_tenants")
-      .update({
-        iors_personality: updatedPersonality,
-        iors_name: updatedPersonality.name,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", user.id);
 
     if (error) {
@@ -102,7 +208,17 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ personality: updatedPersonality });
+    return NextResponse.json({
+      personality: updatedPersonality,
+      customInstructions:
+        updatePayload.iors_custom_instructions ??
+        tenant?.iors_custom_instructions,
+      behaviorPresets:
+        updatePayload.iors_behavior_presets ?? tenant?.iors_behavior_presets,
+      systemPromptOverride:
+        updatePayload.iors_system_prompt_override ??
+        tenant?.iors_system_prompt_override,
+    });
   } catch (error) {
     console.error("[PersonalityAPI] Error:", {
       error: error instanceof Error ? error.message : error,

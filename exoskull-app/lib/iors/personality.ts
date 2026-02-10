@@ -89,6 +89,61 @@ export function getPersonalityPromptFragment(
   return `\n\n## OSOBOWOSC IORS\n${hints.join("\n")}`;
 }
 
+// ── Behavior preset → prompt fragment mapping ──
+
+const PRESET_PROMPTS: Record<string, string> = {
+  // Style
+  motivator:
+    "Zachecaj, chwal postepy, podnos na duchu. Kazdy maly krok jest wazny.",
+  coach:
+    "Badz wymagajacy. Rozliczaj z commitmentow. Nie odpuszczaj. Pytaj o postepy.",
+  analyst:
+    "Dawaj dane, statystyki, trendy. Mniej emocji, wiecej faktow i liczb.",
+  friend:
+    "Badz ciepły, empatyczny, pytaj jak sie czuje. Wspieraj emocjonalnie.",
+  // Proactivity
+  plan_day:
+    "Rano podaj plan dnia na podstawie taskow i kalendarza. Zaproponuj priorytety.",
+  monitor_health:
+    "Reaguj na spadki snu, energii, nastroju. Informuj o trendach zdrowotnych.",
+  track_goals:
+    "Co tydzien sprawdzaj postep celow i przypominaj. Proponuj dalsze kroki.",
+  find_gaps:
+    "Wykrywaj co uzytkownik pomija i delikatnie zwracaj uwage na zaniedbane obszary.",
+  // Boundaries
+  no_meditation: "NIGDY nie sugeruj medytacji ani mindfulness.",
+  no_finance: "NIE poruszaj tematow finansowych. Pomijaj kwestie pieniedzy.",
+  no_calls:
+    "NIGDY nie wykonuj polaczen telefonicznych bez wyraznego polecenia.",
+  weekend_quiet:
+    "W weekendy (sobota, niedziela) — minimalna komunikacja. Tylko na pytanie.",
+};
+
+/**
+ * Generate prompt fragment from behavior presets.
+ */
+export function getBehaviorPresetsFragment(
+  presets: string[] | null | undefined,
+): string {
+  if (!presets || presets.length === 0) return "";
+  const fragments = presets
+    .filter((p) => PRESET_PROMPTS[p])
+    .map((p) => `- ${PRESET_PROMPTS[p]}`);
+  if (fragments.length === 0) return "";
+  return `\n\n## AKTYWNE ZACHOWANIA\n${fragments.join("\n")}`;
+}
+
+/**
+ * Generate prompt fragment from custom instructions.
+ */
+export function getCustomInstructionsFragment(
+  instructions: string | null | undefined,
+): string {
+  if (!instructions || instructions.trim().length === 0) return "";
+  const sanitized = instructions.slice(0, 2000).trim();
+  return `\n\n## INSTRUKCJE UZYTKOWNIKA (najwyzszy priorytet)\n${sanitized}`;
+}
+
 /**
  * Parse personality from DB JSONB, merging with defaults for missing fields.
  */
