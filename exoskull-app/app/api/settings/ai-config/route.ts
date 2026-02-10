@@ -22,13 +22,9 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Parallel: AI config + usage summary
+    // Parallel: AI config (select * for migration resilience) + usage summary
     const [configResult, usageResult] = await Promise.allSettled([
-      supabase
-        .from("exo_tenants")
-        .select("iors_ai_config")
-        .eq("id", user.id)
-        .single(),
+      supabase.from("exo_tenants").select("*").eq("id", user.id).single(),
       supabase
         .from("exo_ai_usage")
         .select("model, tier, estimated_cost, created_at")
@@ -41,10 +37,11 @@ export async function GET() {
         .limit(200),
     ]);
 
-    const aiConfig =
+    const tenantRow =
       configResult.status === "fulfilled"
-        ? configResult.value.data?.iors_ai_config
+        ? (configResult.value.data as Record<string, unknown> | null)
         : null;
+    const aiConfig = tenantRow?.iors_ai_config ?? null;
 
     // Compute usage summary
     const usageRows =
@@ -100,14 +97,15 @@ export async function PATCH(req: NextRequest) {
 
     const body = await req.json();
 
-    // Load current
+    // Load current (select * for migration resilience)
     const { data: tenant } = await supabase
       .from("exo_tenants")
-      .select("iors_ai_config")
+      .select("*")
       .eq("id", user.id)
       .single();
 
-    const current = (tenant?.iors_ai_config as Record<string, unknown>) ?? {};
+    const t = tenant as Record<string, unknown> | null;
+    const current = (t?.iors_ai_config as Record<string, unknown>) ?? {};
     const updated = { ...current };
 
     // Temperature (0-2)

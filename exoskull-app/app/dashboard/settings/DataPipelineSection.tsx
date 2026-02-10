@@ -87,7 +87,32 @@ export function DataPipelineSection() {
         const res = await fetch("/api/settings/data-pipeline");
         if (!res.ok) throw new Error("Nie udalo sie pobrac statusu pipeline");
         const json = await res.json();
-        setData(json);
+
+        // API returns { syncStatus: [...], etl: { silver, gold } }
+        // Map to component's expected shape
+        const dataTypes: DataTypeStatus[] = (json.syncStatus ?? []).map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (s: any) => ({
+            data_type: s.data_type,
+            last_sync: s.last_sync,
+            record_count: s.records ?? s.record_count ?? 0,
+          }),
+        );
+        const etlLayers: ETLStatus[] = [];
+        if (json.etl?.silver) {
+          etlLayers.push({
+            layer: "Silver",
+            last_run: json.etl.silver.lastRun ?? null,
+          });
+        }
+        if (json.etl?.gold) {
+          etlLayers.push({
+            layer: "Gold",
+            last_run: json.etl.gold.lastRun ?? null,
+          });
+        }
+
+        setData({ data_types: dataTypes, etl: etlLayers });
       } catch (err) {
         console.error("[DataPipelineSection] Load error:", {
           error: err instanceof Error ? err.message : err,

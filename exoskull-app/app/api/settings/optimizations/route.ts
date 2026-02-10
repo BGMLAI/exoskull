@@ -23,27 +23,102 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { data: optimizations, error } = await supabase
-      .from("system_optimizations")
+    // Parallel: optimizations history + permissions from iors_ai_config
+    const [optResult, tenantResult] = await Promise.allSettled([
+      supabase
+        .from("system_optimizations")
+        .select("*")
+        .eq("tenant_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      supabase.from("exo_tenants").select("*").eq("id", user.id).single(),
+    ]);
+
+    const optimizations =
+      optResult.status === "fulfilled" ? (optResult.value.data ?? []) : [];
+    if (optResult.status === "fulfilled" && optResult.value.error) {
+      console.error("[OptimizationsAPI] GET optimizations failed:", {
+        userId: user.id,
+        error: optResult.value.error.message,
+      });
+    }
+
+    const tenant =
+      tenantResult.status === "fulfilled"
+        ? (tenantResult.value.data as Record<string, unknown> | null)
+        : null;
+    const aiConfig = (tenant?.iors_ai_config as Record<string, unknown>) ?? {};
+    const permissions = aiConfig.permissions ?? null;
+
+    return NextResponse.json({
+      optimizations,
+      permissions,
+    });
+  } catch (error) {
+    console.error("[OptimizationsAPI] GET Error:", {
+      error: error instanceof Error ? error.message : error,
+    });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await req.json();
+
+    if (!body.permissions || typeof body.permissions !== "object") {
+      return NextResponse.json(
+        { error: "Missing permissions object" },
+        { status: 400 },
+      );
+    }
+
+    // Load current iors_ai_config (select * for migration resilience)
+    const { data: tenant } = await supabase
+      .from("exo_tenants")
       .select("*")
-      .eq("tenant_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
+      .eq("id", user.id)
+      .single();
+
+    const t = tenant as Record<string, unknown> | null;
+    const currentConfig = (t?.iors_ai_config as Record<string, unknown>) ?? {};
+    const updatedConfig = { ...currentConfig, permissions: body.permissions };
+
+    const { error } = await supabase
+      .from("exo_tenants")
+      .update({
+        iors_ai_config: updatedConfig,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id);
 
     if (error) {
-      console.error("[OptimizationsAPI] GET failed:", {
+      console.error("[OptimizationsAPI] PATCH permissions failed:", {
         userId: user.id,
         error: error.message,
       });
       return NextResponse.json(
-        { error: "Failed to load optimizations" },
+        { error: "Failed to save permissions" },
         { status: 500 },
       );
     }
 
-    return NextResponse.json({ optimizations: optimizations ?? [] });
+    return NextResponse.json({ permissions: body.permissions });
   } catch (error) {
-    console.error("[OptimizationsAPI] GET Error:", {
+    console.error("[OptimizationsAPI] PATCH Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(
@@ -214,11 +289,12 @@ async function applyOptimization(
     // Update inside iors_ai_config JSONB
     const { data: tenant } = await supabase
       .from("exo_tenants")
-      .select("iors_ai_config")
+      .select("*")
       .eq("id", userId)
       .single();
 
-    const config = (tenant?.iors_ai_config as Record<string, unknown>) ?? {};
+    const tRow = tenant as Record<string, unknown> | null;
+    const config = (tRow?.iors_ai_config as Record<string, unknown>) ?? {};
 
     if (parameterName.startsWith("model_")) {
       const category = parameterName.replace("model_", "");
@@ -249,7 +325,7 @@ async function applyOptimization(
     // Update inside iors_personality JSONB
     const { data: tenant } = await supabase
       .from("exo_tenants")
-      .select("iors_personality")
+      .select("*")
       .eq("id", userId)
       .single();
 

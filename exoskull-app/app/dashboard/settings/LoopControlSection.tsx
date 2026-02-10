@@ -77,13 +77,30 @@ export function LoopControlSection() {
         const res = await fetch("/api/settings/loop-config");
         if (!res.ok) throw new Error("Nie udalo sie pobrac konfiguracji petli");
         const data = await res.json();
-        setConfig(data);
-        setFrequency(
-          data.user_eval_interval_minutes === null
-            ? "auto"
-            : String(data.user_eval_interval_minutes),
+        // API returns { config: {...}, stats: { cyclesToday, interventionsToday } }
+        const cfg = data.config;
+        setConfig(
+          cfg
+            ? {
+                activity_class: cfg.activity_class ?? "unknown",
+                last_eval_at: cfg.last_eval_at ?? null,
+                next_eval_at: cfg.next_eval_at ?? null,
+                cycles_today: data.stats?.cyclesToday ?? 0,
+                interventions_today: data.stats?.interventionsToday ?? 0,
+                user_eval_interval_minutes:
+                  cfg.user_eval_interval_minutes ?? null,
+                daily_ai_budget_cents: cfg.daily_ai_budget_cents ?? 50,
+                spent_today_cents: cfg.spent_today_cents ?? 0,
+              }
+            : null,
         );
-        setBudget(data.daily_ai_budget_cents ?? 50);
+        setFrequency(
+          cfg?.user_eval_interval_minutes === null ||
+            cfg?.user_eval_interval_minutes === undefined
+            ? "auto"
+            : String(cfg.user_eval_interval_minutes),
+        );
+        setBudget(cfg?.daily_ai_budget_cents ?? 50);
       } catch (err) {
         console.error("[LoopControlSection] Load error:", {
           error: err instanceof Error ? err.message : err,

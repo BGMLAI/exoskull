@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import {
   Card,
   CardContent,
@@ -166,7 +166,7 @@ export function SelfOptimizeSection() {
         if (data.permissions) {
           setPermissions({ ...DEFAULT_PERMISSIONS, ...data.permissions });
         }
-        setHistory(data.history || []);
+        setHistory(data.optimizations || data.history || []);
       } catch (err) {
         console.error("[SelfOptimizeSection] Load error:", {
           error: err instanceof Error ? err.message : err,
@@ -250,7 +250,7 @@ export function SelfOptimizeSection() {
       const refreshRes = await fetch("/api/settings/optimizations");
       if (refreshRes.ok) {
         const data = await refreshRes.json();
-        setHistory(data.history || []);
+        setHistory(data.optimizations || data.history || []);
       }
     } catch (err) {
       console.error("[SelfOptimizeSection] Action error:", {
@@ -301,8 +301,8 @@ export function SelfOptimizeSection() {
                 </thead>
                 <tbody>
                   {PERMISSION_GROUPS.map((group) => (
-                    <>
-                      <tr key={`group-${group.label}`}>
+                    <Fragment key={group.label}>
+                      <tr>
                         <td
                           colSpan={3}
                           className="pt-4 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
@@ -345,7 +345,7 @@ export function SelfOptimizeSection() {
                           </tr>
                         );
                       })}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

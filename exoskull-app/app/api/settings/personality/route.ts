@@ -23,11 +23,10 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Use select("*") so missing columns (pre-migration) don't fail the query
     const { data: tenant, error } = await supabase
       .from("exo_tenants")
-      .select(
-        "iors_personality, iors_name, iors_custom_instructions, iors_behavior_presets, iors_system_prompt_override",
-      )
+      .select("*")
       .eq("id", user.id)
       .single();
 
@@ -42,11 +41,12 @@ export async function GET() {
       );
     }
 
+    const t = tenant as Record<string, unknown> | null;
     return NextResponse.json({
-      personality: tenant?.iors_personality ?? null,
-      customInstructions: tenant?.iors_custom_instructions ?? null,
-      behaviorPresets: tenant?.iors_behavior_presets ?? [],
-      systemPromptOverride: tenant?.iors_system_prompt_override ?? null,
+      personality: t?.iors_personality ?? null,
+      customInstructions: t?.iors_custom_instructions ?? null,
+      behaviorPresets: t?.iors_behavior_presets ?? [],
+      systemPromptOverride: t?.iors_system_prompt_override ?? null,
     });
   } catch (error) {
     console.error("[PersonalityAPI] GET Error:", {
@@ -73,12 +73,10 @@ export async function PATCH(req: NextRequest) {
 
     const body = await req.json();
 
-    // Load current personality + new fields
+    // Load current personality + new fields (select * for migration resilience)
     const { data: tenant } = await supabase
       .from("exo_tenants")
-      .select(
-        "iors_personality, iors_name, iors_custom_instructions, iors_behavior_presets, iors_system_prompt_override",
-      )
+      .select("*")
       .eq("id", user.id)
       .single();
 

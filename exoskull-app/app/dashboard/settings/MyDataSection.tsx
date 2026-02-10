@@ -88,7 +88,47 @@ export function MyDataSection() {
         const res = await fetch("/api/user/my-data");
         if (!res.ok) throw new Error("Nie udalo sie pobrac danych");
         const json = await res.json();
-        setData(json);
+
+        // Map API response to component's expected shape
+        const mits: MIT[] = (json.mits ?? []).map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (m: any, i: number) => ({
+            objective: m.objective ?? m.content ?? "",
+            reasoning: m.reasoning ?? m.category ?? "",
+            rank: m.rank ?? i + 1,
+          }),
+        );
+        const patterns: Pattern[] = (json.patterns ?? []).map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (p: any) => ({
+            id: p.id,
+            pattern_type: p.pattern_type ?? "",
+            description: p.description ?? "",
+            confidence: p.confidence ?? 0,
+          }),
+        );
+        // API returns "learningEvents", component expects "learning_events"
+        const learning_events: LearningEvent[] = (
+          json.learning_events ??
+          json.learningEvents ??
+          []
+        ).map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (e: any) => ({
+            id: e.id,
+            event_type: e.event_type ?? "",
+            description: e.description ?? "",
+            created_at: e.created_at ?? "",
+          }),
+        );
+        const engagement: Engagement | null = json.engagement
+          ? {
+              level: json.engagement.level ?? "unknown",
+              churn_risk: json.engagement.churn_risk ?? "unknown",
+            }
+          : null;
+
+        setData({ mits, patterns, learning_events, engagement });
       } catch (err) {
         console.error("[MyDataSection] Load error:", {
           error: err instanceof Error ? err.message : err,
