@@ -4,6 +4,59 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-10] App Builder + Settings Self-Modify
+
+### What was done
+
+**1. App Builder — AI-generated custom apps from conversation**
+- IORS can now build custom data-tracking apps from natural language
+- User says "track my coffee intake" → AI generates schema + UI + API
+- `exo_generated_apps` table + `create_app_table()` RPC (dynamic DDL with validation)
+- App generator pipeline: AI spec → validate → create table → register widget
+- 4 new IORS tools: `build_app`, `list_apps`, `app_log_data`, `app_get_data` (46 total)
+- Dynamic CRUD API: `/api/apps/[slug]/data` (GET + POST)
+- `AppWidget` component: form + entries list + summary stats on canvas
+- Canvas integration: `app:` prefix in widget-registry + CanvasGrid render
+
+**2. Settings Self-Modify — user-controlled IORS behavior**
+- DB migration: `iors_custom_instructions`, `iors_behavior_presets`, `iors_ai_config` columns on `exo_tenants`
+- Two-tier permission system (with_approval + autonomous) for 22 setting categories
+- `InstructionsSection` component for settings page
+- Personality + dynamic-context updates for new config columns
+- Fixed `settings_self_modify.sql`: wrapped `system_optimizations` ALTER in table existence check
+
+### Files created
+- `exoskull-app/lib/apps/` — types, generator, prompts (5 files)
+- `exoskull-app/app/api/apps/` — 3 API routes (generate, list, CRUD)
+- `exoskull-app/components/widgets/AppWidget.tsx`
+- `exoskull-app/lib/iors/tools/app-builder-tools.ts`
+- `exoskull-app/supabase/migrations/20260217000001_app_builder.sql`
+- `exoskull-app/supabase/migrations/20260218000001_settings_self_modify.sql`
+- `exoskull-app/app/dashboard/settings/InstructionsSection.tsx`
+
+### Files modified
+- `exoskull-app/components/canvas/CanvasGrid.tsx` — app: prefix rendering
+- `exoskull-app/lib/canvas/widget-registry.ts` — app: prefix metadata
+- `exoskull-app/lib/iors/tools/index.ts` — registered appBuilderTools
+- `exoskull-app/lib/iors/personality.ts` — new config integration
+- `exoskull-app/lib/voice/dynamic-context.ts` — new config awareness
+
+### How to verify
+- Chat: "Zbuduj mi aplikację do śledzenia kawy" → should create app + widget
+- Dashboard: new app widget appears on canvas
+- API: `GET /api/apps` lists generated apps
+- Settings: custom instructions section visible
+- DB: `exo_generated_apps` table exists, `create_app_table()` RPC works
+
+### Notes for future agents
+- App tables always prefixed `exo_app_` (enforced by RPC)
+- Column types whitelisted: text, integer, bigint, numeric, boolean, date, timestamptz, jsonb, real
+- SQL injection blocked: DROP/DELETE/TRUNCATE/ALTER/GRANT/REVOKE/EXECUTE/COPY
+- `getServiceSupabase()` from `@/lib/supabase/service` — NOT inline createClient
+- Postgrest builder is thenable but doesn't have `.catch()` — use try/catch instead
+
+---
+
 ## [2026-02-10] MAPEK Loop + Document Reprocessing + Google Integration Fix
 
 ### What was done
