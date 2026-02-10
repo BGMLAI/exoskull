@@ -126,7 +126,13 @@ export function AIConfigSection() {
           });
         }
         if (data.usage) {
-          setUsage(data.usage);
+          setUsage({
+            today_cost_cents: data.usage.today_cost_cents ?? 0,
+            daily_budget_cents: data.usage.daily_budget_cents ?? 0,
+            per_model: Array.isArray(data.usage.per_model)
+              ? data.usage.per_model
+              : [],
+          });
         }
       } catch (err) {
         console.error("[AIConfigSection] Load error:", {
