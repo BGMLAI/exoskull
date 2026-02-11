@@ -22,11 +22,10 @@ export async function GET() {
   }
 
   try {
-    // Use anon key — these are count-only queries on RLS-enabled tables
-    // No need for service role key on a public endpoint
+    // Use service role key — anon key returns 0 due to RLS policies
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 

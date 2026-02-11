@@ -126,4 +126,5 @@ async function postHandler(req: NextRequest) {
   });
 }
 
+export const GET = withCronGuard({ name: "admin-metrics" }, postHandler);
 export const POST = withCronGuard({ name: "admin-metrics" }, postHandler);
