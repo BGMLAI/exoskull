@@ -150,7 +150,7 @@
     },
     {
       "path": "/api/cron/impulse",
-      "schedule": "*/30 * * * *"
+      "schedule": "*/15 * * * *"
     }
   ]
 }
