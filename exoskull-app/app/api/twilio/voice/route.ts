@@ -16,6 +16,7 @@ import {
   generateSayAndGatherTwiML,
   generateEndCallTwiML,
   generateErrorTwiML,
+  generateConversationRelayTwiML,
   validateTwilioSignature,
 } from "@/lib/voice/twilio-client";
 import { textToSpeech, uploadTTSAudio } from "@/lib/voice/elevenlabs-tts";
@@ -141,6 +142,39 @@ export async function POST(req: NextRequest) {
         const tenant = await findTenantByPhone(from);
         tenantId = tenant?.id || "anonymous";
       }
+
+      // ── ConversationRelay mode (real-time WebSocket pipeline) ──
+      const voiceWsUrl = process.env.VOICE_WS_URL;
+      if (voiceWsUrl) {
+        // Generate personalized greeting (ConversationRelay speaks it via ElevenLabs)
+        const greeting = await generateGreeting(tenantId);
+
+        const twiml = generateConversationRelayTwiML({
+          wsUrl: voiceWsUrl,
+          welcomeGreeting: greeting,
+          voiceId: process.env.ELEVENLABS_VOICE_ID,
+          language: "pl",
+          actionUrl: getActionUrl("end"),
+          hints: "ExoSkull,IORS,Bogumił",
+          customParameters: {
+            tenantId,
+            greeting,
+            ...(jobType ? { jobType } : {}),
+          },
+        });
+
+        logger.info("[Twilio Voice] ConversationRelay TwiML generated:", {
+          tenantId,
+          wsUrl: voiceWsUrl,
+          greeting: greeting.substring(0, 50),
+        });
+
+        return new NextResponse(twiml, {
+          headers: { "Content-Type": "application/xml" },
+        });
+      }
+
+      // ── Legacy Gather mode (HTTP turn-by-turn) ──
 
       // Create session
       const session = await getOrCreateSession(callSid, tenantId);

@@ -11,11 +11,16 @@ export {
   generateEndCallTwiML,
   generateErrorTwiML,
   generateSayAndGatherTwiML,
+  generateConversationRelayTwiML,
   makeOutboundCall,
   validateTwilioSignature,
-  getTwilioClient
-} from './twilio-client'
-export type { GatherOptions, OutboundCallOptions } from './twilio-client'
+  getTwilioClient,
+} from "./twilio-client";
+export type {
+  GatherOptions,
+  OutboundCallOptions,
+  ConversationRelayOptions,
+} from "./twilio-client";
 
 // ElevenLabs TTS
 export {
@@ -23,9 +28,9 @@ export {
   uploadTTSAudio,
   generateAndUploadTTS,
   precacheCommonPhrases,
-  cleanupSessionAudio
-} from './elevenlabs-tts'
-export type { TTSOptions, TTSResult } from './elevenlabs-tts'
+  cleanupSessionAudio,
+} from "./elevenlabs-tts";
+export type { TTSOptions, TTSResult } from "./elevenlabs-tts";
 
 // ElevenLabs STT
 export {
@@ -33,9 +38,9 @@ export {
   speechToTextFromUrl,
   speechToTextDeepgram,
   transcribeAudio,
-  transcribeAudioFromUrl
-} from './elevenlabs-stt'
-export type { STTOptions, STTResult } from './elevenlabs-stt'
+  transcribeAudioFromUrl,
+} from "./elevenlabs-stt";
+export type { STTOptions, STTResult } from "./elevenlabs-stt";
 
 // Conversation Handler
 export {
@@ -44,9 +49,13 @@ export {
   endSession,
   processUserMessage,
   generateGreeting,
-  findTenantByPhone
-} from './conversation-handler'
-export type { VoiceSession, ConversationResult } from './conversation-handler'
+  findTenantByPhone,
+} from "./conversation-handler";
+export type { VoiceSession, ConversationResult } from "./conversation-handler";
 
 // System Prompt (re-export from existing)
-export { PSYCODE_PROMPT, STATIC_SYSTEM_PROMPT, buildFullSystemPrompt } from './system-prompt'
+export {
+  PSYCODE_PROMPT,
+  STATIC_SYSTEM_PROMPT,
+  buildFullSystemPrompt,
+} from "./system-prompt";

@@ -1,8 +1,24 @@
 # Voice Configuration - IORS Speech & Conversation Settings
 #
 # Konfiguracja pipeline'u glosowego.
-# Stack: Web Speech API (STT) + Claude (LLM) + ElevenLabs (TTS)
-# Telefon: Twilio (STT via Gather) + Claude (LLM) + ElevenLabs (TTS)
+# Primary: ConversationRelay (Deepgram STT + ElevenLabs TTS + WebSocket)
+# Fallback: Twilio Gather (HTTP turn-by-turn)
+# Web: Web Speech API (browser-native)
+
+# =====================================================
+# TRANSPORT
+# =====================================================
+
+transport:
+  # Primary: ConversationRelay (real-time WebSocket)
+  # Set VOICE_WS_URL env to enable. Unset = legacy Gather mode.
+  primary: "conversation_relay"
+  fallback: "gather"
+  ws_server:
+    env_key: "VOICE_WS_URL"
+    port_env: "VOICE_WS_PORT"
+    default_port: 8080
+    notes: "Deploy on Railway/Render. Run: npx tsx server/voice-ws.ts"
 
 # =====================================================
 # PROVIDERS
@@ -18,30 +34,46 @@ providers:
       primary: "+48732143210"
 
   stt:
+    # ConversationRelay mode: Deepgram Nova (streaming, best Polish)
+    conversation_relay:
+      name: "Deepgram Nova"
+      provider_key: "Deepgram"
+      language: "pl"
+      hints: "ExoSkull,IORS,Bogumił"
+      notes: "Configured via ConversationRelay TwiML. No API key needed (Twilio manages it)."
+    # Legacy Gather mode: Twilio built-in
+    gather:
+      name: "Twilio Gather"
+      language: "pl-PL"
+      notes: "Twilio built-in STT via <Gather>"
+    # Web browser
     web:
       name: "Web Speech API"
       language: "pl-PL"
       notes: "Browser-native, free, no API key needed"
-    phone:
-      name: "Twilio Gather"
-      language: "pl-PL"
-      notes: "Twilio built-in STT via <Gather>"
 
   tts:
-    name: "ElevenLabs"
-    model: "eleven_turbo_v2_5"
-    env_key: "ELEVENLABS_API_KEY"
-    voice_id: "Qs4qmNrqlneCgYPLSNQ7"
-    stability: 0.5
-    similarity_boost: 0.75
-    style: 0
+    # ConversationRelay mode: ElevenLabs (natural Polish, managed by Twilio)
+    conversation_relay:
+      name: "ElevenLabs"
+      provider_key: "ElevenLabs"
+      env_key: "ELEVENLABS_VOICE_ID"
+      notes: "Configured via ConversationRelay TwiML. Voice ID in env."
+    # Legacy Gather mode: Cartesia Sonic 3 (server-side generation)
+    gather:
+      name: "Cartesia Sonic 3"
+      model: "sonic-3"
+      env_key: "CARTESIA_API_KEY"
+      voice_id_env: "CARTESIA_VOICE_ID"
+      default_voice: "82a7fc13-2927-4e42-9b8a-bb1f9e506521"
+      notes: "5x cheaper than ElevenLabs. Used when ConversationRelay unavailable."
 
   llm:
     name: "Claude"
     model: "claude-sonnet-4-20250514"
     env_key: "ANTHROPIC_API_KEY"
-    max_tokens: 500
-    notes: "Fast + capable for voice conversations"
+    max_tokens: 200
+    notes: "Fast + capable for voice. Shared between both transport modes."
 
 # =====================================================
 # IORS IDENTITY
@@ -92,20 +124,31 @@ conversation:
 # =====================================================
 
 performance:
-  stt_latency_target_ms: 500
-  llm_response_target_ms: 2000
-  tts_generation_target_ms: 1000
-  total_turnaround_target_ms: 3500
+  # ConversationRelay targets (significantly faster)
+  conversation_relay:
+    stt_latency_target_ms: 300
+    llm_response_target_ms: 1500
+    tts_start_target_ms: 200
+    total_turnaround_target_ms: 1500
+    p50_target_ms: 491
+  # Legacy Gather targets
+  gather:
+    stt_latency_target_ms: 500
+    llm_response_target_ms: 2000
+    tts_generation_target_ms: 1000
+    total_turnaround_target_ms: 3500
 
 # =====================================================
-# AUDIO CACHING
+# AUDIO CACHING (Legacy Gather mode only)
 # =====================================================
+# ConversationRelay handles TTS directly — no caching needed on our side.
 
 audio_cache:
   enabled: true
   storage: "supabase"
   bucket: "voice-audio"
   ttl_days: 30
+  notes: "Only used in legacy Gather mode. ConversationRelay bypasses this."
 
   cached_phrases:
     - "Cześć! Tu IORS. W czym mogę pomóc?"
@@ -124,6 +167,17 @@ audio_cache:
     - "Potrzebuję więcej informacji."
     - "Potwierdzam."
     - "Miłego dnia!"
+
+# =====================================================
+# CONVERSATION RELAY CONFIG
+# =====================================================
+
+conversation_relay:
+  interruptible: true
+  dtmf_detection: true
+  interrupt_sensitivity: "high"
+  hints: "ExoSkull,IORS,Bogumił"
+  elevenlabs_text_normalization: "auto"
 
 # =====================================================
 # PROMPT CONFIGURATION

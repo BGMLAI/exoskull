@@ -221,6 +221,93 @@ export function generateSayAndGatherTwiML(options: {
 }
 
 // ============================================================================
+// CONVERSATION RELAY — Real-time WebSocket voice pipeline
+// ============================================================================
+
+export interface ConversationRelayOptions {
+  /** WebSocket server URL (wss://) */
+  wsUrl: string;
+  /** Personalized welcome greeting text (spoken immediately via ElevenLabs TTS) */
+  welcomeGreeting?: string;
+  /** ElevenLabs voice ID */
+  voiceId?: string;
+  /** Language code for STT and TTS */
+  language?: string;
+  /** Action URL for post-call callback */
+  actionUrl?: string;
+  /** Custom parameters passed to WS setup message */
+  customParameters?: Record<string, string>;
+  /** Speech recognition hints (comma-separated keywords) */
+  hints?: string;
+}
+
+/**
+ * Generate TwiML for ConversationRelay — real-time voice via WebSocket.
+ *
+ * Twilio handles the entire audio pipeline:
+ * - STT: Deepgram Nova (streaming Polish)
+ * - TTS: ElevenLabs (natural Polish voice)
+ * - Turn detection, interruptions, buffer management
+ *
+ * Our WebSocket server only sends/receives TEXT.
+ */
+export function generateConversationRelayTwiML(
+  options: ConversationRelayOptions,
+): string {
+  const {
+    wsUrl,
+    welcomeGreeting,
+    voiceId,
+    language = "pl",
+    actionUrl,
+    customParameters,
+    hints,
+  } = options;
+
+  const response = new VoiceResponse();
+
+  const connectAttrs: Record<string, string> = {};
+  if (actionUrl) {
+    connectAttrs.action = actionUrl;
+  }
+
+  const connect = response.connect(connectAttrs);
+
+  // Build ConversationRelay attributes
+  const crAttrs: Record<string, string | boolean> = {
+    url: wsUrl,
+    ttsProvider: "ElevenLabs",
+    transcriptionProvider: "Deepgram",
+    language,
+    interruptible: true,
+    dtmfDetection: true,
+  };
+
+  if (welcomeGreeting) {
+    crAttrs.welcomeGreeting = welcomeGreeting;
+  }
+
+  if (voiceId) {
+    crAttrs.voice = voiceId;
+  }
+
+  if (hints) {
+    crAttrs.hints = hints;
+  }
+
+  const conversationRelay = connect.conversationRelay(crAttrs as any);
+
+  // Pass custom parameters to WebSocket setup message
+  if (customParameters) {
+    for (const [name, value] of Object.entries(customParameters)) {
+      conversationRelay.parameter({ name, value });
+    }
+  }
+
+  return response.toString();
+}
+
+// ============================================================================
 // OUTBOUND CALLS
 // ============================================================================
 

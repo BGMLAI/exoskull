@@ -66,6 +66,8 @@ export interface ConversationResult {
   text: string;
   toolsUsed: string[];
   shouldEndCall: boolean;
+  /** Detected emotion state (for voice prosody / TTS adaptation) */
+  emotion?: import("@/lib/emotion/types").EmotionState;
 }
 
 /** Callback for real-time processing events (used by SSE stream) */
@@ -304,6 +306,7 @@ export async function processUserMessage(
       text: "Do usłyszenia! Miłego dnia!",
       toolsUsed: [],
       shouldEndCall: true,
+      // No emotion analysis for end-call shortcut
     };
   }
 
@@ -701,6 +704,7 @@ export async function processUserMessage(
         text: responseText,
         toolsUsed,
         shouldEndCall: false,
+        emotion: emotionState,
       };
     }
 
@@ -716,6 +720,7 @@ export async function processUserMessage(
       text: textContent?.text || "Przepraszam, nie zrozumiałem.",
       toolsUsed: [],
       shouldEndCall: false,
+      emotion: emotionState,
     };
   } catch (error) {
     const err = error as Error & {
@@ -787,6 +792,7 @@ export async function processUserMessage(
             text: result.text || "Przepraszam, nie zrozumiałem.",
             toolsUsed: result.toolsUsed,
             shouldEndCall: false,
+            emotion: emotionState,
           };
         } catch (openaiError) {
           console.error("[ConversationHandler] OpenAI fallback also failed:", {
