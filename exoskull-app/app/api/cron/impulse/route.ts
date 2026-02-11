@@ -11,6 +11,7 @@
  * C. Goal deadlines approaching → warning
  * D. Pending approved interventions → execute
  * E. Stale email sync → log warning
+ * F. System development suggestions → gap detection + proactive coaching
  *
  * Rate limited: max 3 message actions per tenant per cycle.
  * Quiet hours respected. Non-message actions (DB updates) don't count.
@@ -417,6 +418,192 @@ async function checkStaleEmailSync(tenantId: string): Promise<ActionResult> {
   return result;
 }
 
+/**
+ * F. System Development Suggestions — detect gaps in user's setup and suggest improvements.
+ *    Checks what features the user ISN'T using and proactively suggests enabling them.
+ *    Dedup: max 1 suggestion per gap type per 7 days (via exo_proactive_log).
+ */
+
+interface GapCheck {
+  id: string;
+  query: () => Promise<boolean>; // true = gap exists
+  message: string;
+}
+
+async function checkSystemDevelopment(
+  tenantId: string,
+  canMessage: boolean,
+): Promise<ActionResult> {
+  const result: ActionResult = {
+    type: "system_suggestion",
+    count: 0,
+    messagesSent: 0,
+  };
+
+  if (!canMessage) return result;
+
+  try {
+    const supabase = getServiceSupabase();
+
+    // Check which suggestions were already sent in the last 7 days
+    const sevenDaysAgo = new Date(
+      Date.now() - 7 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const { data: recentSuggestions } = await supabase
+      .from("exo_proactive_log")
+      .select("trigger_type")
+      .eq("tenant_id", tenantId)
+      .like("trigger_type", "system_suggestion:%")
+      .gte("created_at", sevenDaysAgo);
+
+    const alreadySuggested = new Set(
+      (recentSuggestions || []).map((s: { trigger_type: string }) =>
+        s.trigger_type.replace("system_suggestion:", ""),
+      ),
+    );
+
+    // Define gap checks — ordered by impact (most valuable first)
+    const gaps: GapCheck[] = [
+      {
+        id: "no_goals",
+        query: async () => {
+          const { count } = await supabase
+            .from("exo_user_goals")
+            .select("*", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
+            .eq("is_active", true);
+          return (count || 0) === 0;
+        },
+        message:
+          "Nie masz jeszcze zadnych celow. Cele pomagaja mi sledzic Twoj postep i proaktywnie wspierac. Powiedz np. 'chce biegac 3x/tydzien' albo 'chce czytac 30 min dziennie'.",
+      },
+      {
+        id: "no_tasks",
+        query: async () => {
+          const { count } = await supabase
+            .from("exo_tasks")
+            .select("*", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
+            .in("status", ["pending", "in_progress"]);
+          return (count || 0) === 0;
+        },
+        message:
+          "Nie masz zadnych aktywnych taskow. Moge sledzic Twoje zadania i przypominac o terminach. Powiedz 'dodaj task: ...' lub po prostu powiedz co masz do zrobienia.",
+      },
+      {
+        id: "no_email",
+        query: async () => {
+          const { count } = await supabase
+            .from("exo_email_accounts")
+            .select("*", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
+            .eq("sync_enabled", true);
+          return (count || 0) === 0;
+        },
+        message:
+          "Nie masz podlaczonego maila. Moge analizowac Twoje maile, wyciagac taski, follow-upy i wazne informacje. Chcesz podlaczyc Gmail lub inny konto?",
+      },
+      {
+        id: "no_knowledge",
+        query: async () => {
+          const { count } = await supabase
+            .from("exo_document_chunks")
+            .select("*", { count: "exact", head: true })
+            .eq("tenant_id", tenantId);
+          return (count || 0) === 0;
+        },
+        message:
+          "Twoja baza wiedzy jest pusta. Moge przechowywac dokumenty, notatki i wazne informacje. Wgraj pliki przez dashboard albo po prostu przeslij mi tekst.",
+      },
+      {
+        id: "few_conversations",
+        query: async () => {
+          const { count } = await supabase
+            .from("exo_unified_messages")
+            .select("*", { count: "exact", head: true })
+            .eq("tenant_id", tenantId);
+          return (count || 0) < 10;
+        },
+        message:
+          "Rozmawiamy jeszcze malo. Im wiecej mi powiesz o swoim dniu, nawykach i celach, tym lepiej Cie wspre. Nie krępuj sie — pisz jak do przyjaciela.",
+      },
+      {
+        id: "no_apps",
+        query: async () => {
+          const { count } = await supabase
+            .from("exo_generated_apps")
+            .select("*", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
+            .eq("is_active", true);
+          return (count || 0) === 0;
+        },
+        message:
+          "Nie masz jeszcze zadnych custom apps. Moge budowac aplikacje dokladnie pod Twoje potrzeby — np. tracker nawykow, dziennik jedzenia, czy budzetowke. Powiedz czego potrzebujesz.",
+      },
+      {
+        id: "no_mood_tracking",
+        query: async () => {
+          const thirtyDaysAgo = new Date(
+            Date.now() - 30 * 24 * 60 * 60 * 1000,
+          ).toISOString();
+          const { count } = await supabase
+            .from("exo_daily_summaries")
+            .select("*", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
+            .not("mood_score", "is", null)
+            .gte("created_at", thirtyDaysAgo);
+          return (count || 0) < 3;
+        },
+        message:
+          "Nie sledzimy Twojego samopoczucia. Regularne check-iny pomagaja mi wykrywac wzorce — np. kiedy masz spadki energii. Chcesz zaczac? Wystarczy odpowiedziec na moje pytania rano/wieczorem.",
+      },
+    ];
+
+    // Check gaps — stop at first hit that wasn't recently suggested
+    for (const gap of gaps) {
+      if (alreadySuggested.has(gap.id)) continue;
+
+      try {
+        const hasGap = await gap.query();
+        if (!hasGap) continue;
+
+        result.count = 1;
+
+        const sent = await sendProactiveMessage(
+          tenantId,
+          gap.message,
+          `system_suggestion:${gap.id}`,
+          "impulse",
+        );
+
+        if (sent.success) {
+          result.messagesSent = 1;
+          logger.info("[Impulse] System suggestion sent:", {
+            tenantId,
+            gapType: gap.id,
+          });
+        }
+
+        // One suggestion per cycle per tenant
+        break;
+      } catch (err) {
+        console.error("[Impulse] Gap check failed:", {
+          tenantId,
+          gapId: gap.id,
+          error: err instanceof Error ? err.message : err,
+        });
+      }
+    }
+  } catch (error) {
+    console.error("[Impulse] checkSystemDevelopment error:", {
+      tenantId,
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+
+  return result;
+}
+
 // ============================================================================
 // MAIN HANDLER
 // ============================================================================
@@ -433,6 +620,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       goal_warning: 0,
       intervention_execution: 0,
       email_stale_warning: 0,
+      system_suggestion: 0,
     } as Record<string, number>,
     totalMessagesSent: 0,
     errors: [] as string[],
@@ -510,6 +698,15 @@ async function handler(request: NextRequest): Promise<NextResponse> {
         // E. Stale Email Sync (no messages — log only)
         const emailResult = await checkStaleEmailSync(tenant.id);
         totals.actions.email_stale_warning += emailResult.count;
+
+        // F. System Development Suggestions (1 suggestion per cycle)
+        const suggestResult = await checkSystemDevelopment(
+          tenant.id,
+          canMessage && messagesThisCycle < MAX_ACTIONS_PER_TENANT,
+        );
+        totals.actions.system_suggestion += suggestResult.count;
+        messagesThisCycle += suggestResult.messagesSent;
+        totals.totalMessagesSent += suggestResult.messagesSent;
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[Impulse] Error processing tenant ${tenant.id}:`, {
