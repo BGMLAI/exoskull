@@ -27,6 +27,7 @@ import {
 import { canSendProactive } from "@/lib/autonomy/outbound-triggers";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { logger } from "@/lib/logger";
+import { generateApp } from "@/lib/apps/generator/app-generator";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -419,15 +420,26 @@ async function checkStaleEmailSync(tenantId: string): Promise<ActionResult> {
 }
 
 /**
- * F. System Development Suggestions — detect gaps in user's setup and suggest improvements.
- *    Checks what features the user ISN'T using and proactively suggests enabling them.
- *    Dedup: max 1 suggestion per gap type per 7 days (via exo_proactive_log).
+ * F. System Auto-Builder — detects gaps in user's setup, BUILDS solutions, and deploys them.
+ *    Instead of suggesting "would you like X?" — actually CREATES apps, goals, tasks.
+ *    Dedup: max 1 build action per gap type per 14 days (via exo_proactive_log).
  */
+
+type GapAction =
+  | { mode: "build_app"; description: string; doneMessage: string }
+  | { mode: "create_goals"; doneMessage: string }
+  | {
+      mode: "create_task";
+      title: string;
+      description: string;
+      doneMessage: string;
+    }
+  | { mode: "suggest"; message: string };
 
 interface GapCheck {
   id: string;
-  query: () => Promise<boolean>; // true = gap exists
-  message: string;
+  query: () => Promise<boolean>;
+  action: GapAction;
 }
 
 async function checkSystemDevelopment(
@@ -445,7 +457,24 @@ async function checkSystemDevelopment(
   try {
     const supabase = getServiceSupabase();
 
-    // Check which suggestions were already sent in the last 7 days
+    // Check which auto-builds were already done in the last 14 days
+    const fourteenDaysAgo = new Date(
+      Date.now() - 14 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const { data: recentActions } = await supabase
+      .from("exo_proactive_log")
+      .select("trigger_type")
+      .eq("tenant_id", tenantId)
+      .like("trigger_type", "auto_build:%")
+      .gte("created_at", fourteenDaysAgo);
+
+    const alreadyBuilt = new Set(
+      (recentActions || []).map((s: { trigger_type: string }) =>
+        s.trigger_type.replace("auto_build:", ""),
+      ),
+    );
+
+    // Also check 7-day dedup for suggestions (things we can't auto-build)
     const sevenDaysAgo = new Date(
       Date.now() - 7 * 24 * 60 * 60 * 1000,
     ).toISOString();
@@ -462,10 +491,60 @@ async function checkSystemDevelopment(
       ),
     );
 
-    // Define gap checks — ordered by impact (most valuable first)
+    // Gap definitions — ordered by impact. auto-build where possible, suggest where not.
     const gaps: GapCheck[] = [
       {
-        id: "no_goals",
+        id: "mood_tracker_app",
+        query: async () => {
+          // No mood tracker app AND no mood data
+          const [{ count: appCount }, { count: moodCount }] = await Promise.all(
+            [
+              supabase
+                .from("exo_generated_apps")
+                .select("*", { count: "exact", head: true })
+                .eq("tenant_id", tenantId)
+                .ilike("slug", "%mood%"),
+              supabase
+                .from("exo_daily_summaries")
+                .select("*", { count: "exact", head: true })
+                .eq("tenant_id", tenantId)
+                .not("mood_score", "is", null)
+                .gte(
+                  "created_at",
+                  new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+                ),
+            ],
+          );
+          return (appCount || 0) === 0 && (moodCount || 0) < 3;
+        },
+        action: {
+          mode: "build_app",
+          description:
+            "Tracker Nastroju i Energii. Pola: nastroj (rating 1-10), energia (rating 1-10), sen_godziny (number), notatka (text), data (date). Chart: line chart nastrojow w czasie.",
+          doneMessage:
+            "Zbudowalem dla Ciebie Tracker Nastroju i Energii! Jest juz na Twoim dashboardzie. Mozesz logowac swoj nastroj, energie i sen — a ja bede wylapywal wzorce.",
+        },
+      },
+      {
+        id: "habit_tracker_app",
+        query: async () => {
+          const { count } = await supabase
+            .from("exo_generated_apps")
+            .select("*", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
+            .ilike("slug", "%habit%");
+          return (count || 0) === 0;
+        },
+        action: {
+          mode: "build_app",
+          description:
+            "Tracker Nawykow. Pola: nazwa_nawyku (text), wykonano (boolean), data (date), notatka (text). Ikona: check-circle. Summary: count wykonanych dzis.",
+          doneMessage:
+            "Zbudowalem Tracker Nawykow — jest na dashboardzie! Dodaj nawyki ktore chcesz sledzic. Bede Ci przypominac codziennie.",
+        },
+      },
+      {
+        id: "starter_goals",
         query: async () => {
           const { count } = await supabase
             .from("exo_user_goals")
@@ -474,22 +553,51 @@ async function checkSystemDevelopment(
             .eq("is_active", true);
           return (count || 0) === 0;
         },
-        message:
-          "Nie masz jeszcze zadnych celow. Cele pomagaja mi sledzic Twoj postep i proaktywnie wspierac. Powiedz np. 'chce biegac 3x/tydzien' albo 'chce czytac 30 min dziennie'.",
+        action: {
+          mode: "create_goals",
+          doneMessage:
+            "Stworzylem 3 startowe cele dla Ciebie — zdrowie, produktywnosc i rozwoj. Mozesz je zobaczyc na dashboardzie w sekcji Cele i dostosowac do swoich potrzeb.",
+        },
       },
       {
-        id: "no_tasks",
+        id: "expense_tracker_app",
+        query: async () => {
+          const { count } = await supabase
+            .from("exo_generated_apps")
+            .select("*", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
+            .or(
+              "slug.ilike.%expense%,slug.ilike.%budget%,slug.ilike.%finance%",
+            );
+          return (count || 0) === 0;
+        },
+        action: {
+          mode: "build_app",
+          description:
+            "Tracker Wydatkow. Pola: kwota (numeric), kategoria (select: jedzenie, transport, rozrywka, rachunki, zakupy, zdrowie, inne), opis (text), data (date). Chart: bar chart wydatkow po kategoriach. Summary: sum kwot z tego miesiaca.",
+          doneMessage:
+            "Zbudowalem Tracker Wydatkow — jest na dashboardzie! Loguj wydatki a ja bede analizowal wzorce i ostrzegal gdy przekroczysz budzet.",
+        },
+      },
+      {
+        id: "onboard_task",
         query: async () => {
           const { count } = await supabase
             .from("exo_tasks")
             .select("*", { count: "exact", head: true })
-            .eq("tenant_id", tenantId)
-            .in("status", ["pending", "in_progress"]);
+            .eq("tenant_id", tenantId);
           return (count || 0) === 0;
         },
-        message:
-          "Nie masz zadnych aktywnych taskow. Moge sledzic Twoje zadania i przypominac o terminach. Powiedz 'dodaj task: ...' lub po prostu powiedz co masz do zrobienia.",
+        action: {
+          mode: "create_task",
+          title: "Poznaj swoj ExoSkull dashboard",
+          description:
+            "Wejdz na dashboard i sprawdz dostepne widgety: nastroj, nawyki, cele, wydatki. Wszystko mozesz dostosowac.",
+          doneMessage:
+            "Stworzylem Twoj pierwszy task: 'Poznaj swoj ExoSkull dashboard'. Sprawdz go w zakladce Taski!",
+        },
       },
+      // Things that need user input — suggest only
       {
         id: "no_email",
         query: async () => {
@@ -500,8 +608,11 @@ async function checkSystemDevelopment(
             .eq("sync_enabled", true);
           return (count || 0) === 0;
         },
-        message:
-          "Nie masz podlaczonego maila. Moge analizowac Twoje maile, wyciagac taski, follow-upy i wazne informacje. Chcesz podlaczyc Gmail lub inny konto?",
+        action: {
+          mode: "suggest",
+          message:
+            "Nie masz podlaczonego maila. Moge analizowac Twoje maile, wyciagac taski i follow-upy. Wejdz w Ustawienia > Integracje zeby podlaczyc Gmail.",
+        },
       },
       {
         id: "no_knowledge",
@@ -512,82 +623,183 @@ async function checkSystemDevelopment(
             .eq("tenant_id", tenantId);
           return (count || 0) === 0;
         },
-        message:
-          "Twoja baza wiedzy jest pusta. Moge przechowywac dokumenty, notatki i wazne informacje. Wgraj pliki przez dashboard albo po prostu przeslij mi tekst.",
-      },
-      {
-        id: "few_conversations",
-        query: async () => {
-          const { count } = await supabase
-            .from("exo_unified_messages")
-            .select("*", { count: "exact", head: true })
-            .eq("tenant_id", tenantId);
-          return (count || 0) < 10;
+        action: {
+          mode: "suggest",
+          message:
+            "Twoja baza wiedzy jest pusta. Wgraj dokumenty przez dashboard (Wiedza > Upload) albo po prostu przeslij mi tekst — zapamietam wszystko.",
         },
-        message:
-          "Rozmawiamy jeszcze malo. Im wiecej mi powiesz o swoim dniu, nawykach i celach, tym lepiej Cie wspre. Nie krępuj sie — pisz jak do przyjaciela.",
-      },
-      {
-        id: "no_apps",
-        query: async () => {
-          const { count } = await supabase
-            .from("exo_generated_apps")
-            .select("*", { count: "exact", head: true })
-            .eq("tenant_id", tenantId)
-            .eq("is_active", true);
-          return (count || 0) === 0;
-        },
-        message:
-          "Nie masz jeszcze zadnych custom apps. Moge budowac aplikacje dokladnie pod Twoje potrzeby — np. tracker nawykow, dziennik jedzenia, czy budzetowke. Powiedz czego potrzebujesz.",
-      },
-      {
-        id: "no_mood_tracking",
-        query: async () => {
-          const thirtyDaysAgo = new Date(
-            Date.now() - 30 * 24 * 60 * 60 * 1000,
-          ).toISOString();
-          const { count } = await supabase
-            .from("exo_daily_summaries")
-            .select("*", { count: "exact", head: true })
-            .eq("tenant_id", tenantId)
-            .not("mood_score", "is", null)
-            .gte("created_at", thirtyDaysAgo);
-          return (count || 0) < 3;
-        },
-        message:
-          "Nie sledzimy Twojego samopoczucia. Regularne check-iny pomagaja mi wykrywac wzorce — np. kiedy masz spadki energii. Chcesz zaczac? Wystarczy odpowiedziec na moje pytania rano/wieczorem.",
       },
     ];
 
-    // Check gaps — stop at first hit that wasn't recently suggested
+    // Process gaps — stop at first hit that wasn't recently handled
     for (const gap of gaps) {
-      if (alreadySuggested.has(gap.id)) continue;
+      const dedupKey = gap.action.mode === "suggest" ? gap.id : gap.id;
+      const dedupSet =
+        gap.action.mode === "suggest" ? alreadySuggested : alreadyBuilt;
+
+      if (dedupSet.has(dedupKey)) continue;
 
       try {
         const hasGap = await gap.query();
         if (!hasGap) continue;
 
         result.count = 1;
+        const action = gap.action;
+        let message: string;
+        let triggerType: string;
 
+        if (action.mode === "build_app") {
+          // ACTUALLY BUILD THE APP
+          logger.info("[Impulse] Auto-building app:", {
+            tenantId,
+            gapId: gap.id,
+          });
+
+          const appResult = await generateApp({
+            tenant_id: tenantId,
+            description: action.description,
+            source: "iors_suggestion",
+          });
+
+          if (!appResult.success) {
+            console.error("[Impulse] App build failed:", {
+              tenantId,
+              gapId: gap.id,
+              error: appResult.error,
+            });
+            continue; // Try next gap
+          }
+
+          message = action.doneMessage;
+          triggerType = `auto_build:${gap.id}`;
+
+          logger.info("[Impulse] App auto-built successfully:", {
+            tenantId,
+            gapId: gap.id,
+            appSlug: appResult.app?.slug,
+          });
+        } else if (action.mode === "create_goals") {
+          // CREATE STARTER GOALS
+          const thirtyDaysFromNow = new Date(
+            Date.now() + 30 * 24 * 60 * 60 * 1000,
+          )
+            .toISOString()
+            .split("T")[0];
+          const today = new Date().toISOString().split("T")[0];
+
+          const starterGoals = [
+            {
+              tenant_id: tenantId,
+              name: "Regularny sen 7-8h",
+              category: "health",
+              description: "Cel startowy — zadbaj o regeneracje",
+              target_type: "numeric",
+              target_value: 7.5,
+              target_unit: "godzin",
+              frequency: "daily",
+              direction: "increase",
+              start_date: today,
+              target_date: thirtyDaysFromNow,
+              is_active: true,
+              wellbeing_weight: 2.0,
+            },
+            {
+              tenant_id: tenantId,
+              name: "30 minut ruchu dziennie",
+              category: "health",
+              description: "Cel startowy — aktywnosc fizyczna",
+              target_type: "numeric",
+              target_value: 30,
+              target_unit: "minut",
+              frequency: "daily",
+              direction: "increase",
+              start_date: today,
+              target_date: thirtyDaysFromNow,
+              is_active: true,
+              wellbeing_weight: 1.5,
+            },
+            {
+              tenant_id: tenantId,
+              name: "Nauka nowej umiejetnosci",
+              category: "learning",
+              description: "Cel startowy — rozwoj osobisty",
+              target_type: "frequency",
+              target_value: 3,
+              target_unit: "sesji/tydzien",
+              frequency: "weekly",
+              direction: "increase",
+              start_date: today,
+              target_date: thirtyDaysFromNow,
+              is_active: true,
+              wellbeing_weight: 1.0,
+            },
+          ];
+
+          const { error: goalsError } = await supabase
+            .from("exo_user_goals")
+            .insert(starterGoals);
+
+          if (goalsError) {
+            console.error("[Impulse] Goals creation failed:", {
+              tenantId,
+              error: goalsError.message,
+            });
+            continue;
+          }
+
+          message = action.doneMessage;
+          triggerType = `auto_build:${gap.id}`;
+        } else if (action.mode === "create_task") {
+          // CREATE A TASK
+          const { error: taskError } = await supabase.from("exo_tasks").insert({
+            tenant_id: tenantId,
+            title: action.title,
+            description: action.description,
+            status: "pending",
+            priority: 3,
+            due_date: new Date(
+              Date.now() + 3 * 24 * 60 * 60 * 1000,
+            ).toISOString(),
+            context: { source: "impulse_auto_build" },
+          });
+
+          if (taskError) {
+            console.error("[Impulse] Task creation failed:", {
+              tenantId,
+              error: taskError.message,
+            });
+            continue;
+          }
+
+          message = action.doneMessage;
+          triggerType = `auto_build:${gap.id}`;
+        } else {
+          // SUGGEST (things needing user input)
+          message = action.message;
+          triggerType = `system_suggestion:${gap.id}`;
+        }
+
+        // Send notification about what was built/suggested
         const sent = await sendProactiveMessage(
           tenantId,
-          gap.message,
-          `system_suggestion:${gap.id}`,
+          message,
+          triggerType,
           "impulse",
         );
 
         if (sent.success) {
           result.messagesSent = 1;
-          logger.info("[Impulse] System suggestion sent:", {
+          logger.info("[Impulse] Auto-build action completed:", {
             tenantId,
-            gapType: gap.id,
+            gapId: gap.id,
+            mode: action.mode,
           });
         }
 
-        // One suggestion per cycle per tenant
+        // One action per cycle per tenant
         break;
       } catch (err) {
-        console.error("[Impulse] Gap check failed:", {
+        console.error("[Impulse] Gap action failed:", {
           tenantId,
           gapId: gap.id,
           error: err instanceof Error ? err.message : err,
