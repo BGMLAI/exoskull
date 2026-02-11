@@ -28,7 +28,6 @@ import {
   type UserJobConfig,
 } from "@/lib/cron/dispatcher";
 import { withCronGuard } from "@/lib/admin/cron-guard";
-import { verifyCronAuth } from "@/lib/cron/auth";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
@@ -218,6 +217,7 @@ async function postHandler(req: NextRequest) {
 }
 
 export const POST = withCronGuard({ name: "master-scheduler" }, postHandler);
+export const GET = withCronGuard({ name: "master-scheduler" }, postHandler);
 
 /**
  * Log job execution to database
@@ -464,54 +464,5 @@ async function logCustomJobExecution(
       });
   } catch (error) {
     console.error("Failed to log custom job execution:", error);
-  }
-}
-
-/**
- * GET endpoint for manual testing / status check
- */
-export async function GET(req: NextRequest) {
-  if (!verifyCronAuth(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  try {
-    const supabase = getServiceSupabase();
-    // Get all jobs with consent info
-    const { data: jobs } = await supabase
-      .from("exo_scheduled_jobs")
-      .select(
-        "job_name, display_name, job_type, time_window_start, default_channel, is_active, is_system, requires_user_consent",
-      )
-      .order("time_window_start");
-
-    // Separate system and user jobs
-    const systemJobs =
-      jobs?.filter((j) => j.is_system || !j.requires_user_consent) || [];
-    const userJobs =
-      jobs?.filter((j) => !j.is_system && j.requires_user_consent) || [];
-
-    // Get recent logs
-    const { data: recentLogs } = await supabase
-      .from("exo_scheduled_job_logs")
-      .select("job_name, status, channel_used, created_at")
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    return NextResponse.json({
-      status: "ok",
-      system_jobs: systemJobs,
-      user_jobs: userJobs,
-      recent_executions: recentLogs || [],
-      next_run: "Hourly at minute 0",
-      note: "System jobs run automatically. User jobs require consent via conversation.",
-    });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    );
   }
 }

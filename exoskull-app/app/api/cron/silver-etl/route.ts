@@ -12,14 +12,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import {
-  runSilverETL,
-  runDirectSilverETL,
-  getSilverStats,
-} from "@/lib/datalake/silver-etl";
+import { runSilverETL, runDirectSilverETL } from "@/lib/datalake/silver-etl";
 import { checkR2Connection } from "@/lib/storage/r2-client";
 import { withCronGuard } from "@/lib/admin/cron-guard";
-import { verifyCronAuth } from "@/lib/cron/auth";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
@@ -100,52 +95,11 @@ async function postHandler(req: NextRequest) {
   }
 }
 
+export const GET = withCronGuard(
+  { name: "silver-etl", dependencies: ["bronze-etl"] },
+  postHandler,
+);
 export const POST = withCronGuard(
   { name: "silver-etl", dependencies: ["bronze-etl"] },
   postHandler,
 );
-
-/**
- * GET /api/cron/silver-etl
- * Get Silver ETL status and stats
- */
-export async function GET(req: NextRequest) {
-  if (!verifyCronAuth(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Check R2 connection status
-  const r2Check = await checkR2Connection();
-
-  // Get Silver stats (works regardless of R2)
-  try {
-    const stats = await getSilverStats();
-
-    return NextResponse.json({
-      status: "ready",
-      description:
-        "Silver ETL — supports R2 mode + direct mode (Supabase → Silver)",
-      mode: r2Check.connected ? "r2" : "direct",
-      r2_connected: r2Check.connected,
-      r2_note: r2Check.connected
-        ? undefined
-        : "Using direct mode (raw tables → Silver). R2 optional.",
-      silver_tables: {
-        conversations: stats.conversations,
-        messages: stats.messages,
-        voice_calls: stats.voiceCalls,
-        sms_logs: stats.smsLogs,
-      },
-      last_sync: stats.lastSync,
-    });
-  } catch (error) {
-    return NextResponse.json({
-      status: "ready",
-      mode: r2Check.connected ? "r2" : "direct",
-      r2_connected: r2Check.connected,
-      stats_error:
-        error instanceof Error ? error.message : "Failed to get stats",
-      note: "Silver tables may not exist yet. Run the migration first.",
-    });
-  }
-}

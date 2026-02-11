@@ -14,9 +14,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { runBronzeETL, runBronzeETLForTenant } from "@/lib/datalake/bronze-etl";
-import { checkR2Connection, getBronzeStats } from "@/lib/storage/r2-client";
+import { checkR2Connection } from "@/lib/storage/r2-client";
 import { withCronGuard } from "@/lib/admin/cron-guard";
-import { verifyCronAuth } from "@/lib/cron/auth";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
@@ -88,66 +87,5 @@ async function postHandler(req: NextRequest) {
   }
 }
 
+export const GET = withCronGuard({ name: "bronze-etl" }, postHandler);
 export const POST = withCronGuard({ name: "bronze-etl" }, postHandler);
-
-/**
- * GET /api/cron/bronze-etl
- * Get Bronze ETL status and stats
- */
-export async function GET(req: NextRequest) {
-  if (!verifyCronAuth(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Check R2 connection
-  const r2Check = await checkR2Connection();
-
-  if (!r2Check.connected) {
-    return NextResponse.json({
-      status: "not_configured",
-      description: "Bronze ETL job - syncs Supabase to R2 Parquet",
-      r2_connected: false,
-      r2_error: r2Check.error,
-      configuration: {
-        required_env_vars: [
-          "R2_ACCOUNT_ID",
-          "R2_ACCESS_KEY_ID",
-          "R2_SECRET_ACCESS_KEY",
-          "R2_BUCKET_NAME",
-        ],
-        schedule: "5 * * * * (every hour at minute 5)",
-      },
-    });
-  }
-
-  // Get stats if R2 is connected
-  try {
-    const stats = await getBronzeStats();
-
-    return NextResponse.json({
-      status: "ready",
-      description: "Bronze ETL job - syncs Supabase to R2 Parquet",
-      r2_connected: true,
-      schedule: "5 * * * * (every hour at minute 5)",
-      stats: {
-        total_files: stats.totalFiles,
-        total_bytes: stats.totalBytes,
-        total_mb: (stats.totalBytes / (1024 * 1024)).toFixed(2),
-        by_data_type: stats.byDataType,
-      },
-      endpoints: {
-        trigger: "POST /api/cron/bronze-etl",
-        status: "GET /api/cron/bronze-etl",
-      },
-    });
-  } catch (error) {
-    return NextResponse.json({
-      status: "ready",
-      description: "Bronze ETL job - syncs Supabase to R2 Parquet",
-      r2_connected: true,
-      schedule: "5 * * * * (every hour at minute 5)",
-      stats_error:
-        error instanceof Error ? error.message : "Failed to get stats",
-    });
-  }
-}

@@ -12,14 +12,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import {
-  runGoldETL,
-  refreshSingleView,
-  getGoldStats,
-  getRefreshHistory,
-} from "@/lib/datalake/gold-etl";
+import { runGoldETL, refreshSingleView } from "@/lib/datalake/gold-etl";
 import { withCronGuard } from "@/lib/admin/cron-guard";
-import { verifyCronAuth } from "@/lib/cron/auth";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
@@ -85,60 +79,11 @@ async function postHandler(req: NextRequest) {
   }
 }
 
+export const GET = withCronGuard(
+  { name: "gold-etl", dependencies: ["silver-etl"] },
+  postHandler,
+);
 export const POST = withCronGuard(
   { name: "gold-etl", dependencies: ["silver-etl"] },
   postHandler,
 );
-
-/**
- * GET /api/cron/gold-etl
- * Get Gold ETL status and stats
- */
-export async function GET(req: NextRequest) {
-  if (!verifyCronAuth(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  try {
-    const [stats, history] = await Promise.all([
-      getGoldStats(),
-      getRefreshHistory(10),
-    ]);
-
-    return NextResponse.json({
-      status: "ready",
-      description:
-        "Gold ETL job - refreshes materialized views for dashboard aggregations",
-      schedule: "0 2 * * * (daily at 02:00 UTC)",
-      views: {
-        exo_gold_daily_summary: stats.daily,
-        exo_gold_weekly_summary: stats.weekly,
-        exo_gold_monthly_summary: stats.monthly,
-        exo_gold_messages_daily: stats.messagesDaily,
-      },
-      last_refresh: stats.lastRefresh,
-      recent_history: history.slice(0, 5).map((h) => ({
-        view_name: h.view_name,
-        refreshed_at: h.refreshed_at,
-        duration_ms: h.duration_ms,
-        rows_count: h.rows_count,
-        status: h.status,
-      })),
-      endpoints: {
-        trigger: "POST /api/cron/gold-etl",
-        trigger_single:
-          'POST /api/cron/gold-etl { "view_name": "exo_gold_daily_summary" }',
-        status: "GET /api/cron/gold-etl",
-      },
-    });
-  } catch (error) {
-    return NextResponse.json({
-      status: "error",
-      description:
-        "Gold ETL job - refreshes materialized views for dashboard aggregations",
-      schedule: "0 2 * * * (daily at 02:00 UTC)",
-      error: error instanceof Error ? error.message : "Failed to get stats",
-      note: "Gold views may not exist yet. Run the migration first.",
-    });
-  }
-}
