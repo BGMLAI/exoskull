@@ -28,7 +28,12 @@ import { ActivityFeedWidget } from "@/components/widgets/ActivityFeedWidget";
 import { OptimizationWidget } from "@/components/widgets/OptimizationWidget";
 import { InterventionInboxWidget } from "@/components/widgets/InterventionInboxWidget";
 import { InsightHistoryWidget } from "@/components/widgets/InsightHistoryWidget";
+import { KnowledgeInsightsWidget } from "@/components/widgets/KnowledgeInsightsWidget";
 import { AppWidget } from "@/components/widgets/AppWidget";
+import {
+  EmailAnalyticsWidget,
+  type EmailWidgetData,
+} from "@/components/widgets/EmailAnalyticsWidget";
 
 import type {
   HealthSummary,
@@ -123,6 +128,22 @@ function CanvasConversationsWidget() {
       lastUpdated={lastUpdated}
     />
   );
+}
+
+function CanvasEmailWidget() {
+  const [data, setData] = useState<EmailWidgetData | null>(null);
+  useEffect(() => {
+    const load = () =>
+      fetch("/api/canvas/data/emails")
+        .then((r) => r.json())
+        .then(setData)
+        .catch((e) => console.error("[CanvasEmail] Fetch error:", e));
+    load();
+    const interval = setInterval(load, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+  if (!data) return <WidgetSkeleton />;
+  return <EmailAnalyticsWidget data={data} />;
 }
 
 function CanvasOptimizationWidget() {
@@ -351,6 +372,10 @@ export function CanvasGrid({
         return <CanvasInterventionInboxWidget />;
       case "insight_history":
         return <CanvasInsightHistoryWidget />;
+      case "knowledge_insights":
+        return <KnowledgeInsightsWidget />;
+      case "email_inbox":
+        return <CanvasEmailWidget />;
       default:
         // Generated app widgets (app:slug-name)
         if (widget.widget_type.startsWith("app:")) {

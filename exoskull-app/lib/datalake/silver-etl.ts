@@ -641,6 +641,371 @@ export async function runSilverETL(): Promise<ETLSummary> {
 }
 
 // ============================================================================
+// Direct Silver ETL (Bypass R2 — reads from raw Supabase tables)
+// ============================================================================
+
+/**
+ * Direct ETL: raw Supabase tables → Silver tables (no R2 dependency).
+ * Use when Bronze/R2 is unavailable or as the primary path.
+ */
+export async function runDirectSilverETL(): Promise<ETLSummary> {
+  const startedAt = new Date();
+  const results: ETLResult[] = [];
+  const tenantIds: string[] = [];
+
+  try {
+    const sb = getServiceSupabase();
+    const { data: tenants } = await sb.from("exo_tenants").select("id");
+
+    if (!tenants || tenants.length === 0) {
+      return {
+        startedAt,
+        completedAt: new Date(),
+        tenants: [],
+        results: [],
+        totalRecords: 0,
+        totalErrors: 0,
+      };
+    }
+
+    for (const tenant of tenants) {
+      tenantIds.push(tenant.id);
+
+      const convResult = await directConversationsETL(tenant.id);
+      results.push(convResult);
+
+      const msgResult = await directMessagesETL(tenant.id);
+      results.push(msgResult);
+
+      const emailResult = await directEmailsETL(tenant.id);
+      results.push(emailResult);
+    }
+
+    return {
+      startedAt,
+      completedAt: new Date(),
+      tenants: tenantIds,
+      results,
+      totalRecords: results.reduce((sum, r) => sum + r.recordsProcessed, 0),
+      totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
+    };
+  } catch (error) {
+    console.error("[DirectSilverETL] Fatal error:", error);
+    return {
+      startedAt,
+      completedAt: new Date(),
+      tenants: tenantIds,
+      results,
+      totalRecords: 0,
+      totalErrors: 1,
+    };
+  }
+}
+
+async function directConversationsETL(tenantId: string): Promise<ETLResult> {
+  const dataType: DataType = "conversations";
+  const errors: string[] = [];
+
+  try {
+    const sb = getServiceSupabase();
+    const lastSync = await getLastSyncTime(tenantId, dataType);
+
+    const { data: raw, error: fetchError } = await sb
+      .from("exo_conversations")
+      .select(
+        "id, tenant_id, channel, created_at, ended_at, duration_seconds, summary, context, insights",
+      )
+      .eq("tenant_id", tenantId)
+      .gt("created_at", lastSync.toISOString())
+      .order("created_at", { ascending: true })
+      .limit(1000);
+
+    if (fetchError) {
+      return {
+        dataType,
+        success: false,
+        recordsProcessed: 0,
+        recordsInserted: 0,
+        recordsUpdated: 0,
+        filesProcessed: [],
+        errors: [`Fetch error: ${fetchError.message}`],
+      };
+    }
+
+    if (!raw || raw.length === 0) {
+      return {
+        dataType,
+        success: true,
+        recordsProcessed: 0,
+        recordsInserted: 0,
+        recordsUpdated: 0,
+        filesProcessed: ["direct"],
+        errors: [],
+      };
+    }
+
+    const silver = raw.map((r) => ({
+      id: r.id,
+      tenant_id: r.tenant_id,
+      channel: validateChannel(r.channel || "web"),
+      started_at: normalizeTimestamp(r.created_at),
+      ended_at: r.ended_at ? normalizeTimestamp(r.ended_at) : null,
+      duration_seconds: r.duration_seconds || 0,
+      summary: r.summary || null,
+      context:
+        typeof r.context === "string"
+          ? JSON.parse(r.context || "{}")
+          : r.context || {},
+      insights:
+        typeof r.insights === "string"
+          ? JSON.parse(r.insights || "[]")
+          : r.insights || [],
+      synced_at: new Date().toISOString(),
+      bronze_source: "direct",
+    }));
+
+    let inserted = 0;
+    if (silver.length > 0) {
+      const { error: upsertError, count } = await sb
+        .from("exo_silver_conversations")
+        .upsert(silver, { onConflict: "id", count: "exact" });
+
+      if (upsertError) {
+        errors.push(`Upsert error: ${upsertError.message}`);
+      } else {
+        inserted = count || silver.length;
+      }
+    }
+
+    await updateSyncLog(tenantId, dataType, ["direct"], silver.length, errors);
+
+    return {
+      dataType,
+      success: errors.length === 0,
+      recordsProcessed: raw.length,
+      recordsInserted: inserted,
+      recordsUpdated: 0,
+      filesProcessed: ["direct"],
+      errors,
+    };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    return {
+      dataType,
+      success: false,
+      recordsProcessed: 0,
+      recordsInserted: 0,
+      recordsUpdated: 0,
+      filesProcessed: [],
+      errors: [msg],
+    };
+  }
+}
+
+async function directMessagesETL(tenantId: string): Promise<ETLResult> {
+  const dataType: DataType = "messages";
+  const errors: string[] = [];
+
+  try {
+    const sb = getServiceSupabase();
+    const lastSync = await getLastSyncTime(tenantId, dataType);
+
+    const { data: raw, error: fetchError } = await sb
+      .from("exo_messages")
+      .select(
+        "id, conversation_id, tenant_id, role, content, created_at, duration_ms, audio_url, transcription_confidence, context",
+      )
+      .eq("tenant_id", tenantId)
+      .gt("created_at", lastSync.toISOString())
+      .order("created_at", { ascending: true })
+      .limit(5000);
+
+    if (fetchError) {
+      return {
+        dataType,
+        success: false,
+        recordsProcessed: 0,
+        recordsInserted: 0,
+        recordsUpdated: 0,
+        filesProcessed: [],
+        errors: [`Fetch error: ${fetchError.message}`],
+      };
+    }
+
+    if (!raw || raw.length === 0) {
+      return {
+        dataType,
+        success: true,
+        recordsProcessed: 0,
+        recordsInserted: 0,
+        recordsUpdated: 0,
+        filesProcessed: ["direct"],
+        errors: [],
+      };
+    }
+
+    const silver = raw.map((r) => ({
+      id: r.id,
+      conversation_id: r.conversation_id,
+      tenant_id: r.tenant_id,
+      role: validateRole(r.role || "user"),
+      content: r.content || "",
+      timestamp: normalizeTimestamp(r.created_at),
+      duration_ms: r.duration_ms || 0,
+      audio_url: r.audio_url || null,
+      transcription_confidence: r.transcription_confidence ?? null,
+      context:
+        typeof r.context === "string"
+          ? JSON.parse(r.context || "{}")
+          : r.context || {},
+      synced_at: new Date().toISOString(),
+    }));
+
+    let inserted = 0;
+    if (silver.length > 0) {
+      const { error: upsertError, count } = await sb
+        .from("exo_silver_messages")
+        .upsert(silver, { onConflict: "id", count: "exact" });
+
+      if (upsertError) {
+        errors.push(`Upsert error: ${upsertError.message}`);
+      } else {
+        inserted = count || silver.length;
+      }
+    }
+
+    await updateSyncLog(tenantId, dataType, ["direct"], silver.length, errors);
+
+    return {
+      dataType,
+      success: errors.length === 0,
+      recordsProcessed: raw.length,
+      recordsInserted: inserted,
+      recordsUpdated: 0,
+      filesProcessed: ["direct"],
+      errors,
+    };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    return {
+      dataType,
+      success: false,
+      recordsProcessed: 0,
+      recordsInserted: 0,
+      recordsUpdated: 0,
+      filesProcessed: [],
+      errors: [msg],
+    };
+  }
+}
+
+async function directEmailsETL(tenantId: string): Promise<ETLResult> {
+  const dataType: DataType = "emails";
+  const errors: string[] = [];
+
+  try {
+    const sb = getServiceSupabase();
+    const lastSync = await getLastSyncTime(tenantId, dataType);
+
+    const { data: raw, error: fetchError } = await sb
+      .from("exo_analyzed_emails")
+      .select(
+        "id, tenant_id, account_id, provider_message_id, subject, from_email, from_name, to_emails, cc_emails, date_received, category, subcategory, priority_score, sentiment, analysis_status, action_items, key_facts, follow_up_needed, follow_up_by, is_read, has_attachments, created_at, updated_at",
+      )
+      .eq("tenant_id", tenantId)
+      .gt("updated_at", lastSync.toISOString())
+      .order("date_received", { ascending: true })
+      .limit(2000);
+
+    if (fetchError) {
+      return {
+        dataType,
+        success: false,
+        recordsProcessed: 0,
+        recordsInserted: 0,
+        recordsUpdated: 0,
+        filesProcessed: [],
+        errors: [`Fetch error: ${fetchError.message}`],
+      };
+    }
+
+    if (!raw || raw.length === 0) {
+      return {
+        dataType,
+        success: true,
+        recordsProcessed: 0,
+        recordsInserted: 0,
+        recordsUpdated: 0,
+        filesProcessed: ["direct"],
+        errors: [],
+      };
+    }
+
+    const silver = raw.map((r) => ({
+      id: r.id,
+      tenant_id: r.tenant_id,
+      account_id: r.account_id || null,
+      provider_message_id: r.provider_message_id || null,
+      subject: r.subject || null,
+      from_email: r.from_email || "",
+      from_name: r.from_name || null,
+      to_emails: r.to_emails || [],
+      cc_emails: r.cc_emails || [],
+      date_received: normalizeTimestamp(r.date_received),
+      category: r.category || "uncategorized",
+      subcategory: r.subcategory || null,
+      priority_score: r.priority_score || 0,
+      sentiment: r.sentiment || "neutral",
+      analysis_status: r.analysis_status || "pending",
+      action_items: r.action_items || [],
+      key_facts: r.key_facts || [],
+      follow_up_needed: r.follow_up_needed || false,
+      follow_up_by: r.follow_up_by || null,
+      is_read: r.is_read || false,
+      has_attachments: r.has_attachments || false,
+      synced_at: new Date().toISOString(),
+      bronze_source: "direct",
+    }));
+
+    let inserted = 0;
+    if (silver.length > 0) {
+      const { error: upsertError, count } = await sb
+        .from("exo_silver_emails")
+        .upsert(silver, { onConflict: "id", count: "exact" });
+
+      if (upsertError) {
+        errors.push(`Upsert error: ${upsertError.message}`);
+      } else {
+        inserted = count || silver.length;
+      }
+    }
+
+    await updateSyncLog(tenantId, dataType, ["direct"], silver.length, errors);
+
+    return {
+      dataType,
+      success: errors.length === 0,
+      recordsProcessed: raw.length,
+      recordsInserted: inserted,
+      recordsUpdated: 0,
+      filesProcessed: ["direct"],
+      errors,
+    };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    return {
+      dataType,
+      success: false,
+      recordsProcessed: 0,
+      recordsInserted: 0,
+      recordsUpdated: 0,
+      filesProcessed: [],
+      errors: [msg],
+    };
+  }
+}
+
+// ============================================================================
 // Stats
 // ============================================================================
 
@@ -649,10 +1014,11 @@ export async function getSilverStats(): Promise<{
   messages: number;
   voiceCalls: number;
   smsLogs: number;
+  emails: number;
   lastSync: string | null;
 }> {
   const sb = getServiceSupabase();
-  const [convCount, msgCount, voiceCount, smsCount, lastSync] =
+  const [convCount, msgCount, voiceCount, smsCount, emailCount, lastSync] =
     await Promise.all([
       sb
         .from("exo_silver_conversations")
@@ -666,6 +1032,7 @@ export async function getSilverStats(): Promise<{
       sb
         .from("exo_silver_sms_logs")
         .select("*", { count: "exact", head: true }),
+      sb.from("exo_silver_emails").select("*", { count: "exact", head: true }),
       sb
         .from("exo_silver_sync_log")
         .select("last_sync_at")
@@ -679,6 +1046,7 @@ export async function getSilverStats(): Promise<{
     messages: msgCount.count || 0,
     voiceCalls: voiceCount.count || 0,
     smsLogs: smsCount.count || 0,
+    emails: emailCount.count || 0,
     lastSync: lastSync.data?.last_sync_at || null,
   };
 }

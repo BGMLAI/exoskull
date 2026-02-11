@@ -86,10 +86,11 @@ export async function handleMaintenance(
       }
 
       case "etl_silver": {
-        // Bridge to existing Silver ETL (Bronze Parquet → Postgres)
-        const { runSilverETL } = await import("@/lib/datalake/silver-etl");
-        const silverResult = await runSilverETL();
-        logger.info("[Petla:Maintenance] Silver ETL completed:", {
+        // Direct Silver ETL: raw Supabase tables → Silver (no R2 dependency)
+        const { runDirectSilverETL } =
+          await import("@/lib/datalake/silver-etl");
+        const silverResult = await runDirectSilverETL();
+        logger.info("[Petla:Maintenance] Silver ETL (direct) completed:", {
           tenantId: tenant_id,
           records: silverResult.totalRecords,
           errors: silverResult.totalErrors,
@@ -139,6 +140,27 @@ export async function handleMaintenance(
           archived: archived.archivedCount,
           expired,
           revoked: revoked.revokedCount,
+        });
+        break;
+      }
+
+      case "knowledge_analysis": {
+        // Deep AI-powered knowledge analysis (daily)
+        const { runKnowledgeAnalysis } =
+          await import("@/lib/iors/knowledge-engine");
+        const kaeResult = await runKnowledgeAnalysis(
+          tenant_id,
+          "deep",
+          "loop_daily",
+        );
+        logger.info("[Petla:Maintenance] Knowledge analysis completed:", {
+          tenantId: tenant_id,
+          insights: kaeResult.insights.length,
+          actionsExecuted: kaeResult.actions.filter(
+            (a) => a.status === "executed",
+          ).length,
+          costCents: kaeResult.costCents,
+          durationMs: kaeResult.durationMs,
         });
         break;
       }

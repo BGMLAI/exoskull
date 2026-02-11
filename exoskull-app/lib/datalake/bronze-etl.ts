@@ -11,9 +11,11 @@ import {
   conversationsToParquet,
   messagesToParquet,
   jobLogsToParquet,
+  emailsToParquet,
   type ConversationRecord,
   type MessageRecord,
   type JobLogRecord,
+  type EmailRecord,
 } from "../storage/parquet-writer";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
@@ -408,6 +410,104 @@ export async function etlJobLogs(tenantId: string): Promise<ETLResult> {
   }
 }
 
+/**
+ * ETL analyzed emails for a single tenant
+ */
+export async function etlEmails(tenantId: string): Promise<ETLResult> {
+  const dataType: DataType = "emails";
+  const startTime = Date.now();
+  const lastSync = await getLastSyncTime(tenantId, dataType);
+  const now = new Date();
+
+  try {
+    const { data: emails, error } = await getServiceSupabase()
+      .from("exo_analyzed_emails")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .gte("updated_at", lastSync.toISOString())
+      .lt("updated_at", now.toISOString())
+      .order("date_received", { ascending: true });
+
+    if (error) throw error;
+
+    if (!emails || emails.length === 0) {
+      return {
+        tenant_id: tenantId,
+        data_type: dataType,
+        records_processed: 0,
+        bytes_written: 0,
+        success: true,
+        duration_ms: Date.now() - startTime,
+      };
+    }
+
+    const records: EmailRecord[] = emails.map((e) => ({
+      id: e.id,
+      tenant_id: e.tenant_id,
+      account_id: e.account_id || "",
+      provider_message_id: e.provider_message_id || "",
+      subject: e.subject || "",
+      from_email: e.from_email || "",
+      from_name: e.from_name || "",
+      to_emails: JSON.stringify(e.to_emails || []),
+      date_received: e.date_received || e.created_at,
+      category: e.category || "uncategorized",
+      priority_score: e.priority_score || 0,
+      sentiment: e.sentiment || "neutral",
+      analysis_status: e.analysis_status || "pending",
+      action_items: JSON.stringify(e.action_items || []),
+      key_facts: JSON.stringify(e.key_facts || []),
+      follow_up_needed: e.follow_up_needed || false,
+      follow_up_by: e.follow_up_by || "",
+      is_read: e.is_read || false,
+      created_at: e.created_at,
+      updated_at: e.updated_at || e.created_at,
+    }));
+
+    const parquetBuffer = emailsToParquet(records);
+
+    const result = await writeToBronze({
+      tenantId,
+      dataType,
+      data: parquetBuffer,
+      date: now,
+      metadata: { recordsCount: String(records.length) },
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || "Failed to write to R2");
+    }
+
+    await updateSyncTime(
+      tenantId,
+      dataType,
+      now,
+      records.length,
+      result.bytesWritten,
+    );
+
+    return {
+      tenant_id: tenantId,
+      data_type: dataType,
+      records_processed: records.length,
+      bytes_written: result.bytesWritten,
+      success: true,
+      duration_ms: Date.now() - startTime,
+    };
+  } catch (error) {
+    console.error(`[Bronze ETL] Emails failed for ${tenantId}:`, error);
+    return {
+      tenant_id: tenantId,
+      data_type: dataType,
+      records_processed: 0,
+      bytes_written: 0,
+      success: false,
+      duration_ms: Date.now() - startTime,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 // ============================================================================
 // Main ETL Runner
 // ============================================================================
@@ -468,6 +568,9 @@ export async function runBronzeETL(): Promise<ETLSummary> {
 
     const messagesResult = await etlMessages(tenant.id);
     results.push(messagesResult);
+
+    const emailsResult = await etlEmails(tenant.id);
+    results.push(emailsResult);
 
     // Note: Job logs ETL commented out until table structure is verified
     // const jobLogsResult = await etlJobLogs(tenant.id)

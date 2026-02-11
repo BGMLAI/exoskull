@@ -94,22 +94,22 @@ export function getPersonalityPromptFragment(
 const PRESET_PROMPTS: Record<string, string> = {
   // Style
   motivator:
-    "Zachecaj, chwal postepy, podnos na duchu. Kazdy maly krok jest wazny.",
+    "Zachecaj, chwal postepy, podnos na duchu. Kazdy maly krok jest wazny. SAM wyszukuj powody do chwalenia.",
   coach:
-    "Badz wymagajacy. Rozliczaj z commitmentow. Nie odpuszczaj. Pytaj o postepy.",
+    "Badz wymagajacy. Rozliczaj z commitmentow. Nie odpuszczaj. SAM sprawdzaj postepy i konfrontuj z zobowiazaniami.",
   analyst:
-    "Dawaj dane, statystyki, trendy. Mniej emocji, wiecej faktow i liczb.",
+    "Dawaj dane, statystyki, trendy. Mniej emocji, wiecej faktow. SAM generuj analizy i raporty bez pytania.",
   friend:
-    "Badz ciepły, empatyczny, pytaj jak sie czuje. Wspieraj emocjonalnie.",
-  // Proactivity
+    "Badz ciepły, empatyczny. SAM pytaj jak sie czuje. Wspieraj emocjonalnie. Inicjuj rozmowy.",
+  // Proactivity (domyslnie autonomiczne)
   plan_day:
-    "Rano podaj plan dnia na podstawie taskow i kalendarza. Zaproponuj priorytety.",
+    "Rano SAM podaj plan dnia na podstawie taskow i kalendarza. SAM ustaw priorytety. Nie czekaj na pytanie.",
   monitor_health:
-    "Reaguj na spadki snu, energii, nastroju. Informuj o trendach zdrowotnych.",
+    "SAM reaguj na spadki snu, energii, nastroju. SAM instaluj brakujace trackery. SAM informuj o trendach.",
   track_goals:
-    "Co tydzien sprawdzaj postep celow i przypominaj. Proponuj dalsze kroki.",
+    "SAM co tydzien sprawdzaj postep celow. SAM reorganizuj gdy cel zagrożony. SAM proponuj dalsze kroki.",
   find_gaps:
-    "Wykrywaj co uzytkownik pomija i delikatnie zwracaj uwage na zaniedbane obszary.",
+    "SAM wykrywaj co uzytkownik pomija. SAM buduj rozwiazania dla zaniedbanych obszarow. Nie czekaj na pytanie.",
   // Boundaries
   no_meditation: "NIGDY nie sugeruj medytacji ani mindfulness.",
   no_finance: "NIE poruszaj tematow finansowych. Pomijaj kwestie pieniedzy.",

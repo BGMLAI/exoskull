@@ -86,10 +86,10 @@ export const WIDGET_REGISTRY: Record<string, WidgetMeta> = {
   },
   email_inbox: {
     type: "email_inbox",
-    label: "Email",
+    label: "Email Analytics",
     icon: "Mail",
-    defaultSize: { w: 2, h: 2 },
-    minSize: { w: 1, h: 1 },
+    defaultSize: { w: 2, h: 3 },
+    minSize: { w: 2, h: 2 },
     category: "productivity",
   },
   knowledge: {
@@ -136,6 +136,14 @@ export const WIDGET_REGISTRY: Record<string, WidgetMeta> = {
     type: "insight_history",
     label: "Historia insightow",
     icon: "Lightbulb",
+    defaultSize: { w: 2, h: 3 },
+    minSize: { w: 2, h: 2 },
+    category: "iors",
+  },
+  knowledge_insights: {
+    type: "knowledge_insights",
+    label: "Analiza wiedzy",
+    icon: "Brain",
     defaultSize: { w: 2, h: 3 },
     minSize: { w: 2, h: 2 },
     category: "iors",

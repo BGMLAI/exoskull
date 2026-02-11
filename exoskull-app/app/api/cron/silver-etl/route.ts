@@ -12,7 +12,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { runSilverETL, getSilverStats } from "@/lib/datalake/silver-etl";
+import {
+  runSilverETL,
+  runDirectSilverETL,
+  getSilverStats,
+} from "@/lib/datalake/silver-etl";
 import { checkR2Connection } from "@/lib/storage/r2-client";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { verifyCronAuth } from "@/lib/cron/auth";
@@ -28,23 +32,22 @@ export const maxDuration = 60;
 async function postHandler(req: NextRequest) {
   logger.info(`[Silver ETL] Triggered at ${new Date().toISOString()}`);
 
-  // Check R2 connection first (needed to read Bronze)
-  const r2Check = await checkR2Connection();
-  if (!r2Check.connected) {
-    console.error("[Silver ETL] R2 not connected:", r2Check.error);
-    return NextResponse.json(
-      {
-        error: "R2 connection failed",
-        message: r2Check.error,
-        action: "Configure R2 credentials in environment variables",
-      },
-      { status: 503 },
-    );
-  }
-
   try {
-    // Run Silver ETL
-    const summary = await runSilverETL();
+    // Try R2-based ETL first, fallback to direct mode
+    const r2Check = await checkR2Connection();
+    let summary;
+    let mode: string;
+
+    if (r2Check.connected) {
+      mode = "r2";
+      summary = await runSilverETL();
+    } else {
+      mode = "direct";
+      logger.info(
+        "[Silver ETL] R2 unavailable, using direct mode (Supabase → Silver)",
+      );
+      summary = await runDirectSilverETL();
+    }
 
     // Calculate totals
     const totalInserted = summary.results.reduce(
@@ -61,6 +64,7 @@ async function postHandler(req: NextRequest) {
 
     return NextResponse.json({
       status: "completed",
+      mode,
       started_at: summary.startedAt.toISOString(),
       completed_at: summary.completedAt.toISOString(),
       duration_ms: summary.completedAt.getTime() - summary.startedAt.getTime(),
@@ -110,65 +114,35 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Check R2 connection (needed to read Bronze)
+  // Check R2 connection status
   const r2Check = await checkR2Connection();
 
-  if (!r2Check.connected) {
-    return NextResponse.json({
-      status: "not_configured",
-      description:
-        "Silver ETL job - transforms Bronze (R2) → Silver (Supabase)",
-      r2_connected: false,
-      r2_error: r2Check.error,
-      configuration: {
-        required_env_vars: [
-          "R2_ACCOUNT_ID",
-          "R2_ACCESS_KEY_ID",
-          "R2_SECRET_ACCESS_KEY",
-          "R2_BUCKET_NAME",
-          "NEXT_PUBLIC_SUPABASE_URL",
-          "SUPABASE_SERVICE_ROLE_KEY",
-        ],
-        schedule: "15 * * * * (every hour at minute 15)",
-      },
-    });
-  }
-
-  // Get Silver stats
+  // Get Silver stats (works regardless of R2)
   try {
     const stats = await getSilverStats();
 
     return NextResponse.json({
       status: "ready",
       description:
-        "Silver ETL job - transforms Bronze (R2) → Silver (Supabase)",
-      r2_connected: true,
-      schedule: "15 * * * * (every hour at minute 15)",
+        "Silver ETL — supports R2 mode + direct mode (Supabase → Silver)",
+      mode: r2Check.connected ? "r2" : "direct",
+      r2_connected: r2Check.connected,
+      r2_note: r2Check.connected
+        ? undefined
+        : "Using direct mode (raw tables → Silver). R2 optional.",
       silver_tables: {
-        "silver.conversations_clean": stats.conversations,
-        "silver.messages_clean": stats.messages,
-        "silver.voice_calls_clean": stats.voiceCalls,
-        "silver.sms_logs_clean": stats.smsLogs,
+        conversations: stats.conversations,
+        messages: stats.messages,
+        voice_calls: stats.voiceCalls,
+        sms_logs: stats.smsLogs,
       },
       last_sync: stats.lastSync,
-      endpoints: {
-        trigger: "POST /api/cron/silver-etl",
-        status: "GET /api/cron/silver-etl",
-      },
-      transformations: [
-        "Deduplicate by ID",
-        "Parse JSON strings → JSONB",
-        "Normalize timestamps to UTC",
-        "Validate schema (channel, role, direction)",
-      ],
     });
   } catch (error) {
     return NextResponse.json({
       status: "ready",
-      description:
-        "Silver ETL job - transforms Bronze (R2) → Silver (Supabase)",
-      r2_connected: true,
-      schedule: "15 * * * * (every hour at minute 15)",
+      mode: r2Check.connected ? "r2" : "direct",
+      r2_connected: r2Check.connected,
       stats_error:
         error instanceof Error ? error.message : "Failed to get stats",
       note: "Silver tables may not exist yet. Run the migration first.",

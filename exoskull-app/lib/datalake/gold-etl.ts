@@ -44,6 +44,7 @@ export interface GoldStats {
   weekly: number;
   monthly: number;
   messagesDaily: number;
+  emailDaily: number;
   lastRefresh: string | null;
 }
 
@@ -56,6 +57,7 @@ const GOLD_VIEWS = [
   "exo_gold_weekly_summary",
   "exo_gold_monthly_summary",
   "exo_gold_messages_daily",
+  "exo_gold_email_daily",
 ] as const;
 
 type GoldViewName = (typeof GOLD_VIEWS)[number];
@@ -233,34 +235,42 @@ export async function refreshSingleView(
  */
 export async function getGoldStats(): Promise<GoldStats> {
   const sb = getServiceSupabase();
-  const [dailyCount, weeklyCount, monthlyCount, msgDailyCount, lastSync] =
-    await Promise.all([
-      sb
-        .from("exo_gold_daily_summary")
-        .select("*", { count: "exact", head: true }),
-      sb
-        .from("exo_gold_weekly_summary")
-        .select("*", { count: "exact", head: true }),
-      sb
-        .from("exo_gold_monthly_summary")
-        .select("*", { count: "exact", head: true }),
-      sb
-        .from("exo_gold_messages_daily")
-        .select("*", { count: "exact", head: true }),
-      sb
-        .from("exo_gold_sync_log")
-        .select("refreshed_at")
-        .eq("status", "success")
-        .order("refreshed_at", { ascending: false })
-        .limit(1)
-        .single(),
-    ]);
+  const [
+    dailyCount,
+    weeklyCount,
+    monthlyCount,
+    msgDailyCount,
+    emailDailyCount,
+    lastSync,
+  ] = await Promise.all([
+    sb
+      .from("exo_gold_daily_summary")
+      .select("*", { count: "exact", head: true }),
+    sb
+      .from("exo_gold_weekly_summary")
+      .select("*", { count: "exact", head: true }),
+    sb
+      .from("exo_gold_monthly_summary")
+      .select("*", { count: "exact", head: true }),
+    sb
+      .from("exo_gold_messages_daily")
+      .select("*", { count: "exact", head: true }),
+    sb.from("exo_gold_email_daily").select("*", { count: "exact", head: true }),
+    sb
+      .from("exo_gold_sync_log")
+      .select("refreshed_at")
+      .eq("status", "success")
+      .order("refreshed_at", { ascending: false })
+      .limit(1)
+      .single(),
+  ]);
 
   return {
     daily: dailyCount.count || 0,
     weekly: weeklyCount.count || 0,
     monthly: monthlyCount.count || 0,
     messagesDaily: msgDailyCount.count || 0,
+    emailDaily: emailDailyCount.count || 0,
     lastRefresh: lastSync.data?.refreshed_at || null,
   };
 }
