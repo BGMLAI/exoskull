@@ -209,7 +209,7 @@ function getModelOptions(model?: SkillGeneratorModel): {
       // Codex not yet in ModelId union — cast until added
       return { forceModel: "openai-codex" as ModelId };
     case "gemini-flash":
-      return { forceModel: "gemini-1.5-flash" };
+      return { forceModel: "gemini-2.5-flash" };
     case "claude-sonnet":
       return { forceModel: "claude-sonnet-4-5" };
     case "auto":

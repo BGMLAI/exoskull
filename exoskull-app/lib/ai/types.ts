@@ -2,7 +2,7 @@
  * Multi-Model AI Router - Type Definitions
  *
  * Tier System:
- * - Tier 1: Gemini 1.5 Flash - Ultra-cheap for simple tasks
+ * - Tier 1: Gemini 2.0 Flash-Lite - Ultra-cheap for simple tasks
  * - Tier 2: Claude 3.5 Haiku - Pattern detection, summarization
  * - Tier 3: Kimi K2.5 - Complex reasoning (placeholder)
  * - Tier 4: Claude Opus 4.5 - Meta-coordination, crisis
@@ -14,7 +14,7 @@ export type ModelTier = 1 | 2 | 3 | 4;
 export type ModelProvider = "openai" | "anthropic" | "gemini" | "kimi";
 
 export type ModelId =
-  | "gemini-1.5-flash" // Tier 1
+  | "gemini-2.5-flash" // Tier 1
   | "claude-3-5-haiku" // Tier 2
   | "claude-sonnet-4-5" // Tier 3
   | "kimi-k2.5" // Tier 3

@@ -9,11 +9,11 @@ import { ModelConfig, ModelId, ModelTier, TaskCategory } from "./types";
 
 // Model configurations
 export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
-  "gemini-1.5-flash": {
-    id: "gemini-1.5-flash",
+  "gemini-2.5-flash": {
+    id: "gemini-2.5-flash",
     provider: "gemini",
     tier: 1,
-    displayName: "Gemini 1.5 Flash",
+    displayName: "Gemini 2.5 Flash",
     inputCostPer1M: 0.075, // $0.075 per 1M input tokens
     outputCostPer1M: 0.3, // $0.30 per 1M output tokens
     maxTokens: 8192,
@@ -68,7 +68,7 @@ export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
 
 // Tier to model mapping (order = priority within tier)
 export const TIER_MODELS: Record<ModelTier, ModelId[]> = {
-  1: ["gemini-1.5-flash"],
+  1: ["gemini-2.5-flash"],
   2: ["claude-3-5-haiku"],
   3: ["claude-sonnet-4-5", "kimi-k2.5"],
   4: ["claude-opus-4-5", "claude-sonnet-4-5"],
