@@ -36,7 +36,7 @@ async function handler(req: NextRequest) {
     const { data: tenants } = await supabase
       .from("exo_tenants")
       .select("id")
-      .eq("status", "active");
+      .in("subscription_status", ["active", "trial"]);
 
     if (!tenants || tenants.length === 0) {
       return NextResponse.json({

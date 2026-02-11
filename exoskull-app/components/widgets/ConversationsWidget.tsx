@@ -1,19 +1,24 @@
-'use client'
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { MessageSquare, Clock, TrendingUp } from 'lucide-react'
-import { ConversationStats, DataPoint } from '@/lib/dashboard/types'
-import Link from 'next/link'
-import { AreaChartWrapper } from '@/components/charts/AreaChartWrapper'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MessageSquare, Clock, TrendingUp } from "lucide-react";
+import { ConversationStats, DataPoint } from "@/lib/dashboard/types";
+import Link from "next/link";
+import { AreaChartWrapper } from "@/components/charts/AreaChartWrapper";
 
 interface ConversationsWidgetProps {
-  stats: ConversationStats
-  series?: DataPoint[]
-  lastUpdated?: string | null
-  loading?: boolean
+  stats: ConversationStats;
+  series?: DataPoint[];
+  lastUpdated?: string | null;
+  loading?: boolean;
 }
 
-export function ConversationsWidget({ stats, series = [], lastUpdated, loading }: ConversationsWidgetProps) {
+export function ConversationsWidget({
+  stats,
+  series = [],
+  lastUpdated,
+  loading,
+}: ConversationsWidgetProps) {
   if (loading) {
     return (
       <Card>
@@ -30,11 +35,11 @@ export function ConversationsWidget({ stats, series = [], lastUpdated, loading }
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
-  const avgMinutes = Math.round(stats.avgDuration / 60)
-  const hasSeries = series.some((point) => point.value > 0)
+  const avgMinutes = Math.round(stats.avgDuration / 60);
+  const hasSeries = series.some((point) => point.value > 0);
 
   return (
     <Card>
@@ -51,7 +56,7 @@ export function ConversationsWidget({ stats, series = [], lastUpdated, loading }
               </span>
             )}
             <Link
-              href="/dashboard/voice"
+              href="/dashboard/chat"
               className="text-sm font-normal text-muted-foreground hover:text-foreground"
             >
               Rozpocznij rozmowe
@@ -88,10 +93,13 @@ export function ConversationsWidget({ stats, series = [], lastUpdated, loading }
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function formatTime(dateStr: string): string {
-  const date = new Date(dateStr)
-  return date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
+  const date = new Date(dateStr);
+  return date.toLocaleTimeString("pl-PL", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

@@ -107,7 +107,7 @@ async function getActiveTenants(): Promise<
   const { data, error } = await supabase
     .from("exo_tenants")
     .select("id, phone, name, timezone, schedule_settings")
-    .eq("status", "active")
+    .in("subscription_status", ["active", "trial"])
     .not("phone", "is", null);
 
   if (error) {

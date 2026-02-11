@@ -74,7 +74,7 @@ async function handler(req: NextRequest) {
     const { data: activeTenants } = await supabase
       .from("exo_tenants")
       .select("id")
-      .eq("subscription_status", "active")
+      .in("subscription_status", ["active", "trial"])
       .limit(100);
 
     let throttleAdjusted = 0;

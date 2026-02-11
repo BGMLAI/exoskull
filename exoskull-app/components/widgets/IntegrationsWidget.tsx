@@ -244,7 +244,7 @@ export function IntegrationsWidget({
         })}
 
         <a
-          href="/dashboard/marketplace"
+          href="/dashboard/mods"
           className="block text-center text-sm text-muted-foreground hover:text-foreground pt-2"
         >
           Zobacz wszystkie integracje →

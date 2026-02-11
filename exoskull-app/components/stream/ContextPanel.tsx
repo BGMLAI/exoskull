@@ -43,27 +43,35 @@ export function ContextPanel({ ttsEnabled, onToggleTTS }: ContextPanelProps) {
       .catch(() => {});
 
     // Fetch task counts
-    fetch("/api/canvas/tasks")
+    fetch("/api/canvas/data/tasks")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data?.tasks) {
-          const total = data.tasks.length;
-          const completed = data.tasks.filter(
-            (t: { status: string }) => t.status === "completed",
-          ).length;
-          setTasks({ total, completed });
+        if (data?.stats) {
+          setTasks({
+            total: data.stats.total ?? 0,
+            completed: data.stats.done ?? 0,
+          });
         }
       })
       .catch(() => {});
 
     // Fetch emotion trend (last 7 days)
-    fetch("/api/canvas/data/emotions")
+    fetch("/api/emotion/trends?days=7")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data?.trend) {
+        if (data?.data && Array.isArray(data.data) && data.data.length > 0) {
+          const days = data.data as {
+            avg_valence?: number;
+            signal_count?: number;
+          }[];
+          const sumValence = days.reduce((s, d) => s + (d.avg_valence ?? 0), 0);
+          const totalSignals = days.reduce(
+            (s, d) => s + (d.signal_count ?? 0),
+            0,
+          );
           setEmotions({
-            avg_valence: data.trend.avg_valence ?? 0,
-            total_signals: data.trend.total_signals ?? 0,
+            avg_valence: sumValence / days.length,
+            total_signals: totalSignals,
           });
         }
       })

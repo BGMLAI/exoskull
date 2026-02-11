@@ -24,7 +24,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   const { data: tenants, error: tenantsErr } = await supabase
     .from("exo_tenants")
     .select("id")
-    .eq("subscription_status", "active");
+    .in("subscription_status", ["active", "trial"]);
 
   if (tenantsErr) {
     console.error("[InsightPush] Failed to fetch tenants:", {
