@@ -558,7 +558,7 @@ export default function SettingsPage() {
               onClick={async () => {
                 setExportingData(true);
                 try {
-                  const res = await fetch("/api/user/export");
+                  const res = await fetch("/api/user/my-data");
                   if (res.ok) {
                     const blob = await res.blob();
                     const url = URL.createObjectURL(blob);
