@@ -9,9 +9,12 @@
  * - Processes with Claude via processUserMessage()
  * - Sends TEXT back to Twilio (→ ElevenLabs TTS → audio to caller)
  *
- * Run: npx tsx server/voice-ws.ts
+ * Run: npx tsx -r tsconfig-paths/register server/voice-ws.ts
  * Deploy: Railway / Render / any Node.js host
  */
+
+// Register tsconfig paths FIRST so @/ aliases resolve in all transitive imports
+import "tsconfig-paths/register";
 
 import dotenv from "dotenv";
 // Load .env.local (Next.js convention) then .env as fallback
@@ -27,9 +30,9 @@ import {
   processUserMessage,
   generateGreeting,
   findTenantByPhone,
-} from "@/lib/voice/conversation-handler";
-import type { VoiceSession } from "@/lib/voice/conversation-handler";
-import { logger } from "@/lib/logger";
+} from "../lib/voice/conversation-handler";
+import type { VoiceSession } from "../lib/voice/conversation-handler";
+import { logger } from "../lib/logger";
 
 // ============================================================================
 // CONFIGURATION
