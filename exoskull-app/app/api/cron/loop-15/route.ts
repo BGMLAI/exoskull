@@ -36,21 +36,32 @@ export const maxDuration = 60;
 
 const TIMEOUT_MS = 50_000; // Leave 10s buffer under Vercel 60s
 
-const EVAL_SYSTEM_PROMPT = `You are the IORS loop evaluator. Based on the tenant's current state, decide if any proactive action is needed.
+const EVAL_SYSTEM_PROMPT = `You are the IORS autonomous evaluator. You are an ACTIVE agent, not a passive monitor.
+Your job: find things to DO for the user, then DO them.
 
 Respond with ONLY a JSON object (no markdown):
 {
   "action": "none" | "proactive" | "observation",
-  "reason": "brief explanation",
-  "message": "optional message to send to user (in their language)"
+  "reason": "what you noticed and why you're acting",
+  "message": "message to send to user (in their language, required if proactive)"
 }
 
+Evaluation priorities (check in order):
+1. Overdue tasks → remind + offer to reschedule
+2. Undelivered insights → send immediately
+3. Pending interventions → notify about them
+4. No recent contact (>6h during waking hours) → warm check-in
+5. Goals behind schedule → suggest corrective actions
+6. Patterns detected → share insights proactively
+
 Rules:
-- "none": nothing to do, user is fine
-- "proactive": send a message (insight, reminder, suggestion)
+- "proactive": send a message (ALWAYS include message field)
 - "observation": run deeper analysis (MAPE-K cycle)
-- Keep messages natural, warm, and concise
-- Respect that user may be busy — don't over-communicate`;
+- "none": ONLY if genuinely nothing to do
+- ALWAYS prefer ACTION over silence. If in doubt — communicate.
+- User WANTS you to be proactive. They configured you to ACT.
+- Keep messages natural, warm, concise — like a caring friend
+- During sleep hours (23:00-07:00) → always "none"`;
 
 /**
  * Get current hour in tenant's timezone.
@@ -97,13 +108,24 @@ async function handler(req: NextRequest) {
         // 2b. Quick state check (DB only)
         const state = await quickStateCheck(tenant.tenant_id);
 
-        // 2c. AI evaluation (only if budget allows AND state check found something)
+        // 2c. Skip if sleeping (23:00-07:00 in tenant's timezone)
+        if (currentHour >= 23 || currentHour < 7) {
+          await updateTenantLoopState(tenant.tenant_id, activityClass, 0);
+          evaluationResults.push({
+            tenantId: tenant.tenant_id,
+            class: activityClass,
+            action: "sleep",
+          });
+          evaluated++;
+          continue;
+        }
+
+        // 2d. AI evaluation (always run during waking hours — budget + circuit breaker gate only)
         let action = "none";
         let aiCostCents = 0;
 
         const breaker = CircuitBreaker.for(tenant.tenant_id, "loop15_haiku");
         if (
-          state.needsEval &&
           tenant.daily_ai_spent_cents < tenant.daily_ai_budget_cents &&
           breaker.isAllowed()
         ) {

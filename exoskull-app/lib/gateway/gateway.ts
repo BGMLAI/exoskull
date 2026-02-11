@@ -146,7 +146,7 @@ async function autoRegisterTenant(
       {
         tenant_id: newTenantId,
         timezone: "Europe/Warsaw",
-        next_eval_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        next_eval_at: new Date().toISOString(),
       },
       { onConflict: "tenant_id" },
     );

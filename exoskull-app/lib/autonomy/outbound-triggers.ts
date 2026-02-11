@@ -35,7 +35,7 @@ export async function canSendProactive(
     });
 
     const count = (data as number) || 0;
-    return count < 2; // Max 2 proactive per day (non-crisis)
+    return count < 8; // Max 8 proactive per day (morning + evening + 6 ad-hoc)
   } catch (error) {
     console.error("[OutboundTriggers] Rate limit check failed:", error);
     return false; // Fail closed — don't send if unsure

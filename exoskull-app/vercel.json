@@ -139,6 +139,18 @@
     {
       "path": "/api/cron/loop-daily",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/morning-briefing",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/evening-reflection",
+      "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/impulse",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

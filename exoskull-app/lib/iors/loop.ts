@@ -477,7 +477,7 @@ export async function backfillMissingConfigs(): Promise<number> {
     const { error } = await supabase.from("exo_tenant_loop_config").insert({
       tenant_id: tenant.id,
       timezone: (tenant as { timezone?: string }).timezone || "Europe/Warsaw",
-      next_eval_at: new Date(Date.now() + 60_000).toISOString(),
+      next_eval_at: new Date().toISOString(),
     });
 
     if (!error) backfilled++;

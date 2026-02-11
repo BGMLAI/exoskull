@@ -207,14 +207,7 @@ async function getHandler(request: NextRequest) {
           continue;
         }
 
-        // Check if user had conversations today
-        const hasConversations = await hasTodayConversations(tenant.id);
-        if (!hasConversations) {
-          results.skipped_no_conversations++;
-          continue;
-        }
-
-        // Generate summary
+        // Generate summary (even without conversations — proactive daily report)
         const summary = await createDailySummary(tenant.id);
         if (!summary) {
           results.errors.push(`${tenant.id}: Failed to create summary`);
