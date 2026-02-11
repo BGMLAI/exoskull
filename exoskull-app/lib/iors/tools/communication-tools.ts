@@ -112,7 +112,7 @@ export const communicationTools: ToolDefinition[] = [
 
         const result = await makeOutboundCall({
           to: phoneNumber,
-          webhookUrl: `${APP_URL}/api/twilio/voice/delegate?session_id=${delegateSession.id}`,
+          webhookUrl: `${APP_URL}/api/twilio/voice/delegate?action=start&session_id=${delegateSession.id}`,
           statusCallbackUrl: `${APP_URL}/api/twilio/status`,
           timeout: 45,
         });
@@ -124,8 +124,15 @@ export const communicationTools: ToolDefinition[] = [
 
         return `Dzwonię pod ${input.phone_number}. Powiadomię Cię jak skończę.`;
       } catch (callError) {
-        console.error("[CommunicationTools] make_call error:", callError);
-        return `Nie udało się zadzwonić pod ${input.phone_number}. Spróbuj później.`;
+        const errMsg =
+          callError instanceof Error ? callError.message : String(callError);
+        console.error("[CommunicationTools] make_call error:", {
+          error: errMsg,
+          phoneNumber,
+          purpose,
+          tenantId,
+        });
+        return `Nie udało się zadzwonić pod ${input.phone_number}: ${errMsg}`;
       }
     },
   },
