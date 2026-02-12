@@ -252,12 +252,17 @@ async function observe(tenantId: string): Promise<RalphObservation> {
       .order("created_at", { ascending: false })
       .limit(5),
 
-    // Detected gaps
+    // Detected gaps — infer from proactive_log (no dedicated gap table)
     supabase
-      .from("exo_gap_detections")
-      .select("id, gap_type, description")
+      .from("exo_proactive_log")
+      .select("id, trigger_type, metadata, created_at")
       .eq("tenant_id", tenantId)
-      .eq("status", "active")
+      .like("trigger_type", "auto_build:%")
+      .gte(
+        "created_at",
+        new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+      )
+      .order("created_at", { ascending: false })
       .limit(10),
 
     // Unused apps (no usage in 14+ days)
@@ -351,8 +356,11 @@ async function observe(tenantId: string): Promise<RalphObservation> {
     })),
     detectedGaps: (gapsResult.data || []).map((g) => ({
       id: g.id,
-      gap_type: g.gap_type,
-      description: g.description,
+      gap_type:
+        (g.trigger_type as string)?.replace("auto_build:", "") || "unknown",
+      description:
+        ((g.metadata as Record<string, unknown>)?.description as string) ||
+        (g.trigger_type as string),
     })),
     unusedApps,
     userPriorities,
