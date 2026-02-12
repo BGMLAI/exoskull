@@ -19,7 +19,7 @@ import { buildDynamicContext, buildVoiceContext } from "./dynamic-context";
 import {
   appendMessage,
   getThreadContext,
-  getConversationalMessages,
+  getVoiceThreadContext,
 } from "../unified-thread";
 import { analyzeEmotion } from "@/lib/emotion";
 import { detectCrisis } from "@/lib/emotion/crisis-detector";
@@ -401,7 +401,7 @@ export async function processUserMessage(
           })
         : analyzeEmotion(userMessage),
       isVoiceChannel
-        ? getConversationalMessages(session.tenantId, 20)
+        ? getVoiceThreadContext(session.tenantId, 20)
             .then((msgs) =>
               msgs
                 .filter((m) => m.role === "user" || m.role === "assistant")
@@ -410,7 +410,7 @@ export async function processUserMessage(
                     m.channel === "voice"
                       ? "[Voice] "
                       : m.channel === "web_chat"
-                        ? "[Web Chat] "
+                        ? "[Chat] "
                         : `[${m.channel}] `;
                   return {
                     role: m.role as "user" | "assistant",
@@ -420,7 +420,7 @@ export async function processUserMessage(
             )
             .catch((err) => {
               console.error(
-                "[ConversationHandler] Conversational context failed:",
+                "[ConversationHandler] Voice thread context failed:",
                 err,
               );
               return [] as { role: "user" | "assistant"; content: string }[];

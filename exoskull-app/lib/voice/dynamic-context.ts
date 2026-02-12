@@ -305,21 +305,23 @@ export async function buildVoiceContext(
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
-  // Only 2 queries (vs 8 in full context)
-  const [tenantResult, taskResult] = await Promise.allSettled([
-    supabase
-      .from("exo_tenants")
-      .select(
-        "name, preferred_name, communication_style, iors_personality, iors_name, iors_custom_instructions, iors_ai_config",
-      )
-      .eq("id", tenantId)
-      .single(),
-    supabase
-      .from("exo_tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending"),
-  ]);
+  // 3 queries (vs 8 in full context) — added thread summary for cross-channel awareness
+  const [tenantResult, taskResult, threadSummaryResult] =
+    await Promise.allSettled([
+      supabase
+        .from("exo_tenants")
+        .select(
+          "name, preferred_name, communication_style, iors_personality, iors_name, iors_custom_instructions, iors_ai_config",
+        )
+        .eq("id", tenantId)
+        .single(),
+      supabase
+        .from("exo_tasks")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("status", "pending"),
+      getThreadSummary(tenantId),
+    ]);
 
   const tenant =
     tenantResult.status === "fulfilled" ? tenantResult.value.data : null;
@@ -345,7 +347,18 @@ export async function buildVoiceContext(
   }
 
   context += `- Zadania: ${taskCount || 0}\n`;
+
+  // Thread summary — cross-channel awareness (what happened in chat, SMS, etc.)
+  const threadSummary =
+    threadSummaryResult.status === "fulfilled"
+      ? threadSummaryResult.value
+      : null;
+  if (threadSummary && threadSummary !== "Brak historii rozmow.") {
+    context += `- Historia: ${threadSummary}\n`;
+  }
+
   context += `- Kanal: ROZMOWA GLOSOWA. Odpowiadaj KROTKO (1-2 zdania). Unikaj list, markdown, emoji.\n`;
+  context += `- WAZNE: Masz kontekst z WSZYSTKICH kanalow (chat, SMS, email). Odwoluj sie do nich naturalnie.\n`;
 
   // Custom instructions (highest priority)
   const customInstructions = (tenant as Record<string, unknown>)

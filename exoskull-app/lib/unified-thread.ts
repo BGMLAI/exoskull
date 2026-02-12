@@ -370,6 +370,69 @@ function enforceAlternatingRoles(
 }
 
 /**
+ * Build voice-optimized thread context with cross-channel mixing.
+ *
+ * Problem: getConversationalMessages(20) returns the most recent 20 messages,
+ * which may all be from voice calls, pushing web_chat messages out of context.
+ *
+ * Solution: Fetch recent conversational messages AND recent non-voice messages
+ * separately, merge them, deduplicate, and return a balanced mix.
+ * This ensures voice calls always have web_chat/SMS/email context.
+ */
+export async function getVoiceThreadContext(
+  tenantId: string,
+  limit: number = 20,
+): Promise<UnifiedMessage[]> {
+  const supabase = getServiceSupabase();
+
+  // Two parallel queries:
+  // 1. Recent conversational messages (any channel) — current voice context
+  // 2. Recent non-voice messages — cross-channel context the voice might miss
+  const [convResult, crossChannelResult] = await Promise.allSettled([
+    getConversationalMessages(tenantId, limit),
+    supabase
+      .from("exo_unified_messages")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .neq("channel", "voice")
+      .in("role", ["user", "assistant"])
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+
+  const conversational =
+    convResult.status === "fulfilled" ? convResult.value : [];
+  const crossChannel =
+    crossChannelResult.status === "fulfilled"
+      ? (crossChannelResult.value.data || []).reverse()
+      : [];
+
+  // If conversational messages already include non-voice channels, we're fine
+  const hasNonVoice = conversational.some((m) => m.channel !== "voice");
+  if (hasNonVoice || crossChannel.length === 0) {
+    return conversational.slice(-limit);
+  }
+
+  // Merge: deduplicate by ID, sort chronologically, take last N
+  const seen = new Set<string>();
+  const merged: UnifiedMessage[] = [];
+
+  for (const msg of [...crossChannel, ...conversational]) {
+    if (!seen.has(msg.id)) {
+      seen.add(msg.id);
+      merged.push(msg);
+    }
+  }
+
+  merged.sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
+
+  return merged.slice(-limit);
+}
+
+/**
  * Get a summary string of recent activity across channels.
  * Useful for system prompt context injection.
  */
