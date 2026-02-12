@@ -96,6 +96,52 @@ const IORS_TOOLS: Anthropic.Tool[] = IORS_TOOLS_RAW.map((tool, i, arr) =>
 );
 
 // ============================================================================
+// VOICE-SPECIFIC TOOL SUBSET (~15 tools vs 51 = faster prompt processing)
+// ============================================================================
+
+const VOICE_ESSENTIAL_TOOL_NAMES = new Set([
+  // Tasks
+  "add_task",
+  "complete_task",
+  "list_tasks",
+  // Memory & Context
+  "search_memory",
+  "get_daily_summary",
+  "correct_daily_summary",
+  // Goals
+  "define_goal",
+  "log_goal_progress",
+  "check_goals",
+  // Planning
+  "plan_action",
+  // Knowledge
+  "search_knowledge",
+  // Communication
+  "send_sms",
+  "send_email",
+  // Mods / Apps (data logging)
+  "log_mod_data",
+  "get_mod_data",
+  // Emotion
+  "tau_assess",
+  // Email
+  "search_emails",
+  "email_summary",
+]);
+
+const VOICE_TOOLS_RAW = IORS_TOOLS_RAW.filter((t) =>
+  VOICE_ESSENTIAL_TOOL_NAMES.has(t.name),
+);
+const VOICE_TOOLS: Anthropic.Tool[] = VOICE_TOOLS_RAW.map((tool, i, arr) =>
+  i === arr.length - 1
+    ? { ...tool, cache_control: { type: "ephemeral" as const } }
+    : tool,
+);
+
+/** Haiku model for voice — 3-5x faster than Sonnet */
+const VOICE_MODEL = "claude-3-5-haiku-20241022";
+
+// ============================================================================
 // SESSION MANAGEMENT
 // ============================================================================
 
@@ -300,6 +346,10 @@ export async function processUserMessage(
     skipThreadAppend?: boolean;
     /** Optional callback for real-time processing events (SSE stream) */
     callback?: ProcessingCallback;
+    /** Channel type — "voice" uses Haiku + reduced tools for speed */
+    channel?: "voice" | "web_chat";
+    /** Streaming callback — when set, text is streamed token-by-token via Claude streaming API */
+    onTextDelta?: (delta: string) => void;
   },
 ): Promise<ConversationResult> {
   let anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
@@ -333,8 +383,12 @@ export async function processUserMessage(
   const systemPromptOverride = dynamicContextResult.systemPromptOverride;
   const aiConfig = dynamicContextResult.aiConfig;
   const userTemperature = aiConfig?.temperature ?? 0.7;
+  const isVoice = options?.channel === "voice";
   const chatModelPref = aiConfig?.model_preferences?.chat ?? "auto";
-  const resolvedModel = CHAT_MODEL_MAP[chatModelPref] || DEFAULT_CLAUDE_MODEL;
+  const resolvedModel = isVoice
+    ? VOICE_MODEL // Haiku for voice — 3-5x faster
+    : CHAT_MODEL_MAP[chatModelPref] || DEFAULT_CLAUDE_MODEL;
+  const activeTools = isVoice ? VOICE_TOOLS : IORS_TOOLS;
 
   // Override Anthropic client with tenant's own key if configured
   const tenantAnthropicKey = aiConfig?.providers?.anthropic?.api_key;
@@ -523,25 +577,51 @@ export async function processUserMessage(
 
     // First API call (max_tokens low for voice = short, fast responses)
     // system + tools use cache_control for ~6K cached tokens (90% input savings)
+    const effectiveMaxTokens = isVoice
+      ? 150
+      : session.maxTokens || maxTokensOverride || 200;
+
     logger.info("[ConversationHandler] Calling Claude API:", {
       model: resolvedModel,
       temperature: userTemperature,
-      maxTokens: session.maxTokens || maxTokensOverride || 200,
+      maxTokens: effectiveMaxTokens,
       messageCount: messages.length,
+      threadMessages: threadMessages.length,
       threadFiltered:
         rawThreadMessages.length - threadMessages.length + " poisoned removed",
       tenantId: session.tenantId,
       modelPreference: chatModelPref,
+      channel: options?.channel || "web_chat",
+      toolCount: activeTools.length,
       hasPromptOverride: !!systemPromptOverride,
+      streaming: !!options?.onTextDelta,
     });
 
+    // ── STREAMING PATH (voice with onTextDelta) ──
+    if (options?.onTextDelta) {
+      return await processWithStreaming(
+        anthropic,
+        resolvedModel,
+        effectiveMaxTokens,
+        userTemperature,
+        systemBlocks,
+        messages,
+        activeTools,
+        session,
+        emotionState,
+        options.onTextDelta,
+        options.callback,
+      );
+    }
+
+    // ── NON-STREAMING PATH (web chat, legacy voice) ──
     const response = await anthropic.messages.create({
       model: resolvedModel,
-      max_tokens: session.maxTokens || maxTokensOverride || 200,
+      max_tokens: effectiveMaxTokens,
       temperature: userTemperature,
       system: systemBlocks,
       messages,
-      tools: IORS_TOOLS,
+      tools: activeTools,
     });
 
     logger.info("[ConversationHandler] First response:", {
@@ -626,7 +706,7 @@ export async function processUserMessage(
           temperature: userTemperature,
           system: systemBlocks,
           messages: currentMessages,
-          tools: IORS_TOOLS,
+          tools: activeTools,
         });
 
         const newToolBlocks = followUp.content.filter(
@@ -790,7 +870,7 @@ export async function processUserMessage(
               model: aiConfig?.providers?.openai?.model || "gpt-4o",
               systemBlocks,
               messages,
-              tools: IORS_TOOLS,
+              tools: activeTools,
               maxTokens: session.maxTokens || maxTokensOverride || 200,
               temperature: userTemperature,
             },
@@ -842,6 +922,141 @@ export async function processUserMessage(
       shouldEndCall: false,
     };
   }
+}
+
+// ============================================================================
+// STREAMING VOICE PIPELINE
+// ============================================================================
+
+/**
+ * Process user message with Claude streaming API.
+ * Streams text deltas via onTextDelta callback (ConversationRelay).
+ * Handles tool use: executes tools, then streams follow-up response.
+ */
+async function processWithStreaming(
+  anthropic: Anthropic,
+  model: string,
+  maxTokens: number,
+  temperature: number,
+  systemBlocks: Anthropic.TextBlockParam[],
+  messages: Anthropic.MessageParam[],
+  tools: Anthropic.Tool[],
+  session: VoiceSession,
+  emotionState: import("@/lib/emotion/types").EmotionState | undefined,
+  onTextDelta: (delta: string) => void,
+  callback?: ProcessingCallback,
+): Promise<ConversationResult> {
+  const toolsUsed: string[] = [];
+  let currentMessages = [...messages];
+  const MAX_ROUNDS = 3;
+
+  for (let round = 0; round <= MAX_ROUNDS; round++) {
+    const stream = anthropic.messages.stream({
+      model,
+      max_tokens: maxTokens,
+      temperature,
+      system: systemBlocks,
+      messages: currentMessages,
+      tools,
+    });
+
+    let streamedText = "";
+
+    // Stream text deltas to caller in real-time
+    stream.on("text", (delta) => {
+      streamedText += delta;
+      onTextDelta(delta);
+    });
+
+    const finalMessage = await stream.finalMessage();
+
+    // Check for tool use
+    const toolUseBlocks = finalMessage.content.filter(
+      (c): c is Anthropic.ToolUseBlock => c.type === "tool_use",
+    );
+
+    if (toolUseBlocks.length === 0) {
+      // No tools — text was streamed, done
+      callback?.onThinkingStep?.("Generuję odpowiedź", "done");
+
+      const text = streamedText.trim() || "Przepraszam, nie zrozumiałem.";
+      return {
+        text,
+        toolsUsed,
+        shouldEndCall: false,
+        emotion: emotionState,
+      };
+    }
+
+    // Tool use detected — execute tools
+    callback?.onThinkingStep?.("Generuję odpowiedź", "done");
+
+    const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+      toolUseBlocks.map(async (toolUse) => {
+        callback?.onToolStart?.(toolUse.name);
+        const toolStart = Date.now();
+        const result = await executeTool(
+          toolUse.name,
+          toolUse.input as Record<string, unknown>,
+          session.tenantId,
+        );
+        toolsUsed.push(toolUse.name);
+        const toolDuration = Date.now() - toolStart;
+        const isError =
+          typeof result === "string" &&
+          (result.startsWith("Error:") || result.startsWith("Blad:"));
+        callback?.onToolEnd?.(toolUse.name, toolDuration, {
+          success: !isError,
+          resultSummary:
+            typeof result === "string" ? result.slice(0, 120) : undefined,
+        });
+        return {
+          type: "tool_result" as const,
+          tool_use_id: toolUse.id,
+          content: result,
+        };
+      }),
+    );
+
+    // Log tool activity
+    logActivities(
+      toolUseBlocks.map((toolUse) => ({
+        tenantId: session.tenantId,
+        actionType: "tool_call" as const,
+        actionName: toolUse.name,
+        description: `Narzedzie: ${toolUse.name}`,
+        source: "conversation",
+        metadata: {
+          toolInput: Object.keys(toolUse.input as Record<string, unknown>),
+        },
+      })),
+    );
+
+    // Continue with tool results for next round
+    currentMessages = [
+      ...currentMessages,
+      { role: "assistant" as const, content: finalMessage.content },
+      { role: "user" as const, content: toolResults },
+    ];
+
+    logger.info("[ConversationHandler] Streaming tool round:", {
+      round,
+      tools: toolUseBlocks.map((t) => t.name),
+      tenantId: session.tenantId,
+    });
+  }
+
+  // Max rounds exceeded — return what we have
+  const fallbackText =
+    toolsUsed.length > 0
+      ? `Gotowe. Użyłem: ${toolsUsed.join(", ")}.`
+      : "Przepraszam, nie mogłem przetworzyć tej wiadomości.";
+  return {
+    text: fallbackText,
+    toolsUsed,
+    shouldEndCall: false,
+    emotion: emotionState,
+  };
 }
 
 // ============================================================================

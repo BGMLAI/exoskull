@@ -262,8 +262,34 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
       wsSession.tenantId,
     );
 
-    // Process with Claude + tools + emotion (reuse entire existing pipeline)
-    const result = await processUserMessage(voiceSession, userText);
+    // Stream Claude response token-by-token via ConversationRelay.
+    // Each token goes to Twilio → ElevenLabs TTS immediately.
+    // User hears first words within ~0.5-1s instead of waiting 3-8s.
+    let streamedText = "";
+    let tokenCount = 0;
+
+    const result = await processUserMessage(voiceSession, userText, {
+      channel: "voice",
+      onTextDelta: (delta) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "text", token: delta, last: false }));
+          streamedText += delta;
+          tokenCount++;
+        }
+      },
+    });
+
+    // Send final empty token with last:true to flush ConversationRelay buffer
+    if (ws.readyState === WebSocket.OPEN) {
+      // If nothing was streamed (e.g., tool-only response), send the full text
+      if (tokenCount === 0 && result.text) {
+        ws.send(
+          JSON.stringify({ type: "text", token: result.text, last: true }),
+        );
+      } else {
+        ws.send(JSON.stringify({ type: "text", token: "", last: true }));
+      }
+    }
 
     const processingMs = Date.now() - startTime;
     logger.info("[VoiceWS] Response:", {
@@ -271,6 +297,8 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
       toolsUsed: result.toolsUsed,
       shouldEndCall: result.shouldEndCall,
       processingMs,
+      streamed: tokenCount > 0,
+      tokenCount,
     });
 
     // Update session in DB (unified thread + voice session)
@@ -284,24 +312,13 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
     wsSession.localMessages.push({ role: "user", content: userText });
     wsSession.localMessages.push({ role: "assistant", content: result.text });
 
-    // Send response to Twilio → ElevenLabs TTS → audio to caller
-    if (ws.readyState !== WebSocket.OPEN) {
-      logger.warn("[VoiceWS] WebSocket closed before response could be sent");
-      return;
-    }
-
-    if (result.shouldEndCall) {
-      // Send final text, then end the call
-      ws.send(JSON.stringify({ type: "text", token: result.text, last: true }));
-      // Small delay to let TTS start before ending
+    // Handle end-call
+    if (result.shouldEndCall && ws.readyState === WebSocket.OPEN) {
       setTimeout(() => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: "end" }));
         }
       }, 500);
-    } else {
-      // Normal response
-      ws.send(JSON.stringify({ type: "text", token: result.text, last: true }));
     }
   } catch (error) {
     console.error("[VoiceWS] Prompt processing error:", {
@@ -375,7 +392,7 @@ server.listen(PORT, () => {
 ║  Stack:                                          ║
 ║  STT:  Deepgram Nova (via ConversationRelay)     ║
 ║  TTS:  ElevenLabs (via ConversationRelay)        ║
-║  LLM:  Claude Sonnet 4 + 49 IORS tools          ║
+║  LLM:  Claude Haiku 3.5 + streaming + 18 tools  ║
 ║  EMO:  analyzeEmotion + crisis detection         ║
 ╚══════════════════════════════════════════════════╝
 `);
