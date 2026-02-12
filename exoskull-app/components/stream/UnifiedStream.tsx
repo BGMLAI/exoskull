@@ -71,6 +71,92 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
   const abortRef = useRef<AbortController | null>(null);
 
   // ---------------------------------------------------------------------------
+  // TTS (Text-to-Speech) — reads AI responses aloud
+  // ---------------------------------------------------------------------------
+
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const polishVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
+
+  // Load TTS preference
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("exoskull-tts-enabled");
+      if (stored !== null) setTtsEnabled(stored === "true");
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  // Find best Polish voice
+  useEffect(() => {
+    function pickVoice() {
+      const voices = window.speechSynthesis?.getVoices() || [];
+      const polish = voices.filter(
+        (v) => v.lang === "pl-PL" || v.lang.startsWith("pl"),
+      );
+      polishVoiceRef.current =
+        polish.find((v) => v.name.includes("Google")) ||
+        polish.find((v) => !v.localService) ||
+        polish[0] ||
+        null;
+    }
+    pickVoice();
+    window.speechSynthesis?.addEventListener("voiceschanged", pickVoice);
+    return () => {
+      window.speechSynthesis?.removeEventListener("voiceschanged", pickVoice);
+      window.speechSynthesis?.cancel();
+    };
+  }, []);
+
+  const speakText = useCallback(
+    (text: string) => {
+      if (!ttsEnabled || !window.speechSynthesis) return;
+      // Strip markdown formatting for cleaner speech
+      const clean = text
+        .replace(/\*\*([^*]+)\*\*/g, "$1")
+        .replace(/\*([^*]+)\*/g, "$1")
+        .replace(/#{1,6}\s/g, "")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/```[\s\S]*?```/g, "")
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/[-*] /g, "")
+        .trim();
+      if (!clean) return;
+
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(clean);
+      if (polishVoiceRef.current) utterance.voice = polishVoiceRef.current;
+      utterance.lang = "pl-PL";
+      utterance.rate = 1.1;
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    },
+    [ttsEnabled],
+  );
+
+  const toggleTTS = useCallback(() => {
+    if (isSpeaking) {
+      window.speechSynthesis?.cancel();
+      setIsSpeaking(false);
+    } else {
+      const next = !ttsEnabled;
+      setTtsEnabled(next);
+      try {
+        localStorage.setItem("exoskull-tts-enabled", String(next));
+      } catch {
+        /* noop */
+      }
+      if (!next) {
+        window.speechSynthesis?.cancel();
+        setIsSpeaking(false);
+      }
+    }
+  }, [isSpeaking, ttsEnabled]);
+
+  // ---------------------------------------------------------------------------
   // Scroll management
   // ---------------------------------------------------------------------------
 
@@ -292,6 +378,7 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
 
                 case "done":
                   finalizeAIMessage(aiEventId, data.fullText, data.toolsUsed);
+                  speakText(data.fullText);
                   break;
 
                 // Phase 2: thinking/tool events
@@ -412,6 +499,7 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
       updateThinkingSteps,
       setLoading,
       setConversationId,
+      speakText,
     ],
   );
 
@@ -607,6 +695,9 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
         }
         onFileUpload={handleFileUpload}
         isLoading={state.isLoading}
+        ttsEnabled={ttsEnabled}
+        isSpeaking={isSpeaking}
+        onToggleTTS={toggleTTS}
       />
     </div>
   );

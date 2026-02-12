@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+// TTS state/logic managed by UnifiedStream, VoiceInputBar receives controlled props
 import { Send, Mic, MicOff, Volume2, VolumeX, Paperclip } from "lucide-react";
 import { useDictation } from "@/lib/hooks/useDictation";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,10 @@ interface VoiceInputBarProps {
   onSendVoice: (transcript: string) => void;
   onFileUpload?: (file: File) => void;
   isLoading: boolean;
+  /** Controlled TTS state from UnifiedStream */
+  ttsEnabled?: boolean;
+  isSpeaking?: boolean;
+  onToggleTTS?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -28,14 +33,14 @@ export function VoiceInputBar({
   onSendVoice,
   onFileUpload,
   isLoading,
+  ttsEnabled = false,
+  isSpeaking = false,
+  onToggleTTS,
 }: VoiceInputBarProps) {
   const [input, setInput] = useState("");
-  const [ttsEnabled, setTtsEnabled] = useState(true);
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [dictationError, setDictationError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const polishVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
 
   // Dictation hook (MediaRecorder + Whisper)
   const { isListening, isSupported, interimTranscript, toggleListening } =
@@ -49,37 +54,6 @@ export function VoiceInputBar({
         setTimeout(() => setDictationError(null), 4000);
       },
     });
-
-  // TTS preference from localStorage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("exoskull-tts-enabled");
-      if (stored !== null) setTtsEnabled(stored === "true");
-    } catch {
-      /* noop */
-    }
-  }, []);
-
-  // Find best Polish voice
-  useEffect(() => {
-    function pickVoice() {
-      const voices = window.speechSynthesis?.getVoices() || [];
-      const polish = voices.filter(
-        (v) => v.lang === "pl-PL" || v.lang.startsWith("pl"),
-      );
-      polishVoiceRef.current =
-        polish.find((v) => v.name.includes("Google")) ||
-        polish.find((v) => !v.localService) ||
-        polish[0] ||
-        null;
-    }
-    pickVoice();
-    window.speechSynthesis?.addEventListener("voiceschanged", pickVoice);
-    return () => {
-      window.speechSynthesis?.removeEventListener("voiceschanged", pickVoice);
-      window.speechSynthesis?.cancel();
-    };
-  }, []);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -122,26 +96,6 @@ export function VoiceInputBar({
     },
     [onFileUpload],
   );
-
-  // TTS toggle
-  const toggleTTS = useCallback(() => {
-    if (isSpeaking) {
-      window.speechSynthesis?.cancel();
-      setIsSpeaking(false);
-    } else {
-      const next = !ttsEnabled;
-      setTtsEnabled(next);
-      try {
-        localStorage.setItem("exoskull-tts-enabled", String(next));
-      } catch {
-        /* noop */
-      }
-      if (!next) {
-        window.speechSynthesis?.cancel();
-        setIsSpeaking(false);
-      }
-    }
-  }, [isSpeaking, ttsEnabled]);
 
   // Voice recording waveform bars
   const WaveformBars = () => (
@@ -201,7 +155,7 @@ export function VoiceInputBar({
 
           {/* TTS toggle */}
           <button
-            onClick={toggleTTS}
+            onClick={onToggleTTS}
             className={cn(
               "p-2.5 rounded-full transition-colors shrink-0",
               isSpeaking
