@@ -4,6 +4,174 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-12] Knowledge System Fix + Chat Rzeka Unified Stream
+
+### Part A — Knowledge Fixes
+
+- **Fixed embedding search bug**: `JSON.stringify` was double-encoding vectors in RPC call, causing `search_knowledge` to return 0 results despite 84 documents
+- **Fixed SQL function**: `search_user_documents` now returns `original_name` instead of storage path
+- **Added XLSX extraction**: SheetJS (`xlsx`) extracts text from all spreadsheet sheets
+- **Added PPTX extraction**: JSZip parses slide XML, extracts `<a:t>` text content
+- **Added URL import**: Firecrawl v2 SDK (`scrape` method) with basic fetch fallback
+- **Added web search**: Tavily API — `search_web` + `fetch_webpage` IORS tools (53 total tools)
+- **Added reprocess-all endpoint**: `/api/knowledge/reprocess-all` for bulk re-processing
+
+### Part B — Chat Rzeka (Unified Stream)
+
+- **6 new StreamEvent types**: `channel_message`, `call_transcript`, `file_upload`, `third_party_action`, `agent_communication`, `knowledge_citation`
+- **6 new event components**: ChannelMessage (color-coded per channel), CallTranscript (collapsible), FileUploadEvent (status indicators), ThirdPartyAction (pill badges), AgentComm, KnowledgeCitation
+- **Gateway wiring**: History loading differentiates channel messages (WhatsApp=green, Telegram=sky, SMS=blue, Discord=indigo, etc.)
+- **Third-party tool actions**: SSE `tool_end` events map to visual service badges for 11 external services
+- **File upload from chat**: Presigned URL flow with live status updates (uploading -> processing -> ready)
+- **Input bar**: Paperclip button + drag-and-drop zone on entire chat area
+- **ProcessingCallback**: Enhanced with tool result metadata (`success`, `resultSummary`)
+
+### Files Changed
+
+- 6 new components in `components/stream/events/`
+- New: `lib/knowledge/url-processor.ts`, `lib/iors/tools/web-tools.ts`
+- New: `app/api/knowledge/import-url/route.ts`, `app/api/knowledge/reprocess-all/route.ts`
+- New: `supabase/migrations/20260223000001_fix_knowledge_search.sql`
+- Modified: `lib/knowledge/document-processor.ts`, `lib/stream/types.ts`, `lib/hooks/useStreamState.ts`
+- Modified: `components/stream/UnifiedStream.tsx`, `VoiceInputBar.tsx`, `StreamEventRouter.tsx`
+- Modified: `lib/voice/conversation-handler.ts`, `app/api/chat/stream/route.ts`
+- Added deps: `xlsx`, `jszip`, `@mendable/firecrawl-js`, `@tavily/core`
+
+### Env vars needed
+
+- `TAVILY_API_KEY` — web search (free tier: 1000/month)
+- `FIRECRAWL_API_KEY` — URL scraping (free tier: 500/month, optional — basic fetch fallback)
+
+### How to verify
+
+1. `npm run build` — passes
+2. After migration: `search_knowledge("Golde.pl")` should return results
+3. Upload .xlsx → chunks created → searchable
+4. Chat: send message → third-party tool badges appear in stream
+5. Chat: click paperclip or drag file → upload with live status
+
+---
+
+## [2026-02-12] ConversationRelay Voice Pipeline — Replace HTTP Gather with Real-Time WebSocket
+
+### Added — Real-Time Voice Pipeline via Twilio ConversationRelay
+
+**Problem:** Voice calls disconnected on empty speech (Gather timeout → end call), used robotic Polly.Maja TTS, had ~4s latency per turn (server-side TTS generation + upload).
+
+**Solution:** Replaced HTTP turn-by-turn Twilio Gather with real-time ConversationRelay WebSocket pipeline.
+
+**New architecture:**
+
+- **STT:** Deepgram Nova (via ConversationRelay) — replaces Twilio built-in Gather
+- **LLM:** Claude Sonnet 4 + 49 IORS tools + emotion analysis (unchanged)
+- **TTS:** ElevenLabs (via ConversationRelay, voice ID: 3kPofxWv5xLwBvMVraip) — replaces Polly.Maja/Cartesia
+- **Transport:** WebSocket (real-time) — replaces HTTP polling
+
+**Key fixes:**
+
+- Empty speech no longer disconnects call (ignored instead of ending)
+- Built-in interruption handling (user can speak mid-response)
+- Natural Polish voice (ElevenLabs) instead of robotic Polly.Maja
+- ~1-2s latency (text-only over WS) vs ~4s (server-side TTS + audio upload)
+
+### Files Created
+
+- `server/voice-ws.ts` — Standalone WebSocket server for ConversationRelay protocol (280 lines)
+- `railway.toml` — Railway deployment config
+- `nixpacks.toml` — Nixpacks start command override
+- `Procfile` — Process declaration for Railway
+
+### Files Modified
+
+- `lib/voice/twilio-client.ts` — Added `generateConversationRelayTwiML()` function
+- `app/api/twilio/voice/route.ts` — ConversationRelay mode when VOICE_WS_URL set, legacy Gather fallback
+- `lib/voice/system-prompt.ts` — Added "NATURALNY STYL MÓWIENIA" voice section
+- `lib/voice/conversation-handler.ts` — Added `emotion` field to ConversationResult
+- `lib/voice/index.ts` — New exports
+- `args/voice.yaml` — Dual transport config (conversation_relay + gather fallback)
+- `.env.example` — VOICE_WS_URL, VOICE_WS_PORT docs
+- `package.json` — Added ws, @types/ws, tsconfig-paths; voice-ws scripts
+
+### Deployment
+
+- **Vercel** (Next.js) — auto-deployed, serves TwiML webhook
+- **Railway** (WS server) — `exoskull-production.up.railway.app`, custom start: `npm run voice-ws`
+- **Feature flag:** `VOICE_WS_URL` env var enables ConversationRelay; unset = legacy Gather
+
+### How to verify
+
+1. Call +48732144112
+2. Voice should be ElevenLabs (natural Polish), not Polly.Maja
+3. Silence should NOT disconnect the call
+4. Interrupting mid-response should work
+5. Tool calls (e.g. "dodaj zadanie") still work
+6. Health check: `GET https://exoskull-production.up.railway.app/health`
+
+### Notes for future agents
+
+- Railway ignores railway.toml/Procfile/nixpacks.toml for GitHub-connected services — must set Custom Start Command in dashboard UI
+- `echo` adds trailing `\n` to Vercel env vars — use `printf` instead
+- voice-ws.ts uses `tsconfig-paths/register` for @/ alias resolution outside Next.js
+- ConversationRelay sends text with `last: true` (non-streaming V1); streaming can be added as V2
+
+### Commits
+
+- `44058b9` feat: implement ConversationRelay voice pipeline
+- `bc8e2ef` fix: resolve @/ path aliases for standalone voice-ws server
+- `d851e4f` fix: add railway.toml to run voice-ws server instead of next start
+- `470b4ec` fix: force Railway to run voice-ws via Procfile + nixpacks.toml
+
+---
+
+## [2026-02-11] Gemini Model Upgrade — 1.5-flash → 2.5-flash
+
+### Fixed — Tier 1 AI Router Broken (Model Deprecated)
+
+**Root cause:** Google removed `gemini-1.5-flash` entirely (404). Free tier also has `limit: 0` for `gemini-2.0-flash` and `gemini-2.0-flash-lite`. Only `gemini-2.5-flash` works on free tier.
+
+- Updated ModelId type, config, provider, and all direct references
+- Gemini 2.5 Flash is a thinking model — uses `thoughtsTokenCount` before generating output
+- Default `maxOutputTokens: 1024` is sufficient (10 tokens would be consumed by thinking alone)
+- Verified: API returns correct response with `candidatesTokenCount` field intact
+
+### Files Changed
+
+- `lib/ai/types.ts` — ModelId union type
+- `lib/ai/config.ts` — model config, display name, tier mapping
+- `lib/ai/providers/gemini-provider.ts` — provider implementation
+- `app/api/onboarding/extract/route.ts` — direct API call URL
+- `lib/skills/generator/skill-generator.ts` — forceModel reference
+
+---
+
+## [2026-02-11] Email Analysis System
+
+### Added — Multi-provider email sync + AI classification
+
+- 3 tables: `exo_email_accounts`, `exo_analyzed_emails`, `exo_email_sender_profiles`
+- Multi-provider: Gmail API (MIME), Outlook Graph, IMAP (imapflow)
+- Two-phase AI: classification + deep extraction — ALL Tier 1 Gemini Flash (~$0.008/day/100 emails)
+- Knowledge extraction: key_facts → RAG pipeline (`exo_document_chunks`)
+- Task generation: action_items → `exo_tasks` with dedup
+- 4 IORS tools: `search_emails`, `email_summary`, `email_follow_ups`, `email_sender_info`
+- Canvas widget `email_inbox` (#18), self-fetching wrapper
+- Data lake: Bronze `emails`, Silver `exo_silver_emails`, Gold `exo_gold_email_daily` view
+- CRONs: `/api/cron/email-sync` (15min) + `/api/cron/email-analyze` (5min)
+- IMAP passwords encrypted with AES-256-GCM (`lib/email/crypto.ts`)
+
+---
+
+## [2026-02-11] Knowledge Analysis Engine
+
+### Added — Automated knowledge base analysis with insights
+
+- Two modes: light (rule-based, $0) + deep (AI via Haiku, ~$0.01-0.05)
+- 17 parallel queries in collector, snapshot hash dedup, 7 action types
+- IORS tool `analyze_knowledge` (#47), widget `knowledge_insights` (#17)
+- `knowledge_analysis` handler in maintenance.ts (loop-daily)
+
+---
+
 ## [2026-02-09] Fix TTS Read-Aloud Not Working
 
 ### Fixed — Cartesia TTS Silent Failure
