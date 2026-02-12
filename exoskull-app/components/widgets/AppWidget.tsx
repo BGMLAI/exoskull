@@ -1,8 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Loader2, Star, Trash2 } from "lucide-react";
-import type { AppColumn, AppUiConfig, AppFormField } from "@/lib/apps/types";
+import { Plus, Loader2, Star } from "lucide-react";
+import type {
+  AppColumn,
+  AppUiConfig,
+  AppFormField,
+  AppLayout,
+} from "@/lib/apps/types";
+import { CardGrid } from "./app-layouts/CardGrid";
+import { TimelineView } from "./app-layouts/TimelineView";
+import { KanbanBoard } from "./app-layouts/KanbanBoard";
+import { StatsBar } from "./app-layouts/StatsBar";
 
 interface AppWidgetProps {
   appSlug: string;
@@ -167,27 +176,84 @@ export function AppWidget({ appSlug }: AppWidgetProps) {
         </div>
       )}
 
-      {/* Entries list */}
-      <div className="flex-1 overflow-y-auto space-y-1.5 min-h-0">
-        {entries.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-4">
-            Brak wpisów. Kliknij + aby dodać pierwszy.
-          </p>
-        ) : (
-          entries
-            .slice(0, 20)
-            .map((entry) => (
-              <EntryRow
-                key={entry.id}
-                entry={entry}
-                displayColumns={ui_config.display_columns}
-                columns={app.columns}
-              />
-            ))
-        )}
+      {/* Entries — layout-dependent rendering */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <LayoutRenderer
+          layout={ui_config.layout || "table"}
+          entries={entries}
+          columns={app.columns}
+          uiConfig={ui_config}
+        />
       </div>
     </div>
   );
+}
+
+/** Dispatch to the appropriate layout renderer */
+function LayoutRenderer({
+  layout,
+  entries,
+  columns,
+  uiConfig,
+}: {
+  layout: AppLayout;
+  entries: AppEntry[];
+  columns: AppColumn[];
+  uiConfig: AppUiConfig;
+}) {
+  switch (layout) {
+    case "cards":
+      return (
+        <CardGrid entries={entries} columns={columns} uiConfig={uiConfig} />
+      );
+    case "timeline":
+      return (
+        <TimelineView entries={entries} columns={columns} uiConfig={uiConfig} />
+      );
+    case "kanban":
+      return (
+        <KanbanBoard entries={entries} columns={columns} uiConfig={uiConfig} />
+      );
+    case "stats-grid":
+      return (
+        <>
+          <StatsBar entries={entries} uiConfig={uiConfig} />
+          {/* Show last few entries below stats */}
+          <div className="mt-2 space-y-1.5">
+            {entries.slice(0, 5).map((entry) => (
+              <EntryRow
+                key={entry.id}
+                entry={entry}
+                displayColumns={uiConfig.display_columns}
+                columns={columns}
+              />
+            ))}
+          </div>
+        </>
+      );
+    case "table":
+    default:
+      // Default table layout (original behavior)
+      if (entries.length === 0) {
+        return (
+          <p className="text-xs text-muted-foreground text-center py-4">
+            Brak wpisów. Kliknij + aby dodać pierwszy.
+          </p>
+        );
+      }
+      return (
+        <div className="space-y-1.5">
+          {entries.slice(0, 20).map((entry) => (
+            <EntryRow
+              key={entry.id}
+              entry={entry}
+              displayColumns={uiConfig.display_columns}
+              columns={columns}
+            />
+          ))}
+        </div>
+      );
+  }
 }
 
 /** Render a single form field */

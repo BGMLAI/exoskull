@@ -80,6 +80,7 @@ Return ONLY valid JSON matching this schema:
     { "columns": ["rating"] }
   ],
   "ui_config": {
+    "layout": "table",
     "display_columns": ["book_title", "author", "pages_read", "rating", "started_at"],
     "form_fields": [
       { "column": "book_title", "label": "Tytuł", "type": "text", "required": true, "placeholder": "Wpisz tytuł książki..." },
@@ -109,6 +110,23 @@ Return ONLY valid JSON matching this schema:
 }
 \`\`\`
 
+## LAYOUT SELECTION
+
+Choose the best layout based on data type:
+
+| Layout | When to use | Example apps |
+|--------|-------------|--------------|
+| "table" | Default list/log view, time-series data | Reading log, workout log |
+| "cards" | Visual items with title+description | Recipes, contacts, project ideas |
+| "timeline" | Chronological events, journal entries | Mood diary, health events, activity log |
+| "kanban" | Items with status/categories to track | Tasks, habit progress, project stages |
+| "stats-grid" | Numeric tracking with dashboards | Expense tracker, fitness stats, sales metrics |
+
+For "cards" layout, also set: \`card_title_column\`, \`card_subtitle_column\`, optionally \`card_badge_column\`
+For "timeline" layout, also set: \`timeline_date_column\`, \`timeline_label_column\`
+For "kanban" layout, also set: \`kanban_group_column\`, \`kanban_columns\` (list of possible values)
+For "stats-grid" layout, also set: \`stats_columns\` array with column/label/aggregation/format
+
 ## CONSTRAINTS
 
 1. \`slug\` — kebab-case, max 40 chars, descriptive
@@ -122,6 +140,7 @@ Return ONLY valid JSON matching this schema:
 9. \`name\` and labels — Use Polish if user's message is in Polish, English otherwise
 10. Keep it practical — don't over-engineer, 3-8 columns for most apps
 11. \`icon\` — must be a valid Lucide icon name (BookOpen, Heart, Dumbbell, Coffee, etc.)
+12. \`layout\` — MUST be one of: table, cards, timeline, kanban, stats-grid
 
 ## Column Type Guide
 

@@ -26,8 +26,18 @@ export interface AppIndex {
   unique?: boolean;
 }
 
+/** Layout type for dynamic app rendering */
+export type AppLayout =
+  | "table"
+  | "cards"
+  | "timeline"
+  | "kanban"
+  | "stats-grid";
+
 /** UI configuration for the app widget */
 export interface AppUiConfig {
+  /** Layout mode — determines how entries are rendered. Default: "table" */
+  layout?: AppLayout;
   /** Columns to show in list view */
   display_columns: string[];
   /** Fields for the add/edit form */
@@ -49,6 +59,34 @@ export interface AppUiConfig {
     aggregation: "count" | "sum" | "avg" | "min" | "max";
     label: string;
   };
+  /** Card layout: which column is the card title */
+  card_title_column?: string;
+  /** Card layout: which column is the card subtitle/description */
+  card_subtitle_column?: string;
+  /** Card layout: which column determines card color/badge */
+  card_badge_column?: string;
+  /** Timeline layout: which column is the timestamp */
+  timeline_date_column?: string;
+  /** Timeline layout: which column is the event label */
+  timeline_label_column?: string;
+  /** Kanban layout: which column defines the swim lanes */
+  kanban_group_column?: string;
+  /** Kanban layout: possible values for swim lanes */
+  kanban_columns?: string[];
+  /** Stats grid: columns to show as stat cards */
+  stats_columns?: {
+    column: string;
+    label: string;
+    aggregation: "count" | "sum" | "avg" | "min" | "max" | "latest";
+    format?: "number" | "currency" | "percent";
+  }[];
+  /** Conditional row styles */
+  conditional_styles?: {
+    column: string;
+    operator: "eq" | "gt" | "lt" | "contains";
+    value: string | number;
+    class: string;
+  }[];
 }
 
 /** Form field configuration */
