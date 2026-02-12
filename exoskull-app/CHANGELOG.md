@@ -4,6 +4,44 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-12] Voice-Chat Context Linkage + CRON Deduplication
+
+### Smart Conversational Context for Voice
+
+- **Problem**: Voice calls loaded chronological messages → proactive CRON spam (goal reminders, task nudges every 15 min) flooded thread → no actual web chat context visible
+- **Solution**: New `getConversationalMessages()` function filters proactive assistant-only messages, keeps only user-initiated exchanges
+- Voice loads **20 conversational messages** across all channels (not 10 chronological)
+- Preserves channel tags: `[Web Chat]`, `[Voice]`, etc.
+- Voice AI now sees actual user conversations, not CRON noise
+
+### Lightweight Voice Pre-Processing
+
+- New `buildVoiceContext()` — **2 DB queries** instead of 8 (goals, suggestions, connections, docs skipped)
+- Voice channel **skips emotion analysis** (was blocking for ~500ms via HuggingFace API)
+- Cuts pre-Claude latency from ~1-3s to ~200ms
+- File: `lib/voice/dynamic-context.ts`
+
+### CRON Message Deduplication Fix
+
+- **Problem**: `sendProactiveMessage()` called both `dispatchReport()` (which writes to unified thread) AND its own `appendMessage()` → every CRON message appeared twice
+- **Solution**: Removed duplicate `appendMessage()` call — `dispatchReport()` already handles it
+- File: `lib/cron/tenant-utils.ts`
+
+### Files Changed
+
+- `lib/unified-thread.ts` — added `getConversationalMessages()`
+- `lib/voice/conversation-handler.ts` — voice uses conversational context, imports `buildVoiceContext`
+- `lib/voice/dynamic-context.ts` — added `buildVoiceContext()` (lightweight)
+- `lib/cron/tenant-utils.ts` — removed duplicate `appendMessage()`
+
+### How to Verify
+
+1. Call voice number → mention something from web chat conversation
+2. Voice AI should reference web chat context (not say "nie mam informacji")
+3. Check unified thread — proactive messages should appear once (not twice)
+
+---
+
 ## [2026-02-12] ConversationRelay Voice Pipeline — Live
 
 ### Twilio Signature Fix (CRITICAL)
