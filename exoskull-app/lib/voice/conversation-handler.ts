@@ -376,24 +376,11 @@ export async function processUserMessage(
   const isVoiceChannel = options?.channel === "voice";
   const preStartTime = Date.now();
 
-  // ── ALL CHANNELS: same full context, same thread, same knowledge ──
-  // Voice channel: skip emotion analysis (speed) but get FULL context + thread
+  // ── ALL CHANNELS: identical context, thread, emotion, tools ──
   const [dynamicContextResult, emotionState, rawThreadMessages] =
     await Promise.all([
       buildDynamicContext(session.tenantId),
-      isVoiceChannel
-        ? Promise.resolve({
-            primary_emotion: "neutral" as const,
-            intensity: 30,
-            secondary_emotions: [] as string[],
-            valence: 0,
-            arousal: 0.3,
-            dominance: 0.5,
-            confidence: 1,
-            source: "text_keywords" as const,
-            raw_data: {},
-          })
-        : analyzeEmotion(userMessage),
+      analyzeEmotion(userMessage),
       getThreadContext(session.tenantId, 50).catch((err) => {
         console.error("[ConversationHandler] Thread context failed:", err);
         return [] as { role: "user" | "assistant"; content: string }[];
@@ -409,10 +396,10 @@ export async function processUserMessage(
   const systemPromptOverride = dynamicContextResult.systemPromptOverride;
   const aiConfig = dynamicContextResult.aiConfig;
   const userTemperature = aiConfig?.temperature ?? 0.7;
-  const isVoice = isVoiceChannel;
   const chatModelPref = aiConfig?.model_preferences?.chat ?? "auto";
-  const resolvedModel = isVoice
-    ? VOICE_MODEL // Haiku for voice — 3-5x faster
+  // Voice uses Haiku for streaming speed (token-by-token TTS), web uses user preference
+  const resolvedModel = isVoiceChannel
+    ? VOICE_MODEL
     : CHAT_MODEL_MAP[chatModelPref] || DEFAULT_CLAUDE_MODEL;
   // ALL channels get full tools (same knowledge, same capabilities)
   const { definitions, dynamicCount } = await getToolsForTenant(
@@ -459,30 +446,21 @@ export async function processUserMessage(
     return true;
   });
 
-  // Tau Matrix — fire-and-forget 4-quadrant emotion classification
-  if (!isVoiceChannel) {
-    import("@/lib/iors/emotion-matrix")
-      .then(({ classifyTauQuadrant, logEmotionSignal }) => {
-        const signal = classifyTauQuadrant(emotionState);
-        return logEmotionSignal(session.tenantId, signal, session.id);
-      })
-      .catch((err) => {
-        logger.warn(
-          "[ConversationHandler] Tau classification failed:",
-          err instanceof Error ? err.message : String(err),
-        );
-      });
-  }
+  // Tau Matrix — fire-and-forget 4-quadrant emotion classification (all channels)
+  import("@/lib/iors/emotion-matrix")
+    .then(({ classifyTauQuadrant, logEmotionSignal }) => {
+      const signal = classifyTauQuadrant(emotionState);
+      return logEmotionSignal(session.tenantId, signal, session.id);
+    })
+    .catch((err) => {
+      logger.warn(
+        "[ConversationHandler] Tau classification failed:",
+        err instanceof Error ? err.message : String(err),
+      );
+    });
 
-  // Crisis check — voice: quick keyword-only scan (no AI), web: full 3-layer check
-  const crisis = isVoiceChannel
-    ? {
-        detected: false,
-        indicators: [] as string[],
-        confidence: 0,
-        protocol: null,
-      }
-    : await detectCrisis(userMessage, emotionState);
+  // Crisis check — full 3-layer detection for ALL channels
+  const crisis = await detectCrisis(userMessage, emotionState);
 
   let systemBlocks: Anthropic.TextBlockParam[];
   let maxTokensOverride: number | undefined;
@@ -625,11 +603,9 @@ export async function processUserMessage(
     options?.callback?.onThinkingStep?.("Ładuję kontekst", "done");
     options?.callback?.onThinkingStep?.("Generuję odpowiedź", "running");
 
-    // max_tokens: voice gets 300 (short but enough for tools), web gets full budget
+    // max_tokens: same for all channels (system prompt tells voice to be concise)
     // system + tools use cache_control for ~6K cached tokens (90% input savings)
-    const effectiveMaxTokens = isVoice
-      ? 300
-      : session.maxTokens || maxTokensOverride || 200;
+    const effectiveMaxTokens = session.maxTokens || maxTokensOverride || 300;
 
     logger.info("[ConversationHandler] Calling Claude API:", {
       model: resolvedModel,
@@ -648,7 +624,8 @@ export async function processUserMessage(
     });
 
     // ── Agent Loop Context (shared between streaming and non-streaming) ──
-    const agentConfig = isVoice ? VOICE_AGENT_CONFIG : WEB_AGENT_CONFIG;
+    // Same agent config for all channels (voice runs on Railway — no 60s timeout)
+    const agentConfig = WEB_AGENT_CONFIG;
     const agentCtx = {
       anthropic,
       model: resolvedModel,
@@ -665,7 +642,7 @@ export async function processUserMessage(
     if (options?.onTextDelta) {
       const streamConfig = {
         ...agentConfig,
-        followUpMaxTokens: isVoice ? 300 : session.maxTokens || 1024,
+        followUpMaxTokens: session.maxTokens || 1024,
       };
 
       const claudeStartTime = Date.now();

@@ -77,7 +77,7 @@ export async function buildDynamicContext(
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
-  // ── ALL queries in parallel (was sequential = ~700ms, now ~150ms) ──
+  // ── ALL queries in parallel (10 queries, ~150-300ms) ──
   const [
     tenantResult,
     taskResult,
@@ -87,6 +87,8 @@ export async function buildDynamicContext(
     suggestionsResult,
     docsResult,
     connectionsResult,
+    appsResult,
+    proactiveResult,
   ] = await Promise.allSettled([
     // 1. User profile + custom instructions + presets + AI config + prompt override
     supabase
@@ -123,6 +125,25 @@ export async function buildDynamicContext(
       .eq("tenant_id", tenantId),
     // 8. Composio connected integrations
     listConnections(tenantId).catch(() => []),
+    // 9. Generated apps (self-awareness)
+    supabase
+      .from("exo_generated_apps")
+      .select("slug, name, status, description")
+      .eq("tenant_id", tenantId)
+      .in("status", ["active", "draft", "pending_approval"])
+      .order("created_at", { ascending: false })
+      .limit(10),
+    // 10. Recent proactive actions (last 24h — what IORS did autonomously)
+    supabase
+      .from("exo_proactive_log")
+      .select("trigger_type, channel, metadata, created_at")
+      .eq("tenant_id", tenantId)
+      .gte(
+        "created_at",
+        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      )
+      .order("created_at", { ascending: false })
+      .limit(10),
   ]);
 
   // ── Extract results safely ──
@@ -156,6 +177,24 @@ export async function buildDynamicContext(
     connectionsResult.status === "fulfilled"
       ? (connectionsResult.value as Array<{ toolkit: string; status: string }>)
       : [];
+  const apps =
+    appsResult.status === "fulfilled"
+      ? (appsResult.value.data as Array<{
+          slug: string;
+          name: string;
+          status: string;
+          description: string | null;
+        }> | null)
+      : null;
+  const proactiveActions =
+    proactiveResult.status === "fulfilled"
+      ? (proactiveResult.value.data as Array<{
+          trigger_type: string;
+          channel: string;
+          metadata: Record<string, unknown> | null;
+          created_at: string;
+        }> | null)
+      : null;
 
   // ── Build context string ──
   const now = new Date();
@@ -277,6 +316,51 @@ export async function buildDynamicContext(
     }
     context += `Gdy użytkownik się zgodzi, użyj narzędzia "accept_skill_suggestion" z ID sugestii.\n`;
     context += `Gdy odmówi, użyj "dismiss_skill_suggestion". NIE naciskaj - zaproponuj raz, naturalnie.\n`;
+  }
+
+  // Generated apps (system self-awareness)
+  if (apps && apps.length > 0) {
+    context += `\n## MOJE APLIKACJE (zbudowane dla użytkownika)\n`;
+    for (const app of apps) {
+      const statusLabel =
+        app.status === "active"
+          ? "✅ aktywna"
+          : app.status === "draft"
+            ? "📝 szkic"
+            : app.status === "pending_approval"
+              ? "⏳ czeka na zatwierdzenie"
+              : app.status;
+      context += `- ${app.name} [${statusLabel}]${app.description ? ` — ${app.description}` : ""}\n`;
+    }
+    context += `Mozesz logowac dane: "app_log_data", pobierac: "app_get_data", budowac nowe: "build_app".\n`;
+  }
+
+  // Recent autonomous actions (last 24h — what I did for the user)
+  if (proactiveActions && proactiveActions.length > 0) {
+    const actionLabels: Record<string, string> = {
+      crisis_followup: "Follow-up kryzysowy",
+      inactivity: "Przypomnienie (brak aktywności)",
+      emotion_trend: "Reakcja na trend emocji",
+      gap: "Wykrycie luki w systemie",
+      overdue_task: "Alert o zaległym zadaniu",
+      insight: "Dostarczenie insightu",
+      goal_nudge: "Przypomnienie o celu",
+      email_sync: "Synchronizacja emaili",
+      auto_build: "Automatyczne zbudowanie aplikacji",
+    };
+    context += `\n## MOJE OSTATNIE DZIAŁANIA (24h)\n`;
+    for (const action of proactiveActions.slice(0, 5)) {
+      const label = actionLabels[action.trigger_type] || action.trigger_type;
+      const time = new Date(action.created_at).toLocaleTimeString("pl-PL", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      context += `- ${time}: ${label} via ${action.channel}\n`;
+    }
+    if (proactiveActions.length > 5) {
+      context += `  ... i ${proactiveActions.length - 5} więcej akcji\n`;
+    }
+    context += `Gdy user pyta "co robiłeś?", "nad czym pracujesz?" — opisz te działania.\n`;
   }
 
   // Extract system prompt override + AI config from tenant
