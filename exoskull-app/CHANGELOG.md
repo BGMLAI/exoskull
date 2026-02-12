@@ -4,6 +4,13 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-12] Middleware Fix — Reprocess-All Endpoint Auth
+
+- Fixed `/api/knowledge/reprocess-all` blocked by auth middleware (was missing from public API routes)
+- Added to `isPublicApi` in `lib/supabase/middleware.ts`
+
+---
+
 ## [2026-02-12] Knowledge System Fix + Chat Rzeka Unified Stream
 
 ### Part A — Knowledge Fixes

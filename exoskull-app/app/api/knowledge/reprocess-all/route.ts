@@ -1,9 +1,15 @@
 /**
  * POST /api/knowledge/reprocess-all
  *
- * Reprocess all documents for a tenant.
+ * Reprocess documents for a tenant (with batching support).
  * Deletes existing chunks, re-runs the processing pipeline.
  * Useful after fixing extractors or embedding bugs.
+ *
+ * Body params:
+ *   tenant_id (required for CRON_SECRET auth)
+ *   offset (default: 0)
+ *   limit (default: 1000)
+ *   delete_chunks (default: true) — set false for subsequent batches
  *
  * Requires CRON_SECRET for admin access.
  */
@@ -18,12 +24,11 @@ export const maxDuration = 300; // 5 minutes for bulk processing
 
 export async function POST(req: NextRequest) {
   try {
-    // Auth: either CRON_SECRET or logged-in user
     const cronSecret = req.headers.get("x-cron-secret");
+    const body = await req.json().catch(() => ({}));
     let tenantId: string;
 
     if (cronSecret === process.env.CRON_SECRET) {
-      const body = await req.json().catch(() => ({}));
       tenantId = body.tenant_id;
       if (!tenantId) {
         return NextResponse.json(
@@ -43,22 +48,29 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getServiceSupabase();
+    const batchOffset = body.offset ?? 0;
+    const batchLimit = body.limit ?? 1000;
+    const deleteChunks = body.delete_chunks !== false;
 
-    // 1. Delete existing chunks for this tenant
-    const { error: deleteError } = await supabase
-      .from("exo_document_chunks")
-      .delete()
-      .eq("tenant_id", tenantId);
+    // 1. Delete existing chunks (only on first batch)
+    if (deleteChunks) {
+      const { error: deleteError } = await supabase
+        .from("exo_document_chunks")
+        .delete()
+        .eq("tenant_id", tenantId);
 
-    if (deleteError) {
-      console.error("[ReprocessAll] Delete chunks failed:", deleteError);
+      if (deleteError) {
+        console.error("[ReprocessAll] Delete chunks failed:", deleteError);
+      }
     }
 
-    // 2. Get all documents
+    // 2. Get documents (with pagination)
     const { data: docs, error: docsError } = await supabase
       .from("exo_user_documents")
       .select("id, original_name, file_type, status")
-      .eq("tenant_id", tenantId);
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: true })
+      .range(batchOffset, batchOffset + batchLimit - 1);
 
     if (docsError || !docs) {
       return NextResponse.json(
@@ -73,6 +85,7 @@ export async function POST(req: NextRequest) {
       success: 0,
       failed: 0,
       skipped: 0,
+      offset: batchOffset,
       details: [] as {
         id: string;
         name: string;
