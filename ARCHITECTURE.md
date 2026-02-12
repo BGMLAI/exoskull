@@ -1,9 +1,9 @@
 # 🧠 EXOSKULL - Adaptive Life Operating System
 ## Your Second Brain. Built For You. By AI.
 
-**Version:** 4.0
+**Version:** 5.0
 **Created:** 2026-02-01
-**Updated:** 2026-02-06
+**Updated:** 2026-02-12
 **Status:** 🟡 Active Development — MVP Live (exoskull.xyz)
 
 ---
@@ -35,20 +35,20 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 
 ---
 
-## 📊 IMPLEMENTATION STATUS (as of 2026-02-05)
+## 📊 IMPLEMENTATION STATUS (as of 2026-02-12)
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **Voice Pipeline** | ✅ Live | Twilio → ElevenLabs STT → Claude Sonnet 4 (20 tools) → ElevenLabs TTS |
+| **Voice Pipeline** | ✅ Live | Twilio → Cartesia Sonic 3 STT → Claude Sonnet 4 (53 tools) → Cartesia Sonic 3 TTS + streaming Haiku pipeline |
 | **Memory System** | ✅ Live | Daily summaries, keyword search, 50+ msg context, user corrections |
 | **Data Lake** | ✅ Live | Bronze (R2 Parquet) → Silver (Postgres) → Gold (Materialized Views) |
-| **AI Router** | ✅ Live | 4-tier: Gemini Flash → Haiku → Sonnet 4.5 → Opus 4.5 (de-escalation) |
+| **AI Router** | ✅ Live | 4-tier: Gemini 2.5 Flash → Haiku → Sonnet 4.5 → Opus 4.5 (de-escalation) |
 | **Mod System** | ✅ Live | 5 mods: task-manager, mood, habit, sleep, activity |
 | **Rig System** | ✅ Live | 6 rigs: Oura, Google Fit, Google Workspace, MS 365, Notion, Todoist |
-| **Knowledge** | ✅ Live | Tyrolka framework, file upload, pgvector embeddings |
+| **Knowledge** | ✅ Live | RAG pipeline (pgvector embeddings, cosine similarity search), web search (Tavily), URL import (Firecrawl v2) |
 | **Admin Panel** | ✅ Live | 9 pages, self-optimization engine, CRON management |
-| **CRON System** | ✅ Live | 19 jobs, timezone-aware, rate-limited |
-| **Onboarding** | ✅ Live | Discovery interview (~60 topics), profile extraction |
+| **CRON System** | ✅ Live | 28 jobs: ETL, morning-briefing, evening-reflection, impulse (6 handlers), email-sync, email-analyze, MAPEK loop, and more |
+| **Onboarding** | ✅ Live | Discovery interview (~60 topics), profile extraction, in-chat onboarding |
 | **Frontend** | ✅ Live | Dashboard, chat, tasks, knowledge, schedule, health, goals, skills, settings |
 | **Auth** | ✅ Live | Supabase SSR, RLS, middleware guards |
 | **Outbound Calls** | ✅ Live | Call user + call third parties (delegate system) |
@@ -57,9 +57,20 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 | **Gap Detection** | ✅ Live | Weekly CRON (Sun 09:00), 7 life domains, skill suggestions, auto-expire 14d |
 | **Emotion Intel** | ✅ Live | Crisis detection (3-layer + fail-safe), 5 adaptive response modes, VAD model, text + voice fusion analyzer, prosody extraction (Deepgram), emotion trends dashboard. Phase 3: pitch/energy, facial analysis |
 | **Integrations** | ✅ Live | Google (40+ scopes), Facebook/Meta (Ads, Commerce, WhatsApp), Apple, Microsoft (Teams, SharePoint) |
+| **GHL Integration** | ✅ Live | SMS, Email, WhatsApp, Messenger, Instagram, CRM, workflows |
+| **Email Analysis** | ✅ Live | Multi-provider Gmail/Outlook/IMAP, 2-phase AI classification (Gemini Flash), RAG knowledge extraction, 4 IORS tools |
+| **Chat Rzeka** | ✅ Live | Unified activity stream, 15 StreamEvent types, 6 event components, SSE real-time updates |
+| **MAPEK Loop** | ✅ Live | 3-tier CRON: petla (1min triage), loop-15 (15min evaluation), loop-daily (24h maintenance) |
+| **Autonomous CRONs** | ✅ Live | morning-briefing (05:00 UTC), evening-reflection (19:00 UTC), impulse (15min, 6 handlers incl. auto-builder) |
+| **Knowledge Analysis** | ✅ Live | Light (rule-based, $0) + deep (AI via Haiku), 17 parallel queries, 7 action types |
+| **App Builder** | ✅ Live | AI JSON spec → validate → DB table → canvas widget, 4 IORS tools, auto-build in impulse Handler F |
+| **Canvas Widgets** | ✅ Live | 18 built-in types + dynamic (app:slug, dynamic_mod:slug), react-grid-layout v2.2.2 |
+| **Web Search** | ✅ Live | Tavily search + Firecrawl v2 URL import, 2 IORS tools |
+| **Presigned Uploads** | ✅ Live | Client → Supabase Storage direct upload (bypasses Vercel 4.5MB limit) |
+| **Settings Self-Modify** | ✅ Live | 22 permission categories, two-tier consent system (with_approval + autonomous) |
+| **Self-Optimization Dashboard** | ✅ Live | OptimizationWidget (8 parallel queries), InterventionInbox (approve/dismiss), InsightHistory |
 | **WhatsApp/Messenger** | 🟡 Partial | Enhanced WhatsApp via Meta API (placeholder for direct), Messenger placeholder |
 | **Android App** | 🔴 Planned | Zero-install SMS/Voice works as alternative |
-| **GHL Integration** | 🔴 Planned | CRM, social media, calendar |
 
 **Deployment:** https://exoskull.xyz | **Phone:** +48732143210, +48732144112
 
@@ -258,7 +269,7 @@ exoskull inventory           # Show installed Mods/Rigs/active Quests
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ TIER 1: INTERFACE LAYER                              ✅ LIVE │
-│   Layer 1: Gateway & Control Plane (94 API routes)    ✅    │
+│   Layer 1: Gateway & Control Plane (142 API routes)   ✅    │
 │   Layer 2: Omnichannel (Voice, SMS, Email, Web)       ✅    │
 │   Layer 3: Multimodal Input/Output                    ⏳    │
 └────────────────────────┬────────────────────────────────────┘
@@ -287,16 +298,16 @@ exoskull inventory           # Show installed Mods/Rigs/active Quests
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ TIER 5: EXECUTION LAYER                              ⏳ WIP │
+│ TIER 5: EXECUTION LAYER                              ✅ LIVE │
 │   Layer 15: Custom App Builder (Mods + Dynamic Skills)✅    │
-│   Layer 16: Autonomous Actions Framework              ⏳    │
+│   Layer 16: Autonomous Actions Framework              ✅    │
 │   Layer 17: Device Integration (Oura, Google Fit)     ⏳    │
 │   Layer 18: Android-First Integration                 🔴    │
 └────────────────────────┬────────────────────────────────────┘
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ TIER 6: OPERATIONS LAYER                             ✅ LIVE │
-│   Layer 19: CRON & Scheduled (15 jobs, TZ-aware)      ✅    │
+│   Layer 19: CRON & Scheduled (28 jobs, TZ-aware)      ✅    │
 │   Layer 20: Progressive Deployment (Vercel)           ✅    │
 │   Layer 21: Comprehensive Guardrails                  ✅    │
 └─────────────────────────────────────────────────────────────┘
@@ -310,7 +321,7 @@ Legend: ✅ = Live/Complete  ⏳ = Partial/In Progress  🔴 = Not Started
 
 ## Layer 1: Gateway & Control Plane — ✅ IMPLEMENTED
 
-**Next.js API Routes (94 endpoints) with Supabase Auth middleware.**
+**Next.js API Routes (142 endpoints) with Supabase Auth middleware.**
 
 ```javascript
 ExoSkull_Gateway = {
@@ -682,12 +693,12 @@ ExoSkull_Gateway = {
 ```
 Communication Channels:
 
-📞 Voice AI (VAPI) - Real-time AI conversations
+📞 Voice AI (Custom Pipeline) - Real-time AI conversations
    ├─ Scheduled check-ins (morning, evening)
    ├─ On-demand calls (user initiates)
    ├─ Proactive calls (crisis, important alerts)
    ├─ Outbound to strangers (with permission)
-   └─ ElevenLabs cloned voice
+   └─ Cartesia Sonic 3 (STT + TTS)
 
 📱 GHL Hub - All text-based communication
    ├─ SMS
@@ -768,13 +779,14 @@ Multimodal_System = {
       ],
       pipeline: {  // ✅ PRODUCTION
         telephony: "Twilio (+48732143210, +48732144112)",
-        stt: "ElevenLabs STT (Deepgram fallback)",
-        llm: "Claude Sonnet 4 (claude-sonnet-4-20250514)",
-        tts: "ElevenLabs eleven_turbo_v2_5 (Piotr Pro PL)",
-        webhook: "https://exoskull.xyz/api/twilio/voice"
+        stt: "Cartesia Sonic 3 (streaming)",
+        llm: "Claude Sonnet 4 via streaming Haiku pipeline (53 IORS tools)",
+        tts: "Cartesia Sonic 3",
+        webhook: "Railway voice-ws WebSocket server"
       },
+      note: "Streaming voice pipeline with Haiku for fast initial responses + Sonnet 4 for tool-heavy tasks. Reduced tool set for voice latency optimization.",
       capabilities: [
-        "Polish speech recognition (ElevenLabs STT + Deepgram fallback)",  // ✅
+        "Polish speech recognition (Cartesia Sonic 3 streaming)",  // ✅
         "Voice biomarker analysis (stress, energy, mood)",  // planned
         "Speaker identification (distinguish user from others)",  // planned
         "Emotion detection (prosody analysis)"  // planned
@@ -917,7 +929,7 @@ Multimodal_System = {
   output_modalities: {
 
     voice: {
-      synthesis: "ElevenLabs eleven_turbo_v2_5 (Piotr Pro PL - LIVE)",  // ✅
+      synthesis: "Cartesia Sonic 3 (server, for phone calls) + browser speechSynthesis (web widget)",  // ✅
       tone_adaptation: {
         urgent: "Direct, loud, fast ('STOP. You need to sleep NOW.')",
         supportive: "Warm, slow ('Hey, I see you're struggling. Want to talk?')",
@@ -1083,7 +1095,7 @@ Agent_Swarm = {
       when: "Focused queries, routine analysis"
     },
     tier_1: {
-      agent: "Router/Classifier (Gemini Flash)",
+      agent: "Router/Classifier (Gemini 2.5 Flash)",
       role: "Classify complexity, route to appropriate tier",
       when: "Every incoming request (first pass)"
     }
@@ -1149,10 +1161,11 @@ AI_Routing = {
   tiers: [
     {
       tier: 1,
-      model: "Gemini 1.5 Flash",
+      model: "Gemini 2.5 Flash",
       speed: "~500ms",
       context: "1M tokens",
       cost: "Ultra-cheap ($0.075/1M input)",
+      note: "Gemini 1.5 Flash deprecated/removed from Google API (2026-02). gemini-2.0-flash-lite has limit=0 on free tier.",
       use: ["SMS routing", "Classification", "Data extraction", "Simple responses"]
     },
     {
@@ -1189,12 +1202,19 @@ AI_Routing = {
   ],
 
   routing_logic: `
-    1. Classify complexity (Gemini Flash: simple → complex)
+    1. Classify complexity (Gemini 2.5 Flash: simple → complex)
     2. Check task history (if Flash succeeded before → use Flash)
     3. Route to appropriate tier
     4. If fail → escalate to next tier (max 3 retries)
-    5. Circuit breaker: 5min cooldown after 3 failures
+    5. De-escalation supported: Tier 4 → 3 → 2 → 1 (cost optimization)
+    6. Circuit breaker: 5min cooldown after 3 failures
   `,
+
+  notes: {
+    kimi: "Kimi K2.5 has no API key (placeholder only)",
+    de_escalation: "Router supports de-escalation (Tier 4 → 3 → 2 → 1) for cost savings",
+    sonnet_workhorse: "Sonnet 4.5 is the workhorse model for code generation"
+  },
 
   // Cost optimization
   prompt_caching: {
@@ -2098,14 +2118,14 @@ Emotion_Intelligence = {
 
 | Layer | Implementation | Status |
 |-------|---------------|--------|
-| L1: Gateway & Control Plane | 94 API routes, Supabase Auth middleware | ✅ Live |
+| L1: Gateway & Control Plane | 142 API routes, Supabase Auth middleware | ✅ Live |
 | L2: Omnichannel Presence | Voice, SMS, Email, Web chat | ✅ Live |
 | L3: Multimodal I/O | Voice + Text live. Vision/Bio planned | ⏳ Partial |
 | L4: Agent Swarm Orchestration | AI routing live. Kimi swarm planned | ⏳ Partial |
 | L5: Multi-Model AI Routing | 4-tier: Flash → Haiku → Kimi → Opus | ✅ Live |
 | L6: MCP Skills Registry | Mod + Rig system with Exoskulleton | ✅ Live |
 | L7: Discovery & Relationship | Onboarding (~60 topics), profile extraction | ✅ Live |
-| L8: Gap Detection | Tables exist, logic planned | 🔴 Planned |
+| L8: Gap Detection | Weekly CRON (Sun 09:00), 7 life domains, skill suggestions, auto-expire 14d | ✅ Live |
 | L9: Success Metrics | Goal engine, dashboard, CRON auto-progress, voice tools | ✅ Live |
 | L10: Self-Optimization | Full MAPE-K loop (6h CRON), system metrics, cross-domain correlations, enhanced A+P+E+K | ✅ Live |
 | L11: Emotion Intelligence | Text + voice fusion, crisis detection, adaptive responses, trends dashboard | ✅ Live |
@@ -2113,10 +2133,10 @@ Emotion_Intelligence = {
 | L13: Data Lake | Bronze/Silver/Gold ETL pipeline | ✅ Live |
 | L14: Skill Memory & Dynamic Generation | Full pipeline live (6 stages, dashboard, suggestions, circuit breaker) | ✅ Live |
 | L15: Custom App Builder | Mod system (5 mods), Rig system (6 rigs), Dynamic Skills pipeline designed | ✅ Live |
-| L16: Autonomous Actions | Intervention executor, voice tools | ⏳ Partial |
+| L16: Autonomous Actions | Outbound calls, proactive messaging, email integration, 22 permission categories, two-tier consent | ✅ Live |
 | L17: Device Integration | Oura + Google Fit live | ⏳ Partial |
 | L18: Android Integration | Zero-install SMS/Voice. APK planned | 🔴 Planned |
-| L19: CRON Operations | 15 jobs, TZ-aware, rate-limited | ✅ Live |
+| L19: CRON Operations | 28 jobs, TZ-aware, rate-limited, MAPEK 3-tier loop | ✅ Live |
 | L20: Progressive Deployment | Vercel auto-deploy, exoskull.xyz | ✅ Live |
 | L21: Guardrails | RLS, auth, rate limits, circuit breaker | ✅ Live |
 
@@ -2695,11 +2715,11 @@ App_Builder = {
 
 ---
 
-## Layer 16: Autonomous Actions Framework — ⏳ PARTIAL
+## Layer 16: Autonomous Actions Framework — ✅ IMPLEMENTED
 
 **All actions system can take autonomously (with user approval).**
 
-> **Implementation:** Tables exist (exo_interventions, exo_guardian_system). Intervention executor runs every 15min. Voice tools: plan_action, list_planned_actions, cancel_planned_action, delegate_complex_task. Full MAPE-K loop logic partially implemented.
+> **Implementation (Feb 2026):** Outbound calls, proactive messaging, and email integration all live. Tables: exo_interventions, exo_guardian_system. Intervention executor runs every 15min. 22 permission categories with two-tier consent system (with_approval + autonomous). Voice tools: plan_action, list_planned_actions, cancel_planned_action, delegate_complex_task. Full MAPE-K loop with 3-tier CRON (petla 1min, loop-15 15min, loop-daily 24h). Rate limit: 8 proactive messages/day.
 
 ```javascript
 Autonomous_Actions = {
@@ -2842,7 +2862,7 @@ Android_Integration = {
 
   zero_install: {
     day_1: "SMS → reply → system active (no install)",  // ✅ LIVE
-    week_1: "SMS + Voice calls (Twilio + ElevenLabs)",   // ✅ LIVE
+    week_1: "SMS + Voice calls (Twilio + Cartesia Sonic 3)",   // ✅ LIVE
     month_1: "Optional app for advanced features"         // planned
   }
 }
@@ -2856,7 +2876,7 @@ Android_Integration = {
 
 **Proactive system, not reactive.**
 
-> **Implementation (Feb 1-5, 2026):** 15 Vercel CRON jobs: master-scheduler (hourly), bronze/silver/gold ETL, daily-summary (21:00 PL), intervention-executor (15min), post-conversation (15min), business-metrics, admin-metrics, engagement-scoring, dunning, drip-engine, guardian-effectiveness, guardian-values, pulse (30min), highlight-decay.
+> **Implementation (Feb 1-12, 2026):** 28 Vercel CRON jobs including: master-scheduler (hourly), bronze/silver/gold ETL, daily-summary (21:00 PL), intervention-executor (15min), post-conversation (15min), business-metrics, admin-metrics, engagement-scoring, dunning, drip-engine, guardian-effectiveness, guardian-values, pulse (30min), highlight-decay, morning-briefing (05:00 UTC), evening-reflection (19:00 UTC), impulse (15min, 6 handlers: overdue tasks, insights, goals, interventions, email sync, auto-builder), email-sync (15min), email-analyze (5min), petla (1min triage), loop-15 (15min evaluation), loop-daily (24h maintenance).
 
 ```javascript
 Scheduled_Operations = {
@@ -3046,29 +3066,33 @@ Guardrails = {
 | Layer | Technology | Status |
 |-------|-----------|--------|
 | **Frontend** | Next.js 14 (App Router), React, TypeScript, Tailwind, shadcn/ui | ✅ Live |
-| **Backend** | Next.js API Routes (94 endpoints), Vercel Serverless | ✅ Live |
-| **Database** | Supabase (PostgreSQL 15+ with pgvector, 75+ tables, RLS) | ✅ Live |
+| **Backend** | Next.js API Routes (142 endpoints), Vercel Serverless | ✅ Live |
+| **Database** | Supabase (PostgreSQL 15+ with pgvector, 56 migrations, RLS) | ✅ Live |
 | **Auth** | Supabase Auth (cookie SSR, middleware guards) | ✅ Live |
 | **Data Lake** | R2 Parquet (Bronze) → Postgres (Silver) → Mat. Views (Gold) | ✅ Live |
 | **Voice (Telephony)** | Twilio (+48732143210, +48732144112) | ✅ Live |
-| **Voice (TTS)** | ElevenLabs eleven_turbo_v2_5 (Piotr Pro PL) | ✅ Live |
-| **Voice (STT)** | ElevenLabs STT + Deepgram fallback | ✅ Live |
-| **Voice (LLM)** | Claude Sonnet 4 (17 tools, conversation handler) | ✅ Live |
+| **Voice (TTS)** | Cartesia Sonic 3 (server) + browser speechSynthesis (web) | ✅ Live |
+| **Voice (STT)** | Cartesia Sonic 3 (streaming) | ✅ Live |
+| **Voice (LLM)** | Claude Sonnet 4 via streaming Haiku pipeline (53 IORS tools) | ✅ Live |
 | **Memory** | Daily summaries + keyword search + unified thread (50+ msg context) | ✅ Live |
 | **Email** | Resend | ✅ Live |
 | **SMS** | Twilio | ✅ Live |
-| **CRON** | Vercel CRON (15 scheduled jobs, timezone-aware) | ✅ Live |
+| **CRON** | Vercel CRON (28 scheduled jobs, timezone-aware, MAPEK 3-tier loop) | ✅ Live |
 | **Admin** | 9 admin pages, 13 API endpoints, self-optimization engine | ✅ Live |
-| **AI Tier 1** | Gemini 1.5 Flash (routing, classification) | ✅ Live |
+| **AI Tier 1** | Gemini 2.5 Flash (routing, classification) | ✅ Live |
 | **AI Tier 2** | Claude Haiku (domain agents) | ✅ Live |
 | **AI Tier 3** | Kimi K2.5 (256K context, swarm planned) | ⏳ Partial |
 | **AI Tier 4** | Claude Opus 4.5 (meta-coordinator) | ✅ Live |
 | **Mod System** | task-manager, mood-tracker, habit-tracker, sleep, activity | ✅ Live |
 | **Dynamic Skills** | lib/skills/ pipeline (sandbox, 2FA approval, versioned deploy, circuit breaker, suggestions) | ✅ Live |
 | **Rig System** | Oura, Google Fit, Google Workspace, MS 365, Notion, Todoist | ✅ Live |
-| **Knowledge** | Tyrolka (Loops→Campaigns→Quests→Ops→Notes), file upload, embeddings | ✅ Live |
-| **Autonomy** | MAPE-K loop, guardian system, intervention executor | ⏳ Partial |
-| **Communication Hub** | GoHighLevel (planned), WhatsApp/Messenger (placeholder) | ⏳ Planned |
+| **Knowledge** | RAG pipeline (pgvector, cosine similarity), Tavily web search, Firecrawl v2 URL import, file upload | ✅ Live |
+| **Autonomy** | MAPE-K 3-tier loop (petla/loop-15/loop-daily), guardian system, 22 permission categories | ✅ Live |
+| **Communication Hub** | GoHighLevel (SMS, Email, WhatsApp, Messenger, Instagram, CRM, workflows) | ✅ Live |
+| **Email Analysis** | Multi-provider (Gmail/Outlook/IMAP), 2-phase AI classification, RAG extraction, 4 IORS tools | ✅ Live |
+| **Chat Rzeka** | Unified activity stream, 15 StreamEvent types, 6 event components, SSE real-time | ✅ Live |
+| **App Builder** | AI JSON spec → validate → DB table → canvas widget, 4 IORS tools, auto-build | ✅ Live |
+| **Canvas Widgets** | 18 built-in types + dynamic (app:slug), react-grid-layout v2.2.2 | ✅ Live |
 | **Emotion Detection** | HuggingFace + PL keywords (text), Deepgram word-timing prosody (voice), crisis detection (3-layer), adaptive prompts, trends dashboard | ✅ Live |
 | **Hosting** | Vercel (frontend + API), Supabase (DB), Cloudflare R2 (storage) | ✅ Live |
 
@@ -3078,11 +3102,11 @@ Guardrails = {
 
 ## Communication Architecture
 
-**Current: Twilio-first pipeline. GHL integration planned for CRM/multichannel.**
+**Current: Twilio voice pipeline + GHL for CRM/multichannel.**
 
 | Capability | Provider | Status |
 |------------|----------|--------|
-| **Voice AI Conversations** | Custom: Twilio + ElevenLabs + Claude Sonnet 4 | ✅ Live |
+| **Voice AI Conversations** | Custom: Twilio + Cartesia Sonic 3 + Claude Sonnet 4 | ✅ Live |
 | **SMS** | Twilio (direct) | ✅ Live |
 | **Email** | GHL | Templates, tracking, automation, CRM sync |
 | **WhatsApp** | GHL | Official API, CRM integration, message templates |
@@ -3105,8 +3129,8 @@ OUTBOUND (ExoSkull → User):                          ✅ LIVE
         ├──▶ Twilio Voice (outbound call)              ✅
         ├──▶ Twilio SMS                                ✅
         ├──▶ Resend Email                              ✅
-        ├──▶ WhatsApp (planned via GHL)                🔴
-        └──▶ Messenger (planned via GHL)               🔴
+        ├──▶ WhatsApp (via GHL)                         ✅
+        └──▶ Messenger (via GHL)                       ✅
 
 INBOUND (User → ExoSkull):                            ✅ LIVE
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
@@ -3209,6 +3233,497 @@ TWILIO_PHONE_NUMBER=+1xxx
 
 ---
 
+# NEW SYSTEMS (Feb 7-12, 2026)
+
+## Email Analysis System — ✅ IMPLEMENTED
+
+**Multi-provider email analysis with AI classification and knowledge extraction.**
+
+> **Implementation (Feb 11, 2026):** 3 tables, multi-provider support, two-phase AI classification, RAG knowledge extraction, task generation, 4 IORS tools, canvas widget, nudge system, 2 CRONs.
+
+```javascript
+Email_Analysis = {
+
+  tables: {
+    exo_email_accounts: "Provider connections (Gmail, Outlook, IMAP)",
+    exo_analyzed_emails: "Classification results, extracted facts, action items",
+    exo_email_sender_profiles: "Sender intelligence (frequency, importance, relationship)"
+  },
+
+  providers: {
+    gmail: "Gmail API (MIME parsing)",
+    outlook: "Microsoft Graph API",
+    imap: "Generic IMAP via imapflow (AES-256-GCM encrypted passwords)"
+  },
+
+  ai_pipeline: {
+    phase_1_classification: {
+      model: "Gemini 2.5 Flash (Tier 1)",
+      cost: "~$0.008/day for 100 emails",
+      outputs: ["category", "priority", "urgency", "sentiment"]
+    },
+    phase_2_extraction: {
+      model: "Gemini 2.5 Flash (Tier 1)",
+      outputs: ["key_facts", "action_items", "deadlines", "contacts_mentioned"]
+    }
+  },
+
+  integrations: {
+    knowledge_extraction: "key_facts → RAG pipeline (exo_document_chunks via pgvector)",
+    task_generation: "action_items → exo_tasks with dedup",
+    nudge_system: ["urgent_unanswered", "follow_up_overdue", "inbox_overload", "important_sender_waiting"]
+  },
+
+  iors_tools: [
+    "search_emails",      // Search analyzed emails by query
+    "email_summary",      // Get inbox summary (unread, urgent, action needed)
+    "email_follow_ups",   // Get overdue follow-ups
+    "email_sender_info"   // Get sender profile and history
+  ],
+
+  widget: "email_inbox (#18 in canvas widget registry)",
+
+  data_lake: {
+    bronze: "emails DataType in Bronze layer",
+    silver: "exo_silver_emails + directEmailsETL()",
+    gold: "exo_gold_email_daily materialized view"
+  },
+
+  crons: {
+    email_sync: "Every 15 minutes — fetch new emails from all providers",
+    email_analyze: "Every 5 minutes — AI classification + extraction"
+  }
+}
+```
+
+---
+
+## Chat Rzeka / Unified Activity Stream — ✅ IMPLEMENTED
+
+**Real-time unified activity stream showing all ExoSkull events in chronological order.**
+
+> **Implementation (Feb 8-12, 2026):** 25+ files in components/stream/ + lib/stream/ + lib/hooks/. 15 StreamEvent types, SSE real-time updates, file upload with drag-and-drop.
+
+```javascript
+Chat_Rzeka = {
+
+  architecture: {
+    core: "StreamEvent union (15 types) → StreamEventRouter → event components",
+    state: "useStreamState (useReducer) for efficient updates",
+    realtime: "SSE via ProcessingCallback on processUserMessage()"
+  },
+
+  event_types: [
+    // Original types
+    "user_message", "assistant_message", "tool_call", "tool_result",
+    "system_event", "error", "thinking", "file_attachment", "status_update",
+
+    // New types (Feb 2026)
+    "channel_message",        // Messages from non-web channels (color-coded per channel)
+    "call_transcript",        // Voice call transcripts
+    "file_upload",            // File upload progress + RAG processing status
+    "third_party_action",     // External service actions (11 tool names → service badges)
+    "agent_communication",    // Inter-agent messages
+    "knowledge_citation"      // RAG citation references
+  ],
+
+  components: {
+    new_event_components: [
+      "ChannelMessage",       // Color-coded channel badge + message
+      "CallTranscript",       // Voice call transcript with duration
+      "FileUploadEvent",      // Upload progress bar + RAG status
+      "ThirdPartyAction",     // Service icon + action description
+      "AgentComm",            // Agent-to-agent communication display
+      "KnowledgeCitation"     // Document citation with relevance score
+    ]
+  },
+
+  file_upload: {
+    trigger: "Paperclip button + drag-and-drop",
+    flow: "presigned URL → PUT to Supabase Storage → confirm → RAG processing",
+    state: "UPDATE_FILE_UPLOAD action in useStreamState"
+  },
+
+  history_loading: {
+    logic: "Checks msg.channel — non-web_chat messages become channel_message events",
+    display: "Color-coded per channel (SMS=green, voice=blue, email=orange, etc.)"
+  },
+
+  processing_callback: {
+    onToolEnd: "(name, durationMs, meta?: { success?, resultSummary? })",
+    note: "Optional, backward compatible with existing processUserMessage() callers"
+  }
+}
+```
+
+---
+
+## MAPEK Loop System — ✅ IMPLEMENTED
+
+**Three-tier autonomous evaluation and maintenance system.**
+
+> **Implementation (Feb 7-11, 2026):** Three-tier CRON architecture for continuous self-optimization. Per-tenant configuration with gateway auto-creation.
+
+```javascript
+MAPEK_Loop_System = {
+
+  tiers: {
+    petla: {
+      frequency: "Every 1 minute",
+      purpose: "Triage — claim and process pending events",
+      rpc: "claim_petla_event (marks expired pending events as 'ignored' before claiming)",
+      event_expiry: "60min default, 360min for gateway events"
+    },
+
+    loop_15: {
+      frequency: "Every 15 minutes",
+      purpose: "Evaluation — proactive analysis and intervention",
+      prompt: "PROACTIVE mode ('ALWAYS prefer ACTION over silence')",
+      rate_limit: "8 proactive messages per day per tenant",
+      config: "exo_tenant_loop_config entry REQUIRED per tenant (without it, loop-15 skips entirely)"
+    },
+
+    loop_daily: {
+      frequency: "Every 24 hours",
+      purpose: "Maintenance — cleanup, ETL, analysis, optimization",
+      handlers: [
+        "expireOldSuggestions()",      // Expire stale skill suggestions
+        "archiveUnusedSkills()",       // Archive unused dynamic skills
+        "runSilverETL()",             // Bronze → Silver data transformation
+        "refreshGoldViews()",         // Update materialized views
+        "generateDailySummary()",     // AI daily summary
+        "runGapDetection()",          // Weekly gap analysis
+        "knowledge_analysis()"        // Knowledge analysis engine
+      ],
+      note: "Processes ALL maintenance items in while-loop (was 1/day, caused pile-up)"
+    }
+  },
+
+  config: {
+    table: "exo_tenant_loop_config",
+    auto_creation: "Gateway auto-creates config with next_eval_at: now() (NOT future — was deadlock bug)",
+    backfill: "backfillMissingConfigs() in loop-daily for users created via Supabase Auth/Dashboard"
+  },
+
+  logging: {
+    table: "admin_cron_runs",
+    column: "started_at (NOT run_started_at)"
+  }
+}
+```
+
+---
+
+## Autonomous CRONs — ✅ IMPLEMENTED
+
+**Proactive scheduled communications and system maintenance.**
+
+> **Implementation (Feb 11, 2026):** Three autonomous CRON jobs for proactive user engagement and system auto-building.
+
+```javascript
+Autonomous_CRONs = {
+
+  morning_briefing: {
+    schedule: "05:00 UTC daily",
+    content: "Tasks, goals, overnight actions summary",
+    model: "Gemini 2.5 Flash",
+    delivery: "dispatchReport (SMS/email/web based on preferences)"
+  },
+
+  evening_reflection: {
+    schedule: "19:00 UTC daily",
+    content: "Day review, mood check, warm reflection",
+    model: "aiChat (router-selected)",
+    delivery: "dispatchReport"
+  },
+
+  impulse: {
+    schedule: "Every 15 minutes",
+    handlers: {
+      A: "Overdue tasks — notify user of tasks past deadline",
+      B: "Insights — deliver ready insights from analysis engine",
+      C: "Goals — check goal progress, send encouragement or alerts",
+      D: "Interventions — execute approved interventions",
+      E: "Email sync — trigger email provider sync",
+      F: {
+        name: "Auto-builder",
+        description: "Detects gaps and AUTO-BUILDS apps (not just suggests)",
+        builds: ["mood tracker", "habit tracker", "expense tracker"],
+        also: "Creates starter goals (3x) and onboarding tasks",
+        method: "generateApp() — takes ~5-8s, fits in 60s CRON timeout",
+        source: "iors_suggestion",
+        dedup: "auto_build:{gap_id} in exo_proactive_log (14 days for builds, 7 days for suggestions)"
+      }
+    }
+  },
+
+  shared_utilities: {
+    file: "lib/cron/tenant-utils.ts",
+    functions: [
+      "getActiveTenants()",
+      "isWithinHours()",
+      "isQuietHours()",
+      "sendProactiveMessage() — dispatchReport + appendMessage + logProactiveOutbound"
+    ]
+  }
+}
+```
+
+---
+
+## RAG Pipeline — ✅ IMPLEMENTED
+
+**Document processing, chunking, embedding, and semantic search.**
+
+> **Implementation (Feb 10-12, 2026):** Full RAG pipeline from document upload to semantic search. Supports 6 file formats.
+
+```javascript
+RAG_Pipeline = {
+
+  processor: "lib/knowledge/document-processor.ts",
+
+  stages: {
+    extract: {
+      pdf: "pdf-parse (use require(), no default export)",
+      docx: "mammoth",
+      xlsx: "xlsx library",
+      pptx: "jszip (regex: use [^<]* NOT .*? — TS target doesn't support ES2018 /s flag)",
+      txt_md_csv: "Direct text reading"
+    },
+
+    chunk: {
+      strategy: "Recursive text splitting",
+      size: "~500 words per chunk",
+      overlap: "50 words between chunks"
+    },
+
+    embed: {
+      model: "OpenAI text-embedding-3-small",
+      dimensions: 1536,
+      storage: "exo_document_chunks table (pgvector)",
+      note: "For RPC calls, pass raw embedding array (NOT JSON.stringify). For INSERT, JSON.stringify works."
+    },
+
+    search: {
+      function: "search_user_documents() SQL function",
+      method: "Cosine similarity",
+      threshold: 0.3,
+      note: "Searches across all user's document chunks"
+    }
+  },
+
+  iors_tools: [
+    "search_knowledge",   // Search user's knowledge base via semantic similarity
+    "import_url"          // Import web page content into knowledge base
+  ],
+
+  url_import: {
+    processor: "lib/knowledge/url-processor.ts",
+    primary: "Firecrawl v2 (scrape(), returns Document directly)",
+    fallback: "Basic fetch (when Firecrawl unavailable)",
+    note: "Firecrawl v2: scrape() NOT scrapeUrl(), throws on failure (no .success check)"
+  }
+}
+```
+
+---
+
+## Web Search & URL Tools — ✅ IMPLEMENTED
+
+**Internet search and webpage fetching capabilities.**
+
+> **Implementation (Feb 12, 2026):** Two IORS tools for web access.
+
+```javascript
+Web_Search_Tools = {
+
+  file: "lib/iors/tools/web-tools.ts",
+
+  tools: {
+    search_web: {
+      provider: "Tavily",
+      import: "const { tavily } = await import('@tavily/core')",
+      usage: "tavily({ apiKey }) → client.search(query)"
+    },
+
+    fetch_webpage: {
+      primary: "Firecrawl v2 (scrape())",
+      fallback: "Basic fetch with HTML-to-text conversion",
+      env: "FIRECRAWL_API_KEY (optional)"
+    }
+  },
+
+  total_iors_tools: 53
+}
+```
+
+---
+
+## App Builder (AI-Generated Apps) — ✅ IMPLEMENTED
+
+**AI generates custom applications from natural language descriptions.**
+
+> **Implementation (Feb 10, 2026):** AI generates JSON spec → validates → creates DB table via RPC → registers canvas widget. Auto-build capability in impulse Handler F.
+
+```javascript
+App_Builder = {
+
+  flow: "AI generates JSON spec → validate → create_app_table() RPC → register canvas widget",
+
+  table: "exo_generated_apps (slug, spec, columns, tenant_id)",
+  rpc: "create_app_table() — SECURITY DEFINER, creates exo_app_{slug} table",
+
+  security: {
+    prefix: "All app tables prefixed exo_app_",
+    columns: "Column types whitelisted",
+    injection: "SQL injection blocked in RPC"
+  },
+
+  dynamic_crud: {
+    endpoint: "/api/apps/[slug]/data",
+    widget_type: "app:{slug}"
+  },
+
+  iors_tools: [
+    "build_app",        // Create new app from description
+    "list_apps",        // List user's custom apps
+    "app_log_data",     // Log data point to app
+    "app_get_data"      // Query app data
+  ],
+
+  auto_build: {
+    trigger: "Impulse Handler F detects gap",
+    apps: ["mood tracker", "habit tracker", "expense tracker"],
+    method: "generateApp() — ~5-8s execution",
+    dedup: "auto_build:{gap_id} in exo_proactive_log"
+  }
+}
+```
+
+---
+
+## Canvas Widget System — ✅ IMPLEMENTED
+
+**Customizable dashboard with 18 built-in widget types.**
+
+> **Implementation (Feb 9, 2026):** react-grid-layout v2.2.2 with self-fetching wrappers.
+
+```javascript
+Canvas_Widgets = {
+
+  library: "react-grid-layout v2.2.2",
+  api_notes: {
+    width: "useContainerWidth (NOT WidthProvider)",
+    drag: "dragConfig.handle (NOT draggableHandle)",
+    compact: "verticalCompactor (NOT compactType)"
+  },
+
+  builtin_types: [
+    "tasks", "mood", "habit", "sleep", "activity",
+    "goals", "health", "schedule", "knowledge",
+    "skills", "emotion", "social", "finance",
+    "weather", "notes", "quick_log",
+    "knowledge_insights",   // #17 — Knowledge analysis widget
+    "email_inbox"           // #18 — Email inbox widget
+  ],
+
+  dynamic_types: [
+    "app:{slug}",           // AI-generated app widgets
+    "dynamic_mod:{slug}"    // Dynamic skill widgets
+  ],
+
+  self_fetching: "CanvasGrid wraps all props-based widgets with self-fetching wrappers (fetch → skeleton → render)"
+}
+```
+
+---
+
+## Presigned Uploads — ✅ IMPLEMENTED
+
+**Direct client-to-storage uploads bypassing Vercel body limit.**
+
+> **Implementation (Feb 8, 2026):** Presigned upload URLs for Supabase Storage.
+
+```javascript
+Presigned_Uploads = {
+
+  problem: "Vercel serverless has hard 4.5MB body limit (no override)",
+  solution: "Client uploads directly to Supabase Storage via presigned URL",
+
+  flow: [
+    "1. Client calls /api/knowledge/upload-url → gets { signedUrl, token }",
+    "2. Client PUTs file directly to Supabase Storage (signed URL valid 5 minutes)",
+    "3. Client calls /api/knowledge/confirm-upload → triggers RAG processing"
+  ],
+
+  method: "createSignedUploadUrl() returns { signedUrl, token }"
+}
+```
+
+---
+
+## Settings Self-Modify — ✅ IMPLEMENTED
+
+**User-configurable AI behavior and permission system.**
+
+> **Implementation (Feb 10, 2026):** 22 permission categories with two-tier consent.
+
+```javascript
+Settings_Self_Modify = {
+
+  tenant_columns: [
+    "iors_custom_instructions",   // Free-text custom instructions for AI
+    "iors_behavior_presets",      // Pre-defined behavior profiles
+    "iors_ai_config"              // AI configuration overrides
+  ],
+
+  permission_system: {
+    categories: 22,
+    tiers: {
+      with_approval: "AI proposes action, user approves",
+      autonomous: "AI acts without asking"
+    }
+  }
+}
+```
+
+---
+
+## Self-Optimization Dashboard — ✅ IMPLEMENTED
+
+**Admin dashboard for monitoring and controlling the self-optimization engine.**
+
+> **Implementation (Feb 9, 2026):** Three widgets for system optimization visibility.
+
+```javascript
+Self_Optimization_Dashboard = {
+
+  widgets: {
+    OptimizationWidget: {
+      queries: "8 parallel queries for system metrics",
+      displays: "Success rates, response times, model usage, cost breakdown"
+    },
+
+    InterventionInboxWidget: {
+      actions: ["approve", "dismiss", "provide feedback"],
+      endpoint: "/api/interventions/[id]/respond (POST)"
+    },
+
+    InsightHistoryWidget: {
+      displays: "Historical insights with filtering and search"
+    }
+  },
+
+  auto_tuning: {
+    low_satisfaction: "Pivot communication style",
+    low_success: "Escalate to higher AI tier",
+    high_satisfaction: "Boost proactivity level"
+  }
+}
+```
+
+---
+
 # ROADMAP
 
 ### Phase 1: Foundation (Months 1-3) — ✅ COMPLETE
@@ -3222,14 +3737,14 @@ TWILIO_PHONE_NUMBER=+1xxx
 - [ ] **DuckDB query engine integration** (client exists, not fully operational)
 
 **Gateway & SaaS (Week 3-4):** ✅
-- [x] Next.js API Routes (94 endpoints) — replaced Node.js Gateway
+- [x] Next.js API Routes (142 endpoints) — replaced Node.js Gateway
 - [x] Session management (Supabase Auth + cookie SSR middleware)
 - [x] Subscription tables (exo_subscriptions, exo_payments)
 - [x] Usage tracking (exo_ai_usage, admin daily snapshots)
 
 **Voice & Discovery (Week 5-8):** ✅
-- [x] Custom voice pipeline: Twilio → ElevenLabs STT → Claude Sonnet 4 → ElevenLabs TTS
-- [x] 17 voice tools (tasks, mods, calls, SMS, email, memory, autonomy)
+- [x] Custom voice pipeline: Twilio → Cartesia Sonic 3 STT → Claude Sonnet 4 → Cartesia Sonic 3 TTS (streaming Haiku pipeline)
+- [x] 53 IORS tools (tasks, mods, calls, SMS, email, memory, autonomy, knowledge, web search, apps, and more)
 - [x] Outbound calling + delegate calling (call third parties on user behalf)
 - [x] Discovery/onboarding conversation system (~60 topics)
 
@@ -3255,10 +3770,10 @@ TWILIO_PHONE_NUMBER=+1xxx
 - [x] File upload (PDF, DOCX, images, video up to 1GB)
 - [x] Document chunking with pgvector embeddings for semantic search
 
-### Phase 2: Intelligence (Months 4-6) — ⏳ IN PROGRESS
+### Phase 2: Intelligence (Months 4-6) — ✅ MOSTLY COMPLETE
 
-- [ ] Full Kimi K2.5 Swarm integration (100-agent parallel)
-- [x] Guardian system + MAPE-K tables + intervention executor (partial)
+- [ ] Full Kimi K2.5 Swarm integration (100-agent parallel) — Kimi K2.5 has no API key (placeholder only)
+- [x] Guardian system + MAPE-K 3-tier loop (petla 1min, loop-15 15min, loop-daily 24h) + intervention executor
 - [x] Full gap detection system (Layer 8) — weekly CRON (Sun 09:00), 7 life domains, skill suggestions, auto-expire 14d
 - [x] Self-Defining Success Metrics (Layer 9) — AI goal extraction, auto-progress tracking, momentum/trajectory, voice tools, dashboard
 - [x] **Emotion Intelligence Layer (Layer 11) — Phase 1 + Phase 2**
@@ -3288,6 +3803,24 @@ TWILIO_PHONE_NUMBER=+1xxx
   - [x] Pre-approval sandbox testing + circuit breaker auto-revoke
 - [ ] Pattern detection on Data Lake (DuckDB queries on Bronze)
 
+### Phase 2.5: Systems Integration (Feb 7-12, 2026) — ✅ COMPLETE
+
+- [x] **Unified Message Gateway** — 12 channels, all route through handleInboundMessage() → processUserMessage() (53 IORS tools)
+- [x] **Email Analysis System** — Multi-provider (Gmail/Outlook/IMAP), 2-phase AI classification, RAG knowledge extraction, 4 IORS tools, 2 CRONs (email-sync 15min, email-analyze 5min)
+- [x] **Chat Rzeka / Unified Activity Stream** — 15 StreamEvent types, 6 event components, SSE real-time, file upload with drag-and-drop
+- [x] **MAPEK Loop System** — 3-tier CRON: petla (1min triage), loop-15 (15min evaluation), loop-daily (24h maintenance, 7 handlers)
+- [x] **Autonomous CRONs** — morning-briefing (05:00 UTC), evening-reflection (19:00 UTC), impulse (15min, 6 handlers incl. auto-builder)
+- [x] **RAG Pipeline** — Document processor (PDF/DOCX/XLSX/PPTX/TXT), chunking (~500 words, 50 overlap), OpenAI text-embedding-3-small (1536 dims), cosine similarity search
+- [x] **Web Search & URL Tools** — Tavily search + Firecrawl v2 URL import, 2 IORS tools
+- [x] **App Builder** — AI JSON spec → validate → DB table → canvas widget, 4 IORS tools, auto-build in impulse Handler F
+- [x] **Canvas Widget System** — 18 built-in types + dynamic (app:slug, dynamic_mod:slug), react-grid-layout v2.2.2
+- [x] **Presigned Uploads** — Client → Supabase Storage direct upload (bypasses Vercel 4.5MB limit)
+- [x] **Settings Self-Modify** — 22 permission categories, two-tier consent system (with_approval + autonomous)
+- [x] **Self-Optimization Dashboard** — OptimizationWidget (8 parallel queries), InterventionInbox (approve/dismiss), InsightHistory
+- [x] **Knowledge Analysis Engine** — Light (rule-based, $0) + deep (AI via Haiku), 17 parallel queries, 7 action types
+- [x] **GHL Integration** — SMS, Email, WhatsApp, Messenger, Instagram, CRM, workflows
+- [x] **In-Chat Onboarding** — Gateway checks onboarding_status, profile extraction via ###PROFILE_DATA### JSON block
+
 ### Phase 3: Expansion (Months 7-12) — ⏳ PLANNED
 
 - [ ] More Mod executors — can now be AI-generated via Dynamic Skills pipeline
@@ -3295,18 +3828,16 @@ TWILIO_PHONE_NUMBER=+1xxx
   - [ ] Community skills marketplace (Exoskulleton: community-contributed, verified dynamic skills)
 - [ ] More Rig clients (Fitbit, Apple Health, Plaid, Home Assistant, Philips Hue)
 - [x] Device integrations: Oura Ring, Google Fit (partial)
-- [ ] Full multi-channel: WhatsApp (placeholder), Messenger (placeholder)
-- [ ] GoHighLevel integration (CRM, social media, calendar)
 - [ ] Smartglasses integration (Meta Ray-Ban)
-- [ ] Voice cloning (ElevenLabs - custom voice)
+- [ ] Voice cloning (custom voice)
 - [ ] Mobile app (React Native)
 
 ---
 
-**Version:** 4.0
-**Status:** MVP Live — Active Development
+**Version:** 5.0
+**Status:** MVP Live — Active Development (142 API routes, 53 IORS tools, 28 CRONs, 56 migrations, 18 canvas widgets)
 **Created:** 2026-02-01
-**Updated:** 2026-02-06
+**Updated:** 2026-02-12
 
 ---
 
