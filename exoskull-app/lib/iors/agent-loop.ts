@@ -85,9 +85,9 @@ export const WEB_AGENT_CONFIG: AgentLoopConfig = {
 };
 
 export const VOICE_AGENT_CONFIG: AgentLoopConfig = {
-  maxSteps: 3,
-  budgetMs: 25_000, // 25s — voice needs fast responses
-  followUpMaxTokens: 300,
+  maxSteps: 6, // Increased: same knowledge/tools as web, streaming mitigates latency
+  budgetMs: 40_000, // 40s — Railway has no hard timeout like Vercel
+  followUpMaxTokens: 512,
 };
 
 export const ASYNC_AGENT_CONFIG: AgentLoopConfig = {

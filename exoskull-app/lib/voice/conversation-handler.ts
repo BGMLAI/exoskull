@@ -15,12 +15,8 @@ import {
   executeExtensionTool,
   getToolsForTenant,
 } from "@/lib/iors/tools";
-import { buildDynamicContext, buildVoiceContext } from "./dynamic-context";
-import {
-  appendMessage,
-  getThreadContext,
-  getVoiceThreadContext,
-} from "../unified-thread";
+import { buildDynamicContext } from "./dynamic-context";
+import { appendMessage, getThreadContext } from "../unified-thread";
 import { analyzeEmotion } from "@/lib/emotion";
 import { detectCrisis } from "@/lib/emotion/crisis-detector";
 import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
@@ -380,13 +376,11 @@ export async function processUserMessage(
   const isVoiceChannel = options?.channel === "voice";
   const preStartTime = Date.now();
 
-  // ── VOICE PATH: lightweight context, skip emotion, fewer thread messages ──
-  // ── WEB PATH: full context + emotion + 50 thread messages ──
+  // ── ALL CHANNELS: same full context, same thread, same knowledge ──
+  // Voice channel: skip emotion analysis (speed) but get FULL context + thread
   const [dynamicContextResult, emotionState, rawThreadMessages] =
     await Promise.all([
-      isVoiceChannel
-        ? buildVoiceContext(session.tenantId)
-        : buildDynamicContext(session.tenantId),
+      buildDynamicContext(session.tenantId),
       isVoiceChannel
         ? Promise.resolve({
             primary_emotion: "neutral" as const,
@@ -400,42 +394,15 @@ export async function processUserMessage(
             raw_data: {},
           })
         : analyzeEmotion(userMessage),
-      isVoiceChannel
-        ? getVoiceThreadContext(session.tenantId, 20)
-            .then((msgs) =>
-              msgs
-                .filter((m) => m.role === "user" || m.role === "assistant")
-                .map((m) => {
-                  const tag =
-                    m.channel === "voice"
-                      ? "[Voice] "
-                      : m.channel === "web_chat"
-                        ? "[Chat] "
-                        : `[${m.channel}] `;
-                  return {
-                    role: m.role as "user" | "assistant",
-                    content: (m.role === "user" ? tag : "") + (m.content || ""),
-                  };
-                }),
-            )
-            .catch((err) => {
-              console.error(
-                "[ConversationHandler] Voice thread context failed:",
-                err,
-              );
-              return [] as { role: "user" | "assistant"; content: string }[];
-            })
-        : getThreadContext(session.tenantId, 50).catch((err) => {
-            console.error("[ConversationHandler] Thread context failed:", err);
-            return [] as { role: "user" | "assistant"; content: string }[];
-          }),
+      getThreadContext(session.tenantId, 50).catch((err) => {
+        console.error("[ConversationHandler] Thread context failed:", err);
+        return [] as { role: "user" | "assistant"; content: string }[];
+      }),
     ]);
 
-  if (isVoiceChannel) {
-    logger.info(
-      `[ConversationHandler] Voice pre-processing: ${Date.now() - preStartTime}ms`,
-    );
-  }
+  logger.info(
+    `[ConversationHandler] Context loaded in ${Date.now() - preStartTime}ms (channel: ${options?.channel || "web_chat"})`,
+  );
 
   // Extract per-user config from dynamic context result
   const dynamicContext = dynamicContextResult.context;
@@ -447,27 +414,21 @@ export async function processUserMessage(
   const resolvedModel = isVoice
     ? VOICE_MODEL // Haiku for voice — 3-5x faster
     : CHAT_MODEL_MAP[chatModelPref] || DEFAULT_CLAUDE_MODEL;
-  // Load dynamic tools for web chat (voice uses static subset for speed)
-  let activeTools: Anthropic.Tool[];
-  if (isVoice) {
-    activeTools = VOICE_TOOLS;
-  } else {
-    // Merge static + dynamic (tenant-specific) tools
-    const { definitions, dynamicCount } = await getToolsForTenant(
-      session.tenantId,
-    );
-    activeTools = definitions.map((tool, i, arr) =>
-      i === arr.length - 1
-        ? { ...tool, cache_control: { type: "ephemeral" as const } }
-        : tool,
-    );
-    if (dynamicCount > 0) {
-      logger.info("[ConversationHandler] Dynamic tools loaded:", {
-        tenantId: session.tenantId,
-        dynamicCount,
-        totalTools: activeTools.length,
-      });
-    }
+  // ALL channels get full tools (same knowledge, same capabilities)
+  const { definitions, dynamicCount } = await getToolsForTenant(
+    session.tenantId,
+  );
+  const activeTools: Anthropic.Tool[] = definitions.map((tool, i, arr) =>
+    i === arr.length - 1
+      ? { ...tool, cache_control: { type: "ephemeral" as const } }
+      : tool,
+  );
+  if (dynamicCount > 0) {
+    logger.info("[ConversationHandler] Dynamic tools loaded:", {
+      tenantId: session.tenantId,
+      dynamicCount,
+      totalTools: activeTools.length,
+    });
   }
 
   // Override Anthropic client with tenant's own key if configured
@@ -664,10 +625,10 @@ export async function processUserMessage(
     options?.callback?.onThinkingStep?.("Ładuję kontekst", "done");
     options?.callback?.onThinkingStep?.("Generuję odpowiedź", "running");
 
-    // First API call (max_tokens low for voice = short, fast responses)
+    // max_tokens: voice gets 300 (short but enough for tools), web gets full budget
     // system + tools use cache_control for ~6K cached tokens (90% input savings)
     const effectiveMaxTokens = isVoice
-      ? 150
+      ? 300
       : session.maxTokens || maxTokensOverride || 200;
 
     logger.info("[ConversationHandler] Calling Claude API:", {
