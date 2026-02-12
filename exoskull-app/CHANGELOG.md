@@ -4,10 +4,31 @@ All notable changes to this project.
 
 ---
 
-## [2026-02-12] Middleware Fix — Reprocess-All Endpoint Auth
+## [2026-02-12] File Upload Fix + Reprocess + Middleware
 
-- Fixed `/api/knowledge/reprocess-all` blocked by auth middleware (was missing from public API routes)
-- Added to `isPublicApi` in `lib/supabase/middleware.ts`
+### File Upload Fix (Chat Rzeka)
+
+- **Root cause**: `handleFileUpload` in UnifiedStream.tsx extracted `path` from upload-url response (doesn't exist), should use `documentId`
+- Confirm-upload received `{path, filename, fileType, fileSize}` instead of `{documentId}` → "Document not found" → "Blad przetwarzania"
+- Now correctly sends `{documentId}` and uses server-side `mimeType` for Storage PUT
+- Also sends `fileSize` to upload-url for accurate DB record
+
+### Reprocess-All Batching
+
+- Added `offset`, `limit`, `delete_chunks` params to `/api/knowledge/reprocess-all`
+- Vercel Hobby has 60s timeout — 84 docs need batching (10 per request)
+- Fixed double `req.json()` parse bug (body consumed twice)
+- **Result**: 84/86 docs reprocessed successfully (2 failed: missing storage files)
+
+### Middleware Fix
+
+- Added `/api/knowledge/reprocess-all` to public API routes in middleware
+- Was returning 401 because endpoint wasn't in `isPublicApi` list
+
+### Migration Applied
+
+- `20260223000001_fix_knowledge_search.sql` — applied to production Supabase
+- `search_user_documents()` returns `original_name`, threshold lowered to 0.3
 
 ---
 
