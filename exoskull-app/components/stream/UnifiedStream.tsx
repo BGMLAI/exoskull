@@ -76,7 +76,8 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
 
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const polishVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ttsAbortRef = useRef<AbortController | null>(null);
 
   // Load TTS preference
   useEffect(() => {
@@ -88,58 +89,82 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
     }
   }, []);
 
-  // Find best Polish voice
+  // Cleanup audio on unmount
   useEffect(() => {
-    function pickVoice() {
-      const voices = window.speechSynthesis?.getVoices() || [];
-      const polish = voices.filter(
-        (v) => v.lang === "pl-PL" || v.lang.startsWith("pl"),
-      );
-      polishVoiceRef.current =
-        polish.find((v) => v.name.includes("Google")) ||
-        polish.find((v) => !v.localService) ||
-        polish[0] ||
-        null;
-    }
-    pickVoice();
-    window.speechSynthesis?.addEventListener("voiceschanged", pickVoice);
     return () => {
-      window.speechSynthesis?.removeEventListener("voiceschanged", pickVoice);
-      window.speechSynthesis?.cancel();
+      ttsAbortRef.current?.abort();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
     };
   }, []);
 
   const speakText = useCallback(
-    (text: string) => {
-      if (!ttsEnabled || !window.speechSynthesis) return;
-      // Strip markdown formatting for cleaner speech
-      const clean = text
-        .replace(/\*\*([^*]+)\*\*/g, "$1")
-        .replace(/\*([^*]+)\*/g, "$1")
-        .replace(/#{1,6}\s/g, "")
-        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-        .replace(/```[\s\S]*?```/g, "")
-        .replace(/`([^`]+)`/g, "$1")
-        .replace(/[-*] /g, "")
-        .trim();
-      if (!clean) return;
+    async (text: string) => {
+      if (!ttsEnabled) return;
 
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(clean);
-      if (polishVoiceRef.current) utterance.voice = polishVoiceRef.current;
-      utterance.lang = "pl-PL";
-      utterance.rate = 1.1;
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-      window.speechSynthesis.speak(utterance);
+      // Cancel any in-flight TTS
+      ttsAbortRef.current?.abort();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+
+      const controller = new AbortController();
+      ttsAbortRef.current = controller;
+
+      try {
+        setIsSpeaking(true);
+
+        const res = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, voice: "nova" }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          console.error("[TTS] API error:", res.status);
+          setIsSpeaking(false);
+          return;
+        }
+
+        const audioBlob = await res.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        audioRef.current = audio;
+
+        audio.onended = () => {
+          setIsSpeaking(false);
+          URL.revokeObjectURL(audioUrl);
+          audioRef.current = null;
+        };
+        audio.onerror = () => {
+          setIsSpeaking(false);
+          URL.revokeObjectURL(audioUrl);
+          audioRef.current = null;
+        };
+
+        await audio.play();
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          console.error("[TTS] Playback error:", err);
+        }
+        setIsSpeaking(false);
+      }
     },
     [ttsEnabled],
   );
 
   const toggleTTS = useCallback(() => {
     if (isSpeaking) {
-      window.speechSynthesis?.cancel();
+      // Stop current playback
+      ttsAbortRef.current?.abort();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
       setIsSpeaking(false);
     } else {
       const next = !ttsEnabled;
@@ -149,8 +174,9 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
       } catch {
         /* noop */
       }
-      if (!next) {
-        window.speechSynthesis?.cancel();
+      if (!next && audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
         setIsSpeaking(false);
       }
     }
