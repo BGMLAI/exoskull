@@ -4,6 +4,58 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-12] ConversationRelay Voice Pipeline — Live
+
+### Twilio Signature Fix (CRITICAL)
+
+- **Root cause**: Signature verification URL mismatch — code validated against `/api/twilio/voice?action=start` but Twilio signs against `/api/twilio/voice` (no query params for initial call)
+- All voice calls were returning HTTP 403 → Twilio played "application error" message
+- **Fix**: Use actual request URL (`url.pathname + url.search`) instead of hardcoded query params
+- File: `app/api/twilio/voice/route.ts:82-86`
+
+### Streaming Voice Pipeline (Performance)
+
+- Voice channel now uses **Claude 3.5 Haiku** instead of Sonnet 4 (~3-5x faster)
+- Reduced voice tools from **51 to 18** essential ones (less prompt tokens)
+- **Token streaming** via `anthropic.messages.stream()` — tokens sent to ConversationRelay as they arrive
+- User hears first words in ~0.5-1s instead of waiting 3-8s for full response
+- New `processWithStreaming()` function handles multi-round tool use with streaming
+- Added `channel` and `onTextDelta` options to `processUserMessage()`
+
+### Voice Tool Subset (18 tools)
+
+- Tasks: `add_task`, `complete_task`, `list_tasks`
+- Memory: `search_memory`, `get_daily_summary`, `correct_daily_summary`
+- Goals: `define_goal`, `log_goal_progress`, `check_goals`
+- Planning: `plan_action`
+- Knowledge: `search_knowledge`
+- Communication: `send_sms`, `send_email`
+- Apps/Mods: `log_mod_data`, `get_mod_data`
+- Email: `search_emails`, `email_summary`
+- Emotion: `tau_assess`
+
+### Chat Context in Voice
+
+- Voice pipeline loads last 50 messages from unified thread (includes web chat)
+- `getThreadContext(tenantId, 50)` annotates messages with `[Web Chat]` / `[Voice]` channel tags
+- Claude sees full conversation history across all channels
+
+### Files Changed
+
+- `app/api/twilio/voice/route.ts` — signature verification fix
+- `lib/voice/conversation-handler.ts` — voice model override, tool subset, streaming
+- `server/voice-ws.ts` — streaming token delivery, channel="voice"
+
+### How to Verify
+
+1. Call +48732143210
+2. Expect: natural ElevenLabs voice (not robotic Polly.Maja)
+3. Expect: fast response (~1-3s vs 5-8s before)
+4. Expect: knowledge of web chat context
+5. Check Railway logs: "Claude Haiku 3.5 + streaming + 18 tools"
+
+---
+
 ## [2026-02-12] TTS Fix + Knowledge Search Fix (HNSW)
 
 ### TTS (Text-to-Speech) Fix
