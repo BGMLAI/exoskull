@@ -4,6 +4,29 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-12] Fix: Ralph Loop + App Layouts Applied
+
+### What was done
+- **Fixed Ralph Loop `observe()`** — was querying non-existent `exo_gap_detections` table, now uses `exo_proactive_log` with `trigger_type 'auto_build:%'` pattern
+- **Applied new layouts to all 6 existing apps** (previously all used default "table"):
+  - `mood-energy-tracker` → **timeline** (chronological mood entries)
+  - `habit-tracker` → **kanban** (habits grouped by name)
+  - `expense-tracker` → **stats-grid** (financial summary cards)
+  - `gastro-equipment-sales` → **cards** (product inventory cards with badges)
+  - `gastro-equipment-sales-cawt` → **kanban** (sales pipeline: wycena → wystawione → zapytanie → sprzedane)
+  - `gastro-equipment-pricing` → **stats-grid** (pricing dashboard with totals)
+
+### Why
+- User reported "nothing changed" after deploy — correct, all changes were backend/infrastructure
+- Root cause 1: Ralph Loop referenced missing table → would crash at runtime
+- Root cause 2: Existing apps had no `layout` field → defaulted to "table" (same as before new layouts)
+
+### Files changed
+- `lib/iors/ralph-loop.ts` — fixed `observe()` gap detection query
+- Database: 6 `exo_generated_apps` rows updated with new `ui_config.layout`
+
+---
+
 ## [2026-02-12] Self-Building System — Ralph Loop + Dynamic UI + Chat Rzeka Evolution
 
 ### What was done
