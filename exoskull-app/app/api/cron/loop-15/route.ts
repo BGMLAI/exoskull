@@ -294,10 +294,41 @@ async function handler(req: NextRequest) {
       }
     }
 
+    // Step 4: Ralph Loop — autonomous development cycle (1 per run)
+    let ralphResult = null;
+    if (Date.now() - startTime < TIMEOUT_MS - 15_000 && tenants.length > 0) {
+      try {
+        const { runRalphCycle } = await import("@/lib/iors/ralph-loop");
+        const remainingMs = TIMEOUT_MS - (Date.now() - startTime);
+        // Run for first tenant that had activity (not sleeping)
+        const activeTenant = evaluationResults.find(
+          (r) => r.action !== "sleep",
+        );
+        if (activeTenant) {
+          ralphResult = await runRalphCycle(
+            activeTenant.tenantId,
+            Math.min(remainingMs - 5000, 20_000),
+          );
+        }
+      } catch (ralphErr) {
+        console.error("[Loop15] Ralph cycle failed:", {
+          error: ralphErr instanceof Error ? ralphErr.message : ralphErr,
+        });
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       evaluated,
       workProcessed,
+      ralph: ralphResult
+        ? {
+            outcome: ralphResult.outcome,
+            action: ralphResult.action.type,
+            description: ralphResult.action.description,
+            durationMs: ralphResult.durationMs,
+          }
+        : null,
       evaluations: evaluationResults,
       durationMs: Date.now() - startTime,
     });
