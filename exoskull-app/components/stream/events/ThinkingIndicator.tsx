@@ -36,10 +36,10 @@ export function ThinkingIndicator({ event }: ThinkingIndicatorProps) {
   const currentStep = data.steps.find((s) => s.status === "running");
   const label = currentStep?.label || (allDone ? "Gotowe" : "Przetwarzam...");
 
-  // Auto-collapse 2s after all steps complete
+  // Auto-collapse 30s after all steps complete (Phase 1: Foundation improvement)
   useEffect(() => {
     if (allDone && expanded) {
-      collapseTimer.current = setTimeout(() => setExpanded(false), 2000);
+      collapseTimer.current = setTimeout(() => setExpanded(false), 30_000); // 30 seconds
     }
     return () => {
       if (collapseTimer.current) clearTimeout(collapseTimer.current);

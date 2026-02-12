@@ -151,6 +151,18 @@
     {
       "path": "/api/cron/impulse",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/integration-health",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/email-sync",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/email-analyze",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
