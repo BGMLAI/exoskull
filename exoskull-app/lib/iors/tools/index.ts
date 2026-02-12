@@ -85,6 +85,30 @@ export function getExtensionToolDefinitions(): Anthropic.Tool[] {
 }
 
 /**
+ * Get all tools for a tenant: static IORS tools + dynamic tools from DB.
+ * Dynamic tools are prefixed with "dyn_" and cached per tenant (5 min).
+ */
+export async function getToolsForTenant(tenantId: string): Promise<{
+  definitions: Anthropic.Tool[];
+  dynamicCount: number;
+}> {
+  // Lazy import to avoid circular deps
+  const { getDynamicToolsForTenant } = await import("./dynamic-handler");
+  const dynamicTools = await getDynamicToolsForTenant(tenantId);
+
+  if (dynamicTools.length === 0) {
+    return { definitions: getExtensionToolDefinitions(), dynamicCount: 0 };
+  }
+
+  const allDefs = [
+    ...IORS_EXTENSION_TOOLS.map((t) => t.definition),
+    ...dynamicTools.map((t) => t.definition),
+  ];
+
+  return { definitions: allDefs, dynamicCount: dynamicTools.length };
+}
+
+/**
  * Execute an extension tool by name.
  * Returns null if the tool is not found (not an extension tool).
  * Logs telemetry to exo_tool_executions (fire-and-forget).
@@ -96,7 +120,20 @@ export async function executeExtensionTool(
   input: Record<string, unknown>,
   tenantId: string,
 ): Promise<string | null> {
-  const tool = IORS_EXTENSION_TOOLS.find((t) => t.definition.name === toolName);
+  let tool = IORS_EXTENSION_TOOLS.find((t) => t.definition.name === toolName);
+
+  // If not found in static tools, check dynamic tools (dyn_* prefix)
+  if (!tool && toolName.startsWith("dyn_")) {
+    try {
+      const { getDynamicToolsForTenant } = await import("./dynamic-handler");
+      const dynamicTools = await getDynamicToolsForTenant(tenantId);
+      tool =
+        dynamicTools.find((t) => t.definition.name === toolName) || undefined;
+    } catch {
+      // Dynamic tool lookup failed — fall through to null
+    }
+  }
+
   if (!tool) return null;
 
   const startMs = Date.now();

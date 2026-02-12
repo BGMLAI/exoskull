@@ -13,6 +13,7 @@ import { STATIC_SYSTEM_PROMPT } from "./system-prompt";
 import {
   getExtensionToolDefinitions,
   executeExtensionTool,
+  getToolsForTenant,
 } from "@/lib/iors/tools";
 import { buildDynamicContext } from "./dynamic-context";
 import { appendMessage, getThreadContext } from "../unified-thread";
@@ -393,7 +394,28 @@ export async function processUserMessage(
   const resolvedModel = isVoice
     ? VOICE_MODEL // Haiku for voice — 3-5x faster
     : CHAT_MODEL_MAP[chatModelPref] || DEFAULT_CLAUDE_MODEL;
-  const activeTools = isVoice ? VOICE_TOOLS : IORS_TOOLS;
+  // Load dynamic tools for web chat (voice uses static subset for speed)
+  let activeTools: Anthropic.Tool[];
+  if (isVoice) {
+    activeTools = VOICE_TOOLS;
+  } else {
+    // Merge static + dynamic (tenant-specific) tools
+    const { definitions, dynamicCount } = await getToolsForTenant(
+      session.tenantId,
+    );
+    activeTools = definitions.map((tool, i, arr) =>
+      i === arr.length - 1
+        ? { ...tool, cache_control: { type: "ephemeral" as const } }
+        : tool,
+    );
+    if (dynamicCount > 0) {
+      logger.info("[ConversationHandler] Dynamic tools loaded:", {
+        tenantId: session.tenantId,
+        dynamicCount,
+        totalTools: activeTools.length,
+      });
+    }
+  }
 
   // Override Anthropic client with tenant's own key if configured
   const tenantAnthropicKey = aiConfig?.providers?.anthropic?.api_key;

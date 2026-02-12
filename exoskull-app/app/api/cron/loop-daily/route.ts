@@ -200,6 +200,7 @@ async function handler(req: NextRequest) {
       { handler: "etl_gold", priority: 5 },
       { handler: "highlight_decay", priority: 5 },
       { handler: "skill_lifecycle", priority: 5 },
+      { handler: "knowledge_analysis", priority: 4 },
     ];
 
     let maintenanceSeeded = 0;

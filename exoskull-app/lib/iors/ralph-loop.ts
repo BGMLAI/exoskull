@@ -546,6 +546,16 @@ async function build(
           error: `Tool registration failed: ${error.message}`,
         };
       }
+
+      // Invalidate dynamic tool cache so next request picks it up
+      try {
+        const { invalidateDynamicToolCache } =
+          await import("@/lib/iors/tools/dynamic-handler");
+        invalidateDynamicToolCache(tenantId);
+      } catch {
+        // Non-critical — cache will expire naturally in 5 min
+      }
+
       return {
         success: true,
         result: `Zarejestrowano nowy tool: ${action.params.name}`,
