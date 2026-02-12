@@ -5,7 +5,7 @@
 
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { dispatchReport } from "@/lib/reports/report-dispatcher";
-import { appendMessage } from "@/lib/unified-thread";
+// appendMessage removed — dispatchReport already writes to unified thread
 import { logProactiveOutbound } from "@/lib/autonomy/outbound-triggers";
 import { logger } from "@/lib/logger";
 
@@ -105,20 +105,8 @@ export async function sendProactiveMessage(
   source: string = "cron",
 ): Promise<{ success: boolean; channel?: string }> {
   try {
+    // dispatchReport already appends to unified thread — don't double-write
     const result = await dispatchReport(tenantId, message, "insight");
-
-    await appendMessage(tenantId, {
-      role: "assistant",
-      content: message,
-      channel: (result.channel || "web_chat") as any,
-      direction: "outbound",
-      source_type: "web_chat",
-      metadata: {
-        autonomous: true,
-        trigger_type: triggerType,
-        source,
-      },
-    });
 
     await logProactiveOutbound(
       tenantId,

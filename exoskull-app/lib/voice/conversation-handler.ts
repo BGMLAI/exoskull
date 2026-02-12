@@ -16,7 +16,11 @@ import {
   getToolsForTenant,
 } from "@/lib/iors/tools";
 import { buildDynamicContext, buildVoiceContext } from "./dynamic-context";
-import { appendMessage, getThreadContext } from "../unified-thread";
+import {
+  appendMessage,
+  getThreadContext,
+  getConversationalMessages,
+} from "../unified-thread";
 import { analyzeEmotion } from "@/lib/emotion";
 import { detectCrisis } from "@/lib/emotion/crisis-detector";
 import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
@@ -396,12 +400,35 @@ export async function processUserMessage(
             raw_data: {},
           })
         : analyzeEmotion(userMessage),
-      getThreadContext(session.tenantId, isVoiceChannel ? 10 : 50).catch(
-        (err) => {
-          console.error("[ConversationHandler] Thread context failed:", err);
-          return [] as { role: "user" | "assistant"; content: string }[];
-        },
-      ),
+      isVoiceChannel
+        ? getConversationalMessages(session.tenantId, 20)
+            .then((msgs) =>
+              msgs
+                .filter((m) => m.role === "user" || m.role === "assistant")
+                .map((m) => {
+                  const tag =
+                    m.channel === "voice"
+                      ? "[Voice] "
+                      : m.channel === "web_chat"
+                        ? "[Web Chat] "
+                        : `[${m.channel}] `;
+                  return {
+                    role: m.role as "user" | "assistant",
+                    content: (m.role === "user" ? tag : "") + (m.content || ""),
+                  };
+                }),
+            )
+            .catch((err) => {
+              console.error(
+                "[ConversationHandler] Conversational context failed:",
+                err,
+              );
+              return [] as { role: "user" | "assistant"; content: string }[];
+            })
+        : getThreadContext(session.tenantId, 50).catch((err) => {
+            console.error("[ConversationHandler] Thread context failed:", err);
+            return [] as { role: "user" | "assistant"; content: string }[];
+          }),
     ]);
 
   if (isVoiceChannel) {

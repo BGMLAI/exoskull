@@ -212,6 +212,68 @@ export async function getRecentMessages(
   return (data || []).reverse();
 }
 
+/**
+ * Get recent CONVERSATIONAL messages (filters out proactive CRON spam).
+ * Loads a larger window, then keeps only messages that are part of actual
+ * conversations (user-initiated exchanges). Proactive-only assistant messages
+ * (nudges, goal reminders, overdue task alerts) are excluded.
+ */
+export async function getConversationalMessages(
+  tenantId: string,
+  limit: number = 20,
+): Promise<UnifiedMessage[]> {
+  const supabase = getServiceSupabase();
+
+  // Load a bigger window to find actual conversations past CRON noise
+  const fetchLimit = Math.max(limit * 5, 100);
+
+  const { data, error } = await supabase
+    .from("exo_unified_messages")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(fetchLimit);
+
+  if (error) {
+    console.error("[UnifiedThread] Error fetching conversational messages:", {
+      tenantId,
+      error: error.message,
+    });
+    return [];
+  }
+
+  if (!data || data.length === 0) return [];
+
+  // Reverse to chronological order for processing
+  const chronological = data.reverse();
+
+  // Mark messages that are part of actual conversations:
+  // A message is "conversational" if it's a user message, or an assistant message
+  // that follows a user message within 2 minutes (a reply, not a proactive push).
+  const conversational: UnifiedMessage[] = [];
+  let lastUserTime: number | null = null;
+
+  for (const msg of chronological) {
+    const msgTime = new Date(msg.created_at).getTime();
+
+    if (msg.role === "user") {
+      lastUserTime = msgTime;
+      conversational.push(msg);
+    } else if (msg.role === "assistant") {
+      // Include if: it's a reply to a user message (within 2 min)
+      const isReply =
+        lastUserTime !== null && msgTime - lastUserTime < 2 * 60 * 1000;
+      if (isReply) {
+        conversational.push(msg);
+      }
+      // Skip proactive messages (assistant-only, no recent user message)
+    }
+  }
+
+  // Take the last N conversational messages
+  return conversational.slice(-limit);
+}
+
 // ============================================================================
 // CONTEXT BUILDER (for Claude)
 // ============================================================================
