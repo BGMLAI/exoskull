@@ -4,6 +4,108 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-13] Phase 2: Infrastructure & Code Generation (In Progress)
+
+### What was done
+
+**Multi-Model Code Router:**
+
+- Created intelligent routing system for code generation tasks (Claude Code / Kimi Code / GPT-o1)
+- Routing logic: Claude Code (default), Kimi Code (long context >100K tokens), GPT-o1 (deep reasoning/algorithms)
+- Automatic fallback chain if primary model fails
+- Health monitoring for all models
+
+**Docker Infrastructure:**
+
+- `infrastructure/docker/Dockerfile.user` — per-user isolated containers (Node.js 20, git, Supabase CLI)
+- `infrastructure/docker/docker-compose.yml` — VPS orchestration (Redis, Prometheus, Grafana)
+- `infrastructure/docker/Dockerfile.orchestrator` — container lifecycle manager
+- Resource limits: 500MB RAM, 0.5 CPU per container (max 100 concurrent users on 32GB VPS)
+- Security: read-only root FS, non-root user, network isolation
+
+**Code Generation System:**
+
+- 4 new IORS tools: `generate_fullstack_app`, `modify_code`, `run_tests`, `deploy_app`
+- Multi-file generation with git integration
+- Workspace management (`exo_code_workspaces`, `exo_generated_files`)
+- Model adapters for Claude Code, Kimi Code, GPT-o1 (scaffolds ready, full implementation pending)
+
+**VPS Deployment:**
+
+- `infrastructure/vps-setup.sh` — one-command VPS installation script
+- Auto-installs: Docker, Caddy (reverse proxy + SSL), Redis, Node.js 20, Prometheus
+- Configures firewall (UFW), SSL certificates (Let's Encrypt via Caddy)
+- Supports Ubuntu 22.04+ and Debian 11+
+
+**Database:**
+
+- Migration `20260213000003_code_workspaces.sql` — tables for code generation workspaces + files
+- RLS policies for per-tenant isolation
+- Indexes for performance
+
+### Why
+
+**Problem:** Vercel serverless limits (60s timeout, no file system, no background processes) block long-running operations like full-stack code generation, Ralph Loop, and multi-file refactoring.
+
+**Solution:** Hybrid architecture — VPS for code generation + long-running tasks, Vercel for fast SSR + simple APIs.
+
+**Impact:**
+
+- Enables full-stack app generation (multi-file React + API + DB migrations)
+- Enables autonomous coding loops (Ralph Loop can run indefinitely)
+- Multi-model routing optimizes cost (use cheapest model that can handle the task)
+- Per-user containers provide isolation and security
+
+### Files changed
+
+**Infrastructure:**
+
+- `infrastructure/docker/Dockerfile.user` — user container spec
+- `infrastructure/docker/docker-compose.yml` — orchestration config
+- `infrastructure/docker/Dockerfile.orchestrator` — orchestrator service
+- `infrastructure/docker/prometheus.yml` — monitoring config
+- `infrastructure/vps-setup.sh` — auto-installation script
+
+**Code Generation:**
+
+- `lib/code-generation/types.ts` — type definitions
+- `lib/code-generation/model-selector.ts` — routing logic
+- `lib/code-generation/executor.ts` — main entry point
+- `lib/code-generation/adapters/claude-code.ts` — Claude Code adapter
+- `lib/code-generation/adapters/kimi-code.ts` — Kimi Code adapter
+- `lib/code-generation/adapters/gpt-o1-code.ts` — GPT-o1 adapter
+- `lib/iors/tools/code-generation-tools.ts` — IORS tool definitions
+- `lib/iors/tools/index.ts` — registered code gen tools
+
+**Database:**
+
+- `supabase/migrations/20260213000003_code_workspaces.sql` — workspace schema
+
+**Fixes:**
+
+- `lib/autonomy/token-refresh.ts` — fixed `dispatchReport` call signature
+- `app/api/cron/integration-health/route.ts` — fixed `dispatchReport` call signature
+
+### How to verify
+
+```bash
+# TypeScript compilation
+cd exoskull-app && npx tsc --noEmit
+# Result: ✅ No errors
+
+# Docker build (when on Linux/Mac)
+cd infrastructure/docker && docker build -f Dockerfile.user -t exoskull/user:latest .
+```
+
+### Notes for future agents
+
+- **Phase 2 Status:** Infrastructure complete, scaffolds ready. Full implementation of model adapters + orchestrator pending.
+- **Next Steps (Phase 2 remaining):** Implement container orchestrator, connect Claude Code CLI, create PC deployment packages (Electron + installers).
+- **PC Deployment Priority:** User explicitly requested PC deployment (Windows/Linux) as PRIORITY before Android.
+- **VPS Setup:** Requires manual provisioning (Hetzner account, domain setup, SSH access) — cannot be automated.
+
+---
+
 ## [2026-02-13] Phase 1: Foundation & Quick Wins - Integration Health + Proactive Token Refresh
 
 ### What was done

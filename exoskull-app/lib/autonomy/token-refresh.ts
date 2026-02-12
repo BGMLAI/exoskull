@@ -146,12 +146,9 @@ export async function refreshAccountToken(
       });
 
       // Alert user to reauthorize
-      await dispatchReport(tenantId, {
-        title: `🔐 ${provider === "gmail" ? "Gmail" : "Outlook"} Reauthorization Needed`,
-        summary: `Your ${provider === "gmail" ? "Gmail" : "Outlook"} integration needs to be reauthorized. Please reconnect your account.`,
-        cta: "/dashboard/settings/integrations",
-        channel: "web_chat",
-      });
+      const providerName = provider === "gmail" ? "Gmail" : "Outlook";
+      const message = `🔐 ${providerName} Reauthorization Needed\n\nYour ${providerName} integration needs to be reauthorized. Please reconnect your account.\n\nGo to: /dashboard/settings/integrations`;
+      await dispatchReport(tenantId, message, "insight");
 
       return {
         success: false,

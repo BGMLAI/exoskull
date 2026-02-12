@@ -1,0 +1,53 @@
+# ExoSkull User Container
+# Phase 2: Per-user isolated environment for code generation
+# Resources: 500MB RAM, 0.5 CPU, read-only root FS
+
+FROM node:20-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    git \
+    bash \
+    curl \
+    postgresql-client \
+    python3 \
+    py3-pip \
+    && rm -rf /var/cache/apk/*
+
+# Install global Node.js tools
+RUN npm install -g \
+    pnpm \
+    supabase@latest \
+    typescript \
+    tsx \
+    && npm cache clean --force
+
+# Create non-root user
+RUN addgroup -g 1000 exoskull \
+    && adduser -D -u 1000 -G exoskull exoskull
+
+# Create workspace directory (will be mounted as volume)
+RUN mkdir -p /workspace \
+    && chown -R exoskull:exoskull /workspace
+
+# Create temp directory (writable)
+RUN mkdir -p /tmp/exoskull \
+    && chown -R exoskull:exoskull /tmp/exoskull
+
+# Switch to non-root user
+USER exoskull
+
+# Set working directory
+WORKDIR /workspace
+
+# Environment variables
+ENV NODE_ENV=production \
+    PNPM_HOME=/home/exoskull/.local/share/pnpm \
+    PATH=/home/exoskull/.local/share/pnpm:$PATH
+
+# Health check (verify Node.js and git available)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD node --version && git --version || exit 1
+
+# Default command (keep container alive)
+CMD ["tail", "-f", "/dev/null"]

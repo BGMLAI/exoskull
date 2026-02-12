@@ -82,12 +82,8 @@ async function handler(_req: NextRequest) {
           .map((i) => i.integration_type)
           .join(", ");
 
-        await dispatchReport(tenant.id, {
-          title: "⚠️ Integration Failed",
-          summary: `${downCount} integration(s) are down: ${downIntegrations}. Please check settings.`,
-          cta: "/dashboard/settings/integrations",
-          channel: "web_chat",
-        });
+        const message = `⚠️ Integration Failed\n\n${downCount} integration(s) are down: ${downIntegrations}. Please check your connections.\n\nGo to: /dashboard/settings/integrations`;
+        await dispatchReport(tenant.id, message, "insight");
 
         alertSent = true;
       }

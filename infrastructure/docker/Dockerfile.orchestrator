@@ -1,0 +1,31 @@
+# ExoSkull Container Orchestrator
+# Manages lifecycle of per-user containers
+
+FROM node:20-alpine
+
+# Install Docker CLI (to manage containers)
+RUN apk add --no-cache \
+    docker-cli \
+    && rm -rf /var/cache/apk/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY pnpm-lock.yaml ./
+
+# Install dependencies
+RUN npm install -g pnpm \
+    && pnpm install --frozen-lockfile --prod \
+    && pnpm store prune
+
+# Copy orchestrator source
+COPY server/orchestrator/ ./orchestrator/
+COPY lib/ ./lib/
+
+# Expose metrics port
+EXPOSE 9100
+
+# Run orchestrator
+CMD ["node", "orchestrator/index.js"]

@@ -48,6 +48,7 @@ import { knowledgeAnalysisTools } from "./knowledge-analysis-tools";
 import { emailTools } from "./email-tools";
 import { webTools } from "./web-tools";
 import { ralphTools } from "./ralph-tools";
+import { codeGenerationTools } from "./code-generation-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -74,6 +75,7 @@ export const IORS_EXTENSION_TOOLS: ToolDefinition[] = [
   ...emailTools,
   ...webTools,
   ...ralphTools,
+  ...codeGenerationTools,
 ];
 
 /**
