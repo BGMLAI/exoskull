@@ -1,0 +1,56 @@
+[    2758ms] [ERROR] Broken trigger flowlet chain! @ https://static.xx.fbcdn.net/rsrc.php/v4/yg/r/MLy8Ba8Q2TC.js:268
+[    2796ms] [ERROR] ErrorUtils caught an error:
+
+JS::requireModule("__inst_41781d56_0_0_iI") did not fire because it has missing dependencies.
+__inst_41781d56_0_0_iI is waiting for __elem_072b8e64_0_0_Dv
+__requireModule____inst_41781d56_0_0_iI__31 is waiting for __inst_41781d56_0_0_iI
+__elem_072b8e64_0_0_Dv is not defined
+
+Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. {column: 180, clientTime: 1770813826, extra: Object, guardList: Array(6), hash: iiodu4} @ https://static.xx.fbcdn.net/rsrc.php/v4/yg/r/MLy8Ba8Q2TC.js:75
+[    2798ms] [ERROR] ErrorUtils caught an error:
+
+JS::call("DevsiteHeaderInteractionsLogger", "registerDialog", ...) did not fire because it has missing dependencies.
+DevsiteHeaderInteractionsLogger is ready
+__call__DevsiteHeaderInteractionsLogger.registerDialog__32 is waiting for __elem_072b8e64_0_0_Dv, __inst_41781d56_0_0_iI
+__elem_072b8e64_0_0_Dv is not defined
+__inst_41781d56_0_0_iI is waiting for __elem_072b8e64_0_0_Dv
+
+Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. {column: 180, clientTime: 1770813826, extra: Object, guardList: Array(6), hash: iiodu4} @ https://static.xx.fbcdn.net/rsrc.php/v4/yg/r/MLy8Ba8Q2TC.js:75
+[    2800ms] [ERROR] ErrorUtils caught an error:
+
+JS::requireModule("__inst_41781d56_0_1_sl") did not fire because it has missing dependencies.
+__inst_41781d56_0_1_sl is waiting for __elem_072b8e64_0_1_AE
+__requireModule____inst_41781d56_0_1_sl__34 is waiting for __inst_41781d56_0_1_sl
+__elem_072b8e64_0_1_AE is not defined
+
+Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. {column: 180, clientTime: 1770813826, extra: Object, guardList: Array(6), hash: iiodu4} @ https://static.xx.fbcdn.net/rsrc.php/v4/yg/r/MLy8Ba8Q2TC.js:75
+[    2801ms] [ERROR] ErrorUtils caught an error:
+
+JS::call("DevsiteHeaderInteractionsLogger", "registerDialog", ...) did not fire because it has missing dependencies.
+DevsiteHeaderInteractionsLogger is ready
+__call__DevsiteHeaderInteractionsLogger.registerDialog__35 is waiting for __elem_072b8e64_0_1_AE, __inst_41781d56_0_1_sl
+__elem_072b8e64_0_1_AE is not defined
+__inst_41781d56_0_1_sl is waiting for __elem_072b8e64_0_1_AE
+
+Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. {column: 180, clientTime: 1770813826, extra: Object, guardList: Array(6), hash: iiodu4} @ https://static.xx.fbcdn.net/rsrc.php/v4/yg/r/MLy8Ba8Q2TC.js:75
+[    2802ms] [ERROR] ErrorUtils caught an error:
+
+JS::requireModule("__inst_41781d56_0_2_nq") did not fire because it has missing dependencies.
+__inst_41781d56_0_2_nq is waiting for __elem_072b8e64_0_2_/Q
+__requireModule____inst_41781d56_0_2_nq__36 is waiting for __inst_41781d56_0_2_nq
+__elem_072b8e64_0_2_/Q is not defined
+
+Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. {column: 180, clientTime: 1770813826, extra: Object, guardList: Array(6), hash: iiodu4} @ https://static.xx.fbcdn.net/rsrc.php/v4/yg/r/MLy8Ba8Q2TC.js:75
+[    2802ms] [ERROR] ErrorUtils caught an error:
+
+JS::call("DevsiteHeaderInteractionsLogger", "registerDialog", ...) did not fire because it has missing dependencies.
+DevsiteHeaderInteractionsLogger is ready
+__call__DevsiteHeaderInteractionsLogger.registerDialog__37 is waiting for __elem_072b8e64_0_2_/Q, __inst_41781d56_0_2_nq
+__elem_072b8e64_0_2_/Q is not defined
+__inst_41781d56_0_2_nq is waiting for __elem_072b8e64_0_2_/Q
+
+Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. {column: 180, clientTime: 1770813826, extra: Object, guardList: Array(6), hash: iiodu4} @ https://static.xx.fbcdn.net/rsrc.php/v4/yg/r/MLy8Ba8Q2TC.js:75
+[  215018ms] [ERROR] The Content Security Policy directive 'upgrade-insecure-requests' is ignored when delivered in a report-only policy. @ https://www.facebook.com/common/referer_frame.php?cb=1:0
+[  215022ms] [ERROR] The Content Security Policy directive 'upgrade-insecure-requests' is ignored when delivered in a report-only policy. @ https://static.xx.fbcdn.net/rsrc.php/v4ivfb4/y7/l/pl_PL-j/jzAuPC9PvRK.js:12
+[  215022ms] [ERROR] The Content Security Policy directive 'upgrade-insecure-requests' is ignored when delivered in a report-only policy. @ https://static.xx.fbcdn.net/rsrc.php/v4ivfb4/y7/l/pl_PL-j/jzAuPC9PvRK.js:12
+[  215231ms] [ERROR] Permissions policy violation: unload is not allowed in this document. @ https://static.xx.fbcdn.net/rsrc.php/v4/yg/r/MLy8Ba8Q2TC.js:326

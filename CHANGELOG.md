@@ -4,6 +4,39 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-12] Full Voice/Web Pipeline Unification + IORS Self-Awareness
+
+### What was done
+
+- **Unified ALL channels** — voice, web, SMS, WhatsApp, email, Telegram, Slack, Discord now run identical pipeline
+- Removed all voice/web branching in `conversation-handler.ts`: emotion analysis, crisis detection, Tau Matrix, tools, agent-loop config, max tokens
+- Voice gets full 53+ IORS tools (was 18), full `buildDynamicContext()` (was lightweight 2-query), full `getThreadContext(50)` (was 20)
+- Agent loop: all channels use WEB_AGENT_CONFIG (10 steps, 55s budget)
+- Only remaining difference: Haiku model for voice (streaming speed), Sonnet for web
+- **Added IORS self-awareness**: 2 new queries in `buildDynamicContext()` — generated apps + last 24h autonomous actions
+- System can now answer "co robiłeś?", "jakie mam aplikacje?", "nad czym pracujesz?"
+
+### Why
+
+- Phone calls had no context from web chat conversations
+- User demanded: ALL channels identical, Chat Rzeka as single source of truth
+- System needed awareness of its own apps, builds, and autonomous actions
+
+### Files changed
+
+- `lib/voice/conversation-handler.ts` — major refactor, removed all voice/web branching
+- `lib/voice/dynamic-context.ts` — added queries #9 (apps) and #10 (proactive actions)
+- `lib/unified-thread.ts` — added `getVoiceThreadContext()` (intermediate, superseded)
+- `lib/iors/agent-loop.ts` — updated VOICE_AGENT_CONFIG (intermediate, now unified)
+
+### Notes for future agents
+
+- `buildDynamicContext()` now runs **10 parallel queries** (was 8)
+- Voice model (Haiku) is the ONLY remaining channel difference — justified by phone TTS latency
+- `buildVoiceContext()` still exists but is no longer called — can be removed in cleanup
+
+---
+
 ## [2026-02-12] Fix: Ralph Loop + App Layouts Applied
 
 ### What was done

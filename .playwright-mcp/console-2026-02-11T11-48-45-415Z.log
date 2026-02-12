@@ -1,0 +1,3 @@
+[     569ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://app.tavily.com/api/organizations:0
+[    1925ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://auth.tavily.com/favicon.ico:0
+[   86172ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://app.tavily.com/api/billing/address:0

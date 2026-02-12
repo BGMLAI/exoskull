@@ -4,6 +4,53 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-12] Full Voice/Web Unification + IORS Self-Awareness
+
+### What was done
+
+**Complete channel unification** — voice and web now run the EXACT same pipeline:
+
+- **Context**: All channels use `buildDynamicContext()` (10 parallel queries) — voice no longer uses lightweight `buildVoiceContext()`
+- **Thread**: All channels use `getThreadContext(50)` — same cross-channel message history
+- **Tools**: All channels get full 53+ IORS tool set (voice was 18, now identical to web)
+- **Emotion**: `analyzeEmotion()` runs for all channels (was skipped for voice)
+- **Crisis**: Full 3-layer detection for all channels (was keyword-only for voice)
+- **Tau Matrix**: Runs for all channels (was skipped for voice)
+- **Agent Loop**: `WEB_AGENT_CONFIG` (10 steps, 55s) for all channels (voice was 3 steps, 25s)
+- **Max tokens**: Session-based for all (voice was hardcoded 150)
+
+**Only remaining difference**: Haiku model for voice (streaming speed for phone TTS), Sonnet for web.
+
+**IORS Self-Awareness** — system now knows what it's doing:
+
+- Query 9: `exo_generated_apps` — lists active/draft/pending apps with status
+- Query 10: `exo_proactive_log` — last 24h autonomous actions (briefings, reflections, builds)
+- New context sections: "MOJE APLIKACJE" and "MOJE OSTATNIE DZIAŁANIA (24h)"
+- When user asks "co robiłeś?" or "nad czym pracujesz?" — IORS can answer accurately
+
+### Why
+
+- User reported phone calls had no context from web chat
+- Escalated to: ALL channels must be identical — same tools, context, knowledge, conversation history
+- Chat Rzeka is single source of truth — phone, SMS, WhatsApp, email, web all see the same data
+- Self-awareness: system must know what apps it built, what stage they're at, what actions it took
+
+### Files Changed
+
+- `lib/voice/conversation-handler.ts` — removed ALL voice/web branching (emotion, crisis, tau, tools, agent-loop, tokens)
+- `lib/voice/dynamic-context.ts` — added apps query (#9) + proactive actions query (#10) + context sections
+- `lib/unified-thread.ts` — added `getVoiceThreadContext()` (intermediate fix, superseded by `getThreadContext()` for all)
+- `lib/iors/agent-loop.ts` — updated VOICE_AGENT_CONFIG (intermediate, now WEB_AGENT_CONFIG for all)
+
+### How to Verify
+
+1. Call voice number → ask "jakie mam aplikacje?" → should list apps
+2. Call voice number → reference something from web chat → should have context
+3. Call voice number → ask "co robiłeś ostatnio?" → should describe autonomous actions
+4. Web chat → same questions → identical answers
+
+---
+
 ## [2026-02-12] Voice-Chat Context Linkage + CRON Deduplication
 
 ### Smart Conversational Context for Voice

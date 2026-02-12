@@ -1,0 +1,11 @@
+[       8ms] [WARNING] Feb-11 13:30:48.430 Couldn't complete metrics measurement for start mark 'session_lifespan' @ https://a.slack-edge.com/bv1-13-br/modern.vendor.a09d5d1dc1c9dbd14c9b.min.js:384
+[       8ms] [WARNING] Feb-11 13:30:48.430 Couldn't complete metrics measurement for start mark 'session_lifespan' @ https://a.slack-edge.com/bv1-13-br/modern.vendor.a09d5d1dc1c9dbd14c9b.min.js:384
+[     144ms] [ERROR] Access to XMLHttpRequest at 'https://slack.com/clog/track/' from origin 'https://api.slack.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://api.slack.com/apps/A0AE8PFDCN9/install-on-team?success=1:0
+[     144ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://slack.com/clog/track/:0
+[  692636ms] [ERROR] ErrorUtils caught an error:
+
+terminate stream because StartStreamFailure with msg : UNAUTHENTICATED [Caught in: Subscription error in preprocessResponse]
+
+Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. {column: 180, clientTime: 1770813741, extra: Object, guardList: Array(0), hash: 2betnp} @ https://static.xx.fbcdn.net/rsrc.php/v4/yG/r/7XNtuxBZa4V.js:76
+[  718953ms] [ERROR] Permissions policy violation: unload is not allowed in this document. @ https://static.xx.fbcdn.net/rsrc.php/v4/yg/r/MLy8Ba8Q2TC.js:326
+[  735533ms] [ERROR] Permissions policy violation: unload is not allowed in this document. @ https://static.xx.fbcdn.net/rsrc.php/v4/yg/r/MLy8Ba8Q2TC.js:326

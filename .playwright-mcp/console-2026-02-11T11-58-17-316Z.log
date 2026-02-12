@@ -1,0 +1,3 @@
+[     639ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://elevenlabs.io/__/firebase/init.json:0
+[    1367ms] [ERROR] Cross-Origin-Opener-Policy policy would block the window.length call. @ https://elevenlabs.io/__/auth/handler.js:544
+[    1368ms] [ERROR] Cross-Origin-Opener-Policy policy would block the window.length call. @ https://elevenlabs.io/__/auth/handler.js:544

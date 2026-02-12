@@ -1,0 +1,48 @@
+[   93135ms] [ERROR] Xe: RPCError 400: AUTH_TOKEN_EXPIRED (caused by auth.ImportLoginToken)
+    at https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:306237
+    at bs._handleRPCResult (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:306274)
+    at bs._processMessage (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:305592)
+    at async bs._recvLoop (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:304492) @ https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:0
+[   93462ms] [ERROR] Error: Not connected
+    at ts.send (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:275637)
+    at bs._sendLoop (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:302831) @ https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:0
+[  113387ms] [ERROR] Error: Not connected
+    at ts.send (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:275637)
+    at bs._sendLoop (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:302831) @ https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:0
+[  128391ms] [WARNING] Error: TIMEOUT
+    at https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369201
+    at async qa (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369302)
+    at async Na._updateLoop (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:351236) @ https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:0
+[  146651ms] [WARNING] Error: TIMEOUT
+    at https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369201
+    at async qa (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369302)
+    at async Na._updateLoop (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:351236) @ https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:0
+[  164912ms] [WARNING] Error: TIMEOUT
+    at https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369201
+    at async qa (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369302)
+    at async Na._updateLoop (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:351236) @ https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:0
+[  183011ms] [WARNING] The provided application server key is not a VAPID key. Only VAPID keys will be supported in the future. For more information check https://crbug.com/979235. @ https://web.telegram.org/a/:0
+[  183161ms] [WARNING] Error: TIMEOUT
+    at https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369201
+    at async qa (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369302)
+    at async Na._updateLoop (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:351236) @ https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:0
+[  201412ms] [WARNING] Error: TIMEOUT
+    at https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369201
+    at async qa (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369302)
+    at async Na._updateLoop (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:351236) @ https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:0
+[  219637ms] [WARNING] Error: TIMEOUT
+    at https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369201
+    at async qa (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369302)
+    at async Na._updateLoop (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:351236) @ https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:0
+[  237881ms] [WARNING] Error: TIMEOUT
+    at https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369201
+    at async qa (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369302)
+    at async Na._updateLoop (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:351236) @ https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:0
+[  256135ms] [WARNING] Error: TIMEOUT
+    at https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369201
+    at async qa (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369302)
+    at async Na._updateLoop (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:351236) @ https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:0
+[  274382ms] [WARNING] Error: TIMEOUT
+    at https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369201
+    at async qa (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:369302)
+    at async Na._updateLoop (https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:1:351236) @ https://web.telegram.org/a/81.126e8b82c436e2fa8999.js:0

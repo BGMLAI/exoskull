@@ -1,0 +1,27 @@
+[   25712ms] [ERROR] Framing 'https://accounts.youtube.com/' violates the following report-only Content Security Policy directive: "frame-ancestors 'self'". The violation has been logged, but no further action has been taken.
+ @ :0
+[   45764ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://dashboard.stripe.com/ajax/auth_challenges/anonymous/validate?include_only%5B%5D=id%2Cchallenge_succeeded%2Cchallenge_secret%2Cdata:0
+[   66038ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://dashboard.stripe.com/ajax/auth_challenges/anonymous/validate?include_only%5B%5D=id%2Cchallenge_succeeded%2Cchallenge_secret%2Cdata:0
+[   77474ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://dashboard.stripe.com/ajax/auth_challenges/anonymous/validate?include_only%5B%5D=id%2Cchallenge_succeeded%2Cchallenge_secret%2Cdata:0
+[  103775ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://dashboard.stripe.com/ajax/auth_challenges/anonymous/validate?include_only%5B%5D=id%2Cchallenge_succeeded%2Cchallenge_secret%2Cdata:0
+[  188476ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://errors.stripe.com/api/864/store/?sentry_key=e66886748d81458d81141a7b67473194&sentry_version=7:0
+[  188736ms] [ERROR] Framing 'https://stripe.com/' violates the following Content Security Policy directive: "frame-ancestors 'self' https://app.contentful.com". The request has been blocked.
+ @ :0
+[  188779ms] [ERROR] Framing 'https://marketplace.stripe.com/' violates the following Content Security Policy directive: "frame-ancestors 'self'". The request has been blocked.
+ @ :0
+[  189255ms] [ERROR] Framing 'https://docs.stripe.com/' violates the following Content Security Policy directive: "frame-ancestors 'self' https://docs-edit.corp.stripe.com https://markdraft.corp.stripe.com". The request has been blocked.
+ @ :0
+[  189256ms] [ERROR] Framing 'https://docs.stripe.com/' violates the following report-only Content Security Policy directive: "frame-ancestors 'self' https://docs-edit.corp.stripe.com https://markdraft.corp.stripe.com". The violation has been logged, but no further action has been taken.
+ @ :0
+[  191562ms] [ERROR] Framing 'https://stripe.com/' violates the following Content Security Policy directive: "frame-ancestors 'self' https://app.contentful.com". The request has been blocked.
+ @ :0
+[  191573ms] [ERROR] Framing 'https://docs.stripe.com/' violates the following Content Security Policy directive: "frame-ancestors 'self' https://docs-edit.corp.stripe.com https://markdraft.corp.stripe.com". The request has been blocked.
+ @ :0
+[  191574ms] [ERROR] Framing 'https://docs.stripe.com/' violates the following report-only Content Security Policy directive: "frame-ancestors 'self' https://docs-edit.corp.stripe.com https://markdraft.corp.stripe.com". The violation has been logged, but no further action has been taken.
+ @ :0
+[  191581ms] [ERROR] Framing 'https://marketplace.stripe.com/' violates the following Content Security Policy directive: "frame-ancestors 'self'". The request has been blocked.
+ @ :0
+[  191827ms] [WARNING] Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://support-conversations.stripe.com') does not match the recipient window's origin ('https://dashboard.stripe.com'). @ https://b.stripecdn.com/dashboard-fe-statics-srv/assets/dashboard.mrd4j77udpsoauvz.js:1
+[  193337ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://dashboard.stripe.com/ajax/startup_merchant?include_only%5B%5D=id%2Cmerchant%2Cpartner_code%2Cpartner_page%2Capplication_status:0
+[  205820ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://errors.stripe.com/api/864/store/?sentry_key=e66886748d81458d81141a7b67473194&sentry_version=7:0
+[  239605ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://dashboard.stripe.com/ajax/settings/apikeys_new/secret/mk_1QnN7rIesWcqqZ2OnwXnuslj/reveal?include_only%5B%5D=hidden%2Cnote%2Csecret:0

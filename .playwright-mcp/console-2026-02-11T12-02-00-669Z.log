@@ -1,0 +1,9 @@
+[    1513ms] [WARNING] No available adapters. @ https://resend.com/login:0
+[    1513ms] [WARNING] No available adapters. @ https://resend.com/login:0
+[    1559ms] [WARNING] No available adapters. @ https://resend.com/login:0
+[   59450ms] [WARNING] No available adapters. @ https://resend.com/onboarding:0
+[   59450ms] [WARNING] No available adapters. @ https://resend.com/onboarding:0
+[   59451ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://resend.com/docs?_rsc=meep3:0
+[   64788ms] [WARNING] The resource https://resend.com/_next/static/chunks/c741423b360e6893.css?dpl=dpl_Cmitn5H8ypkVtdjBEKZEAbpqtJns was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ https://resend.com/onboarding:0
+[   70126ms] [WARNING] The resource https://resend.com/_next/static/chunks/c741423b360e6893.css?dpl=dpl_Cmitn5H8ypkVtdjBEKZEAbpqtJns was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ https://resend.com/onboarding:0
+[   85033ms] [WARNING] Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}. @ https://resend.com/relay-qWzP/static/posthog-recorder.js?v=1.335.0:0

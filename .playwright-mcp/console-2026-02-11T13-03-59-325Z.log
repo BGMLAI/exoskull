@@ -1,0 +1,17 @@
+[      59ms] [WARNING] Error with Permissions-Policy header: Unrecognized feature: 'ambient-light-sensor'. @ :0
+[      59ms] [WARNING] Error with Permissions-Policy header: Unrecognized feature: 'battery'. @ :0
+[     442ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://login.microsoftonline.com/favicon.ico:0
+[     607ms] [ERROR] Framing 'https://portal.azure.com/' violates the following Content Security Policy directive: "frame-ancestors 'self'". The request has been blocked.
+ @ :0
+[   26413ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ https://login.live.com/favicon.ico:0
+[   26556ms] [ERROR] Framing 'https://portal.azure.com/' violates the following Content Security Policy directive: "frame-ancestors 'self'". The request has been blocked.
+ @ :0
+[   49999ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://management.azure.com/providers/Microsoft.PortalServices/settings/default?api-version=2024-09-01-preview:0
+[   50225ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://graph.microsoft.com/v1.0/organization/f8cdef31-a31e-4b4a-93e4-5f571e91255a:0
+[   50244ms] [WARNING] Error with Permissions-Policy header: Unrecognized feature: 'ambient-light-sensor'. @ :0
+[   50244ms] [WARNING] Error with Permissions-Policy header: Unrecognized feature: 'battery'. @ :0
+[   50756ms] [WARNING] Error with Permissions-Policy header: Unrecognized feature: 'ambient-light-sensor'. @ :0
+[   50756ms] [WARNING] Error with Permissions-Policy header: Unrecognized feature: 'battery'. @ :0
+[   51131ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade:0
+[   51138ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://management.azure.com/providers/Microsoft.PortalServices/settings/default?api-version=2025-09-01-preview:0
+[   51215ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://management.azure.com/providers/Microsoft.PortalServices/settings/default?api-version=2025-09-01-preview:0

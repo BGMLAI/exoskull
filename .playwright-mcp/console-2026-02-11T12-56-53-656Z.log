@@ -1,0 +1,3 @@
+[    4997ms] [WARNING] Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://support-conversations.stripe.com') does not match the recipient window's origin ('https://dashboard.stripe.com'). @ https://b.stripecdn.com/dashboard-fe-statics-srv/assets/dashboard.mrd4j77udpsoauvz.js:1
+[    9126ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://dashboard.stripe.com/ajax/startup_merchant?include_only%5B%5D=id%2Cmerchant%2Cpartner_code%2Cpartner_page%2Capplication_status:0
+[   10715ms] [ERROR] Error: <path> attribute d: Expected number, "M-nan -nanL53.232…". @ https://b.stripecdn.com/dashboard-fe-statics-srv/assets/dashboard.gjl2dcypd6dm0fjz.js:54

@@ -228,6 +228,21 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
         if (threadRes.status === "fulfilled" && threadRes.value.ok) {
           const data = await threadRes.value.json();
           const messages = data.messages || data || [];
+
+          console.log(`[UnifiedStream] Loading ${messages.length} messages`);
+          const voiceMessages = messages.filter(
+            (m: any) => m.channel === "voice",
+          );
+          console.log(
+            `[UnifiedStream] Found ${voiceMessages.length} voice messages:`,
+            voiceMessages.map((m: any) => ({
+              id: m.id,
+              role: m.role,
+              direction: m.direction,
+              content: m.content?.slice(0, 30),
+            })),
+          );
+
           for (const msg of messages) {
             if (!msg.content) continue;
 
