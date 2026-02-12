@@ -4,6 +4,266 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-12] Self-Building System — Ralph Loop + Dynamic UI + Chat Rzeka Evolution
+
+### What was done
+
+**Agentic Execution Loop (Krok 1):**
+- `lib/iors/agent-loop.ts` — multi-step tool execution (10 web, 3 voice, 15 async)
+- Budget-aware: stops gracefully at 55s (Vercel safety margin)
+- Replaced inline tool loop in conversation-handler.ts (~190 lines → agentLoop call)
+- followUpMaxTokens: 150 → 1024 (web), 300 (voice)
+
+**Schema-Driven Dynamic UI (Krok 2):**
+- 6 layout modes: table, cards, timeline, kanban, stats-grid, **mindmap**
+- `components/widgets/app-layouts/` — CardGrid, TimelineView, KanbanBoard, StatsBar, MindmapView
+- LayoutRenderer dispatcher in AppWidget.tsx
+- AI auto-selects layout based on app description
+- **Media rich**: thumbnail/cover/avatar modes, image_url form field with preview
+- **Mindmap**: branching layout with grouped nodes, central hub, color-coded branches
+
+**Ralph Loop Foundation (Krok 3A-C):**
+- 3 new tables: `exo_dev_journal`, `exo_dynamic_tools`, `exo_tool_executions`
+- Fire-and-forget tool telemetry on every IORS tool call
+- 3 new IORS tools: `view_dev_journal`, `trigger_ralph_cycle`, `set_development_priority` (56 total)
+- `agent_state JSONB` column on `exo_async_tasks` for loop continuation
+
+**Ralph Loop Engine (Krok 3D):**
+- `lib/iors/ralph-loop.ts` — autonomous OBSERVE → ANALYZE → BUILD → LEARN cycle
+- OBSERVE: 5 parallel queries (failures, plans, gaps, apps, priorities)
+- ANALYZE: Gemini Flash classification (~$0.001/call)
+- BUILD: generates apps, disables broken tools, registers new tools
+- Integrated into loop-15 CRON as Step 4
+
+**Chat Rzeka system_evolution (Krok 3E):**
+- `SystemEvolutionData` type (16th stream event type)
+- `SystemEvolution.tsx` component with color-coded build/fix/optimize/register_tool indicators
+- Ralph Loop sends proactive notification via sendProactiveMessage on successful actions
+
+### Files changed
+- `lib/iors/agent-loop.ts` (NEW)
+- `lib/iors/ralph-loop.ts` (NEW)
+- `lib/iors/tools/ralph-tools.ts` (NEW)
+- `lib/voice/conversation-handler.ts` (MODIFIED — replaced tool loop)
+- `lib/iors/tools/index.ts` (MODIFIED — telemetry + ralph tools)
+- `app/api/cron/loop-15/route.ts` (MODIFIED — Step 4 Ralph cycle)
+- `lib/apps/types.ts` (MODIFIED — mindmap, media_column, media_display)
+- `components/widgets/AppWidget.tsx` (MODIFIED — 6 layouts + url/image_url fields)
+- `components/widgets/app-layouts/*` (NEW/MODIFIED — all layout components)
+- `components/stream/events/SystemEvolution.tsx` (NEW)
+- `components/stream/StreamEventRouter.tsx` (MODIFIED — 16 event types)
+- `lib/stream/types.ts` (MODIFIED — SystemEvolutionData)
+- `lib/apps/generator/prompts/app-prompt.ts` (MODIFIED — mindmap + media instructions)
+- `supabase/migrations/20260224000001_ralph_loop_tables.sql` (NEW)
+
+### How to verify
+- Chat: "zbuduj tracker pomysłów" → should get mindmap layout
+- Chat: "tracker przepisów ze zdjęciami" → cards layout with media thumbnails
+- After 15min CRON: Ralph Loop runs, dev_journal entries appear
+- Chat Rzeka: system_evolution events show build/fix notifications
+- `view_dev_journal` tool: shows Ralph Loop activity history
+
+### Notes for future agents
+- Ralph Loop budget: max 20s per cycle in loop-15
+- Dynamic tools: max 15 per tenant (enforced in handler)
+- Tool telemetry: auto-expires after 7 days (cleanup_tool_executions RPC)
+- MindmapView: CSS-only, no canvas/SVG (fits widget constraints)
+- Media: images loaded with `loading="lazy"`, no server-side optimization
+
+---
+
+## [2026-02-11] Application Health Audit — 19 Issues Found, All Fixed
+
+### What was done
+
+**CRITICAL fixes (4):**
+- ContextPanel: `/api/canvas/tasks` → `/api/canvas/data/tasks` (endpoint didn't exist)
+- ContextPanel: `/api/canvas/data/emotions` → `/api/emotion/trends` (endpoint didn't exist)
+- ConversationsWidget: `href="/dashboard/voice"` → `href="/dashboard/chat"` (page didn't exist)
+- IntegrationsWidget: `href="/dashboard/marketplace"` → `href="/dashboard/mods"` + 9 Oura OAuth redirects
+
+**CRON fixes (8):**
+- 6 CRONs used `.eq("status", "active")` — column is `subscription_status`, value needs `["active", "trial"]`
+  - Affected: self-optimization, daily-summary, weekly-summary, monthly-summary, insight-push, guardian-effectiveness
+- admin-metrics: only exported POST, Vercel sends GET → 405. Added GET export.
+- 4 ETL CRONs (bronze, silver, gold, master-scheduler): GET handler was status-only, replaced with actual handler
+
+**Other fixes (3):**
+- public/stats: used anon key → RLS blocked count queries → returned zeros. Switched to service role key.
+- settings page: data export fetched non-existent `/api/user/export` → changed to `/api/user/my-data`
+- Oura OAuth: 9 redirect URLs pointed to `/dashboard/marketplace/...` → `/dashboard/mods/...`
+
+**Dead code removed (4 files):**
+- `app/api/generate-greeting/route.ts` — orphaned, 0 references
+- `app/api/referrals/route.ts` — orphaned, 0 references
+- `app/api/setup-cron/route.ts` — orphaned, 0 references
+- `lib/gateway/onboarding-handler.ts` — deprecated, replaced by birth-flow.ts
+
+### Why
+
+- User reported "half the functionality doesn't work" — functional testing on production confirmed multiple broken paths
+- Self-optimization was the #1 broken feature (wrong column name → 0 tenants processed)
+- ETL pipeline never ran via Vercel CRONs (GET→POST mismatch)
+
+### Production verification
+
+- 35/35 CRONs return HTTP 200
+- Self-optimization: 4 tenants processed, 12 proposals generated (was 0)
+- ETL: bronze 1064 records, silver 1066 records, gold 4/5 views refreshed
+- All 124 frontend fetch calls verified against 177 API routes
+
+### Files changed
+
+- `components/stream/ContextPanel.tsx`, `components/widgets/ConversationsWidget.tsx`
+- `components/widgets/IntegrationsWidget.tsx`, `app/api/rigs/oura/callback/route.ts`
+- 6x CRON tenant query fixes, 4x ETL GET/POST fixes
+- `app/api/public/stats/route.ts`, `app/dashboard/settings/page.tsx`
+- 4 orphaned files deleted
+
+### Notes for future agents
+
+- Vercel CRONs send GET — every CRON handler MUST export GET (not just POST)
+- `exo_tenants` uses `subscription_status` column (NOT `status`), values: `"active"`, `"trial"`
+- After big sprints, audit: `grep -r "href=\"/dashboard/"` vs `app/dashboard/` pages
+
+---
+
+## [2026-02-11] Impulse Auto-Builder — Autonomous App/Goal/Task Creation
+
+### What was done
+
+- Refactored Impulse handler F from "suggest" to "build & deploy" mode
+- System now auto-builds apps via `generateApp()` when gaps detected:
+  - Mood & Energy Tracker (nastroj, energia, sen, notatka)
+  - Habit Tracker (nawyki z daily check)
+  - Expense Tracker (wydatki z kategoriami + chart)
+- Auto-creates 3 starter goals (sleep 7-8h, 30min exercise, learning)
+- Auto-creates onboarding task for new users
+- Suggest-only for things needing credentials (email, knowledge upload)
+- Dedup: 14 days for auto-builds, 7 days for suggestions via `exo_proactive_log`
+
+### Why
+
+- User feedback: "system ma sam proponować budowę aplikacji, budować i wdrażać"
+- Suggesting "would you like X?" gets ignored — building X and saying "I built X" creates engagement
+
+### Files changed
+
+- `exoskull-app/app/api/cron/impulse/route.ts` — Handler F rewritten (+272 lines)
+
+### How to verify
+
+1. `curl -H "Authorization: Bearer $CRON_SECRET" https://exoskull.xyz/api/cron/impulse`
+2. Response should show `system_suggestion: 1` when gaps exist
+3. Check dashboard — auto-built app widget should appear
+
+### Notes for future agents
+
+- `generateApp()` takes 5-8s, fits in 60s CRON timeout
+- One auto-build per 15-min cycle per tenant (rate limited)
+- `AppGenerationRequest.source` = `"iors_suggestion"` for impulse-built apps
+
+---
+
+## [2026-02-11] API Keys Setup + Gemini Model Upgrade
+
+### What was done
+- Filled all missing API keys via Playwright browser automation (12 services)
+- Upgraded Gemini model from deprecated `1.5-flash` to `2.5-flash` (thinking model)
+- Configured Tuya Smart Home cloud project (Central Europe, 5 API services authorized)
+
+### API Keys Completed
+| Service | Purpose | Tier/Cost |
+|---------|---------|-----------|
+| Google AI (Gemini 2.5 Flash) | Tier 1 AI routing | Free (15 RPM) |
+| Tavily | Web search for IORS tools | Free (1000/mo) |
+| Deepgram | Speech-to-text | Free ($200 credit) |
+| ElevenLabs | Text-to-speech | Free (10K chars/mo) |
+| Resend | Email sending | Free (3000/mo) |
+| Telegram Bot | Messaging channel | Free |
+| Discord Bot | Messaging channel | Free |
+| Slack Bot | Messaging channel | Free |
+| Meta WhatsApp | Messaging channel | Free (dev) |
+| Stripe | Payments + webhooks | Pay-as-you-go |
+| Upstash Redis | Caching/rate limiting | Free (10K cmd/day) |
+| Tuya Smart Home | IoT device control | Free (6mo trial) |
+
+### Skipped (intentional)
+- Microsoft Outlook — needs Azure AD directory
+- TP-Link Tapo — user request to skip
+- Kimi K2.5 — requires Chinese phone number
+
+### Gemini Model Fix
+- `gemini-1.5-flash` → 404 (removed from Google API entirely)
+- `gemini-2.0-flash` / `gemini-2.0-flash-lite` → `limit: 0` on free tier
+- `gemini-2.5-flash` → works on free tier, is a thinking model (uses `thoughtsTokenCount`)
+- Updated 5 files: types.ts, config.ts, gemini-provider.ts, extract/route.ts, skill-generator.ts
+
+### Files changed
+- `lib/ai/types.ts` — ModelId `gemini-1.5-flash` → `gemini-2.5-flash`
+- `lib/ai/config.ts` — model config + tier mapping updated
+- `lib/ai/providers/gemini-provider.ts` — provider model references
+- `app/api/onboarding/extract/route.ts` — direct API URL
+- `lib/skills/generator/skill-generator.ts` — forceModel reference
+- `.env.local` — 12 new API keys added
+
+### How to verify
+1. `npm run build` — passes with 0 errors
+2. Gemini API test: `curl` to `gemini-2.5-flash:generateContent` returns response
+3. All API keys present in `.env.local` (check with `grep -c '=""' .env.local`)
+
+### Notes for future agents
+- Gemini 2.5 Flash is a thinking model — needs `maxOutputTokens ≥ 256` for simple tasks
+- Google free tier model availability changes without notice — always test before switching
+- Tuya trial expires after 6 months — monitor `TUYA_ACCESS_ID` validity
+- Microsoft + Tapo keys still empty — fill when needed
+
+---
+
+## [2026-02-11] Email Analysis System
+
+### What was done
+- Multi-provider email sync (Gmail API, Outlook Graph, IMAP)
+- Two-phase AI analysis: classification + deep extraction (all Tier 1 Gemini Flash)
+- Knowledge extraction: key facts → RAG pipeline
+- Task generation: action items → exo_tasks with dedup
+- 4 IORS tools: search_emails, email_summary, email_follow_ups, email_sender_info
+- Email inbox canvas widget (#18)
+- Data lake integration: Bronze emails, Silver ETL, Gold daily view
+- CRONs: email-sync (15min) + email-analyze (5min)
+
+### Files changed
+- 3 new DB tables: exo_email_accounts, exo_analyzed_emails, exo_email_sender_profiles
+- `lib/email/` — sync, analysis, crypto modules
+- `app/api/cron/email-sync/` + `email-analyze/` — CRON endpoints
+- `lib/iors/tools/email-tools.ts` — 4 IORS tools
+- `components/canvas/widgets/EmailInboxWidget.tsx`
+
+---
+
+## [2026-02-11] Knowledge Analysis Engine
+
+### What was done
+- Two modes: light (rule-based, $0) + deep (AI via Haiku)
+- 17 parallel queries in collector, snapshot hash dedup
+- 7 action types (intervention, task, insight, etc.)
+- IORS tool `analyze_knowledge` (#47), widget `knowledge_insights` (#17)
+- Maintenance handler in loop-daily
+
+---
+
+## [2026-02-11] Autonomous IORS Engine — Impulse, Morning Briefing, Evening Reflection
+
+### What was done
+- 3 new autonomous CRONs: morning-briefing (05:00 UTC), evening-reflection (19:00 UTC), impulse (30min)
+- Fixed `next_eval_at` deadlock preventing loop-15 from evaluating any tenant
+- Rewrote loop-15 prompt from passive to active ("ALWAYS prefer ACTION over silence")
+- Removed `needsEval` gate — AI eval runs during waking hours
+- Rate limit raised 2 → 8 proactive messages/day
+- Shared tenant-utils.ts for reuse across autonomous CRONs
+
+---
+
 ## [2026-02-10] Dashboard UX — Unified Skills Page (Mods + Skills + Apps)
 
 ### What was done
