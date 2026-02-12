@@ -74,7 +74,11 @@ export interface ConversationResult {
 export interface ProcessingCallback {
   onThinkingStep?: (step: string, status: "running" | "done") => void;
   onToolStart?: (toolName: string) => void;
-  onToolEnd?: (toolName: string, durationMs: number) => void;
+  onToolEnd?: (
+    toolName: string,
+    durationMs: number,
+    meta?: { success?: boolean; resultSummary?: string },
+  ) => void;
 }
 
 // ============================================================================
@@ -565,7 +569,15 @@ export async function processUserMessage(
             toolUse.input as Record<string, any>,
             session.tenantId,
           );
-          options?.callback?.onToolEnd?.(toolUse.name, Date.now() - toolStart);
+          const toolDuration = Date.now() - toolStart;
+          const isError =
+            typeof result === "string" &&
+            (result.startsWith("Error:") || result.startsWith("Blad:"));
+          options?.callback?.onToolEnd?.(toolUse.name, toolDuration, {
+            success: !isError,
+            resultSummary:
+              typeof result === "string" ? result.slice(0, 120) : undefined,
+          });
           return { toolUse, result };
         }),
       );
@@ -638,10 +650,15 @@ export async function processUserMessage(
               session.tenantId,
             );
             toolsUsed.push(toolUse.name);
-            options?.callback?.onToolEnd?.(
-              toolUse.name,
-              Date.now() - toolStart,
-            );
+            const toolDuration2 = Date.now() - toolStart;
+            const isErr =
+              typeof result === "string" &&
+              (result.startsWith("Error:") || result.startsWith("Blad:"));
+            options?.callback?.onToolEnd?.(toolUse.name, toolDuration2, {
+              success: !isErr,
+              resultSummary:
+                typeof result === "string" ? result.slice(0, 120) : undefined,
+            });
             return {
               type: "tool_result" as const,
               tool_use_id: toolUse.id,

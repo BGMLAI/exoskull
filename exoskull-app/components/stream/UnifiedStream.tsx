@@ -7,7 +7,35 @@ import { VoiceInputBar } from "./VoiceInputBar";
 import { EmptyState } from "./EmptyState";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { StreamEvent, AIMessageData } from "@/lib/stream/types";
+import type {
+  StreamEvent,
+  AIMessageData,
+  ChannelType,
+} from "@/lib/stream/types";
+
+// ---------------------------------------------------------------------------
+// Third-party tool → service mapping (for Chat Rzeka stream events)
+// ---------------------------------------------------------------------------
+
+const THIRD_PARTY_TOOL_MAP: Record<
+  string,
+  { service: string; action: string }
+> = {
+  send_email: { service: "Gmail", action: "Wyslanie emaila" },
+  send_whatsapp: { service: "WhatsApp", action: "Wyslanie wiadomosci" },
+  send_sms: { service: "SMS", action: "Wyslanie SMS" },
+  search_web: { service: "Tavily", action: "Szukanie w internecie" },
+  fetch_webpage: { service: "Firecrawl", action: "Pobieranie strony" },
+  import_url: { service: "Firecrawl", action: "Import URL do bazy wiedzy" },
+  create_calendar_event: {
+    service: "Kalendarz",
+    action: "Tworzenie wydarzenia",
+  },
+  check_calendar: { service: "Kalendarz", action: "Sprawdzanie kalendarza" },
+  build_app: { service: "App Builder", action: "Budowanie aplikacji" },
+  search_emails: { service: "Email", action: "Przeszukiwanie emaili" },
+  email_summary: { service: "Email", action: "Podsumowanie emaili" },
+};
 
 // ---------------------------------------------------------------------------
 // Props
@@ -29,6 +57,7 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
     finalizeAIMessage,
     updateAgentAction,
     updateThinkingSteps,
+    updateFileUpload,
     setLoading,
     setConversationId,
     setError,
@@ -83,24 +112,67 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
 
         const historyEvents: StreamEvent[] = [];
 
-        // Thread messages → user/ai events
+        // Thread messages → user/ai/channel events
         if (threadRes.status === "fulfilled" && threadRes.value.ok) {
           const data = await threadRes.value.json();
           const messages = data.messages || data || [];
           for (const msg of messages) {
             if (!msg.content) continue;
-            historyEvents.push({
-              id: `hist-${msg.id || Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              timestamp: new Date(msg.created_at || Date.now()),
-              data:
-                msg.role === "user"
-                  ? { type: "user_message", content: msg.content }
-                  : {
-                      type: "ai_message",
-                      content: msg.content,
-                      isStreaming: false,
-                    },
-            });
+
+            const evtId = `hist-${msg.id || Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            const evtTs = new Date(msg.created_at || Date.now());
+            const channel: string = msg.channel || "web_chat";
+
+            if (channel !== "web_chat") {
+              // Non-web_chat → channel_message (WhatsApp, Telegram, SMS, etc.)
+              // Voice channel with call metadata → call_transcript
+              if (channel === "voice" && msg.metadata?.call_transcript) {
+                historyEvents.push({
+                  id: evtId,
+                  timestamp: evtTs,
+                  data: {
+                    type: "call_transcript",
+                    direction:
+                      msg.direction ||
+                      (msg.role === "user" ? "inbound" : "outbound"),
+                    callerName:
+                      msg.metadata?.sender_name || msg.metadata?.caller_name,
+                    transcript: msg.content,
+                    durationSec: msg.metadata?.duration_sec,
+                    recordingUrl: msg.metadata?.recording_url,
+                  },
+                });
+              } else {
+                historyEvents.push({
+                  id: evtId,
+                  timestamp: evtTs,
+                  data: {
+                    type: "channel_message",
+                    channel: channel as ChannelType,
+                    direction:
+                      msg.direction ||
+                      (msg.role === "user" ? "inbound" : "outbound"),
+                    content: msg.content,
+                    senderName: msg.metadata?.sender_name,
+                    from: msg.metadata?.from,
+                  },
+                });
+              }
+            } else {
+              // Standard web_chat messages → user/ai events
+              historyEvents.push({
+                id: evtId,
+                timestamp: evtTs,
+                data:
+                  msg.role === "user"
+                    ? { type: "user_message", content: msg.content }
+                    : {
+                        type: "ai_message",
+                        content: msg.content,
+                        isStreaming: false,
+                      },
+              });
+            }
           }
         }
 
@@ -286,6 +358,22 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
                   if (actionEvent) {
                     updateAgentAction(actionEvent.id, "done", data.durationMs);
                   }
+
+                  // Emit third_party_action for external service tools
+                  const tpInfo = THIRD_PARTY_TOOL_MAP[data.tool];
+                  if (tpInfo) {
+                    addEvent({
+                      id: `tp-${data.tool}-${Date.now()}`,
+                      timestamp: new Date(),
+                      data: {
+                        type: "third_party_action",
+                        service: tpInfo.service,
+                        action: tpInfo.action,
+                        resultSummary: data.resultSummary || "",
+                        success: data.success !== false,
+                      },
+                    });
+                  }
                   break;
                 }
 
@@ -328,11 +416,132 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
   );
 
   // ---------------------------------------------------------------------------
+  // File upload via presigned URL
+  // ---------------------------------------------------------------------------
+
+  const handleFileUpload = useCallback(
+    async (file: File) => {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
+      const eventId = `upload-${Date.now()}`;
+
+      // 1. Show uploading state in stream
+      addEvent({
+        id: eventId,
+        timestamp: new Date(),
+        data: {
+          type: "file_upload",
+          filename: file.name,
+          fileType: ext,
+          fileSize: file.size,
+          status: "uploading",
+        },
+      });
+
+      try {
+        // 2. Get presigned upload URL
+        const urlRes = await fetch("/api/knowledge/upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: file.name,
+            contentType: file.type || "application/octet-stream",
+          }),
+        });
+
+        if (!urlRes.ok) throw new Error("Nie udalo sie uzyskac URL uploadu");
+        const { signedUrl, path } = await urlRes.json();
+
+        // 3. Upload directly to storage
+        const uploadRes = await fetch(signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+
+        if (!uploadRes.ok) throw new Error("Upload nie powiodl sie");
+
+        // 4. Update status → processing
+        updateFileUpload(eventId, "processing");
+
+        // 5. Confirm upload → triggers RAG processing
+        const confirmRes = await fetch("/api/knowledge/confirm-upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            path,
+            filename: file.name,
+            fileType: ext,
+            fileSize: file.size,
+          }),
+        });
+
+        if (!confirmRes.ok)
+          throw new Error("Potwierdzenie uploadu nie powiodlo sie");
+        const confirmData = await confirmRes.json();
+
+        // 6. Update status → ready
+        updateFileUpload(
+          eventId,
+          "ready",
+          confirmData.chunks || confirmData.document?.chunk_count,
+        );
+      } catch (err) {
+        console.error("[UnifiedStream] File upload failed:", err);
+        updateFileUpload(eventId, "failed");
+      }
+    },
+    [addEvent, updateFileUpload],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Drag & drop zone
+  // ---------------------------------------------------------------------------
+
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      const files = e.dataTransfer.files;
+      for (let i = 0; i < files.length; i++) {
+        handleFileUpload(files[i]);
+      }
+    },
+    [handleFileUpload],
+  );
+
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
   return (
-    <div className={cn("flex flex-col h-full", className)}>
+    <div
+      className={cn("flex flex-col h-full relative", className)}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm border-2 border-dashed border-primary rounded-lg">
+          <p className="text-lg font-medium text-primary">Upusc pliki tutaj</p>
+        </div>
+      )}
+
       {/* Stream area */}
       <div
         ref={scrollRef}
@@ -398,6 +607,7 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
         onSendVoice={(transcript) =>
           sendMessage(transcript, "voice_transcript")
         }
+        onFileUpload={handleFileUpload}
         isLoading={state.isLoading}
       />
     </div>

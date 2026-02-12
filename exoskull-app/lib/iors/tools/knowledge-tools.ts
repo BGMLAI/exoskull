@@ -3,10 +3,12 @@
  *
  * Tools for searching user-uploaded documents via semantic search (pgvector).
  * - search_knowledge: Find relevant document chunks by meaning
+ * - import_url: Import a web page into the knowledge base
  */
 
 import type { ToolDefinition } from "./index";
 import { searchDocuments } from "@/lib/knowledge/document-processor";
+import { importUrl } from "@/lib/knowledge/url-processor";
 
 import { logger } from "@/lib/logger";
 
@@ -58,6 +60,50 @@ export const knowledgeTools: ToolDefinition[] = [
       } catch (searchError) {
         console.error("[KnowledgeTools] search_knowledge error:", searchError);
         return "Nie udało się przeszukać dokumentów. Spróbuj jeszcze raz.";
+      }
+    },
+  },
+  {
+    definition: {
+      name: "import_url",
+      description:
+        'Zaimportuj stronę internetową do bazy wiedzy użytkownika. Strona zostanie pobrana, przetworzona i będzie dostępna przez search_knowledge. Użyj gdy user chce zapisać artykuł/stronę. Przykłady: "zapisz tę stronę: https://...", "dodaj ten link do mojej wiedzy".',
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          url: {
+            type: "string",
+            description: "URL strony do zaimportowania",
+          },
+          category: {
+            type: "string",
+            description:
+              "Kategoria dokumentu (np. business, health, personal). Domyślnie: web",
+          },
+        },
+        required: ["url"],
+      },
+    },
+    execute: async (
+      input: Record<string, unknown>,
+      tenantId: string,
+    ): Promise<string> => {
+      const url = input.url as string;
+      const category = (input.category as string) || "web";
+
+      logger.info("[KnowledgeTools] import_url:", { url, category });
+
+      try {
+        const result = await importUrl(url, tenantId, category);
+
+        if (result.success) {
+          return `Strona zaimportowana pomyślnie (ID: ${result.documentId}). Treść jest teraz dostępna przez search_knowledge.`;
+        }
+
+        return `Nie udało się zaimportować strony: ${result.error}`;
+      } catch (error) {
+        console.error("[KnowledgeTools] import_url error:", error);
+        return "Nie udało się zaimportować strony. Sprawdź URL i spróbuj ponownie.";
       }
     },
   },

@@ -3,8 +3,9 @@
  *
  * Upload → Extract text → Chunk → Generate embeddings → Store in pgvector
  *
- * Supported formats: TXT, MD, CSV, JSON, PDF, DOCX
- * Uses: unpdf (PDF), mammoth (DOCX), OpenAI text-embedding-3-small (embeddings)
+ * Supported formats: TXT, MD, CSV, JSON, PDF, DOCX, XLSX, XLS, PPTX, PPT
+ * Uses: unpdf (PDF), mammoth (DOCX), xlsx (Excel), jszip (PPTX),
+ *        OpenAI text-embedding-3-small (embeddings)
  */
 
 import { getServiceSupabase } from "@/lib/supabase/service";
@@ -75,6 +76,10 @@ export async function processDocument(
       extractedText = await extractPDF(fileData);
     } else if (["docx", "doc"].includes(fileType)) {
       extractedText = await extractDOCX(fileData);
+    } else if (["xlsx", "xls"].includes(fileType)) {
+      extractedText = await extractXLSX(fileData);
+    } else if (["pptx", "ppt"].includes(fileType)) {
+      extractedText = await extractPPTX(fileData);
     } else {
       // Unsupported type — store metadata only
       await supabase
@@ -221,6 +226,51 @@ async function extractDOCX(fileData: Blob): Promise<string> {
   return result.value;
 }
 
+async function extractXLSX(fileData: Blob): Promise<string> {
+  const XLSX = await import("xlsx");
+  const buffer = Buffer.from(await fileData.arrayBuffer());
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+
+  const parts: string[] = [];
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    if (rows.length === 0) continue;
+
+    parts.push(`--- Arkusz: ${sheetName} ---`);
+    for (const row of rows) {
+      const line = row.map((cell) => String(cell ?? "")).join("\t");
+      if (line.trim()) parts.push(line);
+    }
+  }
+
+  return parts.join("\n");
+}
+
+async function extractPPTX(fileData: Blob): Promise<string> {
+  const JSZip = (await import("jszip")).default;
+  const buffer = Buffer.from(await fileData.arrayBuffer());
+  const zip = await JSZip.loadAsync(buffer);
+
+  const parts: string[] = [];
+  const slideFiles = Object.keys(zip.files)
+    .filter((f) => /^ppt\/slides\/slide\d+\.xml$/i.test(f))
+    .sort();
+
+  for (const slidePath of slideFiles) {
+    const xml = await zip.files[slidePath].async("text");
+    // Extract text from <a:t> tags
+    const texts = [...xml.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]);
+    if (texts.length > 0) {
+      const slideNum = slidePath.match(/slide(\d+)/)?.[1] || "?";
+      parts.push(`--- Slajd ${slideNum} ---`);
+      parts.push(texts.join(" "));
+    }
+  }
+
+  return parts.join("\n");
+}
+
 // ============================================================================
 // CHUNKING
 // ============================================================================
@@ -339,9 +389,9 @@ export async function searchDocuments(
   // Call pgvector search function
   const { data, error } = await supabase.rpc("search_user_documents", {
     p_tenant_id: tenantId,
-    p_query_embedding: JSON.stringify(queryEmbedding),
+    p_query_embedding: queryEmbedding,
     p_limit: limit,
-    p_similarity_threshold: 0.5,
+    p_similarity_threshold: 0.3,
   });
 
   if (error) {

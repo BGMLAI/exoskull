@@ -4,6 +4,7 @@ import { useReducer, useCallback } from "react";
 import type {
   StreamEvent,
   AIMessageData,
+  FileUploadData,
   ThinkingStep,
 } from "@/lib/stream/types";
 
@@ -45,6 +46,12 @@ type StreamAction =
       durationMs?: number;
     }
   | { type: "UPDATE_THINKING_STEPS"; id: string; steps: ThinkingStep[] }
+  | {
+      type: "UPDATE_FILE_UPLOAD";
+      id: string;
+      status: FileUploadData["status"];
+      chunks?: number;
+    }
   | { type: "SET_LOADING"; loading: boolean }
   | { type: "SET_CONVERSATION_ID"; id: string }
   | { type: "SET_ERROR"; error: string | null }
@@ -120,6 +127,25 @@ function streamReducer(state: StreamState, action: StreamAction): StreamState {
         ),
       };
 
+    case "UPDATE_FILE_UPLOAD":
+      return {
+        ...state,
+        events: state.events.map((e) =>
+          e.id === action.id && e.data.type === "file_upload"
+            ? {
+                ...e,
+                data: {
+                  ...e.data,
+                  status: action.status,
+                  ...(action.chunks !== undefined
+                    ? { chunks: action.chunks }
+                    : {}),
+                } as FileUploadData,
+              }
+            : e,
+        ),
+      };
+
     case "SET_LOADING":
       return { ...state, isLoading: action.loading };
 
@@ -173,6 +199,12 @@ export function useStreamState() {
     [],
   );
 
+  const updateFileUpload = useCallback(
+    (id: string, status: FileUploadData["status"], chunks?: number) =>
+      dispatch({ type: "UPDATE_FILE_UPLOAD", id, status, chunks }),
+    [],
+  );
+
   const setLoading = useCallback(
     (loading: boolean) => dispatch({ type: "SET_LOADING", loading }),
     [],
@@ -200,6 +232,7 @@ export function useStreamState() {
     finalizeAIMessage,
     updateAgentAction,
     updateThinkingSteps,
+    updateFileUpload,
     setLoading,
     setConversationId,
     setError,

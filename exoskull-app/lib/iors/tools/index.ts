@@ -46,6 +46,7 @@ import { appBuilderTools } from "./app-builder-tools";
 import { selfConfigTools } from "./self-config-tools";
 import { knowledgeAnalysisTools } from "./knowledge-analysis-tools";
 import { emailTools } from "./email-tools";
+import { webTools } from "./web-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -70,6 +71,7 @@ export const IORS_EXTENSION_TOOLS: ToolDefinition[] = [
   ...selfConfigTools,
   ...knowledgeAnalysisTools,
   ...emailTools,
+  ...webTools,
 ];
 
 /**

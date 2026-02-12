@@ -11,6 +11,14 @@ import { EmotionCard } from "./events/EmotionCard";
 import { InsightCard } from "./events/InsightCard";
 import { SessionSummary } from "./events/SessionSummary";
 
+// Chat Rzeka — new event components
+import { ChannelMessage } from "./events/ChannelMessage";
+import { CallTranscript } from "./events/CallTranscript";
+import { FileUploadEvent } from "./events/FileUploadEvent";
+import { ThirdPartyAction } from "./events/ThirdPartyAction";
+import { AgentComm } from "./events/AgentComm";
+import { KnowledgeCitation } from "./events/KnowledgeCitation";
+
 interface StreamEventRouterProps {
   event: StreamEvent;
 }
@@ -34,6 +42,19 @@ export function StreamEventRouter({ event }: StreamEventRouterProps) {
       return <InsightCard event={event} />;
     case "session_summary":
       return <SessionSummary event={event} />;
+    // Chat Rzeka events
+    case "channel_message":
+      return <ChannelMessage event={event} />;
+    case "call_transcript":
+      return <CallTranscript event={event} />;
+    case "file_upload":
+      return <FileUploadEvent event={event} />;
+    case "third_party_action":
+      return <ThirdPartyAction event={event} />;
+    case "agent_communication":
+      return <AgentComm event={event} />;
+    case "knowledge_citation":
+      return <KnowledgeCitation event={event} />;
     default:
       return null;
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Send, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { Send, Mic, MicOff, Volume2, VolumeX, Paperclip } from "lucide-react";
 import { useDictation } from "@/lib/hooks/useDictation";
 import { cn } from "@/lib/utils";
 
@@ -9,9 +9,13 @@ import { cn } from "@/lib/utils";
 // Types
 // ---------------------------------------------------------------------------
 
+const UPLOAD_ACCEPT =
+  ".pdf,.doc,.docx,.txt,.md,.csv,.xlsx,.xls,.pptx,.ppt,.jpg,.jpeg,.png,.webp,.mp4,.webm,.mov";
+
 interface VoiceInputBarProps {
   onSendText: (text: string) => void;
   onSendVoice: (transcript: string) => void;
+  onFileUpload?: (file: File) => void;
   isLoading: boolean;
 }
 
@@ -22,6 +26,7 @@ interface VoiceInputBarProps {
 export function VoiceInputBar({
   onSendText,
   onSendVoice,
+  onFileUpload,
   isLoading,
 }: VoiceInputBarProps) {
   const [input, setInput] = useState("");
@@ -29,6 +34,7 @@ export function VoiceInputBar({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [dictationError, setDictationError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const polishVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
 
   // Dictation hook (MediaRecorder + Whisper)
@@ -103,6 +109,20 @@ export function VoiceInputBar({
     [handleSend],
   );
 
+  // File picker handler
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      for (let i = 0; i < files.length; i++) {
+        onFileUpload?.(files[i]);
+      }
+      // Reset input so the same file can be selected again
+      e.target.value = "";
+    },
+    [onFileUpload],
+  );
+
   // TTS toggle
   const toggleTTS = useCallback(() => {
     if (isSpeaking) {
@@ -154,9 +174,31 @@ export function VoiceInputBar({
         </div>
       )}
 
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={UPLOAD_ACCEPT}
+        multiple
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
       {/* Input bar */}
       <div className="p-3">
         <div className="flex items-end gap-2">
+          {/* File upload */}
+          {onFileUpload && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading}
+              className="p-2.5 rounded-full transition-colors shrink-0 bg-muted text-muted-foreground hover:bg-accent hover:text-foreground"
+              title="Wgraj plik do bazy wiedzy"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+          )}
+
           {/* TTS toggle */}
           <button
             onClick={toggleTTS}

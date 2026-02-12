@@ -109,10 +109,16 @@ export async function POST(request: NextRequest) {
                 ),
               );
             },
-            onToolEnd: (toolName, durationMs) => {
+            onToolEnd: (toolName, durationMs, meta) => {
               controller.enqueue(
                 encoder.encode(
-                  `data: ${JSON.stringify({ type: "tool_end", tool: toolName, durationMs })}\n\n`,
+                  `data: ${JSON.stringify({
+                    type: "tool_end",
+                    tool: toolName,
+                    durationMs,
+                    success: meta?.success,
+                    resultSummary: meta?.resultSummary,
+                  })}\n\n`,
                 ),
               );
             },

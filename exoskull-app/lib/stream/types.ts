@@ -26,7 +26,13 @@ export type StreamEventData =
   | EmotionReadingData
   | SystemNotificationData
   | InsightCardData
-  | SessionSummaryData;
+  | SessionSummaryData
+  | ChannelMessageData
+  | CallTranscriptData
+  | FileUploadData
+  | ThirdPartyActionData
+  | AgentCommunicationData
+  | KnowledgeCitationData;
 
 // ---------------------------------------------------------------------------
 // Message events
@@ -105,6 +111,76 @@ export interface SessionSummaryData {
   toolsUsed: string[];
   emotionSummary?: string;
   duration: string;
+}
+
+// ---------------------------------------------------------------------------
+// Chat Rzeka — channel & cross-system events
+// ---------------------------------------------------------------------------
+
+export type ChannelType =
+  | "sms"
+  | "whatsapp"
+  | "telegram"
+  | "discord"
+  | "signal"
+  | "imessage"
+  | "email"
+  | "slack"
+  | "messenger"
+  | "instagram"
+  | "web_chat"
+  | "voice";
+
+export interface ChannelMessageData {
+  type: "channel_message";
+  channel: ChannelType;
+  direction: "inbound" | "outbound";
+  content: string;
+  senderName?: string;
+  from?: string;
+}
+
+export interface CallTranscriptData {
+  type: "call_transcript";
+  direction: "inbound" | "outbound";
+  callerName?: string;
+  callerPhone?: string;
+  transcript: string;
+  durationSec?: number;
+  recordingUrl?: string;
+}
+
+export interface FileUploadData {
+  type: "file_upload";
+  filename: string;
+  fileType: string;
+  fileSize: number;
+  status: "uploading" | "processing" | "ready" | "failed";
+  documentId?: string;
+  chunks?: number;
+}
+
+export interface ThirdPartyActionData {
+  type: "third_party_action";
+  service: string;
+  action: string;
+  resultSummary: string;
+  success: boolean;
+}
+
+export interface AgentCommunicationData {
+  type: "agent_communication";
+  agentName: string;
+  targetName?: string;
+  content: string;
+}
+
+export interface KnowledgeCitationData {
+  type: "knowledge_citation";
+  documentName: string;
+  documentId: string;
+  snippet: string;
+  relevanceScore: number;
 }
 
 // ---------------------------------------------------------------------------
