@@ -4,6 +4,56 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-13] Phase 3b: Wire Dual-Write/Read to All Critical Paths
+
+### What was done
+
+**Centralized Service Layer:**
+- `lib/tasks/task-service.ts` — Thin wrapper: createTask, getTasks, completeTask, updateTask, getTaskStats, findTaskByTitle, getOverdueTasks
+- `lib/goals/goal-service.ts` — Thin wrapper: createGoal, getGoals, getGoal, getActiveGoalCount, updateGoal
+- Both accept optional SupabaseClient param (defaults to getServiceSupabase for IORS/CRON contexts)
+
+**IORS Tools Updated (8 tools):**
+- `task-tools.ts`: add_task, complete_task, list_tasks → use task-service
+- `tyrolka-tools.ts` (NEW): create_op, create_quest, list_ops, list_quests, update_op_status (gated by quest_system_enabled)
+- Registered in tools/index.ts (58 total tools)
+
+**CRONs Updated (4 files):**
+- impulse: 6 legacy refs replaced (overdue check, gap detection, goal/task creation)
+- morning-briefing: fixed wrong table name (exo_goals → getGoals service)
+- evening-reflection: fixed Promise.allSettled double-wrapping, replaced legacy queries
+- goal-progress: replaced productivity data collection
+
+**Write Paths Updated (7 files):**
+- email/task-generator.ts: dedup + create via task-service
+- voice/tools/route.ts: 3 VAPI handlers → task-service
+- messages/[id]/to-task/route.ts: message-to-task conversion
+- autonomy/action-executor.ts: handleCreateTask + handleCompleteTask
+- autonomy/executor.ts: intervention task creation
+- canvas/data/tasks/route.ts: dashboard widget stats
+- mods/executors/task-manager.ts: ExoSkull source CRUD (4 operations)
+
+**Goals Engine Updated:**
+- defineGoal → createGoal from goal-service (dual-write)
+- logProgressByName → getGoals from goal-service (dual-read)
+- Added target_unit to Goal interface for fuzzy matching
+
+### What was NOT changed (and why)
+- Dashboard pages (tasks/page.tsx, goals/page.tsx): Client-side "use client" components that can't import server-side services. Dual-write ensures data in legacy tables is always up-to-date.
+- Read-only analytics (dynamic-context.ts, mape-k-monitor.ts, swarm data-collectors, base-agent.ts): These use efficient count queries (head: true). Will switch table names when legacy is fully deprecated.
+
+### Files changed
+- NEW: lib/tasks/task-service.ts, lib/goals/goal-service.ts, lib/iors/tools/tyrolka-tools.ts
+- MODIFIED: 17 files (see commit 8de2140)
+
+### How to verify
+1. Build passes: `cd exoskull-app && npm run build` (zero errors)
+2. Enable dual-write: Set `quest_system_dual_write: true` in tenant presets
+3. Send "dodaj task: test" via chat → verify row in BOTH exo_tasks AND user_ops
+4. Rollback: Set `quest_system_dual_write: false` → all writes go to legacy only
+
+---
+
 ## [2026-02-13] Phase 3: Quest System Migration (In Progress)
 
 ### What was done
