@@ -47,6 +47,7 @@ import { selfConfigTools } from "./self-config-tools";
 import { knowledgeAnalysisTools } from "./knowledge-analysis-tools";
 import { emailTools } from "./email-tools";
 import { webTools } from "./web-tools";
+import { ralphTools } from "./ralph-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -72,6 +73,7 @@ export const IORS_EXTENSION_TOOLS: ToolDefinition[] = [
   ...knowledgeAnalysisTools,
   ...emailTools,
   ...webTools,
+  ...ralphTools,
 ];
 
 /**
@@ -85,6 +87,7 @@ export function getExtensionToolDefinitions(): Anthropic.Tool[] {
 /**
  * Execute an extension tool by name.
  * Returns null if the tool is not found (not an extension tool).
+ * Logs telemetry to exo_tool_executions (fire-and-forget).
  */
 const TOOL_TIMEOUT_MS = 10_000; // 10s per tool max
 
@@ -95,6 +98,8 @@ export async function executeExtensionTool(
 ): Promise<string | null> {
   const tool = IORS_EXTENSION_TOOLS.find((t) => t.definition.name === toolName);
   if (!tool) return null;
+
+  const startMs = Date.now();
 
   try {
     const result = await Promise.race([
@@ -111,12 +116,58 @@ export async function executeExtensionTool(
         ),
       ),
     ]);
+
+    // Fire-and-forget telemetry
+    logToolExecution(tenantId, toolName, true, null, Date.now() - startMs);
+
     return result;
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+
     console.error(`[IORSTools] Tool ${toolName} failed:`, {
       tenantId,
-      error: error instanceof Error ? error.message : error,
+      error: errorMsg,
     });
+
+    // Fire-and-forget telemetry
+    logToolExecution(tenantId, toolName, false, errorMsg, Date.now() - startMs);
+
     return `Blad: nie udalo sie wykonac ${toolName}. Sprobuj ponownie.`;
   }
+}
+
+/**
+ * Log tool execution to exo_tool_executions (fire-and-forget).
+ * Never throws — errors are silently swallowed.
+ */
+function logToolExecution(
+  tenantId: string,
+  toolName: string,
+  success: boolean,
+  errorMessage: string | null,
+  durationMs: number,
+): void {
+  // Dynamic import to avoid circular dependencies and module-level side effects
+  import("@/lib/supabase/service")
+    .then(({ getServiceSupabase }) => {
+      const supabase = getServiceSupabase();
+      supabase
+        .from("exo_tool_executions")
+        .insert({
+          tenant_id: tenantId,
+          tool_name: toolName,
+          success,
+          error_message: errorMessage,
+          duration_ms: Math.round(durationMs),
+        })
+        .then(({ error }) => {
+          if (error) {
+            // Silently log — telemetry should never break the main flow
+            console.warn("[IORSTools:Telemetry] Insert failed:", error.message);
+          }
+        });
+    })
+    .catch(() => {
+      // Silently ignore — telemetry is non-critical
+    });
 }
