@@ -293,3 +293,73 @@ export async function buildDynamicContext(
   logger.info(`[DynamicContext] Built in ${Date.now() - startTime}ms`);
   return { context, systemPromptOverride, aiConfig };
 }
+
+/**
+ * Lightweight voice context — only tenant profile + task count.
+ * Skips: goals, suggestions, connections, docs, mods, thread summary.
+ * Cuts pre-Claude latency from ~1-3s to ~200ms.
+ */
+export async function buildVoiceContext(
+  tenantId: string,
+): Promise<DynamicContextResult> {
+  const supabase = getServiceSupabase();
+  const startTime = Date.now();
+
+  // Only 2 queries (vs 8 in full context)
+  const [tenantResult, taskResult] = await Promise.allSettled([
+    supabase
+      .from("exo_tenants")
+      .select(
+        "name, preferred_name, communication_style, iors_personality, iors_name, iors_custom_instructions, iors_ai_config",
+      )
+      .eq("id", tenantId)
+      .single(),
+    supabase
+      .from("exo_tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("status", "pending"),
+  ]);
+
+  const tenant =
+    tenantResult.status === "fulfilled" ? tenantResult.value.data : null;
+  const taskCount =
+    taskResult.status === "fulfilled" ? taskResult.value.count : 0;
+
+  const now = new Date();
+  const timeString = now.toLocaleTimeString("pl-PL", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const dayOfWeek = now.toLocaleDateString("pl-PL", { weekday: "long" });
+
+  let context = `\n\n## AKTUALNY KONTEKST\n`;
+  context += `- Czas: ${dayOfWeek}, ${timeString}\n`;
+
+  if (tenant?.preferred_name || tenant?.name) {
+    context += `- Uzytkownik: ${tenant.preferred_name || tenant.name} (UZYWAJ IMIENIA)\n`;
+  }
+
+  if (tenant?.communication_style) {
+    context += `- Styl: ${tenant.communication_style}\n`;
+  }
+
+  context += `- Zadania: ${taskCount || 0}\n`;
+  context += `- Kanal: ROZMOWA GLOSOWA. Odpowiadaj KROTKO (1-2 zdania). Unikaj list, markdown, emoji.\n`;
+
+  // Custom instructions (highest priority)
+  const customInstructions = (tenant as Record<string, unknown>)
+    ?.iors_custom_instructions as string | null;
+  if (customInstructions) {
+    context += `\n## INSTRUKCJE UZYTKOWNIKA\n${customInstructions}\n`;
+  }
+
+  const rawAiConfig = (tenant as Record<string, unknown>)?.iors_ai_config;
+  const aiConfig: TenantAIConfig =
+    rawAiConfig && typeof rawAiConfig === "object"
+      ? { ...DEFAULT_AI_CONFIG, ...(rawAiConfig as Partial<TenantAIConfig>) }
+      : DEFAULT_AI_CONFIG;
+
+  logger.info(`[VoiceContext] Built in ${Date.now() - startTime}ms`);
+  return { context, systemPromptOverride: null, aiConfig };
+}

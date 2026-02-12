@@ -15,7 +15,7 @@ import {
   executeExtensionTool,
   getToolsForTenant,
 } from "@/lib/iors/tools";
-import { buildDynamicContext } from "./dynamic-context";
+import { buildDynamicContext, buildVoiceContext } from "./dynamic-context";
 import { appendMessage, getThreadContext } from "../unified-thread";
 import { analyzeEmotion } from "@/lib/emotion";
 import { detectCrisis } from "@/lib/emotion/crisis-detector";
@@ -373,23 +373,49 @@ export async function processUserMessage(
   // Fire thinking step: loading context
   options?.callback?.onThinkingStep?.("Ładuję kontekst", "running");
 
-  // Build dynamic context + emotion + thread context — ALL parallel
+  const isVoiceChannel = options?.channel === "voice";
+  const preStartTime = Date.now();
+
+  // ── VOICE PATH: lightweight context, skip emotion, fewer thread messages ──
+  // ── WEB PATH: full context + emotion + 50 thread messages ──
   const [dynamicContextResult, emotionState, rawThreadMessages] =
     await Promise.all([
-      buildDynamicContext(session.tenantId),
-      analyzeEmotion(userMessage),
-      getThreadContext(session.tenantId, 50).catch((err) => {
-        console.error("[ConversationHandler] Thread context failed:", err);
-        return [] as { role: "user" | "assistant"; content: string }[];
-      }),
+      isVoiceChannel
+        ? buildVoiceContext(session.tenantId)
+        : buildDynamicContext(session.tenantId),
+      isVoiceChannel
+        ? Promise.resolve({
+            primary_emotion: "neutral" as const,
+            intensity: 30,
+            secondary_emotions: [] as string[],
+            valence: 0,
+            arousal: 0.3,
+            dominance: 0.5,
+            confidence: 1,
+            source: "text_keywords" as const,
+            raw_data: {},
+          })
+        : analyzeEmotion(userMessage),
+      getThreadContext(session.tenantId, isVoiceChannel ? 10 : 50).catch(
+        (err) => {
+          console.error("[ConversationHandler] Thread context failed:", err);
+          return [] as { role: "user" | "assistant"; content: string }[];
+        },
+      ),
     ]);
+
+  if (isVoiceChannel) {
+    logger.info(
+      `[ConversationHandler] Voice pre-processing: ${Date.now() - preStartTime}ms`,
+    );
+  }
 
   // Extract per-user config from dynamic context result
   const dynamicContext = dynamicContextResult.context;
   const systemPromptOverride = dynamicContextResult.systemPromptOverride;
   const aiConfig = dynamicContextResult.aiConfig;
   const userTemperature = aiConfig?.temperature ?? 0.7;
-  const isVoice = options?.channel === "voice";
+  const isVoice = isVoiceChannel;
   const chatModelPref = aiConfig?.model_preferences?.chat ?? "auto";
   const resolvedModel = isVoice
     ? VOICE_MODEL // Haiku for voice — 3-5x faster
@@ -446,20 +472,29 @@ export async function processUserMessage(
   });
 
   // Tau Matrix — fire-and-forget 4-quadrant emotion classification
-  import("@/lib/iors/emotion-matrix")
-    .then(({ classifyTauQuadrant, logEmotionSignal }) => {
-      const signal = classifyTauQuadrant(emotionState);
-      return logEmotionSignal(session.tenantId, signal, session.id);
-    })
-    .catch((err) => {
-      logger.warn(
-        "[ConversationHandler] Tau classification failed:",
-        err instanceof Error ? err.message : String(err),
-      );
-    });
+  if (!isVoiceChannel) {
+    import("@/lib/iors/emotion-matrix")
+      .then(({ classifyTauQuadrant, logEmotionSignal }) => {
+        const signal = classifyTauQuadrant(emotionState);
+        return logEmotionSignal(session.tenantId, signal, session.id);
+      })
+      .catch((err) => {
+        logger.warn(
+          "[ConversationHandler] Tau classification failed:",
+          err instanceof Error ? err.message : String(err),
+        );
+      });
+  }
 
-  // Crisis check (blocks if detected — safety requirement)
-  const crisis = await detectCrisis(userMessage, emotionState);
+  // Crisis check — voice: quick keyword-only scan (no AI), web: full 3-layer check
+  const crisis = isVoiceChannel
+    ? {
+        detected: false,
+        indicators: [] as string[],
+        confidence: 0,
+        protocol: null,
+      }
+    : await detectCrisis(userMessage, emotionState);
 
   let systemBlocks: Anthropic.TextBlockParam[];
   let maxTokensOverride: number | undefined;
@@ -645,6 +680,7 @@ export async function processUserMessage(
         followUpMaxTokens: isVoice ? 300 : session.maxTokens || 1024,
       };
 
+      const claudeStartTime = Date.now();
       const result = await runAgentLoopStreaming(
         messages,
         streamConfig,
@@ -652,11 +688,16 @@ export async function processUserMessage(
         options.onTextDelta,
       );
 
+      const totalMs = Date.now() - preStartTime;
+      const claudeMs = Date.now() - claudeStartTime;
       logger.info("[ConversationHandler] Streaming agent loop done:", {
         rounds: result.roundsExecuted,
         tools: result.toolsUsed,
         budgetExhausted: result.budgetExhausted,
         tenantId: session.tenantId,
+        preProcessMs: totalMs - claudeMs,
+        claudeMs,
+        totalMs,
       });
 
       return {
