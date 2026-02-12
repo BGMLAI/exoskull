@@ -4,6 +4,27 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-12] TTS Fix + Knowledge Search Fix (HNSW)
+
+### TTS (Text-to-Speech) Fix
+
+- **Root cause**: VoiceInputBar had TTS toggle UI but `speakText()` was never called when AI messages arrived
+- Moved TTS state/logic (voice selection, localStorage, speakText) from VoiceInputBar to UnifiedStream
+- VoiceInputBar now receives controlled props (`ttsEnabled`, `isSpeaking`, `onToggleTTS`)
+- `speakText()` called on SSE "done" event — AI responses are now read aloud in Polish
+- Markdown stripping for cleaner speech output (removes `**`, `#`, code blocks, links)
+
+### Knowledge Search Fix (CRITICAL)
+
+- **Root cause**: IVFFlat vector index created on empty table = 0 clusters
+- All 1915 chunks had valid embeddings but search returned 0 results (broken index)
+- **Fix**: Replaced IVFFlat with HNSW index (`m=16, ef_construction=64`)
+- HNSW works immediately regardless of table state at creation time
+- Migration: `20260224000002_rebuild_vector_index.sql`
+- **Verified**: `search_user_documents()` now returns results with all embedding formats
+
+---
+
 ## [2026-02-12] File Upload Fix + Reprocess + Middleware
 
 ### File Upload Fix (Chat Rzeka)
