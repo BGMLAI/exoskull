@@ -13,6 +13,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { getTasks } from "@/lib/tasks/task-service";
+import { getActiveGoalCount } from "@/lib/goals/goal-service";
 import { aiChat } from "@/lib/ai";
 import { canSendProactive } from "@/lib/autonomy/outbound-triggers";
 import {
@@ -59,14 +61,8 @@ async function gatherDayData(tenantId: string): Promise<DaySnapshot> {
     proactiveResult,
     emotionResult,
   ] = await Promise.allSettled([
-    // Tasks completed today
-    supabase
-      .from("exo_tasks")
-      .select("title")
-      .eq("tenant_id", tenantId)
-      .eq("status", "completed")
-      .gte("updated_at", todayStart)
-      .limit(10),
+    // Tasks completed today (via dual-read service)
+    getTasks(tenantId, { status: "done", limit: 10 }),
 
     // Conversation count today
     supabase
@@ -84,12 +80,8 @@ async function gatherDayData(tenantId: string): Promise<DaySnapshot> {
       .order("logged_at", { ascending: false })
       .limit(5),
 
-    // Active goals count
-    supabase
-      .from("exo_user_goals")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "active"),
+    // Active goals count (via dual-read service)
+    getActiveGoalCount(tenantId),
 
     // Proactive actions today
     supabase
@@ -108,14 +100,15 @@ async function gatherDayData(tenantId: string): Promise<DaySnapshot> {
       .limit(5),
   ]);
 
+  // getTasks() returns Task[] directly, getActiveGoalCount() returns number
   const tasks =
-    tasksResult.status === "fulfilled" ? tasksResult.value.data || [] : [];
+    tasksResult.status === "fulfilled" ? tasksResult.value || [] : [];
   const msgCount =
     messagesResult.status === "fulfilled" ? messagesResult.value.count || 0 : 0;
   const moods =
     moodResult.status === "fulfilled" ? moodResult.value.data || [] : [];
   const goalsCount =
-    goalsResult.status === "fulfilled" ? goalsResult.value.count || 0 : 0;
+    goalsResult.status === "fulfilled" ? goalsResult.value || 0 : 0;
   const proactiveCount =
     proactiveResult.status === "fulfilled"
       ? proactiveResult.value.count || 0

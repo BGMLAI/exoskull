@@ -28,6 +28,12 @@ import { canSendProactive } from "@/lib/autonomy/outbound-triggers";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { logger } from "@/lib/logger";
 import { generateApp } from "@/lib/apps/generator/app-generator";
+import {
+  getOverdueTasks,
+  getTasks,
+  createTask,
+} from "@/lib/tasks/task-service";
+import { getActiveGoalCount, createGoal } from "@/lib/goals/goal-service";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -59,23 +65,7 @@ async function checkOverdueTasks(
   };
 
   try {
-    const supabase = getServiceSupabase();
-    const { data: overdue, error } = await supabase
-      .from("exo_tasks")
-      .select("id, title, due_date, priority")
-      .eq("tenant_id", tenantId)
-      .in("status", ["pending", "in_progress"])
-      .lt("due_date", new Date().toISOString())
-      .order("priority", { ascending: true })
-      .limit(5);
-
-    if (error) {
-      console.error("[Impulse] Overdue tasks query failed:", {
-        tenantId,
-        error: error.message,
-      });
-      return result;
-    }
+    const overdue = await getOverdueTasks(tenantId, 5);
 
     if (!overdue || overdue.length === 0) return result;
     result.count = overdue.length;
@@ -546,12 +536,8 @@ async function checkSystemDevelopment(
       {
         id: "starter_goals",
         query: async () => {
-          const { count } = await supabase
-            .from("exo_user_goals")
-            .select("*", { count: "exact", head: true })
-            .eq("tenant_id", tenantId)
-            .eq("is_active", true);
-          return (count || 0) === 0;
+          const count = await getActiveGoalCount(tenantId);
+          return count === 0;
         },
         action: {
           mode: "create_goals",
@@ -582,11 +568,8 @@ async function checkSystemDevelopment(
       {
         id: "onboard_task",
         query: async () => {
-          const { count } = await supabase
-            .from("exo_tasks")
-            .select("*", { count: "exact", head: true })
-            .eq("tenant_id", tenantId);
-          return (count || 0) === 0;
+          const existingTasks = await getTasks(tenantId, { limit: 1 });
+          return existingTasks.length === 0;
         },
         action: {
           mode: "create_task",
@@ -679,7 +662,7 @@ async function checkSystemDevelopment(
             appSlug: appResult.app?.slug,
           });
         } else if (action.mode === "create_goals") {
-          // CREATE STARTER GOALS
+          // CREATE STARTER GOALS (via dual-write service)
           const thirtyDaysFromNow = new Date(
             Date.now() + 30 * 24 * 60 * 60 * 1000,
           )
@@ -689,45 +672,42 @@ async function checkSystemDevelopment(
 
           const starterGoals = [
             {
-              tenant_id: tenantId,
               name: "Regularny sen 7-8h",
-              category: "health",
+              category: "health" as const,
               description: "Cel startowy — zadbaj o regeneracje",
-              target_type: "numeric",
+              target_type: "numeric" as const,
               target_value: 7.5,
               target_unit: "godzin",
-              frequency: "daily",
-              direction: "increase",
+              frequency: "daily" as const,
+              direction: "increase" as const,
               start_date: today,
               target_date: thirtyDaysFromNow,
               is_active: true,
               wellbeing_weight: 2.0,
             },
             {
-              tenant_id: tenantId,
               name: "30 minut ruchu dziennie",
-              category: "health",
+              category: "health" as const,
               description: "Cel startowy — aktywnosc fizyczna",
-              target_type: "numeric",
+              target_type: "numeric" as const,
               target_value: 30,
               target_unit: "minut",
-              frequency: "daily",
-              direction: "increase",
+              frequency: "daily" as const,
+              direction: "increase" as const,
               start_date: today,
               target_date: thirtyDaysFromNow,
               is_active: true,
               wellbeing_weight: 1.5,
             },
             {
-              tenant_id: tenantId,
               name: "Nauka nowej umiejetnosci",
-              category: "learning",
+              category: "learning" as const,
               description: "Cel startowy — rozwoj osobisty",
-              target_type: "frequency",
+              target_type: "frequency" as const,
               target_value: 3,
               target_unit: "sesji/tydzien",
-              frequency: "weekly",
-              direction: "increase",
+              frequency: "weekly" as const,
+              direction: "increase" as const,
               start_date: today,
               target_date: thirtyDaysFromNow,
               is_active: true,
@@ -735,24 +715,22 @@ async function checkSystemDevelopment(
             },
           ];
 
-          const { error: goalsError } = await supabase
-            .from("exo_user_goals")
-            .insert(starterGoals);
+          let goalsCreated = 0;
+          for (const goalInput of starterGoals) {
+            const goalResult = await createGoal(tenantId, goalInput);
+            if (goalResult.id) goalsCreated++;
+          }
 
-          if (goalsError) {
-            console.error("[Impulse] Goals creation failed:", {
-              tenantId,
-              error: goalsError.message,
-            });
+          if (goalsCreated === 0) {
+            console.error("[Impulse] Goals creation failed:", { tenantId });
             continue;
           }
 
           message = action.doneMessage;
           triggerType = `auto_build:${gap.id}`;
         } else if (action.mode === "create_task") {
-          // CREATE A TASK
-          const { error: taskError } = await supabase.from("exo_tasks").insert({
-            tenant_id: tenantId,
+          // CREATE A TASK (via dual-write service)
+          const taskResult = await createTask(tenantId, {
             title: action.title,
             description: action.description,
             status: "pending",
@@ -763,10 +741,10 @@ async function checkSystemDevelopment(
             context: { source: "impulse_auto_build" },
           });
 
-          if (taskError) {
+          if (!taskResult.id) {
             console.error("[Impulse] Task creation failed:", {
               tenantId,
-              error: taskError.message,
+              error: taskResult.error,
             });
             continue;
           }

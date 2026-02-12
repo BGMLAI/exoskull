@@ -7,6 +7,8 @@
 
 import { createServiceClient } from "@/lib/supabase/service-client";
 import { aiChat } from "@/lib/ai";
+import { createGoal as createGoalService } from "@/lib/goals/goal-service";
+import { dualReadGoal, dualReadGoals } from "@/lib/tasks/dual-read";
 import type {
   UserGoal,
   GoalCheckpoint,
@@ -38,10 +40,12 @@ export async function defineGoal(
     enriched = await enrichGoalWithAI(input);
   }
 
-  const row = {
-    tenant_id: tenantId,
+  const category = (enriched.category || "health") as GoalCategory;
+
+  // Use goal-service for dual-write (legacy + Tyrolka)
+  const result = await createGoalService(tenantId, {
     name: enriched.name,
-    category: enriched.category || "health",
+    category: category as any,
     description: enriched.description,
     target_type: enriched.target_value ? "numeric" : "boolean",
     target_value: enriched.target_value,
@@ -52,23 +56,27 @@ export async function defineGoal(
     start_date: new Date().toISOString().split("T")[0],
     target_date: enriched.target_date,
     is_active: true,
-    measurable_proxies: [] as MeasurableProxy[],
-    wellbeing_weight: getWellbeingWeight(enriched.category || "health"),
-  };
+    wellbeing_weight: getWellbeingWeight(category),
+  });
 
-  const { data, error } = await supabase
-    .from("exo_user_goals")
-    .insert(row)
-    .select()
-    .single();
-
-  if (error) {
+  if (!result.id) {
     console.error("[GoalEngine] defineGoal failed:", {
-      error: error.message,
+      error: result.error,
       tenantId,
       input,
     });
-    throw new Error(`Failed to create goal: ${error.message}`);
+    throw new Error(`Failed to create goal: ${result.error || "unknown"}`);
+  }
+
+  // Reload the full goal object for return
+  const { data } = await supabase
+    .from("exo_user_goals")
+    .select("*")
+    .eq("id", result.id)
+    .single();
+
+  if (!data) {
+    throw new Error(`Goal created but could not reload: ${result.id}`);
   }
 
   return data as UserGoal;
@@ -143,16 +151,21 @@ export async function logProgress(
 ): Promise<GoalCheckpoint> {
   const supabase = createServiceClient();
 
-  // Load goal for progress calculation
+  // Load goal for progress calculation (dual-read: Tyrolka first, legacy fallback)
+  const dualGoal = await dualReadGoal(goalId, tenantId);
+  if (!dualGoal) {
+    throw new Error(`Goal not found: ${goalId}`);
+  }
+
+  // Also load full legacy record for checkpoint calculation (has extra fields)
   const { data: goal } = await supabase
     .from("exo_user_goals")
     .select("*")
     .eq("id", goalId)
-    .eq("tenant_id", tenantId)
     .single();
 
   if (!goal) {
-    throw new Error(`Goal not found: ${goalId}`);
+    throw new Error(`Goal not found in legacy: ${goalId}`);
   }
 
   const progressPercent = calculateProgressPercent(goal as UserGoal, value);
@@ -208,12 +221,8 @@ export async function logProgressByName(
 ): Promise<GoalCheckpoint | null> {
   const supabase = createServiceClient();
 
-  // Find best matching active goal
-  const { data: goals } = await supabase
-    .from("exo_user_goals")
-    .select("*")
-    .eq("tenant_id", tenantId)
-    .eq("is_active", true);
+  // Find best matching active goal (dual-read: Tyrolka + legacy)
+  const goals = await dualReadGoals(tenantId, { is_active: true });
 
   if (!goals || goals.length === 0) return null;
 
@@ -389,7 +398,11 @@ export async function getGoalStatus(tenantId: string): Promise<GoalStatus[]> {
       { p_goal_id: row.goal_id, p_days: 30 },
     );
 
-    // Load full goal object
+    // Load full goal object (dual-read: Tyrolka first, legacy fallback)
+    const dualG = await dualReadGoal(row.goal_id as string, tenantId);
+    if (!dualG) continue;
+
+    // Also load legacy record for full UserGoal fields
     const { data: goal } = await supabase
       .from("exo_user_goals")
       .select("*")

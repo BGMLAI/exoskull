@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { logProgress, detectMomentum } from "@/lib/goals/engine";
+import { getTasks } from "@/lib/tasks/task-service";
 import type { UserGoal, MeasurableProxy } from "@/lib/goals/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -306,17 +307,13 @@ async function collectProductivityData(
   tenantId: string,
   today: string,
 ): Promise<number | null> {
-  const since = new Date();
-  since.setHours(0, 0, 0, 0);
-
-  const { count } = await supabase
-    .from("exo_tasks")
-    .select("*", { count: "exact", head: true })
-    .eq("tenant_id", tenantId)
-    .eq("status", "done")
-    .gte("completed_at", since.toISOString());
-
-  return count || 0;
+  // Use dual-read service — handles both exo_tasks and user_ops
+  const doneTasks = await getTasks(tenantId, { status: "done" });
+  const todayStart = new Date(today).toISOString();
+  const completedToday = doneTasks.filter(
+    (t) => t.completed_at && t.completed_at >= todayStart,
+  );
+  return completedToday.length;
 }
 
 async function collectMentalData(

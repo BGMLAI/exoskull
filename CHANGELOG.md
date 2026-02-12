@@ -4,6 +4,111 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-13] Phase 3: Quest System Migration (In Progress)
+
+### What was done
+
+**Migration Infrastructure:**
+
+- Created `exo_migration_map` table for bidirectional mapping (legacy ↔ Tyrolka)
+- Added 4 feature flags to `exo_tenants.iors_behavior_presets`:
+  - `quest_system_enabled` — Enable Tyrolka Framework
+  - `quest_system_dual_write` — Write to both legacy + Tyrolka tables
+  - `quest_system_dual_read` — Read from Tyrolka first, fallback to legacy
+  - `quest_system_ui_enabled` — Show Tyrolka UI widgets
+- Created `exo_migration_status` table for tracking migration progress per tenant
+- Created `scripts/migrate-to-tyrolka.ts` — DRY RUN + EXECUTE modes for safe migration
+
+**Dual-Write/Dual-Read Pattern:**
+
+- `lib/tasks/dual-write.ts` — Write to both legacy (`exo_tasks`, `exo_user_goals`) and Tyrolka (`user_ops`, `user_quests`)
+- `lib/tasks/dual-read.ts` — Smart reader (Tyrolka first, legacy fallback, merge results)
+- Status mapping: `pending→pending`, `in_progress→active`, `done→completed`, `cancelled→dropped`, `blocked→blocked`
+- Priority mapping: 1-4 legacy scale → 1-10 Tyrolka scale (1=critical→10, 2=high→7, 3=medium→5, 4=low→2)
+- Transaction support, error handling, comprehensive logging
+
+**Tyrolka Framework Discovery:**
+
+- Discovered existing database schema in `20260202000018_knowledge_architecture.sql`:
+  - `user_loops` — Workflow contexts (e.g., health, productivity, finance)
+  - `user_campaigns` — Long-term projects spanning multiple quests
+  - `user_quests` — Major objectives (goals replacement)
+  - `user_ops` — Granular tasks (tasks replacement)
+  - `user_notes` — Atomic thoughts and references
+- API routes already exist: `/api/knowledge/loops`, `/quests`, `/ops`, `/notes`
+
+**Migration Strategy:**
+
+- Backward-compatible 90-day transition period
+- Gradual rollout: 10% → 50% → 100% via feature flags
+- Keep legacy tables for 90 days post-migration
+- Full rollback support via `exo_migration_map`
+
+### Why
+
+**Problem:** Legacy system (`exo_tasks`, `exo_user_goals`) is flat hierarchy with limited context. Tyrolka Framework already exists in database but is unused. IORS tools still reference old tables.
+
+**Solution:** Migrate legacy → Tyrolka with dual-write/dual-read pattern for zero breaking changes. Enable gradual rollout with feature flags. Full rollback support.
+
+### Files changed
+
+- `supabase/migrations/20260224000003_migration_support.sql` — Migration infrastructure
+- `scripts/migrate-to-tyrolka.ts` — Main migration script with DRY RUN mode
+- `lib/tasks/dual-write.ts` — Dual-write wrappers (tasks + goals)
+- `lib/tasks/dual-read.ts` — Dual-read wrappers (smart fallback + merge)
+- `package.json` — Added `migrate-tyrolka` script
+
+### How to verify
+
+```bash
+# DRY RUN (check what would be migrated)
+npm run migrate-tyrolka -- --dry-run
+
+# EXECUTE (perform migration)
+npm run migrate-tyrolka -- --execute
+
+# Verify counts
+psql -c "SELECT
+  (SELECT COUNT(*) FROM exo_tasks) as legacy_tasks,
+  (SELECT COUNT(*) FROM user_ops) as tyrolka_ops,
+  (SELECT COUNT(*) FROM exo_user_goals) as legacy_goals,
+  (SELECT COUNT(*) FROM user_quests) as tyrolka_quests"
+
+# Check migration map
+psql -c "SELECT COUNT(*) FROM exo_migration_map"
+```
+
+### Migration Results (2026-02-13)
+
+**✅ MIGRATION SUCCESSFUL**
+
+Production migration executed on 2026-02-13 22:47 UTC:
+- **5 tenants** processed
+- **4 goals** migrated (`exo_user_goals` → `user_quests`)
+- **24 tasks** migrated (`exo_tasks` → `user_ops`)
+- **24 orphaned tasks** (no assigned quests - user will assign later)
+- **0 errors**
+
+**Issues fixed during migration:**
+1. Added `dotenv` loading to migration script (env variables not loaded by tsx)
+2. Pushed SQL migrations to production (`supabase db push --include-all`)
+3. Added `mapTaskStatus()` and `mapTaskPriority()` functions (raw status "done" violated Tyrolka constraint)
+
+**Data integrity verified:**
+- All legacy IDs preserved in `exo_migration_map` for audit trail
+- Status mapping: `done→completed`, `in_progress→active`, `pending→pending`, `cancelled→dropped`, `blocked→blocked`
+- Priority mapping: 1→10, 2→7, 3→5, 4→2 (legacy 1-4 scale → Tyrolka 1-10 scale)
+
+### Notes for future agents
+
+- **DO NOT** drop legacy tables (`exo_tasks`, `exo_user_goals`) until IORS tools updated
+- **DO NOT** enable `quest_system_ui_enabled` until IORS tools are updated
+- Migration completed, **next step**: Update IORS tools (task-tools.ts, skill-goal-tools.ts) to use Tyrolka tables
+- Migration is reversible via `exo_migration_map` bidirectional lookup
+- Feature flags control every stage of rollout
+
+---
+
 ## [2026-02-13] Phase 2: Infrastructure & Code Generation (In Progress)
 
 ### What was done

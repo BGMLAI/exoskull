@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { createTask } from "@/lib/tasks/task-service";
 
 export const dynamic = "force-dynamic";
 
@@ -79,29 +80,24 @@ export async function POST(
       metadata.from ? `Od: ${metadata.from}\n` : ""
     }${metadata.subject ? `Temat: ${metadata.subject}\n` : ""}---\n${message.content}`;
 
-    // Create the task
-    const { data: task, error: taskError } = await supabase
-      .from("exo_tasks")
-      .insert({
-        tenant_id: user.id,
-        title: body.title || defaultTitle,
-        description: body.description || defaultDescription,
-        project_id: body.project_id || null,
-        priority: body.priority || 3, // Default: medium
-        due_date: body.due_date || null,
-        status: "pending",
-        context: {
-          source_message_id: messageId,
-          source_channel: message.channel,
-          created_from: "message_conversion",
-        },
-      })
-      .select()
-      .single();
+    // Create the task via dual-write service
+    const taskResult = await createTask(user.id, {
+      title: body.title || defaultTitle,
+      description: body.description || defaultDescription,
+      project_id: body.project_id || null,
+      priority: (body.priority || 3) as 1 | 2 | 3 | 4,
+      due_date: body.due_date || null,
+      status: "pending",
+      context: {
+        source_message_id: messageId,
+        source_channel: message.channel,
+        created_from: "message_conversion",
+      },
+    });
 
-    if (taskError || !task) {
+    if (!taskResult.id) {
       console.error("[MessageToTask] Failed to create task:", {
-        error: taskError?.message,
+        error: taskResult.error,
         messageId,
       });
       return NextResponse.json(
@@ -109,6 +105,16 @@ export async function POST(
         { status: 500 },
       );
     }
+
+    const task = {
+      id: taskResult.id,
+      title: body.title || defaultTitle,
+      status: "pending",
+      priority: body.priority || 3,
+      project_id: body.project_id || null,
+      due_date: body.due_date || null,
+      created_at: new Date().toISOString(),
+    };
 
     // Link the task to the message
     const { error: linkError } = await supabase

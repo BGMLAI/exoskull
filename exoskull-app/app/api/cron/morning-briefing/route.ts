@@ -13,6 +13,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { getTasks } from "@/lib/tasks/task-service";
+import { getGoals } from "@/lib/goals/goal-service";
 import { ModelRouter } from "@/lib/ai/model-router";
 import { logger } from "@/lib/logger";
 import {
@@ -74,21 +76,14 @@ async function handler(req: NextRequest) {
         const [tasksRes, goalsRes, insightsRes, overnightRes] =
           await Promise.all([
             // Active tasks
-            supabase
-              .from("exo_tasks")
-              .select("title, priority, due_date, status")
-              .eq("tenant_id", tenant.id)
-              .eq("status", "active")
-              .order("priority", { ascending: false })
-              .limit(10),
+            getTasks(tenant.id, { status: "pending", limit: 10 })
+              .then((tasks) => ({ data: tasks, error: null }))
+              .catch((e) => ({ data: null, error: e })),
 
-            // Active goals
-            supabase
-              .from("exo_goals")
-              .select("title, progress, target_date")
-              .eq("tenant_id", tenant.id)
-              .eq("status", "active")
-              .limit(5),
+            // Active goals (via dual-read service)
+            getGoals(tenant.id, { is_active: true, limit: 5 })
+              .then((goals) => ({ data: goals, error: null }))
+              .catch((e) => ({ data: null, error: e })),
 
             // Undelivered insights
             supabase
@@ -111,7 +106,7 @@ async function handler(req: NextRequest) {
           ]);
 
         const tasks = tasksRes.data || [];
-        const goals = goalsRes.data || [];
+        const goals = goalsRes.data || []; // getGoals wraps in { data, error } via .then()
         const pendingInsights = insightsRes.data?.length || 0;
         const overnightActions = overnightRes.data || [];
 
@@ -124,8 +119,7 @@ async function handler(req: NextRequest) {
             due: t.due_date,
           })),
           goals: goals.map((g: any) => ({
-            title: g.title,
-            progress: g.progress,
+            title: g.name || g.title,
             deadline: g.target_date,
           })),
           pending_insights: pendingInsights,

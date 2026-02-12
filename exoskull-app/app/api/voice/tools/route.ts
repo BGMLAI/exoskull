@@ -1,33 +1,31 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import {
+  getTasks as getTasksService,
+  createTask as createTaskService,
+  completeTask as completeTaskService,
+} from "@/lib/tasks/task-service";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
-// Tool Handlers (legacy VAPI format - kept for backward compatibility)
-// TODO: Migrate callers to use lib/tools/ registry instead
+// Tool Handlers (legacy VAPI format - using dual-write task service)
 async function getTasks(tenantId: string) {
-  const supabase = getServiceSupabase();
-  const { data, error } = await supabase
-    .from("exo_tasks")
-    .select(
-      "id, title, status, priority, due_date, description, energy_required",
-    )
-    .eq("tenant_id", tenantId)
-    .neq("status", "cancelled")
-    .order("priority", { ascending: true })
-    .order("due_date", { ascending: true, nullsFirst: false })
-    .limit(20);
-
-  if (error) {
+  try {
+    const tasks = await getTasksService(tenantId, { limit: 20 });
+    // Filter out cancelled
+    const filtered = tasks.filter((t) => t.status !== "cancelled");
+    return {
+      tasks: filtered,
+      count: filtered.length,
+    };
+  } catch (error) {
     console.error("Error fetching tasks:", error);
-    return { tasks: [], error: error.message };
+    return {
+      tasks: [],
+      error: error instanceof Error ? error.message : "Unknown",
+    };
   }
-
-  return {
-    tasks: data || [],
-    count: data?.length || 0,
-  };
 }
 
 async function createTask(
@@ -40,56 +38,56 @@ async function createTask(
     energy_required?: number;
   },
 ) {
-  const supabase = getServiceSupabase();
-  const { data, error } = await supabase
-    .from("exo_tasks")
-    .insert({
-      tenant_id: tenantId,
+  try {
+    const result = await createTaskService(tenantId, {
       title: params.title,
-      priority: params.priority || 3, // default medium
+      priority: (params.priority || 3) as 1 | 2 | 3 | 4,
       due_date: params.due_date || null,
       description: params.description || null,
       energy_required: params.energy_required || null,
       status: "pending",
-    })
-    .select()
-    .single();
+    });
 
-  if (error) {
+    if (!result.id) {
+      return { success: false, error: result.error || "Failed to create task" };
+    }
+
+    return {
+      success: true,
+      task: { id: result.id, title: params.title },
+      message: `Zadanie "${params.title}" zostało dodane`,
+    };
+  } catch (error) {
     console.error("Error creating task:", error);
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown",
+    };
   }
-
-  return {
-    success: true,
-    task: data,
-    message: `Zadanie "${params.title}" zostało dodane`,
-  };
 }
 
 async function completeTask(tenantId: string, taskId: string) {
-  const supabase = getServiceSupabase();
-  const { data, error } = await supabase
-    .from("exo_tasks")
-    .update({
-      status: "done",
-      completed_at: new Date().toISOString(),
-    })
-    .eq("id", taskId)
-    .eq("tenant_id", tenantId)
-    .select()
-    .single();
+  try {
+    const result = await completeTaskService(taskId, tenantId);
 
-  if (error) {
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error || "Failed to complete task",
+      };
+    }
+
+    return {
+      success: true,
+      message: `Zadanie oznaczone jako wykonane`,
+    };
+  } catch (error) {
     console.error("Error completing task:", error);
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown",
+    };
   }
-
-  return {
-    success: true,
-    task: data,
-    message: `Zadanie oznaczone jako wykonane`,
-  };
 }
 
 // Schedule/Check-in handlers

@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getTaskStats } from "@/lib/tasks/task-service";
 
 export const dynamic = "force-dynamic";
 
@@ -20,19 +21,8 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Count tasks by status
-    const { data: tasks } = await supabase
-      .from("exo_tasks")
-      .select("status")
-      .eq("tenant_id", user.id);
-
-    const stats = {
-      total: tasks?.length || 0,
-      pending: tasks?.filter((t) => t.status === "pending").length || 0,
-      in_progress: tasks?.filter((t) => t.status === "in_progress").length || 0,
-      done: tasks?.filter((t) => t.status === "done").length || 0,
-      blocked: tasks?.filter((t) => t.status === "blocked").length || 0,
-    };
+    // Count tasks by status via dual-read service
+    const stats = await getTaskStats(user.id);
 
     return NextResponse.json({ stats, series: [] });
   } catch (error) {

@@ -26,6 +26,7 @@ import {
 } from "./custom-action-registry";
 
 import { logger } from "@/lib/logger";
+import { createTask, completeTask } from "@/lib/tasks/task-service";
 
 // ============================================================================
 // ACTION EXECUTOR CLASS
@@ -275,26 +276,27 @@ export class ActionExecutor {
         labels?: string[];
       };
 
-    const { data, error } = await this.supabase
-      .from("exo_tasks")
-      .insert({
-        tenant_id: request.tenantId,
-        title,
-        description: description || null,
-        due_date: dueDate || null,
-        priority: priority || "medium",
-        labels: labels || [],
-        status: "pending",
-        source: "autonomy",
-      })
-      .select()
-      .single();
+    // Use dual-write task service
+    const priorityMap: Record<string, 1 | 2 | 3 | 4> = {
+      critical: 1,
+      high: 2,
+      medium: 3,
+      low: 4,
+    };
+    const taskResult = await createTask(request.tenantId, {
+      title,
+      description: description || null,
+      due_date: dueDate || null,
+      priority: priorityMap[priority || "medium"] || 3,
+      status: "pending",
+      context: { source: "autonomy", labels: labels || [] },
+    });
 
-    if (error) {
+    if (!taskResult.id) {
       return {
         success: false,
         actionType: "create_task",
-        error: error.message,
+        error: taskResult.error || "Failed to create task",
         durationMs: 0,
       };
     }
@@ -302,7 +304,7 @@ export class ActionExecutor {
     return {
       success: true,
       actionType: "create_task",
-      data: { taskId: data.id, title: data.title },
+      data: { taskId: taskResult.id, title },
       durationMs: 0,
     };
   }
@@ -315,22 +317,14 @@ export class ActionExecutor {
       notes?: string;
     };
 
-    const { error } = await this.supabase
-      .from("exo_tasks")
-      .update({
-        status: "completed",
-        completed_at: new Date().toISOString(),
-        notes: notes || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", taskId)
-      .eq("tenant_id", request.tenantId);
+    // Use dual-write task service
+    const { success, error } = await completeTask(taskId, request.tenantId);
 
-    if (error) {
+    if (!success) {
       return {
         success: false,
         actionType: "complete_task",
-        error: error.message,
+        error: error || "Failed to complete task",
         durationMs: 0,
       };
     }

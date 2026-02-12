@@ -49,6 +49,7 @@ import { emailTools } from "./email-tools";
 import { webTools } from "./web-tools";
 import { ralphTools } from "./ralph-tools";
 import { codeGenerationTools } from "./code-generation-tools";
+import { tyrolkaTools } from "./tyrolka-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -76,6 +77,7 @@ export const IORS_EXTENSION_TOOLS: ToolDefinition[] = [
   ...webTools,
   ...ralphTools,
   ...codeGenerationTools,
+  ...tyrolkaTools,
 ];
 
 /**

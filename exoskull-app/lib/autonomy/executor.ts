@@ -14,6 +14,7 @@ import { makeOutboundCall } from "../voice/twilio-client";
 import { appendMessage } from "../unified-thread";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { emitEvent } from "@/lib/iors/loop";
+import { createTask } from "@/lib/tasks/task-service";
 
 import { logger } from "@/lib/logger";
 function getTwilioConfig() {
@@ -528,7 +529,6 @@ async function handleMakeCall(
 async function handleCreateTask(
   intervention: Intervention,
 ): Promise<ExecutionResult> {
-  const supabase = getServiceSupabase();
   const { title, priority } = intervention.action_payload as {
     title?: string;
     priority?: number;
@@ -538,17 +538,20 @@ async function handleCreateTask(
     return { success: false, message: "Missing task title" };
   }
 
-  const { error } = await supabase.from("exo_tasks").insert({
-    tenant_id: intervention.tenant_id,
+  const result = await createTask(intervention.tenant_id, {
     title,
-    priority: priority || 2,
+    priority: (priority || 2) as 1 | 2 | 3 | 4,
     status: "pending",
+    context: {
+      source: "intervention",
+      intervention_id: intervention.id,
+    },
   });
 
-  if (error) {
+  if (!result.id) {
     return {
       success: false,
-      message: `Failed to create task: ${error.message}`,
+      message: `Failed to create task: ${result.error || "unknown"}`,
     };
   }
 
