@@ -445,16 +445,19 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
           body: JSON.stringify({
             filename: file.name,
             contentType: file.type || "application/octet-stream",
+            fileSize: file.size,
           }),
         });
 
         if (!urlRes.ok) throw new Error("Nie udalo sie uzyskac URL uploadu");
-        const { signedUrl, path } = await urlRes.json();
+        const { signedUrl, documentId, mimeType } = await urlRes.json();
 
-        // 3. Upload directly to storage
+        // 3. Upload directly to storage (use correct MIME from server)
         const uploadRes = await fetch(signedUrl, {
           method: "PUT",
-          headers: { "Content-Type": file.type || "application/octet-stream" },
+          headers: {
+            "Content-Type": mimeType || file.type || "application/octet-stream",
+          },
           body: file,
         });
 
@@ -467,12 +470,7 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
         const confirmRes = await fetch("/api/knowledge/confirm-upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            path,
-            filename: file.name,
-            fileType: ext,
-            fileSize: file.size,
-          }),
+          body: JSON.stringify({ documentId }),
         });
 
         if (!confirmRes.ok)
