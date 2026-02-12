@@ -1,20 +1,19 @@
 /**
  * POST /api/tts
  *
- * Text-to-speech using OpenAI TTS API.
+ * Text-to-speech using ElevenLabs API (fallback: OpenAI TTS).
  * Returns audio/mpeg stream for client playback.
  *
- * Body: { text: string, voice?: string }
+ * Body: { text: string }
  * Response: audio/mpeg binary stream
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import OpenAI from "openai";
 
 export const dynamic = "force-dynamic";
 
-const MAX_CHARS = 4000; // OpenAI TTS limit is 4096
+const MAX_CHARS = 4000;
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,7 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { text, voice = "nova" } = await req.json();
+    const { text } = await req.json();
 
     if (!text || typeof text !== "string") {
       return NextResponse.json({ error: "text is required" }, { status: 400 });
@@ -51,17 +50,71 @@ export async function POST(req: NextRequest) {
 
     const truncated = clean.slice(0, MAX_CHARS);
 
+    // Try ElevenLabs first, fallback to OpenAI
+    const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
+    const voiceId = process.env.ELEVENLABS_VOICE_ID || "gFl0NeqphJUaoBLtWrqM";
+
+    if (elevenLabsKey) {
+      try {
+        const elRes = await fetch(
+          `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+          {
+            method: "POST",
+            headers: {
+              "xi-api-key": elevenLabsKey,
+              "Content-Type": "application/json",
+              Accept: "audio/mpeg",
+            },
+            body: JSON.stringify({
+              text: truncated,
+              model_id: "eleven_multilingual_v2",
+              voice_settings: {
+                stability: 0.5,
+                similarity_boost: 0.75,
+                style: 0.3,
+                use_speaker_boost: true,
+              },
+            }),
+          },
+        );
+
+        if (elRes.ok) {
+          const audioBuffer = Buffer.from(await elRes.arrayBuffer());
+          return new NextResponse(audioBuffer, {
+            status: 200,
+            headers: {
+              "Content-Type": "audio/mpeg",
+              "Content-Length": String(audioBuffer.length),
+              "Cache-Control": "no-cache",
+            },
+          });
+        }
+
+        console.error(
+          "[TTS] ElevenLabs failed:",
+          elRes.status,
+          await elRes.text().catch(() => ""),
+        );
+      } catch (elErr) {
+        console.error(
+          "[TTS] ElevenLabs error:",
+          elErr instanceof Error ? elErr.message : elErr,
+        );
+      }
+    }
+
+    // Fallback: OpenAI TTS
+    const OpenAI = (await import("openai")).default;
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
     const response = await openai.audio.speech.create({
       model: "tts-1",
-      voice: voice as "nova" | "alloy" | "echo" | "fable" | "onyx" | "shimmer",
+      voice: "nova",
       input: truncated,
       response_format: "mp3",
       speed: 1.05,
     });
 
-    // Stream the audio back
     const audioBuffer = Buffer.from(await response.arrayBuffer());
 
     return new NextResponse(audioBuffer, {
