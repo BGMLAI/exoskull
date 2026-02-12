@@ -1,7 +1,7 @@
 # 🧠 EXOSKULL - Adaptive Life Operating System
 ## Your Second Brain. Built For You. By AI.
 
-**Version:** 5.0
+**Version:** 5.1
 **Created:** 2026-02-01
 **Updated:** 2026-02-12
 **Status:** 🟡 Active Development — MVP Live (exoskull.xyz)
@@ -39,7 +39,7 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **Voice Pipeline** | ✅ Live | Twilio → Cartesia Sonic 3 STT → Claude Sonnet 4 (53 tools) → Cartesia Sonic 3 TTS + streaming Haiku pipeline |
+| **Voice Pipeline** | ✅ Live | Twilio → Cartesia Sonic 3 STT → Claude Sonnet 4 (56 tools) → Cartesia Sonic 3 TTS + streaming Haiku pipeline |
 | **Memory System** | ✅ Live | Daily summaries, keyword search, 50+ msg context, user corrections |
 | **Data Lake** | ✅ Live | Bronze (R2 Parquet) → Silver (Postgres) → Gold (Materialized Views) |
 | **AI Router** | ✅ Live | 4-tier: Gemini 2.5 Flash → Haiku → Sonnet 4.5 → Opus 4.5 (de-escalation) |
@@ -69,6 +69,12 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 | **Presigned Uploads** | ✅ Live | Client → Supabase Storage direct upload (bypasses Vercel 4.5MB limit) |
 | **Settings Self-Modify** | ✅ Live | 22 permission categories, two-tier consent system (with_approval + autonomous) |
 | **Self-Optimization Dashboard** | ✅ Live | OptimizationWidget (8 parallel queries), InterventionInbox (approve/dismiss), InsightHistory |
+| **Agentic Execution Loop** | ✅ Live | Multi-step tool use (10 web, 3 voice, 15 async), budget-aware 55s cutoff, async overflow |
+| **Ralph Loop** | ✅ Live | Autonomous self-development: OBSERVE → ANALYZE → BUILD → LEARN → NOTIFY. Runs in loop-15 |
+| **Dynamic Tool Registry** | ✅ Live | Hot-loadable per-tenant tools from `exo_dynamic_tools`, max 15/tenant, 5min cache |
+| **Tool Telemetry** | ✅ Live | Fire-and-forget execution logging to `exo_tool_executions`, 7-day TTL |
+| **Schema-Driven Dynamic UI** | ✅ Live | 6 app layouts: table, cards, timeline, kanban, stats-grid, mindmap + media rich |
+| **Chat Rzeka Evolution** | ✅ Live | 16 StreamEvent types (added `system_evolution` for Ralph Loop notifications) |
 | **WhatsApp/Messenger** | 🟡 Partial | Enhanced WhatsApp via Meta API (placeholder for direct), Messenger placeholder |
 | **Android App** | 🔴 Planned | Zero-install SMS/Voice works as alternative |
 
@@ -780,7 +786,7 @@ Multimodal_System = {
       pipeline: {  // ✅ PRODUCTION
         telephony: "Twilio (+48732143210, +48732144112)",
         stt: "Cartesia Sonic 3 (streaming)",
-        llm: "Claude Sonnet 4 via streaming Haiku pipeline (53 IORS tools)",
+        llm: "Claude Sonnet 4 via streaming Haiku pipeline (56 IORS tools)",
         tts: "Cartesia Sonic 3",
         webhook: "Railway voice-ws WebSocket server"
       },
@@ -3067,13 +3073,13 @@ Guardrails = {
 |-------|-----------|--------|
 | **Frontend** | Next.js 14 (App Router), React, TypeScript, Tailwind, shadcn/ui | ✅ Live |
 | **Backend** | Next.js API Routes (142 endpoints), Vercel Serverless | ✅ Live |
-| **Database** | Supabase (PostgreSQL 15+ with pgvector, 56 migrations, RLS) | ✅ Live |
+| **Database** | Supabase (PostgreSQL 15+ with pgvector, 57 migrations, RLS) | ✅ Live |
 | **Auth** | Supabase Auth (cookie SSR, middleware guards) | ✅ Live |
 | **Data Lake** | R2 Parquet (Bronze) → Postgres (Silver) → Mat. Views (Gold) | ✅ Live |
 | **Voice (Telephony)** | Twilio (+48732143210, +48732144112) | ✅ Live |
 | **Voice (TTS)** | Cartesia Sonic 3 (server) + browser speechSynthesis (web) | ✅ Live |
 | **Voice (STT)** | Cartesia Sonic 3 (streaming) | ✅ Live |
-| **Voice (LLM)** | Claude Sonnet 4 via streaming Haiku pipeline (53 IORS tools) | ✅ Live |
+| **Voice (LLM)** | Claude Sonnet 4 via streaming Haiku pipeline (56 IORS tools) | ✅ Live |
 | **Memory** | Daily summaries + keyword search + unified thread (50+ msg context) | ✅ Live |
 | **Email** | Resend | ✅ Live |
 | **SMS** | Twilio | ✅ Live |
@@ -3302,13 +3308,13 @@ Email_Analysis = {
 
 **Real-time unified activity stream showing all ExoSkull events in chronological order.**
 
-> **Implementation (Feb 8-12, 2026):** 25+ files in components/stream/ + lib/stream/ + lib/hooks/. 15 StreamEvent types, SSE real-time updates, file upload with drag-and-drop.
+> **Implementation (Feb 8-12, 2026):** 25+ files in components/stream/ + lib/stream/ + lib/hooks/. 16 StreamEvent types, SSE real-time updates, file upload with drag-and-drop.
 
 ```javascript
 Chat_Rzeka = {
 
   architecture: {
-    core: "StreamEvent union (15 types) → StreamEventRouter → event components",
+    core: "StreamEvent union (16 types) → StreamEventRouter → event components",
     state: "useStreamState (useReducer) for efficient updates",
     realtime: "SSE via ProcessingCallback on processUserMessage()"
   },
@@ -3324,7 +3330,8 @@ Chat_Rzeka = {
     "file_upload",            // File upload progress + RAG processing status
     "third_party_action",     // External service actions (11 tool names → service badges)
     "agent_communication",    // Inter-agent messages
-    "knowledge_citation"      // RAG citation references
+    "knowledge_citation",     // RAG citation references
+    "system_evolution"        // Ralph Loop build/fix/optimize notifications
   ],
 
   components: {
@@ -3334,7 +3341,8 @@ Chat_Rzeka = {
       "FileUploadEvent",      // Upload progress bar + RAG status
       "ThirdPartyAction",     // Service icon + action description
       "AgentComm",            // Agent-to-agent communication display
-      "KnowledgeCitation"     // Document citation with relevance score
+      "KnowledgeCitation",    // Document citation with relevance score
+      "SystemEvolution"       // Ralph Loop build/fix/optimize event (color-coded)
     ]
   },
 
@@ -3553,7 +3561,7 @@ Web_Search_Tools = {
     }
   },
 
-  total_iors_tools: 53
+  total_iors_tools: 56
 }
 ```
 
@@ -3596,6 +3604,118 @@ App_Builder = {
     apps: ["mood tracker", "habit tracker", "expense tracker"],
     method: "generateApp() — ~5-8s execution",
     dedup: "auto_build:{gap_id} in exo_proactive_log"
+  },
+
+  schema_driven_ui: {
+    layouts: ["table", "cards", "timeline", "kanban", "stats-grid", "mindmap"],
+    media_rich: {
+      modes: ["thumbnail", "cover", "avatar"],
+      column: "media_column in ui_config",
+      form_type: "image_url"
+    },
+    ai_selects_layout: "Based on app description in buildAppSystemPrompt()",
+    components: {
+      table: "AppWidget.tsx (default EntryRow)",
+      cards: "app-layouts/CardGrid.tsx (title, subtitle, badge, media)",
+      timeline: "app-layouts/TimelineView.tsx (date-sorted, vertical line)",
+      kanban: "app-layouts/KanbanBoard.tsx (swim lanes, 140px columns)",
+      stats_grid: "app-layouts/StatsBar.tsx (2x2 stat cards + last entries)",
+      mindmap: "app-layouts/MindmapView.tsx (central node + branches)"
+    }
+  }
+}
+```
+
+---
+
+## Agentic Execution Loop — ✅ IMPLEMENTED
+
+**Multi-step autonomous tool execution replacing the old 3-round limit.**
+
+> **Implementation (Feb 12, 2026):** `lib/iors/agent-loop.ts` — Claude calls tools in a loop, observing results and deciding next steps.
+
+```javascript
+Agent_Loop = {
+
+  file: "lib/iors/agent-loop.ts",
+
+  max_steps: {
+    web: 10,         // Chat/API requests
+    voice: 3,        // Voice calls (low latency)
+    async: 15         // Background tasks (exo_async_tasks)
+  },
+
+  budget_ms: 55000,   // Vercel safety margin (60s timeout)
+
+  flow: "Claude → tool_use → execute → observe → Claude → repeat",
+
+  overflow: {
+    trigger: ">50s elapsed",
+    action: "Serialize agent state to exo_async_tasks.agent_state JSONB",
+    resume: "async-processor picks up and continues"
+  },
+
+  processing_callback: "SSE stream per step (Chat Rzeka real-time)",
+
+  integration: {
+    conversation_handler: "Replaced inline 190-line tool loop",
+    follow_up_tokens: { web: 1024, voice: 300 }
+  }
+}
+```
+
+---
+
+## Ralph Loop (Autonomous Self-Development) — ✅ IMPLEMENTED
+
+**ExoSkull builds, fixes, and improves itself autonomously.**
+
+> **Implementation (Feb 12, 2026):** `lib/iors/ralph-loop.ts` — runs inside loop-15 CRON every 15 minutes.
+
+```javascript
+Ralph_Loop = {
+
+  file: "lib/iors/ralph-loop.ts",
+
+  cycle: {
+    observe: "Query tool failures, pending plans, gaps, unused apps, user priorities",
+    analyze: "Gemini Flash decides ONE action (cheapest model)",
+    build:   "Execute action using existing IORS tools",
+    learn:   "Log outcome to exo_dev_journal",
+    notify:  "Send system_evolution event via Chat Rzeka"
+  },
+
+  tables: {
+    dev_journal:     "exo_dev_journal (entry_type: build|fix|learning|plan|observation)",
+    dynamic_tools:   "exo_dynamic_tools (per-tenant hot-loadable tools, max 15)",
+    tool_executions: "exo_tool_executions (telemetry, 7-day TTL)"
+  },
+
+  action_types: ["build_app", "fix_tool", "optimize", "register_tool", "none"],
+
+  gap_detection: "Reads exo_proactive_log trigger_type 'auto_build:%' (NOT a dedicated gap table)",
+
+  safety: {
+    budget_per_cycle: "max 1 build + 2 fixes per 15min",
+    consent_gate:     "Uses tenant permission categories (autonomous vs with_approval)",
+    circuit_breaker:  "3+ failures of same tool in 24h → auto-remediation"
+  },
+
+  iors_tools: [
+    "view_dev_journal",           // Show what system built/fixed
+    "trigger_ralph_cycle",        // Force development cycle
+    "set_development_priority"    // User sets what's important
+  ],
+
+  chat_rzeka_event: {
+    type: "system_evolution",
+    component: "components/stream/events/SystemEvolution.tsx",
+    colors: {
+      build: "emerald",
+      fix: "amber",
+      optimize: "blue",
+      register_tool: "violet"
+    }
   }
 }
 ```
@@ -3744,7 +3864,7 @@ Self_Optimization_Dashboard = {
 
 **Voice & Discovery (Week 5-8):** ✅
 - [x] Custom voice pipeline: Twilio → Cartesia Sonic 3 STT → Claude Sonnet 4 → Cartesia Sonic 3 TTS (streaming Haiku pipeline)
-- [x] 53 IORS tools (tasks, mods, calls, SMS, email, memory, autonomy, knowledge, web search, apps, and more)
+- [x] 56 IORS tools (tasks, mods, calls, SMS, email, memory, autonomy, knowledge, web search, apps, and more)
 - [x] Outbound calling + delegate calling (call third parties on user behalf)
 - [x] Discovery/onboarding conversation system (~60 topics)
 
@@ -3805,7 +3925,7 @@ Self_Optimization_Dashboard = {
 
 ### Phase 2.5: Systems Integration (Feb 7-12, 2026) — ✅ COMPLETE
 
-- [x] **Unified Message Gateway** — 12 channels, all route through handleInboundMessage() → processUserMessage() (53 IORS tools)
+- [x] **Unified Message Gateway** — 12 channels, all route through handleInboundMessage() → processUserMessage() (56 IORS tools)
 - [x] **Email Analysis System** — Multi-provider (Gmail/Outlook/IMAP), 2-phase AI classification, RAG knowledge extraction, 4 IORS tools, 2 CRONs (email-sync 15min, email-analyze 5min)
 - [x] **Chat Rzeka / Unified Activity Stream** — 15 StreamEvent types, 6 event components, SSE real-time, file upload with drag-and-drop
 - [x] **MAPEK Loop System** — 3-tier CRON: petla (1min triage), loop-15 (15min evaluation), loop-daily (24h maintenance, 7 handlers)
@@ -3834,8 +3954,8 @@ Self_Optimization_Dashboard = {
 
 ---
 
-**Version:** 5.0
-**Status:** MVP Live — Active Development (142 API routes, 53 IORS tools, 28 CRONs, 56 migrations, 18 canvas widgets)
+**Version:** 5.1
+**Status:** MVP Live — Active Development (142 API routes, 56 IORS tools, 28 CRONs, 57 migrations, 18 canvas widgets)
 **Created:** 2026-02-01
 **Updated:** 2026-02-12
 
