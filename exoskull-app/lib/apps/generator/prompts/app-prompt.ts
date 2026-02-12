@@ -121,11 +121,23 @@ Choose the best layout based on data type:
 | "timeline" | Chronological events, journal entries | Mood diary, health events, activity log |
 | "kanban" | Items with status/categories to track | Tasks, habit progress, project stages |
 | "stats-grid" | Numeric tracking with dashboards | Expense tracker, fitness stats, sales metrics |
+| "mindmap" | Categorized/grouped data with branches | Idea mapping, skill trees, knowledge maps, brainstorms |
 
 For "cards" layout, also set: \`card_title_column\`, \`card_subtitle_column\`, optionally \`card_badge_column\`
 For "timeline" layout, also set: \`timeline_date_column\`, \`timeline_label_column\`
 For "kanban" layout, also set: \`kanban_group_column\`, \`kanban_columns\` (list of possible values)
 For "stats-grid" layout, also set: \`stats_columns\` array with column/label/aggregation/format
+For "mindmap" layout, also set: \`mindmap_group_column\` (branch grouping), \`mindmap_node_label\` (leaf label), optionally \`mindmap_center_label\`
+
+## MEDIA RICH SUPPORT
+
+If the app involves images, photos, or visual media, add a \`text\` column for the URL (e.g. \`image_url\`, \`cover_url\`, \`photo_url\`).
+Then set these in ui_config:
+- \`media_column\`: column name holding the image URL
+- \`media_display\`: "thumbnail" (small square), "cover" (full-width banner), or "avatar" (small circle)
+- In form_fields, use type "image_url" for the media column
+
+Use media for: recipes (cover), contacts (avatar), collections (thumbnail), portfolios (cover), mood boards (cover).
 
 ## CONSTRAINTS
 
@@ -136,11 +148,11 @@ For "stats-grid" layout, also set: \`stats_columns\` array with column/label/agg
 5. Column names — lowercase, underscores, no spaces
 6. \`display_columns\` — max 6 columns (fits widget width)
 7. \`form_fields\` — match column names exactly
-8. Form field types: text, number, date, boolean, select, textarea, rating
+8. Form field types: text, number, date, boolean, select, textarea, rating, url, image_url
 9. \`name\` and labels — Use Polish if user's message is in Polish, English otherwise
 10. Keep it practical — don't over-engineer, 3-8 columns for most apps
 11. \`icon\` — must be a valid Lucide icon name (BookOpen, Heart, Dumbbell, Coffee, etc.)
-12. \`layout\` — MUST be one of: table, cards, timeline, kanban, stats-grid
+12. \`layout\` — MUST be one of: table, cards, timeline, kanban, stats-grid, mindmap
 
 ## Column Type Guide
 

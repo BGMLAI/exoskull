@@ -182,6 +182,11 @@ export async function runRalphCycle(
     // ── Step 4: LEARN ──
     const journalEntryId = await learn(tenantId, action, buildResult);
 
+    // ── Step 5: NOTIFY (Chat Rzeka system_evolution) ──
+    if (buildResult.success) {
+      await notifyUser(tenantId, action, buildResult, journalEntryId);
+    }
+
     return {
       observed: observedStats,
       action,
@@ -584,6 +589,38 @@ async function learn(
 // ============================================================================
 // HELPERS
 // ============================================================================
+
+const EVOLUTION_LABELS: Record<string, string> = {
+  build_app: "Zbudowano",
+  fix_tool: "Naprawiono",
+  optimize: "Zoptymalizowano",
+  register_tool: "Zarejestrowano narzędzie",
+};
+
+async function notifyUser(
+  tenantId: string,
+  action: RalphAction,
+  buildResult: { success: boolean; result?: string },
+  journalEntryId?: string,
+): Promise<void> {
+  try {
+    const { sendProactiveMessage } = await import("@/lib/cron/tenant-utils");
+    const label = EVOLUTION_LABELS[action.type] || action.type;
+    const message = `${label}: ${buildResult.result || action.description}`;
+    await sendProactiveMessage(
+      tenantId,
+      message,
+      `ralph_${action.type}`,
+      "ralph_loop",
+    );
+  } catch (error) {
+    // Non-critical — don't break the loop
+    console.error("[RalphLoop:Notify] Failed:", {
+      tenantId,
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+}
 
 async function logToJournal(
   tenantId: string,

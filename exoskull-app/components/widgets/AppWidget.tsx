@@ -12,6 +12,7 @@ import { CardGrid } from "./app-layouts/CardGrid";
 import { TimelineView } from "./app-layouts/TimelineView";
 import { KanbanBoard } from "./app-layouts/KanbanBoard";
 import { StatsBar } from "./app-layouts/StatsBar";
+import { MindmapView } from "./app-layouts/MindmapView";
 
 interface AppWidgetProps {
   appSlug: string;
@@ -214,6 +215,10 @@ function LayoutRenderer({
       return (
         <KanbanBoard entries={entries} columns={columns} uiConfig={uiConfig} />
       );
+    case "mindmap":
+      return (
+        <MindmapView entries={entries} columns={columns} uiConfig={uiConfig} />
+      );
     case "stats-grid":
       return (
         <>
@@ -381,6 +386,28 @@ function FormField({
               </option>
             ))}
           </select>
+        </div>
+      );
+    case "url":
+    case "image_url":
+      return (
+        <div>
+          <label className="text-xs text-muted-foreground">{field.label}</label>
+          <input
+            type="url"
+            className={baseClass}
+            placeholder={field.placeholder || "https://..."}
+            value={(value as string) || ""}
+            onChange={(e) => onChange(e.target.value || null)}
+            required={field.required}
+          />
+          {field.type === "image_url" && typeof value === "string" && value && (
+            <img
+              src={value as string}
+              alt="Preview"
+              className="mt-1 w-12 h-12 rounded object-cover"
+            />
+          )}
         </div>
       );
     default:

@@ -32,7 +32,8 @@ export type AppLayout =
   | "cards"
   | "timeline"
   | "kanban"
-  | "stats-grid";
+  | "stats-grid"
+  | "mindmap";
 
 /** UI configuration for the app widget */
 export interface AppUiConfig {
@@ -87,6 +88,16 @@ export interface AppUiConfig {
     value: string | number;
     class: string;
   }[];
+  /** Mindmap layout: which column is the central node label */
+  mindmap_center_label?: string;
+  /** Mindmap layout: which column groups entries into branches */
+  mindmap_group_column?: string;
+  /** Mindmap layout: which column is the node label */
+  mindmap_node_label?: string;
+  /** Media rich: which column holds image/media URLs */
+  media_column?: string;
+  /** Media rich: display mode for media */
+  media_display?: "thumbnail" | "cover" | "avatar";
 }
 
 /** Form field configuration */
@@ -100,7 +111,9 @@ export interface AppFormField {
     | "boolean"
     | "select"
     | "textarea"
-    | "rating";
+    | "rating"
+    | "url"
+    | "image_url";
   required?: boolean;
   placeholder?: string;
   options?: string[]; // For select fields

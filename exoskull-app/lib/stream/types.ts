@@ -32,7 +32,8 @@ export type StreamEventData =
   | FileUploadData
   | ThirdPartyActionData
   | AgentCommunicationData
-  | KnowledgeCitationData;
+  | KnowledgeCitationData
+  | SystemEvolutionData;
 
 // ---------------------------------------------------------------------------
 // Message events
@@ -181,6 +182,20 @@ export interface KnowledgeCitationData {
   documentId: string;
   snippet: string;
   relevanceScore: number;
+}
+
+// ---------------------------------------------------------------------------
+// System Evolution events (Ralph Loop)
+// ---------------------------------------------------------------------------
+
+export interface SystemEvolutionData {
+  type: "system_evolution";
+  evolutionType: "build" | "fix" | "optimize" | "register_tool";
+  title: string;
+  description: string;
+  outcome: "success" | "failed" | "pending";
+  relatedEntity?: string;
+  journalEntryId?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@ import { FileUploadEvent } from "./events/FileUploadEvent";
 import { ThirdPartyAction } from "./events/ThirdPartyAction";
 import { AgentComm } from "./events/AgentComm";
 import { KnowledgeCitation } from "./events/KnowledgeCitation";
+import { SystemEvolution } from "./events/SystemEvolution";
 
 interface StreamEventRouterProps {
   event: StreamEvent;
@@ -55,6 +56,8 @@ export function StreamEventRouter({ event }: StreamEventRouterProps) {
       return <AgentComm event={event} />;
     case "knowledge_citation":
       return <KnowledgeCitation event={event} />;
+    case "system_evolution":
+      return <SystemEvolution event={event} />;
     default:
       return null;
   }
