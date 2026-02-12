@@ -261,6 +261,7 @@ export async function updateSession(
           role: "user",
           content: userMessage,
           channel,
+          direction: "inbound",
           source_type: sourceType,
           source_id: sessionId,
         });
@@ -269,6 +270,7 @@ export async function updateSession(
         role: "assistant",
         content: assistantMessage,
         channel,
+        direction: "outbound",
         source_type: sourceType,
         source_id: sessionId,
       });
