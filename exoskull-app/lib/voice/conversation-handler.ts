@@ -22,9 +22,14 @@ import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
 import { logEmotion } from "@/lib/emotion/logger";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { callOpenAIChatWithTools } from "./openai-chat-provider";
+import {
+  runAgentLoop,
+  runAgentLoopStreaming,
+  WEB_AGENT_CONFIG,
+  VOICE_AGENT_CONFIG,
+} from "@/lib/iors/agent-loop";
 
 import { logger } from "@/lib/logger";
-import { logActivities } from "@/lib/activity-log";
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -597,24 +602,50 @@ export async function processUserMessage(
       streaming: !!options?.onTextDelta,
     });
 
+    // ── Agent Loop Context (shared between streaming and non-streaming) ──
+    const agentConfig = isVoice ? VOICE_AGENT_CONFIG : WEB_AGENT_CONFIG;
+    const agentCtx = {
+      anthropic,
+      model: resolvedModel,
+      temperature: userTemperature,
+      systemBlocks,
+      tools: activeTools,
+      tenantId: session.tenantId,
+      sessionId: session.id,
+      executeTool,
+      callback: options?.callback,
+    };
+
     // ── STREAMING PATH (voice with onTextDelta) ──
     if (options?.onTextDelta) {
-      return await processWithStreaming(
-        anthropic,
-        resolvedModel,
-        effectiveMaxTokens,
-        userTemperature,
-        systemBlocks,
+      const streamConfig = {
+        ...agentConfig,
+        followUpMaxTokens: isVoice ? 300 : session.maxTokens || 1024,
+      };
+
+      const result = await runAgentLoopStreaming(
         messages,
-        activeTools,
-        session,
-        emotionState,
+        streamConfig,
+        agentCtx,
         options.onTextDelta,
-        options.callback,
       );
+
+      logger.info("[ConversationHandler] Streaming agent loop done:", {
+        rounds: result.roundsExecuted,
+        tools: result.toolsUsed,
+        budgetExhausted: result.budgetExhausted,
+        tenantId: session.tenantId,
+      });
+
+      return {
+        text: result.text,
+        toolsUsed: result.toolsUsed,
+        shouldEndCall: false,
+        emotion: emotionState,
+      };
     }
 
-    // ── NON-STREAMING PATH (web chat, legacy voice) ──
+    // ── NON-STREAMING PATH (web chat) ──
     const response = await anthropic.messages.create({
       model: resolvedModel,
       max_tokens: effectiveMaxTokens,
@@ -630,192 +661,32 @@ export async function processUserMessage(
       tenantId: session.tenantId,
     });
 
-    // Check for tool use
-    const toolUseBlocks = response.content.filter(
-      (c): c is Anthropic.ToolUseBlock => c.type === "tool_use",
+    // Run agent loop (handles multi-step tool execution)
+    const loopConfig = {
+      ...agentConfig,
+      followUpMaxTokens: session.maxTokens || maxTokensOverride || 1024,
+    };
+
+    const agentResult = await runAgentLoop(
+      response,
+      messages,
+      loopConfig,
+      agentCtx,
     );
 
-    if (toolUseBlocks.length > 0) {
-      // Fire thinking step: tools detected
-      options?.callback?.onThinkingStep?.("Generuję odpowiedź", "done");
+    logger.info("[ConversationHandler] Agent loop done:", {
+      rounds: agentResult.roundsExecuted,
+      tools: agentResult.toolsUsed,
+      budgetExhausted: agentResult.budgetExhausted,
+      tenantId: session.tenantId,
+    });
 
-      // Execute all tool calls in PARALLEL (was sequential)
-      const toolExecutions = await Promise.all(
-        toolUseBlocks.map(async (toolUse) => {
-          options?.callback?.onToolStart?.(toolUse.name);
-          const toolStart = Date.now();
-          const result = await executeTool(
-            toolUse.name,
-            toolUse.input as Record<string, any>,
-            session.tenantId,
-          );
-          const toolDuration = Date.now() - toolStart;
-          const isError =
-            typeof result === "string" &&
-            (result.startsWith("Error:") || result.startsWith("Blad:"));
-          options?.callback?.onToolEnd?.(toolUse.name, toolDuration, {
-            success: !isError,
-            resultSummary:
-              typeof result === "string" ? result.slice(0, 120) : undefined,
-          });
-          return { toolUse, result };
-        }),
-      );
-
-      const toolResults: Anthropic.ToolResultBlockParam[] = toolExecutions.map(
-        ({ toolUse, result }) => ({
-          type: "tool_result" as const,
-          tool_use_id: toolUse.id,
-          content: result,
-        }),
-      );
-
-      for (const { toolUse } of toolExecutions) {
-        toolsUsed.push(toolUse.name);
-      }
-
-      // Log all tool executions to activity feed
-      logActivities(
-        toolUseBlocks.map((toolUse) => ({
-          tenantId: session.tenantId,
-          actionType: "tool_call" as const,
-          actionName: toolUse.name,
-          description: `Narzedzie: ${toolUse.name}`,
-          source: "conversation",
-          metadata: {
-            toolInput: Object.keys(toolUse.input as Record<string, unknown>),
-          },
-        })),
-      );
-
-      // Multi-turn tool loop: allow Claude to call additional tools (max 3 rounds)
-      const followUpMaxTokens = session.maxTokens || maxTokensOverride || 150;
-      let currentMessages: Anthropic.MessageParam[] = [
-        ...messages,
-        { role: "assistant" as const, content: response.content },
-        { role: "user" as const, content: toolResults },
-      ];
-
-      const MAX_TOOL_ROUNDS = 3;
-      let finalResponse: Anthropic.Message | null = null;
-
-      for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-        const followUp = await anthropic.messages.create({
-          model: resolvedModel,
-          max_tokens: followUpMaxTokens,
-          temperature: userTemperature,
-          system: systemBlocks,
-          messages: currentMessages,
-          tools: activeTools,
-        });
-
-        const newToolBlocks = followUp.content.filter(
-          (c): c is Anthropic.ToolUseBlock => c.type === "tool_use",
-        );
-
-        // No more tool calls or last round — use this as final response
-        if (newToolBlocks.length === 0 || round === MAX_TOOL_ROUNDS - 1) {
-          finalResponse = followUp;
-          break;
-        }
-
-        // Execute additional tool calls
-        const newResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
-          newToolBlocks.map(async (toolUse) => {
-            options?.callback?.onToolStart?.(toolUse.name);
-            const toolStart = Date.now();
-            const result = await executeTool(
-              toolUse.name,
-              toolUse.input as Record<string, unknown>,
-              session.tenantId,
-            );
-            toolsUsed.push(toolUse.name);
-            const toolDuration2 = Date.now() - toolStart;
-            const isErr =
-              typeof result === "string" &&
-              (result.startsWith("Error:") || result.startsWith("Blad:"));
-            options?.callback?.onToolEnd?.(toolUse.name, toolDuration2, {
-              success: !isErr,
-              resultSummary:
-                typeof result === "string" ? result.slice(0, 120) : undefined,
-            });
-            return {
-              type: "tool_result" as const,
-              tool_use_id: toolUse.id,
-              content: result,
-            };
-          }),
-        );
-
-        // Log additional tool executions
-        logActivities(
-          newToolBlocks.map((toolUse) => ({
-            tenantId: session.tenantId,
-            actionType: "tool_call" as const,
-            actionName: toolUse.name,
-            description: `Narzedzie: ${toolUse.name}`,
-            source: "conversation",
-            metadata: {
-              toolInput: Object.keys(toolUse.input as Record<string, unknown>),
-            },
-          })),
-        );
-
-        currentMessages = [
-          ...currentMessages,
-          { role: "assistant" as const, content: followUp.content },
-          { role: "user" as const, content: newResults },
-        ];
-      }
-
-      // Extract text from final response
-      const textContent = finalResponse?.content.find(
-        (c): c is Anthropic.TextBlock => c.type === "text",
-      );
-      const text = textContent?.text?.trim();
-
-      if (!text) {
-        logger.warn(
-          "[ConversationHandler] Follow-up has no text — smart fallback:",
-          {
-            contentTypes: finalResponse?.content.map((c) => c.type),
-            stopReason: finalResponse?.stop_reason,
-            toolsUsed,
-            tenantId: session.tenantId,
-          },
-        );
-      }
-
-      // Smart fallback: describe what was done instead of generic "Zrobione!"
-      let responseText: string;
-      if (text) {
-        responseText = text;
-      } else if (toolsUsed.length > 0) {
-        responseText = `Gotowe. Użyłem: ${toolsUsed.join(", ")}.`;
-      } else {
-        responseText =
-          "Przepraszam, nie mogłem przetworzyć tej wiadomości. Spróbuj ponownie.";
-      }
-
-      return {
-        text: responseText,
-        toolsUsed,
-        shouldEndCall: false,
-        emotion: emotionState,
-      };
-    }
-
-    // No tool use — mark generating as done
+    // Mark generating as done
     options?.callback?.onThinkingStep?.("Generuję odpowiedź", "done");
 
-    // No tool use, return text directly
-    const textContent = response.content.find(
-      (c): c is Anthropic.TextBlock => c.type === "text",
-    );
-
     return {
-      text: textContent?.text || "Przepraszam, nie zrozumiałem.",
-      toolsUsed: [],
+      text: agentResult.text,
+      toolsUsed: agentResult.toolsUsed,
       shouldEndCall: false,
       emotion: emotionState,
     };
@@ -925,139 +796,9 @@ export async function processUserMessage(
 }
 
 // ============================================================================
-// STREAMING VOICE PIPELINE
+// STREAMING VOICE PIPELINE — now delegated to AgentExecutionLoop
 // ============================================================================
-
-/**
- * Process user message with Claude streaming API.
- * Streams text deltas via onTextDelta callback (ConversationRelay).
- * Handles tool use: executes tools, then streams follow-up response.
- */
-async function processWithStreaming(
-  anthropic: Anthropic,
-  model: string,
-  maxTokens: number,
-  temperature: number,
-  systemBlocks: Anthropic.TextBlockParam[],
-  messages: Anthropic.MessageParam[],
-  tools: Anthropic.Tool[],
-  session: VoiceSession,
-  emotionState: import("@/lib/emotion/types").EmotionState | undefined,
-  onTextDelta: (delta: string) => void,
-  callback?: ProcessingCallback,
-): Promise<ConversationResult> {
-  const toolsUsed: string[] = [];
-  let currentMessages = [...messages];
-  const MAX_ROUNDS = 3;
-
-  for (let round = 0; round <= MAX_ROUNDS; round++) {
-    const stream = anthropic.messages.stream({
-      model,
-      max_tokens: maxTokens,
-      temperature,
-      system: systemBlocks,
-      messages: currentMessages,
-      tools,
-    });
-
-    let streamedText = "";
-
-    // Stream text deltas to caller in real-time
-    stream.on("text", (delta) => {
-      streamedText += delta;
-      onTextDelta(delta);
-    });
-
-    const finalMessage = await stream.finalMessage();
-
-    // Check for tool use
-    const toolUseBlocks = finalMessage.content.filter(
-      (c): c is Anthropic.ToolUseBlock => c.type === "tool_use",
-    );
-
-    if (toolUseBlocks.length === 0) {
-      // No tools — text was streamed, done
-      callback?.onThinkingStep?.("Generuję odpowiedź", "done");
-
-      const text = streamedText.trim() || "Przepraszam, nie zrozumiałem.";
-      return {
-        text,
-        toolsUsed,
-        shouldEndCall: false,
-        emotion: emotionState,
-      };
-    }
-
-    // Tool use detected — execute tools
-    callback?.onThinkingStep?.("Generuję odpowiedź", "done");
-
-    const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
-      toolUseBlocks.map(async (toolUse) => {
-        callback?.onToolStart?.(toolUse.name);
-        const toolStart = Date.now();
-        const result = await executeTool(
-          toolUse.name,
-          toolUse.input as Record<string, unknown>,
-          session.tenantId,
-        );
-        toolsUsed.push(toolUse.name);
-        const toolDuration = Date.now() - toolStart;
-        const isError =
-          typeof result === "string" &&
-          (result.startsWith("Error:") || result.startsWith("Blad:"));
-        callback?.onToolEnd?.(toolUse.name, toolDuration, {
-          success: !isError,
-          resultSummary:
-            typeof result === "string" ? result.slice(0, 120) : undefined,
-        });
-        return {
-          type: "tool_result" as const,
-          tool_use_id: toolUse.id,
-          content: result,
-        };
-      }),
-    );
-
-    // Log tool activity
-    logActivities(
-      toolUseBlocks.map((toolUse) => ({
-        tenantId: session.tenantId,
-        actionType: "tool_call" as const,
-        actionName: toolUse.name,
-        description: `Narzedzie: ${toolUse.name}`,
-        source: "conversation",
-        metadata: {
-          toolInput: Object.keys(toolUse.input as Record<string, unknown>),
-        },
-      })),
-    );
-
-    // Continue with tool results for next round
-    currentMessages = [
-      ...currentMessages,
-      { role: "assistant" as const, content: finalMessage.content },
-      { role: "user" as const, content: toolResults },
-    ];
-
-    logger.info("[ConversationHandler] Streaming tool round:", {
-      round,
-      tools: toolUseBlocks.map((t) => t.name),
-      tenantId: session.tenantId,
-    });
-  }
-
-  // Max rounds exceeded — return what we have
-  const fallbackText =
-    toolsUsed.length > 0
-      ? `Gotowe. Użyłem: ${toolsUsed.join(", ")}.`
-      : "Przepraszam, nie mogłem przetworzyć tej wiadomości.";
-  return {
-    text: fallbackText,
-    toolsUsed,
-    shouldEndCall: false,
-    emotion: emotionState,
-  };
-}
+// processWithStreaming() removed — replaced by runAgentLoopStreaming() in agent-loop.ts
 
 // ============================================================================
 // GREETING GENERATION
