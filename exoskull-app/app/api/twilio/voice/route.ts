@@ -79,7 +79,11 @@ export async function POST(req: NextRequest) {
     const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
     if (twilioAuthToken) {
       const twilioSignature = req.headers.get("x-twilio-signature") || "";
-      const requestUrl = `${getAppUrl()}/api/twilio/voice?action=${action}`;
+      // Use the actual request URL (pathname + search) — NOT constructed URL.
+      // Twilio signs against the exact URL it POSTs to. For the initial call,
+      // that's /api/twilio/voice (no ?action=start), but subsequent calls include
+      // ?action=process. Mismatched URLs cause signature validation failure (403).
+      const requestUrl = `${getAppUrl()}${url.pathname}${url.search}`;
       if (
         !validateTwilioSignature(
           twilioAuthToken,
