@@ -142,22 +142,24 @@ export async function buildDynamicContext(
       )
       .order("created_at", { ascending: false })
       .limit(10),
-    // 11. Memory stats — daily summaries + highlights count
+    // 11. Memory stats — existence checks (NO count:exact — causes full table scans)
     Promise.all([
       supabase
         .from("exo_daily_summaries")
-        .select("summary_date, mood_score", { count: "exact" })
+        .select("summary_date, mood_score")
         .eq("tenant_id", tenantId)
         .order("summary_date", { ascending: false })
-        .limit(1),
+        .limit(3),
       supabase
         .from("user_memory_highlights")
-        .select("id", { count: "exact" })
-        .eq("user_id", tenantId),
+        .select("id")
+        .eq("user_id", tenantId)
+        .limit(1),
       supabase
         .from("exo_unified_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("tenant_id", tenantId),
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .limit(1),
     ]).catch(() => [null, null, null]),
   ]);
 
@@ -211,24 +213,23 @@ export async function buildDynamicContext(
         }> | null)
       : null;
 
-  // Extract memory stats
+  // Extract memory stats (existence checks, not counts)
   const memoryData =
     memoryResult.status === "fulfilled"
       ? (memoryResult.value as [
           {
-            count: number | null;
             data: Array<{
               summary_date: string;
               mood_score: number | null;
             }> | null;
           } | null,
-          { count: number | null } | null,
-          { count: number | null } | null,
+          { data: Array<{ id: string }> | null } | null,
+          { data: Array<{ id: string }> | null } | null,
         ])
       : [null, null, null];
-  const summariesInfo = memoryData[0];
-  const highlightsInfo = memoryData[1];
-  const messagesInfo = memoryData[2];
+  const summariesData = memoryData[0]?.data ?? [];
+  const hasHighlights = (memoryData[1]?.data ?? []).length > 0;
+  const hasMessages = (memoryData[2]?.data ?? []).length > 0;
 
   // ── Build context string ──
   const now = new Date();
@@ -335,21 +336,19 @@ export async function buildDynamicContext(
   }
 
   // Memory system — daily summaries, highlights, conversation history
-  const summaryCount = summariesInfo?.count ?? 0;
-  const highlightCount = highlightsInfo?.count ?? 0;
-  const messageCount = messagesInfo?.count ?? 0;
-  if (summaryCount > 0 || highlightCount > 0 || messageCount > 0) {
+  const hasSummaries = summariesData.length > 0;
+  if (hasSummaries || hasHighlights || hasMessages) {
     context += `\n## PAMIĘĆ\n`;
     context += `Masz dostęp do pełnej pamięci użytkownika:\n`;
-    if (messageCount > 0) {
-      context += `- Historia rozmów: ${messageCount} wiadomości (wszystkie kanały)\n`;
+    if (hasMessages) {
+      context += `- Historia rozmów: aktywna (wszystkie kanały)\n`;
     }
-    if (summaryCount > 0) {
-      const lastDate = summariesInfo?.data?.[0]?.summary_date;
-      context += `- Podsumowania dzienne: ${summaryCount} dni${lastDate ? ` (ostatnie: ${lastDate})` : ""}\n`;
+    if (hasSummaries) {
+      const lastDate = summariesData[0]?.summary_date;
+      context += `- Podsumowania dzienne: aktywne${lastDate ? ` (ostatnie: ${lastDate})` : ""}\n`;
     }
-    if (highlightCount > 0) {
-      context += `- Zapamiętane fakty: ${highlightCount} wpisów\n`;
+    if (hasHighlights) {
+      context += `- Zapamiętane fakty: aktywne\n`;
     }
     context += `\n→ ZAWSZE gdy user pyta o przeszłość, wspomnienia, "kiedy mówiłem o...", "co robiłem...", "czy pamiętasz..." — użyj "search_memory".\n`;
     context += `→ Gdy user pyta o podsumowanie dnia — użyj "get_daily_summary".\n`;
