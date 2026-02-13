@@ -44,6 +44,9 @@ const PORT = parseInt(process.env.VOICE_WS_PORT || "8080", 10);
 // TYPES
 // ============================================================================
 
+/** Silence timeout — disconnect after 2s of no speech */
+const SILENCE_DISCONNECT_MS = 2000;
+
 /** Per-connection session state */
 interface WSSession {
   callSid: string;
@@ -54,6 +57,8 @@ interface WSSession {
   localMessages: Array<{ role: "user" | "assistant"; content: string }>;
   /** Greeting text (passed as custom parameter, logged to session) */
   greeting?: string;
+  /** Timer for silence-based disconnect */
+  silenceTimer?: ReturnType<typeof setTimeout>;
 }
 
 /** Twilio ConversationRelay setup message */
@@ -162,6 +167,7 @@ wss.on("connection", (ws: WebSocket, req) => {
   ws.on("close", (code, reason) => {
     const session = sessions.get(ws);
     if (session) {
+      if (session.silenceTimer) clearTimeout(session.silenceTimer);
       endSession(session.sessionId).catch((e) =>
         console.error("[VoiceWS] End session error:", e),
       );
@@ -242,6 +248,12 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
     return;
   }
 
+  // Reset silence timer — user is speaking
+  if (wsSession.silenceTimer) {
+    clearTimeout(wsSession.silenceTimer);
+    wsSession.silenceTimer = undefined;
+  }
+
   const userText = data.voicePrompt?.trim();
 
   // CRITICAL FIX: Don't hang up on empty speech!
@@ -319,6 +331,28 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
           ws.send(JSON.stringify({ type: "end" }));
         }
       }, 500);
+    } else {
+      // Start silence timer — if user doesn't speak within 2s, disconnect
+      wsSession.silenceTimer = setTimeout(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          logger.info(
+            "[VoiceWS] Silence timeout (2s) — ending call:",
+            wsSession.callSid,
+          );
+          ws.send(
+            JSON.stringify({
+              type: "text",
+              token: "Do usłyszenia!",
+              last: true,
+            }),
+          );
+          setTimeout(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: "end" }));
+            }
+          }, 1500);
+        }
+      }, SILENCE_DISCONNECT_MS);
     }
   } catch (error) {
     console.error("[VoiceWS] Prompt processing error:", {

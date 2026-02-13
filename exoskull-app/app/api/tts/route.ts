@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
     // Try ElevenLabs first, fallback to OpenAI
     const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
-    const voiceId = process.env.ELEVENLABS_VOICE_ID || "gFl0NeqphJUaoBLtWrqM";
+    const voiceId = process.env.ELEVENLABS_VOICE_ID || "3kPofxWv5xLwBvMVraip";
 
     if (elevenLabsKey) {
       try {
