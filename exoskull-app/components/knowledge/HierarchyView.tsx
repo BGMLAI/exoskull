@@ -33,6 +33,10 @@ interface HierarchyViewProps {
   onEditCampaign: (campaign: Campaign) => void;
   onEditQuest: (quest: Quest) => void;
   onEditOp: (op: Op) => void;
+  onDeleteLoop?: (loop: Loop) => void;
+  onDeleteCampaign?: (campaign: Campaign) => void;
+  onDeleteQuest?: (quest: Quest) => void;
+  onDeleteOp?: (op: Op) => void;
   onToggleOpStatus: (op: Op) => void;
   onAddLoop: () => void;
   onAddCampaign: () => void;
@@ -87,6 +91,10 @@ export function HierarchyView({
   onEditCampaign,
   onEditQuest,
   onEditOp,
+  onDeleteLoop,
+  onDeleteCampaign,
+  onDeleteQuest,
+  onDeleteOp,
   onToggleOpStatus,
   onAddLoop,
   onAddCampaign,
@@ -126,6 +134,7 @@ export function HierarchyView({
                   onSelectLoop(selectedLoop?.id === loop.id ? null : loop)
                 }
                 onEdit={() => onEditLoop(loop)}
+                onDelete={onDeleteLoop ? () => onDeleteLoop(loop) : undefined}
               />
             ))
           )}
@@ -189,6 +198,11 @@ export function HierarchyView({
                   )
                 }
                 onEdit={() => onEditCampaign(campaign)}
+                onDelete={
+                  onDeleteCampaign
+                    ? () => onDeleteCampaign(campaign)
+                    : undefined
+                }
               />
             ))
           )}
@@ -251,6 +265,9 @@ export function HierarchyView({
                   onSelectQuest(selectedQuest?.id === quest.id ? null : quest)
                 }
                 onEdit={() => onEditQuest(quest)}
+                onDelete={
+                  onDeleteQuest ? () => onDeleteQuest(quest) : undefined
+                }
               />
             ))
           )}
@@ -308,6 +325,7 @@ export function HierarchyView({
                 op={op}
                 loop={loops.find((l) => l.slug === op.loop_slug)}
                 onEdit={() => onEditOp(op)}
+                onDelete={onDeleteOp ? () => onDeleteOp(op) : undefined}
                 onToggleStatus={() => onToggleOpStatus(op)}
               />
             ))

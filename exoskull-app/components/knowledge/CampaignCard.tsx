@@ -5,7 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Campaign, CAMPAIGN_STATUS_LABELS, Loop } from "@/lib/types/knowledge";
-import { Calendar, Target, ChevronRight, MoreHorizontal } from "lucide-react";
+import {
+  Calendar,
+  Target,
+  ChevronRight,
+  MoreHorizontal,
+  Trash2,
+} from "lucide-react";
 
 interface CampaignCardProps {
   campaign: Campaign;
@@ -13,6 +19,7 @@ interface CampaignCardProps {
   isSelected?: boolean;
   onClick?: () => void;
   onEdit?: () => void;
+  onDelete?: () => void;
   className?: string;
 }
 
@@ -22,6 +29,7 @@ export function CampaignCard({
   isSelected,
   onClick,
   onEdit,
+  onDelete,
   className,
 }: CampaignCardProps) {
   const statusInfo = CAMPAIGN_STATUS_LABELS[campaign.status];
@@ -61,6 +69,20 @@ export function CampaignCard({
                 aria-label="Edytuj kampanie"
               >
                 <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-destructive hover:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                aria-label="Usun kampanie"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>

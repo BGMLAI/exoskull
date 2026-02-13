@@ -15,58 +15,65 @@ import {
   Op,
   Note,
   OpStatus,
-} from '@/lib/types/knowledge'
+} from "@/lib/types/knowledge";
 
 // ============================================================================
 // LOOPS
 // ============================================================================
 
-export async function createLoop(tenantId: string, input: CreateLoopInput): Promise<Loop> {
-  const res = await fetch('/api/knowledge/loops', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+export async function createLoop(
+  tenantId: string,
+  input: CreateLoopInput,
+): Promise<Loop> {
+  const res = await fetch("/api/knowledge/loops", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tenantId, ...input }),
-  })
+  });
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad tworzenia loop')
+    const error = await res.json();
+    throw new Error(error.error || "Blad tworzenia loop");
   }
 
-  const data = await res.json()
-  return data.loop
+  const data = await res.json();
+  return data.loop;
 }
 
 export async function updateLoop(
   tenantId: string,
   loopId: string,
-  input: Partial<CreateLoopInput>
+  input: Partial<CreateLoopInput>,
 ): Promise<Loop> {
-  const res = await fetch('/api/knowledge/loops', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+  const res = await fetch("/api/knowledge/loops", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tenantId, loopId, ...input }),
-  })
+  });
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad aktualizacji loop')
+    const error = await res.json();
+    throw new Error(error.error || "Blad aktualizacji loop");
   }
 
-  const data = await res.json()
-  return data.loop
+  const data = await res.json();
+  return data.loop;
 }
 
-export async function deleteLoop(tenantId: string, loopId: string): Promise<void> {
-  const res = await fetch('/api/knowledge/loops', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tenantId, loopId }),
-  })
+export async function deleteLoop(
+  tenantId: string,
+  loopId: string,
+): Promise<void> {
+  const res = await fetch(
+    `/api/knowledge/loops?tenantId=${tenantId}&loopId=${loopId}`,
+    {
+      method: "DELETE",
+    },
+  );
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad usuwania loop')
+    const error = await res.json();
+    throw new Error(error.error || "Blad usuwania loop");
   }
 }
 
@@ -74,52 +81,59 @@ export async function deleteLoop(tenantId: string, loopId: string): Promise<void
 // CAMPAIGNS
 // ============================================================================
 
-export async function createCampaign(tenantId: string, input: CreateCampaignInput): Promise<Campaign> {
-  const res = await fetch('/api/knowledge/campaigns', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+export async function createCampaign(
+  tenantId: string,
+  input: CreateCampaignInput,
+): Promise<Campaign> {
+  const res = await fetch("/api/knowledge/campaigns", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tenantId, ...input }),
-  })
+  });
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad tworzenia campaign')
+    const error = await res.json();
+    throw new Error(error.error || "Blad tworzenia campaign");
   }
 
-  const data = await res.json()
-  return data.campaign
+  const data = await res.json();
+  return data.campaign;
 }
 
 export async function updateCampaign(
   tenantId: string,
   campaignId: string,
-  input: Partial<CreateCampaignInput> & { status?: string }
+  input: Partial<CreateCampaignInput> & { status?: string },
 ): Promise<Campaign> {
-  const res = await fetch('/api/knowledge/campaigns', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+  const res = await fetch("/api/knowledge/campaigns", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tenantId, campaignId, ...input }),
-  })
+  });
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad aktualizacji campaign')
+    const error = await res.json();
+    throw new Error(error.error || "Blad aktualizacji campaign");
   }
 
-  const data = await res.json()
-  return data.campaign
+  const data = await res.json();
+  return data.campaign;
 }
 
-export async function deleteCampaign(tenantId: string, campaignId: string): Promise<void> {
-  const res = await fetch('/api/knowledge/campaigns', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tenantId, campaignId }),
-  })
+export async function deleteCampaign(
+  tenantId: string,
+  campaignId: string,
+): Promise<void> {
+  const res = await fetch(
+    `/api/knowledge/campaigns?tenantId=${tenantId}&campaignId=${campaignId}`,
+    {
+      method: "DELETE",
+    },
+  );
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad usuwania campaign')
+    const error = await res.json();
+    throw new Error(error.error || "Blad usuwania campaign");
   }
 }
 
@@ -127,52 +141,59 @@ export async function deleteCampaign(tenantId: string, campaignId: string): Prom
 // QUESTS
 // ============================================================================
 
-export async function createQuest(tenantId: string, input: CreateQuestInput): Promise<Quest> {
-  const res = await fetch('/api/knowledge/quests', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+export async function createQuest(
+  tenantId: string,
+  input: CreateQuestInput,
+): Promise<Quest> {
+  const res = await fetch("/api/knowledge/quests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tenantId, ...input }),
-  })
+  });
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad tworzenia quest')
+    const error = await res.json();
+    throw new Error(error.error || "Blad tworzenia quest");
   }
 
-  const data = await res.json()
-  return data.quest
+  const data = await res.json();
+  return data.quest;
 }
 
 export async function updateQuest(
   tenantId: string,
   questId: string,
-  input: Partial<CreateQuestInput> & { status?: string }
+  input: Partial<CreateQuestInput> & { status?: string },
 ): Promise<Quest> {
-  const res = await fetch('/api/knowledge/quests', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+  const res = await fetch("/api/knowledge/quests", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tenantId, questId, ...input }),
-  })
+  });
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad aktualizacji quest')
+    const error = await res.json();
+    throw new Error(error.error || "Blad aktualizacji quest");
   }
 
-  const data = await res.json()
-  return data.quest
+  const data = await res.json();
+  return data.quest;
 }
 
-export async function deleteQuest(tenantId: string, questId: string): Promise<void> {
-  const res = await fetch('/api/knowledge/quests', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tenantId, questId }),
-  })
+export async function deleteQuest(
+  tenantId: string,
+  questId: string,
+): Promise<void> {
+  const res = await fetch(
+    `/api/knowledge/quests?tenantId=${tenantId}&questId=${questId}`,
+    {
+      method: "DELETE",
+    },
+  );
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad usuwania quest')
+    const error = await res.json();
+    throw new Error(error.error || "Blad usuwania quest");
   }
 }
 
@@ -180,57 +201,66 @@ export async function deleteQuest(tenantId: string, questId: string): Promise<vo
 // OPS
 // ============================================================================
 
-export async function createOp(tenantId: string, input: CreateOpInput): Promise<Op> {
-  const res = await fetch('/api/knowledge/ops', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+export async function createOp(
+  tenantId: string,
+  input: CreateOpInput,
+): Promise<Op> {
+  const res = await fetch("/api/knowledge/ops", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tenantId, ...input }),
-  })
+  });
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad tworzenia op')
+    const error = await res.json();
+    throw new Error(error.error || "Blad tworzenia op");
   }
 
-  const data = await res.json()
-  return data.op
+  const data = await res.json();
+  return data.op;
 }
 
 export async function updateOp(
   tenantId: string,
   opId: string,
-  input: Partial<CreateOpInput> & { status?: OpStatus }
+  input: Partial<CreateOpInput> & { status?: OpStatus },
 ): Promise<Op> {
-  const res = await fetch('/api/knowledge/ops', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+  const res = await fetch("/api/knowledge/ops", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tenantId, opId, ...input }),
-  })
+  });
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad aktualizacji op')
+    const error = await res.json();
+    throw new Error(error.error || "Blad aktualizacji op");
   }
 
-  const data = await res.json()
-  return data.op
+  const data = await res.json();
+  return data.op;
 }
 
-export async function toggleOpStatus(tenantId: string, opId: string, currentStatus: OpStatus): Promise<Op> {
-  const newStatus: OpStatus = currentStatus === 'completed' ? 'pending' : 'completed'
-  return updateOp(tenantId, opId, { status: newStatus })
+export async function toggleOpStatus(
+  tenantId: string,
+  opId: string,
+  currentStatus: OpStatus,
+): Promise<Op> {
+  const newStatus: OpStatus =
+    currentStatus === "completed" ? "pending" : "completed";
+  return updateOp(tenantId, opId, { status: newStatus });
 }
 
 export async function deleteOp(tenantId: string, opId: string): Promise<void> {
-  const res = await fetch('/api/knowledge/ops', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tenantId, opId }),
-  })
+  const res = await fetch(
+    `/api/knowledge/ops?tenantId=${tenantId}&opId=${opId}`,
+    {
+      method: "DELETE",
+    },
+  );
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad usuwania op')
+    const error = await res.json();
+    throw new Error(error.error || "Blad usuwania op");
   }
 }
 
@@ -238,52 +268,58 @@ export async function deleteOp(tenantId: string, opId: string): Promise<void> {
 // NOTES
 // ============================================================================
 
-export async function createNote(tenantId: string, input: CreateNoteInput): Promise<Note> {
-  const res = await fetch('/api/knowledge/notes', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+export async function createNote(
+  tenantId: string,
+  input: CreateNoteInput,
+): Promise<Note> {
+  const res = await fetch("/api/knowledge/notes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tenantId, ...input }),
-  })
+  });
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad tworzenia note')
+    const error = await res.json();
+    throw new Error(error.error || "Blad tworzenia note");
   }
 
-  const data = await res.json()
-  return data.note
+  const data = await res.json();
+  return data.note;
 }
 
 export async function updateNote(
   tenantId: string,
   noteId: string,
-  input: Partial<CreateNoteInput>
+  input: Partial<CreateNoteInput>,
 ): Promise<Note> {
-  const res = await fetch('/api/knowledge/notes', {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+  const res = await fetch("/api/knowledge/notes", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tenantId, noteId, ...input }),
-  })
+  });
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad aktualizacji note')
+    const error = await res.json();
+    throw new Error(error.error || "Blad aktualizacji note");
   }
 
-  const data = await res.json()
-  return data.note
+  const data = await res.json();
+  return data.note;
 }
 
-export async function deleteNote(tenantId: string, noteId: string): Promise<void> {
-  const res = await fetch('/api/knowledge/notes', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+export async function deleteNote(
+  tenantId: string,
+  noteId: string,
+): Promise<void> {
+  const res = await fetch("/api/knowledge/notes", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tenantId, noteId }),
-  })
+  });
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad usuwania note')
+    const error = await res.json();
+    throw new Error(error.error || "Blad usuwania note");
   }
 }
 
@@ -292,45 +328,48 @@ export async function deleteNote(tenantId: string, noteId: string): Promise<void
 // ============================================================================
 
 export interface UploadDocumentResult {
-  id: string
-  filename: string
-  status: string
-  category: string
+  id: string;
+  filename: string;
+  status: string;
+  category: string;
 }
 
 export async function uploadDocument(
   tenantId: string,
   file: File,
-  category?: string
+  category?: string,
 ): Promise<UploadDocumentResult> {
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('tenant_id', tenantId)
-  if (category) formData.append('category', category)
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("tenant_id", tenantId);
+  if (category) formData.append("category", category);
 
-  const res = await fetch('/api/knowledge/upload', {
-    method: 'POST',
+  const res = await fetch("/api/knowledge/upload", {
+    method: "POST",
     body: formData,
-  })
+  });
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad uploadu pliku')
+    const error = await res.json();
+    throw new Error(error.error || "Blad uploadu pliku");
   }
 
-  const data = await res.json()
-  return data.document
+  const data = await res.json();
+  return data.document;
 }
 
-export async function deleteDocument(tenantId: string, documentId: string): Promise<void> {
-  const res = await fetch('/api/knowledge', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+export async function deleteDocument(
+  tenantId: string,
+  documentId: string,
+): Promise<void> {
+  const res = await fetch("/api/knowledge", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tenantId, documentId }),
-  })
+  });
 
   if (!res.ok) {
-    const error = await res.json()
-    throw new Error(error.error || 'Blad usuwania dokumentu')
+    const error = await res.json();
+    throw new Error(error.error || "Blad usuwania dokumentu");
   }
 }

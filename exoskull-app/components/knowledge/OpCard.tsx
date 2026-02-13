@@ -13,6 +13,7 @@ import {
   MoreHorizontal,
   Repeat,
   Tag,
+  Trash2,
   Zap,
 } from "lucide-react";
 
@@ -22,6 +23,7 @@ interface OpCardProps {
   isSelected?: boolean;
   onClick?: () => void;
   onEdit?: () => void;
+  onDelete?: () => void;
   onToggleStatus?: () => void;
   className?: string;
 }
@@ -32,6 +34,7 @@ export function OpCard({
   isSelected,
   onClick,
   onEdit,
+  onDelete,
   onToggleStatus,
   className,
 }: OpCardProps) {
@@ -105,6 +108,20 @@ export function OpCard({
                 aria-label="Edytuj op"
               >
                 <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-destructive hover:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                aria-label="Usun op"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>

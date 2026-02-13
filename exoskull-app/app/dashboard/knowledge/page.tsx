@@ -42,12 +42,16 @@ import {
 import {
   createLoop,
   updateLoop,
+  deleteLoop,
   createCampaign,
   updateCampaign,
+  deleteCampaign,
   createQuest,
   updateQuest,
+  deleteQuest,
   createOp,
   updateOp,
+  deleteOp,
   toggleOpStatus,
   createNote,
   updateNote,
@@ -412,6 +416,67 @@ export default function KnowledgePage() {
     }
   };
 
+  // ─── DELETE HANDLERS ───
+  const handleDeleteLoop = async (loop: Loop) => {
+    if (!tenantId) return;
+    if (
+      !confirm(
+        `Usunąć loop "${loop.name}"? Wszystkie kampanie, questy i opy w tym loopie zostaną osierocone.`,
+      )
+    )
+      return;
+    try {
+      await deleteLoop(tenantId, loop.id);
+      toast.success(`Loop "${loop.name}" usunięty`);
+      if (selectedLoop?.id === loop.id) setSelectedLoop(null);
+      fetchLoops();
+    } catch (error) {
+      console.error("[Knowledge] Delete loop error:", error);
+      toast.error("Nie udało się usunąć loopa");
+    }
+  };
+
+  const handleDeleteCampaign = async (campaign: Campaign) => {
+    if (!tenantId) return;
+    if (!confirm(`Usunąć kampanię "${campaign.title}"?`)) return;
+    try {
+      await deleteCampaign(tenantId, campaign.id);
+      toast.success(`Kampania "${campaign.title}" usunięta`);
+      if (selectedCampaign?.id === campaign.id) setSelectedCampaign(null);
+      fetchCampaigns(selectedLoop?.slug);
+    } catch (error) {
+      console.error("[Knowledge] Delete campaign error:", error);
+      toast.error("Nie udało się usunąć kampanii");
+    }
+  };
+
+  const handleDeleteQuest = async (quest: Quest) => {
+    if (!tenantId) return;
+    if (!confirm(`Usunąć quest "${quest.title}"?`)) return;
+    try {
+      await deleteQuest(tenantId, quest.id);
+      toast.success(`Quest "${quest.title}" usunięty`);
+      if (selectedQuest?.id === quest.id) setSelectedQuest(null);
+      fetchQuests(selectedCampaign?.id, selectedLoop?.slug);
+    } catch (error) {
+      console.error("[Knowledge] Delete quest error:", error);
+      toast.error("Nie udało się usunąć questu");
+    }
+  };
+
+  const handleDeleteOp = async (op: Op) => {
+    if (!tenantId) return;
+    if (!confirm(`Usunąć op "${op.title}"?`)) return;
+    try {
+      await deleteOp(tenantId, op.id);
+      toast.success(`Op "${op.title}" usunięty`);
+      fetchOps(selectedQuest?.id, selectedLoop?.slug);
+    } catch (error) {
+      console.error("[Knowledge] Delete op error:", error);
+      toast.error("Nie udało się usunąć opa");
+    }
+  };
+
   const handleSaveNote = async (data: NoteEditorData) => {
     if (!tenantId) return;
     try {
@@ -553,6 +618,10 @@ export default function KnowledgePage() {
           onEditCampaign={openEditCampaign}
           onEditQuest={openEditQuest}
           onEditOp={openEditOp}
+          onDeleteLoop={handleDeleteLoop}
+          onDeleteCampaign={handleDeleteCampaign}
+          onDeleteQuest={handleDeleteQuest}
+          onDeleteOp={handleDeleteOp}
           onToggleOpStatus={handleToggleOpStatus}
           onAddLoop={openAddLoop}
           onAddCampaign={openAddCampaign}

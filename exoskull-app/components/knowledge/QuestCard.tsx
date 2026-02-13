@@ -11,6 +11,7 @@ import {
   ChevronRight,
   MoreHorizontal,
   Tag,
+  Trash2,
 } from "lucide-react";
 
 interface QuestCardProps {
@@ -19,6 +20,7 @@ interface QuestCardProps {
   isSelected?: boolean;
   onClick?: () => void;
   onEdit?: () => void;
+  onDelete?: () => void;
   className?: string;
 }
 
@@ -28,6 +30,7 @@ export function QuestCard({
   isSelected,
   onClick,
   onEdit,
+  onDelete,
   className,
 }: QuestCardProps) {
   const statusInfo = QUEST_STATUS_LABELS[quest.status];
@@ -73,6 +76,20 @@ export function QuestCard({
                 aria-label="Edytuj quest"
               >
                 <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-destructive hover:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                aria-label="Usun quest"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>
