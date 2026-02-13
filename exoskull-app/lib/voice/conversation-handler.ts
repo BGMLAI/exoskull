@@ -382,15 +382,16 @@ export async function processUserMessage(
   const isVoiceChannel = options?.channel === "voice";
   const preStartTime = Date.now();
 
-  // ── ALL CHANNELS: identical context, thread, emotion, tools ──
-  const [dynamicContextResult, emotionState, rawThreadMessages] =
+  // ── ALL CHANNELS: context, thread, emotion, tools — ALL PARALLEL ──
+  const [dynamicContextResult, emotionState, rawThreadMessages, toolsResult] =
     await Promise.all([
       buildDynamicContext(session.tenantId),
       analyzeEmotion(userMessage),
-      getThreadContext(session.tenantId, 50).catch((err) => {
+      getThreadContext(session.tenantId, 25).catch((err) => {
         console.error("[ConversationHandler] Thread context failed:", err);
         return [] as { role: "user" | "assistant"; content: string }[];
       }),
+      getToolsForTenant(session.tenantId),
     ]);
 
   logger.info(
@@ -407,10 +408,8 @@ export async function processUserMessage(
   const resolvedModel = isVoiceChannel
     ? VOICE_MODEL
     : CHAT_MODEL_MAP[chatModelPref] || DEFAULT_CLAUDE_MODEL;
-  // ALL channels get full tools (same knowledge, same capabilities)
-  const { definitions, dynamicCount } = await getToolsForTenant(
-    session.tenantId,
-  );
+  // Tools already loaded in parallel above
+  const { definitions, dynamicCount } = toolsResult;
   const activeTools: Anthropic.Tool[] = definitions.map((tool, i, arr) =>
     i === arr.length - 1
       ? { ...tool, cache_control: { type: "ephemeral" as const } }

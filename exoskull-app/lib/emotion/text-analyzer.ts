@@ -276,6 +276,7 @@ interface HFEmotion {
   score: number;
 }
 
+/** HuggingFace emotion analysis with 1.5s timeout (cold starts can take 10-30s) */
 async function analyzeWithHuggingFace(
   text: string,
 ): Promise<HFEmotion[] | null> {
@@ -283,6 +284,9 @@ async function analyzeWithHuggingFace(
   if (!hfToken) return null;
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500);
+
     const response = await fetch(HF_API_URL, {
       method: "POST",
       headers: {
@@ -290,7 +294,10 @@ async function analyzeWithHuggingFace(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ inputs: text }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
 
     if (!response.ok) return null;
 
@@ -304,6 +311,13 @@ async function analyzeWithHuggingFace(
     emotions.sort((a, b) => b.score - a.score);
     return emotions;
   } catch (error) {
+    // AbortError = timeout — fall back to keyword analysis silently
+    if (error instanceof Error && error.name === "AbortError") {
+      console.warn(
+        "[EmotionAnalyzer] HuggingFace timed out (1.5s), using keyword fallback",
+      );
+      return null;
+    }
     console.error("[EmotionAnalyzer] HuggingFace error:", error);
     return null;
   }
