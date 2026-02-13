@@ -7,7 +7,7 @@
  * Dependencies: docx (npm), jspdf, pptxgenjs
  */
 
-import { aiChat } from "@/lib/ai/chat";
+import { aiChat } from "@/lib/ai";
 
 // ============================================================================
 // TYPES
@@ -45,8 +45,8 @@ async function generateContent(req: DocumentRequest): Promise<string> {
     ? `\n\nRequired sections:\n${req.sections.map((s, i) => `${i + 1}. ${s}`).join("\n")}`
     : "";
 
-  const result = await aiChat({
-    messages: [
+  const result = await aiChat(
+    [
       {
         role: "system",
         content: `You are a professional document writer. Create high-quality ${req.type === "pptx" ? "presentation" : "document"} content.
@@ -62,9 +62,8 @@ For documents: use markdown formatting with proper headings, paragraphs, and lis
         content: `Title: ${req.title}\nDescription: ${req.description}${sectionPrompt}${req.context ? `\n\nAdditional context:\n${req.context}` : ""}`,
       },
     ],
-    forceModel: "claude-sonnet-4-5",
-    maxTokens: 8000,
-  });
+    { forceModel: "claude-sonnet-4-5", maxTokens: 8000 },
+  );
 
   return result.content || "";
 }

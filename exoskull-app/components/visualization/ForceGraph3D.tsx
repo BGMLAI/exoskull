@@ -106,9 +106,8 @@ export function ForceGraphVisualization({
   width,
   onNodeClick,
 }: ForceGraphProps) {
-  const fgRef = useRef<{
-    d3Force: (name: string) => { strength: (s: number) => void };
-  }>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fgRef = useRef<any>(undefined);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
   const graphData = useMemo(
@@ -198,7 +197,7 @@ export function ForceGraphVisualization({
       </div>
 
       <ForceGraph2D
-        ref={fgRef as React.MutableRefObject<null>}
+        ref={fgRef}
         graphData={graphData}
         width={width}
         height={height}

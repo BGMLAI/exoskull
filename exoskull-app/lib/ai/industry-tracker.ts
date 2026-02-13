@@ -12,7 +12,7 @@
  * - Strategic move suggestions
  */
 
-import { aiChat } from "@/lib/ai/chat";
+import { aiChat } from "@/lib/ai";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 // ============================================================================
@@ -89,8 +89,8 @@ export async function analyzeIndustry(
     values?.map((v) => `${v.name}: ${v.description}`).join(", ") || "";
 
   // AI analysis using Opus for strategic quality
-  const result = await aiChat({
-    messages: [
+  const result = await aiChat(
+    [
       {
         role: "system",
         content: `You are a strategic industry analyst and business advisor. Analyze the current state of the given industry and provide actionable intelligence.
@@ -119,9 +119,8 @@ User context (values/goals): ${userContext || "not specified"}
 Analyze current trends, identify opportunities (minimum effort → maximum impact), and suggest the top 3-5 strategic moves.`,
       },
     ],
-    forceModel: "claude-opus-4-5",
-    maxTokens: 4000,
-  });
+    { forceModel: "claude-opus-4-5", maxTokens: 4000 },
+  );
 
   // Parse response
   let report: IndustryReport = {
@@ -184,8 +183,8 @@ export async function analyzeScenarios(
   }>;
   recommendation: string;
 }> {
-  const result = await aiChat({
-    messages: [
+  const result = await aiChat(
+    [
       {
         role: "system",
         content: `You are a scenario analyst. Given a goal, generate 3-5 possible paths to achieve it.
@@ -211,9 +210,8 @@ Respond in JSON:
         content: `Goal: ${goal}${constraints ? `\nConstraints: ${constraints}` : ""}\n\nGenerate possible paths with probability estimates.`,
       },
     ],
-    forceModel: "claude-opus-4-5",
-    maxTokens: 4000,
-  });
+    { forceModel: "claude-opus-4-5", maxTokens: 4000 },
+  );
 
   try {
     const jsonMatch = result.content?.match(/\{[\s\S]*\}/);

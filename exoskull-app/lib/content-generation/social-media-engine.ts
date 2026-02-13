@@ -12,7 +12,7 @@
  * - Industry trend monitoring
  */
 
-import { aiChat } from "@/lib/ai/chat";
+import { aiChat } from "@/lib/ai";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 // ============================================================================
@@ -125,8 +125,8 @@ export async function generateMultiChannelContent(
     })
     .join("\n");
 
-  const result = await aiChat({
-    messages: [
+  const result = await aiChat(
+    [
       {
         role: "system",
         content: `You are an expert social media strategist and copywriter. Generate content for multiple platforms simultaneously.
@@ -167,9 +167,8 @@ ${req.hashtags !== false ? "Include relevant hashtags" : "No hashtags"}
 Generate engaging content for each channel.`,
       },
     ],
-    forceModel: "claude-sonnet-4-5",
-    maxTokens: 4000,
-  });
+    { forceModel: "claude-sonnet-4-5", maxTokens: 4000 },
+  );
 
   // Parse AI response
   try {
@@ -225,8 +224,8 @@ export async function generateContentCalendar(
 ): Promise<
   Array<{ day: string; channel: SocialChannel; topic: string; time: string }>
 > {
-  const result = await aiChat({
-    messages: [
+  const result = await aiChat(
+    [
       {
         role: "system",
         content: `You are a social media strategist. Create a weekly content calendar.
@@ -243,9 +242,8 @@ Respond as JSON array: [{ "day": "Mon", "channel": "linkedin", "topic": "...", "
         content: `Topics: ${topics.join(", ")}\nChannels: ${channels.join(", ")}\nWeek starting: ${weekStartDate.toLocaleDateString()}`,
       },
     ],
-    forceModel: "claude-3-5-haiku-20241022",
-    maxTokens: 2000,
-  });
+    { forceModel: "claude-3-5-haiku", maxTokens: 2000 },
+  );
 
   try {
     const jsonMatch = result.content?.match(/\[[\s\S]*\]/);
@@ -268,8 +266,8 @@ export async function analyzeIndustryTrends(
   contentIdeas: string[];
   competitors: string[];
 }> {
-  const result = await aiChat({
-    messages: [
+  const result = await aiChat(
+    [
       {
         role: "system",
         content: `Analyze current trends in the given industry. Suggest content ideas that would perform well on social media.
@@ -280,9 +278,8 @@ Respond as JSON: { "trends": ["..."], "contentIdeas": ["..."], "competitors": ["
         content: `Industry: ${industry}\nDate: ${new Date().toLocaleDateString()}\n\nWhat are the current hot topics and content opportunities?`,
       },
     ],
-    forceModel: "claude-3-5-haiku-20241022",
-    maxTokens: 2000,
-  });
+    { forceModel: "claude-3-5-haiku", maxTokens: 2000 },
+  );
 
   try {
     const jsonMatch = result.content?.match(/\{[\s\S]*\}/);
