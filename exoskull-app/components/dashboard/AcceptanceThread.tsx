@@ -140,7 +140,7 @@ function StatusCards({ tenantId }: { tenantId: string }) {
     {
       icon: FileText,
       label: "Wiedza",
-      value: `${data.loopsCount} loopow`,
+      value: `${data.loopsCount} biegunow`,
       href: "/dashboard/memory",
       color: "text-purple-500",
     },

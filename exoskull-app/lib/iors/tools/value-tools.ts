@@ -2,7 +2,7 @@
  * Value Hierarchy IORS Tools
  *
  * Manage user-defined core values and the full hierarchy:
- * Values > Areas (Loops) > Quests > Missions > Ops > Notes
+ * Values > Bieguny (Poles) > Quests > Missions > Ops > Notes
  */
 
 import type { ToolDefinition } from "./index";
@@ -16,19 +16,18 @@ export const valueTools: ToolDefinition[] = [
     definition: {
       name: "list_values",
       description:
-        "Pokaz wartosci zyciowe uzytkownika — co jest dla niego najwazniejsze. Kazda wartosc ma powiazane obszary (loops) i questy.",
+        "Pokaz wartosci zyciowe uzytkownika — co jest dla niego najwazniejsze. Kazda wartosc ma powiazane bieguny i questy. Bieguny to magnetyczne sfery zycia — im wiekszy biegun, tym wiecej notatek i taskow przyciaga.",
       input_schema: {
         type: "object" as const,
         properties: {
           include_loops: {
             type: "boolean",
-            description:
-              "Czy uwzglednic powiazane petle/obszary (domyslnie: true)",
+            description: "Czy uwzglednic powiazane bieguny (domyslnie: true)",
             default: true,
           },
           include_quests: {
             type: "boolean",
-            description: "Czy uwzglednic questy pod kazdym obszarem",
+            description: "Czy uwzglednic questy pod kazdym biegunem",
             default: false,
           },
         },
@@ -94,7 +93,7 @@ export const valueTools: ToolDefinition[] = [
 
               loopDetails.push(loopStr);
             }
-            result += `\n   Obszary: ${loopDetails.join("; ")}`;
+            result += `\n   Bieguny: ${loopDetails.join("; ")}`;
           }
         }
         result += "\n\n";
@@ -141,7 +140,7 @@ export const valueTools: ToolDefinition[] = [
             type: "array",
             items: { type: "string" },
             description:
-              "Slugi petli do powiazania z ta wartoscia, np. ['health', 'fun']",
+              "Slugi bieguna do powiazania z ta wartoscia, np. ['health', 'fun']",
           },
         },
         required: ["name"],
@@ -186,7 +185,7 @@ export const valueTools: ToolDefinition[] = [
           .in("slug", loopSlugs);
       }
 
-      return `Utworzono wartosc: ${data.icon || "***"} **${data.name}** (priorytet: ${data.priority}/10)${loopSlugs?.length ? `. Powiazano z obszarami: ${loopSlugs.join(", ")}` : ""}`;
+      return `Utworzono wartosc: ${data.icon || "***"} **${data.name}** (priorytet: ${data.priority}/10)${loopSlugs?.length ? `. Powiazano z biegunami: ${loopSlugs.join(", ")}` : ""}`;
     },
   },
 
@@ -280,7 +279,7 @@ export const valueTools: ToolDefinition[] = [
     definition: {
       name: "link_area_to_value",
       description:
-        "Powiaz obszar (petla/loop) z wartoscia. Kazdy obszar powinien nalezec do jednej wartosci.",
+        "Powiaz biegun (biegun) z wartoscia. Kazdy biegun powinien nalezec do jednej wartosci.",
       input_schema: {
         type: "object" as const,
         properties: {
@@ -290,8 +289,7 @@ export const valueTools: ToolDefinition[] = [
           },
           loop_slug: {
             type: "string",
-            description:
-              "Slug petli/obszaru do powiazania, np. 'health', 'work'",
+            description: "Slug bieguna do powiazania, np. 'health', 'work'",
           },
         },
         required: ["value_name", "loop_slug"],
@@ -325,10 +323,10 @@ export const valueTools: ToolDefinition[] = [
         .single();
 
       if (error || !loop) {
-        return `Nie znaleziono obszaru "${input.loop_slug}" lub blad powiazania.`;
+        return `Nie znaleziono biegunu "${input.loop_slug}" lub blad powiazania.`;
       }
 
-      return `Powiazano obszar "${loop.name}" (${loop.slug}) z wartoscia "${value.name}".`;
+      return `Powiazano biegun "${loop.name}" (${loop.slug}) z wartoscia "${value.name}".`;
     },
   },
 
@@ -339,13 +337,13 @@ export const valueTools: ToolDefinition[] = [
     definition: {
       name: "create_area",
       description:
-        "Stworz nowy obszar zyciowy (petla/loop). Opcjonalnie powiaz z wartoscia.",
+        "Stworz nowy biegun zyciowy (biegun). Opcjonalnie powiaz z wartoscia.",
       input_schema: {
         type: "object" as const,
         properties: {
           name: {
             type: "string",
-            description: "Nazwa obszaru, np. 'Sport', 'Side Project'",
+            description: "Nazwa biegunu, np. 'Sport', 'Side Project'",
           },
           slug: {
             type: "string",
@@ -405,17 +403,17 @@ export const valueTools: ToolDefinition[] = [
 
       if (error) {
         if (error.code === "23505") {
-          return `Obszar "${input.slug}" juz istnieje.`;
+          return `Biegun "${input.slug}" juz istnieje.`;
         }
         console.error("[create_area] Failed:", {
           error: error.message,
           tenantId,
           slug: input.slug,
         });
-        return `Blad tworzenia obszaru: ${error.message}`;
+        return `Blad tworzenia biegunu: ${error.message}`;
       }
 
-      return `Utworzono obszar: ${data.icon || ""} **${data.name}** (${data.slug})${valueId ? " — powiazany z wartoscia" : ""}`;
+      return `Utworzono biegun: ${data.icon || ""} **${data.name}** (${data.slug})${valueId ? " — powiazany z wartoscia" : ""}`;
     },
   },
 
@@ -630,7 +628,7 @@ export const valueTools: ToolDefinition[] = [
     definition: {
       name: "create_note_in_hierarchy",
       description:
-        "Dodaj notatke polaczona z hierarchia wartosci — moze byc przypisana do wartosci, obszaru, questa, misji lub wyzwania.",
+        "Dodaj notatke polaczona z hierarchia wartosci — moze byc przypisana do wartosci, biegunu, questa, misji lub wyzwania.",
       input_schema: {
         type: "object" as const,
         properties: {
@@ -648,7 +646,7 @@ export const valueTools: ToolDefinition[] = [
           },
           loop_slug: {
             type: "string",
-            description: "Slug obszaru do powiazania",
+            description: "Slug biegunu do powiazania",
           },
           quest_title: {
             type: "string",
@@ -755,7 +753,7 @@ export const valueTools: ToolDefinition[] = [
 
       const links: string[] = [];
       if (valueId) links.push("wartosc");
-      if (loopId) links.push("obszar");
+      if (loopId) links.push("biegun");
       if (questId) links.push("quest");
       if (missionId) links.push("misja");
       if (challengeId) links.push("wyzwanie");
@@ -771,7 +769,7 @@ export const valueTools: ToolDefinition[] = [
     definition: {
       name: "get_value_hierarchy",
       description:
-        "Pokaz pelna hierarchie wartosci uzytkownika: Wartosci > Obszary > Questy > Misje > Wyzwania. Uzywaj do przegladu calej struktury.",
+        "Pokaz pelna hierarchie wartosci uzytkownika: Wartosci > Bieguny > Questy > Misje > Wyzwania. Uzywaj do przegladu calej struktury.",
       input_schema: {
         type: "object" as const,
         properties: {},
@@ -956,7 +954,7 @@ export const valueTools: ToolDefinition[] = [
     definition: {
       name: "seed_hierarchy",
       description:
-        "Zainicjalizuj domyslna hierarchie wartosci dla uzytkownika — tworzy wartosci, obszary i startowe questy.",
+        "Zainicjalizuj domyslna hierarchie wartosci dla uzytkownika — tworzy wartosci, bieguny i startowe questy.",
       input_schema: {
         type: "object" as const,
         properties: {},
@@ -1008,7 +1006,7 @@ export const valueTools: ToolDefinition[] = [
         .eq("tenant_id", tenantId)
         .in("status", ["active", "draft"]);
 
-      return `Hierarchia zainicjalizowana: ${valuesCount || 0} wartosci, ${loopsCount || 0} obszarow, ${questsCount || 0} questow. Mozesz teraz dostosowac ja do swoich potrzeb.`;
+      return `Hierarchia zainicjalizowana: ${valuesCount || 0} wartosci, ${loopsCount || 0} biegunow, ${questsCount || 0} questow. Mozesz teraz dostosowac ja do swoich potrzeb.`;
     },
   },
 ];

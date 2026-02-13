@@ -134,7 +134,7 @@ const DEFAULT_COLORS = [
 
 const TYPE_LABELS: Record<string, string> = {
   value: "Wartosc",
-  loop: "Obszar",
+  loop: "Biegun",
   quest: "Quest",
   mission: "Misja",
   challenge: "Wyzwanie",
@@ -547,7 +547,7 @@ export default function ValuesPage() {
             </Badge>
           </h1>
           <p className="text-sm text-indigo-300/50 mt-1">
-            {stats.values} wartosci / {stats.loops} obszarow / {stats.quests}{" "}
+            {stats.values} wartosci / {stats.loops} biegunow / {stats.quests}{" "}
             questow / {stats.missions} misji / {stats.challenges} wyzwan
           </p>
         </div>
@@ -595,7 +595,7 @@ export default function ValuesPage() {
           </span>
           <span className="flex items-center gap-1.5 text-white/70">
             <span className="w-3 h-3 rounded-full bg-emerald-500/60" />
-            Obszar
+            Biegun
           </span>
           <span className="flex items-center gap-1.5 text-white/70">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/40" />
@@ -797,7 +797,7 @@ export default function ValuesPage() {
                           <div className="mt-4">
                             <p className="text-xs text-white/40 mb-2 flex items-center gap-1">
                               <Folder className="h-3 w-3" />
-                              Obszary ({v.loops.length}):
+                              Bieguny ({v.loops.length}):
                             </p>
                             <div className="space-y-2">
                               {v.loops.map((loop) => (
@@ -876,7 +876,7 @@ export default function ValuesPage() {
                   <>
                     <p className="text-sm text-white/50 mb-3 flex items-center gap-1.5">
                       <Folder className="h-3.5 w-3.5" />
-                      Obszar / Petla
+                      Biegun
                     </p>
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-xs text-white/40">Questy:</span>
@@ -984,7 +984,7 @@ export default function ValuesPage() {
               {selectedNode.type === "loop" &&
                 `Wartosc > ${selectedNode.parentName || "?"}`}
               {selectedNode.type === "quest" &&
-                `Wartosc > Obszar > ${selectedNode.name}`}
+                `Wartosc > Biegun > ${selectedNode.name}`}
               {selectedNode.type === "mission" &&
                 `... > Quest > ${selectedNode.name}`}
               {selectedNode.type === "challenge" &&

@@ -103,17 +103,17 @@ export function HierarchyView({
 }: HierarchyViewProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* Column 1: Loops */}
+      {/* Column 1: Bieguny (Poles) — magnetic areas that attract notes */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium">Loopy</CardTitle>
+            <CardTitle className="text-sm font-medium">Bieguny</CardTitle>
             <Button
               variant="ghost"
               size="icon"
               className="h-6 w-6"
               onClick={onAddLoop}
-              aria-label="Dodaj loop"
+              aria-label="Dodaj biegun"
             >
               <Plus className="h-4 w-4" />
             </Button>
@@ -123,7 +123,7 @@ export function HierarchyView({
           {loopsLoading ? (
             <ColumnSkeleton />
           ) : loops.length === 0 ? (
-            <EmptyState message="Brak loopow" onAdd={onAddLoop} />
+            <EmptyState message="Brak biegunow" onAdd={onAddLoop} />
           ) : (
             loops.map((loop) => (
               <LoopCard
@@ -180,8 +180,8 @@ export function HierarchyView({
             <EmptyState
               message={
                 selectedLoop
-                  ? "Brak kampanii w tym loopie"
-                  : "Wybierz loop lub dodaj kampanie"
+                  ? "Brak kampanii w tym biegunie"
+                  : "Wybierz biegun lub dodaj kampanie"
               }
               onAdd={onAddCampaign}
             />

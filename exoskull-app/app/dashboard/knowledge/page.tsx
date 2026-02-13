@@ -163,7 +163,7 @@ export default function KnowledgePage() {
       setLoops(data.loops || []);
     } catch (error) {
       console.error("[Knowledge] Fetch loops error:", error);
-      toast.error("Nie udalo sie zaladowac loopow");
+      toast.error("Nie udalo sie zaladowac biegunow");
     } finally {
       setLoopsLoading(false);
     }
@@ -357,10 +357,10 @@ export default function KnowledgePage() {
     if (!tenantId) return;
     if (editingLoop) {
       await updateLoop(tenantId, editingLoop.id, input);
-      toast.success("Loop zaktualizowany");
+      toast.success("Biegun zaktualizowany");
     } else {
       await createLoop(tenantId, input);
-      toast.success("Loop utworzony");
+      toast.success("Biegun utworzony");
     }
     setEditingLoop(undefined);
     fetchLoops();
@@ -421,18 +421,18 @@ export default function KnowledgePage() {
     if (!tenantId) return;
     if (
       !confirm(
-        `Usunąć loop "${loop.name}"? Wszystkie kampanie, questy i opy w tym loopie zostaną osierocone.`,
+        `Usunąć biegun "${loop.name}"? Wszystkie kampanie, questy i opy w tym biegunie zostaną osierocone.`,
       )
     )
       return;
     try {
       await deleteLoop(tenantId, loop.id);
-      toast.success(`Loop "${loop.name}" usunięty`);
+      toast.success(`Biegun "${loop.name}" usunięty`);
       if (selectedLoop?.id === loop.id) setSelectedLoop(null);
       fetchLoops();
     } catch (error) {
       console.error("[Knowledge] Delete loop error:", error);
-      toast.error("Nie udało się usunąć loopa");
+      toast.error("Nie udało się usunąć bieguna");
     }
   };
 

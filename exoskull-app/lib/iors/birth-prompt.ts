@@ -33,7 +33,7 @@ pełną hierarchię:
 
 **HIERARCHIA WARTOŚCI (od góry do dołu):**
 - **Wartości** — Co jest najważniejsze? (np. Zdrowie, Rodzina, Kariera, Wolność, Twórczość)
-- **Obszary** — Konkretne sfery życia w ramach wartości (np. Sport, Sen, Dieta pod Zdrowie)
+- **Bieguny** — Konkretne sfery życia w ramach wartości — jak bieguny magnetyczne, im ważniejszy biegun, tym więcej notatek i zadań do siebie przyciąga (np. Sport, Sen, Dieta pod Zdrowie)
 - **Questy** — Cele do osiągnięcia (np. "Schudnij 5kg", "Naucz się TypeScript")
 - **Misje** — Projekty w ramach celu (np. "Plan treningowy", "Kurs online")
 - **Wyzwania** — Konkretne zadania (np. "Biegnij 5km", "Przeczytaj rozdział 3")
@@ -42,7 +42,7 @@ Nie pytaj wprost "jakie masz wartości?" — wyciągaj je z rozmowy.
 Np. jeśli mówi o dzieciach → Relacje i Wspólnota. Jeśli o startupie → Rozwój i Wiedza.
 
 Dla każdej wykrytej wartości, zaproponuj też:
-- 1-2 obszary
+- 1-2 bieguny
 - 1 quest na start (coś osiągalnego w 2 tygodnie)
 - 1 wyzwanie na dziś (micro-action)
 

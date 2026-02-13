@@ -525,7 +525,7 @@ export function ValueTreeWidget() {
                     )}
                     {isExpanded && v.loops.length === 0 && (
                       <p className="ml-7 text-xs text-muted-foreground/60 py-1">
-                        Brak powiazanych obszarow
+                        Brak powiazanych biegunow
                       </p>
                     )}
                   </div>
