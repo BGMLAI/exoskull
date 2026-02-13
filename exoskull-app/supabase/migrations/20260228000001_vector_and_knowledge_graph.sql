@@ -178,12 +178,17 @@ CREATE INDEX IF NOT EXISTS idx_widget_interactions_tenant ON exo_widget_interact
 CREATE TABLE IF NOT EXISTS exo_system_events (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   tenant_id UUID NOT NULL,
-  type TEXT NOT NULL DEFAULT 'info', -- info, warn, error, critical
-  source TEXT NOT NULL,
-  message TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'info',
+  source TEXT NOT NULL DEFAULT 'system',
+  message TEXT NOT NULL DEFAULT '',
   metadata JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+-- Add columns if table existed without them
+ALTER TABLE exo_system_events ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'info';
+ALTER TABLE exo_system_events ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'system';
+ALTER TABLE exo_system_events ADD COLUMN IF NOT EXISTS message TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_system_events_tenant ON exo_system_events(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_system_events_type ON exo_system_events(type, created_at);
@@ -230,11 +235,16 @@ CREATE INDEX IF NOT EXISTS idx_challenges_tenant ON exo_challenges(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_challenges_mission ON exo_challenges(mission_id);
 CREATE INDEX IF NOT EXISTS idx_challenges_campaign ON exo_challenges(campaign_id);
 
--- Link notes to hierarchy
-ALTER TABLE exo_notes ADD COLUMN IF NOT EXISTS challenge_id UUID REFERENCES exo_challenges(id) ON DELETE SET NULL;
-ALTER TABLE exo_notes ADD COLUMN IF NOT EXISTS mission_id UUID REFERENCES user_missions(id) ON DELETE SET NULL;
-ALTER TABLE exo_notes ADD COLUMN IF NOT EXISTS quest_id UUID REFERENCES user_quests(id) ON DELETE SET NULL;
-ALTER TABLE exo_notes ADD COLUMN IF NOT EXISTS value_id UUID REFERENCES exo_values(id) ON DELETE SET NULL;
+-- Link notes to hierarchy (only if exo_notes table exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'exo_notes' AND table_schema = 'public') THEN
+    ALTER TABLE exo_notes ADD COLUMN IF NOT EXISTS challenge_id UUID REFERENCES exo_challenges(id) ON DELETE SET NULL;
+    ALTER TABLE exo_notes ADD COLUMN IF NOT EXISTS mission_id UUID REFERENCES user_missions(id) ON DELETE SET NULL;
+    ALTER TABLE exo_notes ADD COLUMN IF NOT EXISTS quest_id UUID REFERENCES user_quests(id) ON DELETE SET NULL;
+    ALTER TABLE exo_notes ADD COLUMN IF NOT EXISTS value_id UUID REFERENCES exo_values(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 -- Voice config column for 11labs voice ID
 ALTER TABLE exo_tenants ADD COLUMN IF NOT EXISTS voice_config JSONB DEFAULT '{}';

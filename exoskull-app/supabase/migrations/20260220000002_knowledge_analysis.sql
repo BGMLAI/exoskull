@@ -32,25 +32,31 @@ CREATE TABLE IF NOT EXISTS exo_knowledge_analyses (
 );
 
 -- Indexes for fast lookups
-CREATE INDEX idx_ka_tenant_created
+CREATE INDEX IF NOT EXISTS idx_ka_tenant_created
   ON exo_knowledge_analyses(tenant_id, created_at DESC);
 
-CREATE INDEX idx_ka_type
+CREATE INDEX IF NOT EXISTS idx_ka_type
   ON exo_knowledge_analyses(analysis_type);
 
 -- Prevent exact-duplicate runs (same data, same tenant)
-CREATE UNIQUE INDEX idx_ka_dedup
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ka_dedup
   ON exo_knowledge_analyses(tenant_id, snapshot_hash)
   WHERE snapshot_hash IS NOT NULL;
 
 -- RLS
 ALTER TABLE exo_knowledge_analyses ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Tenants can read own analyses"
-  ON exo_knowledge_analyses FOR SELECT
-  USING (tenant_id = auth.uid());
+DO $$ BEGIN
+  CREATE POLICY "Tenants can read own analyses"
+    ON exo_knowledge_analyses FOR SELECT
+    USING (tenant_id = auth.uid());
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
-CREATE POLICY "Service role full access to analyses"
-  ON exo_knowledge_analyses FOR ALL
-  USING (auth.role() = 'service_role')
-  WITH CHECK (auth.role() = 'service_role');
+DO $$ BEGIN
+  CREATE POLICY "Service role full access to analyses"
+    ON exo_knowledge_analyses FOR ALL
+    USING (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

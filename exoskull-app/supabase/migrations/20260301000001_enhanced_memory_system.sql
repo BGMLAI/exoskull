@@ -140,6 +140,9 @@ ALTER TABLE exo_knowledge_entities ADD COLUMN IF NOT EXISTS embedding vector(153
 ALTER TABLE exo_knowledge_entities ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE exo_knowledge_entities ADD COLUMN IF NOT EXISTS importance FLOAT DEFAULT 0.5;
 
+-- Enable pg_trgm for trigram-based text search
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 -- Index for entity name search
 CREATE INDEX IF NOT EXISTS idx_knowledge_entities_name_trgm
   ON exo_knowledge_entities USING gin (name gin_trgm_ops);
