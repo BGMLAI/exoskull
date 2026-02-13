@@ -7,10 +7,12 @@ import { VoiceInputBar } from "./VoiceInputBar";
 import { EmptyState } from "./EmptyState";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type {
   StreamEvent,
   AIMessageData,
   ChannelType,
+  SystemNotificationData,
 } from "@/lib/stream/types";
 
 // ---------------------------------------------------------------------------
@@ -57,6 +59,7 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
     finalizeAIMessage,
     updateAgentAction,
     updateThinkingSteps,
+    updateThinkingTools,
     updateFileUpload,
     setLoading,
     setConversationId,
@@ -462,29 +465,65 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
                   break;
                 }
 
-                case "tool_start":
-                  addEvent({
-                    id: `tool-${data.tool}-${Date.now()}`,
-                    timestamp: new Date(),
-                    data: {
-                      type: "agent_action",
-                      toolName: data.tool,
-                      displayLabel: data.label || data.tool,
-                      status: "running",
-                    },
-                  });
+                case "tool_start": {
+                  // Fold tool into thinking event (grouped process view)
+                  const tsThinkingId = `thinking-${aiEventId}`;
+                  const tsExisting = state.events.find(
+                    (e) => e.id === tsThinkingId,
+                  );
+                  if (tsExisting && tsExisting.data.type === "thinking_step") {
+                    const tools = [
+                      ...(tsExisting.data.toolActions || []),
+                      {
+                        toolName: data.tool,
+                        displayLabel: data.label || data.tool,
+                        status: "running" as const,
+                      },
+                    ];
+                    updateThinkingTools(tsThinkingId, tools);
+                  } else {
+                    // No thinking event yet — create one with this tool
+                    addEvent({
+                      id: tsThinkingId,
+                      timestamp: new Date(),
+                      data: {
+                        type: "thinking_step",
+                        steps: [],
+                        toolActions: [
+                          {
+                            toolName: data.tool,
+                            displayLabel: data.label || data.tool,
+                            status: "running",
+                          },
+                        ],
+                      },
+                    });
+                  }
                   break;
+                }
 
                 case "tool_end": {
-                  // Find the running action for this tool
-                  const actionEvent = state.events.find(
-                    (e) =>
-                      e.data.type === "agent_action" &&
-                      e.data.toolName === data.tool &&
-                      e.data.status === "running",
+                  // Update tool in thinking event
+                  const teThinkingId = `thinking-${aiEventId}`;
+                  const teExisting = state.events.find(
+                    (e) => e.id === teThinkingId,
                   );
-                  if (actionEvent) {
-                    updateAgentAction(actionEvent.id, "done", data.durationMs);
+                  if (teExisting && teExisting.data.type === "thinking_step") {
+                    const tools = (teExisting.data.toolActions || []).map(
+                      (t) =>
+                        t.toolName === data.tool && t.status === "running"
+                          ? {
+                              ...t,
+                              status: (data.success === false
+                                ? "error"
+                                : "done") as "done" | "error",
+                              durationMs: data.durationMs,
+                              resultSummary: data.resultSummary,
+                              success: data.success !== false,
+                            }
+                          : t,
+                    );
+                    updateThinkingTools(teThinkingId, tools);
                   }
 
                   // Emit third_party_action for external service tools
@@ -538,6 +577,7 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
       finalizeAIMessage,
       updateAgentAction,
       updateThinkingSteps,
+      updateThinkingTools,
       setLoading,
       setConversationId,
       speakText,
@@ -650,6 +690,36 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
     },
     [handleFileUpload],
   );
+
+  // ---------------------------------------------------------------------------
+  // Toast for system notifications
+  // ---------------------------------------------------------------------------
+
+  const prevEventCountRef = useRef(0);
+  useEffect(() => {
+    const events = state.events;
+    if (events.length <= prevEventCountRef.current) {
+      prevEventCountRef.current = events.length;
+      return;
+    }
+    // Check only new events
+    const newEvents = events.slice(prevEventCountRef.current);
+    prevEventCountRef.current = events.length;
+
+    for (const ev of newEvents) {
+      if (ev.data.type === "system_notification") {
+        const d = ev.data as SystemNotificationData;
+        const severity = d.severity;
+        if (severity === "warning") {
+          toast.warning(d.message);
+        } else if (severity === "success") {
+          toast.success(d.message);
+        } else {
+          toast.info(d.message);
+        }
+      }
+    }
+  }, [state.events]);
 
   // ---------------------------------------------------------------------------
   // Render

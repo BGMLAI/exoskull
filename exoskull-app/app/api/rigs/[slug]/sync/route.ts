@@ -75,17 +75,32 @@ export async function POST(
       .eq("id", connection.id);
 
     // Refresh token if needed (before sync)
+    const OAUTH_REQUIRED_RIGS = [
+      "google",
+      "google-fit",
+      "google-workspace",
+      "google-calendar",
+      "microsoft-365",
+      "oura",
+      "fitbit",
+      "facebook",
+    ];
     try {
       const freshToken = await ensureFreshToken(connection);
       if (freshToken !== connection.access_token) {
         connection.access_token = freshToken;
       }
     } catch (tokenError) {
+      if (OAUTH_REQUIRED_RIGS.includes(slug)) {
+        // OAuth-dependent rigs MUST have a valid token — fail hard
+        throw new Error(
+          `Token refresh failed for ${slug}: ${(tokenError as Error).message}. User may need to re-authorize.`,
+        );
+      }
       logger.warn(
         `[Rig Sync] Token refresh skipped for ${slug}:`,
         (tokenError as Error).message,
       );
-      // Continue with existing token - some rigs don't need refresh
     }
 
     // Perform sync based on rig type

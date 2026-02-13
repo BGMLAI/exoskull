@@ -5,7 +5,7 @@
  * Uses format=full for complete MIME parsing.
  */
 
-import type { RawEmail } from "../types";
+import type { RawEmail, AttachmentMeta } from "../types";
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
@@ -33,8 +33,9 @@ export async function fetchGmailEmails(
         `${GMAIL_API}/messages/${sinceMessageId}?format=minimal`,
       );
       const afterDate = new Date(parseInt(refMsg.internalDate));
-      const dateStr = `${afterDate.getFullYear()}/${String(afterDate.getMonth() + 1).padStart(2, "0")}/${String(afterDate.getDate()).padStart(2, "0")}`;
-      q = `after:${dateStr} ${q}`.trim();
+      // Use epoch seconds for precision (day-level dates skip same-day emails)
+      const afterEpoch = Math.floor(afterDate.getTime() / 1000);
+      q = `after:${afterEpoch} ${q}`.trim();
     } catch (err) {
       console.error("[GmailProvider] Failed to resolve sinceMessageId:", err);
     }
@@ -109,6 +110,7 @@ async function fetchFullGmailMessage(
 
   // Check for attachments
   const attachmentNames = extractAttachmentNames(msg.payload);
+  const attachmentMetadata = extractAttachmentMetadata(msg.payload);
 
   return {
     messageId: msg.id,
@@ -125,6 +127,7 @@ async function fetchFullGmailMessage(
     isRead: !msg.labelIds?.includes("UNREAD"),
     hasAttachments: attachmentNames.length > 0,
     attachmentNames,
+    attachmentMetadata,
     labels: msg.labelIds || [],
   };
 }
@@ -194,6 +197,25 @@ function extractAttachmentNames(payload: GmailPart): string[] {
   }
   walk(payload);
   return names;
+}
+
+function extractAttachmentMetadata(payload: GmailPart): AttachmentMeta[] {
+  const metas: AttachmentMeta[] = [];
+  function walk(part: GmailPart): void {
+    if (part.filename && part.body?.attachmentId) {
+      metas.push({
+        attachmentId: part.body.attachmentId,
+        filename: part.filename,
+        mimeType: part.mimeType,
+        size: part.body.size || 0,
+      });
+    }
+    if (part.parts) {
+      for (const child of part.parts) walk(child);
+    }
+  }
+  walk(payload);
+  return metas;
 }
 
 function decodeBase64Url(data: string): string {

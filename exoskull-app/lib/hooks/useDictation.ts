@@ -39,8 +39,12 @@ export function useDictation(
   const analyserRef = useRef<AnalyserNode | null>(null);
   const levelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hadAudioRef = useRef(false);
+  const silenceStartRef = useRef<number | null>(null);
   const onFinalTranscriptRef = useRef(onFinalTranscript);
   const onErrorRef = useRef(onError);
+
+  const SILENCE_TIMEOUT_MS = 5000; // 5 seconds silence → auto-stop
+  const MAX_RECORDING_MS = 120_000; // 2 min safety limit
 
   // Keep refs fresh to avoid stale closures
   onFinalTranscriptRef.current = onFinalTranscript;
@@ -81,13 +85,40 @@ export function useDictation(
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
+      silenceStartRef.current = null;
+
       levelIntervalRef.current = setInterval(() => {
         analyser.getByteFrequencyData(dataArray);
         const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
 
+        // Max recording duration safety
+        const elapsed = Date.now() - recordStartRef.current;
+        if (elapsed >= MAX_RECORDING_MS) {
+          if (mediaRecorderRef.current?.state === "recording") {
+            mediaRecorderRef.current.stop();
+          }
+          return;
+        }
+
         if (avg > 5) {
           hadAudioRef.current = true;
+          silenceStartRef.current = null; // Reset silence timer
           setInterimTranscript("Nagrywam... 🎤");
+        } else if (hadAudioRef.current) {
+          // Had audio before, now silent → start auto-stop countdown
+          if (!silenceStartRef.current) {
+            silenceStartRef.current = Date.now();
+          }
+          const silentFor = Date.now() - silenceStartRef.current;
+          if (silentFor >= SILENCE_TIMEOUT_MS) {
+            // Auto-stop after 5s silence
+            if (mediaRecorderRef.current?.state === "recording") {
+              mediaRecorderRef.current.stop();
+            }
+            return;
+          }
+          const remaining = Math.ceil((SILENCE_TIMEOUT_MS - silentFor) / 1000);
+          setInterimTranscript(`Cisza... auto-wysyłka za ${remaining}s`);
         } else if (!hadAudioRef.current) {
           setInterimTranscript(
             "🔇 Mikrofon nie łapie dźwięku — sprawdź ustawienia",

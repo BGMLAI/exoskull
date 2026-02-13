@@ -76,10 +76,21 @@ export async function analyzeEmails(
 
     if (!classification) {
       result.errors++;
-      await supabase
-        .from("exo_analyzed_emails")
-        .update({ analysis_status: "failed" })
-        .eq("id", email.id);
+      const currentRetry =
+        (email as AnalyzedEmail & { retry_count?: number }).retry_count || 0;
+      if (currentRetry >= 2) {
+        // 3rd failure → mark as failed permanently
+        await supabase
+          .from("exo_analyzed_emails")
+          .update({ analysis_status: "failed", retry_count: currentRetry + 1 })
+          .eq("id", email.id);
+      } else {
+        // Retry later — keep as pending with incremented counter
+        await supabase
+          .from("exo_analyzed_emails")
+          .update({ analysis_status: "pending", retry_count: currentRetry + 1 })
+          .eq("id", email.id);
+      }
       continue;
     }
 

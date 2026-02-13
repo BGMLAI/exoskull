@@ -72,12 +72,22 @@ export interface AgentActionData {
 export interface ThinkingStepData {
   type: "thinking_step";
   steps: ThinkingStep[];
+  toolActions?: ToolAction[];
 }
 
 export interface ThinkingStep {
   label: string;
   status: "pending" | "running" | "done";
   detail?: string;
+}
+
+export interface ToolAction {
+  toolName: string;
+  displayLabel: string;
+  status: "running" | "done" | "error";
+  durationMs?: number;
+  resultSummary?: string;
+  success?: boolean;
 }
 
 // ---------------------------------------------------------------------------

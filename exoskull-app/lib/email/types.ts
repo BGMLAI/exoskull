@@ -111,6 +111,13 @@ export interface KeyFact {
   stored_in_rag?: boolean;
 }
 
+export interface AttachmentMeta {
+  attachmentId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
 export interface RawEmail {
   messageId: string;
   threadId?: string;
@@ -126,6 +133,7 @@ export interface RawEmail {
   isRead: boolean;
   hasAttachments: boolean;
   attachmentNames: string[];
+  attachmentMetadata?: AttachmentMeta[];
   labels?: string[];
 }
 

@@ -2,7 +2,8 @@
  * IORS Email Tools
  *
  * Tools for the AI to search, summarize, and query email data.
- * - search_emails: Find emails by query/from/category
+ * - search_emails: Find emails by query/from/category (searches body_text too)
+ * - get_full_email: Read complete email body + attachments
  * - email_summary: Inbox overview stats
  * - email_follow_ups: Emails needing response
  * - email_sender_info: Sender profile and patterns
@@ -79,11 +80,11 @@ export const emailTools: ToolDefinition[] = [
         query = query.eq("priority", input.priority);
       }
 
-      // Text search in subject + snippet
+      // Text search in subject + snippet + body_text + from_name
       const searchQuery = input.query as string;
       if (searchQuery) {
         query = query.or(
-          `subject.ilike.%${searchQuery}%,snippet.ilike.%${searchQuery}%,from_name.ilike.%${searchQuery}%`,
+          `subject.ilike.%${searchQuery}%,snippet.ilike.%${searchQuery}%,from_name.ilike.%${searchQuery}%,body_text.ilike.%${searchQuery}%`,
         );
       }
 
@@ -112,6 +113,128 @@ export const emailTools: ToolDefinition[] = [
       });
 
       return `Znaleziono ${emails.length} emaili:\n${results.join("\n")}`;
+    },
+  },
+
+  // ----------------------------------------------------------------
+  // get_full_email
+  // ----------------------------------------------------------------
+  {
+    definition: {
+      name: "get_full_email",
+      description:
+        "Pobierz pelna tresc emaila (body) + nazwy zalacznikow + AI podsumowanie. Uzywaj gdy user chce przeczytac caly email lub potrzebuje szczegulow.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          email_id: {
+            type: "string",
+            description: "ID emaila z wynikow search_emails (jesli znany)",
+          },
+          subject: {
+            type: "string",
+            description: "Temat emaila (do wyszukania jesli brak ID)",
+          },
+          from_email: {
+            type: "string",
+            description: "Adres nadawcy (pomaga zawezic wyniki)",
+          },
+        },
+      },
+    },
+    execute: async (input, tenantId) => {
+      const supabase = getServiceSupabase();
+
+      let query = supabase
+        .from("exo_analyzed_emails")
+        .select(
+          "id, subject, from_name, from_email, to_emails, cc_emails, date_received, body_text, body_html, attachment_names, attachment_metadata, action_items, key_facts, category, priority, sentiment, direction, has_attachments, follow_up_needed, follow_up_by",
+        )
+        .eq("tenant_id", tenantId);
+
+      if (input.email_id) {
+        query = query.eq("id", input.email_id);
+      } else if (input.subject) {
+        query = query.ilike("subject", `%${input.subject}%`);
+        if (input.from_email) {
+          query = query.ilike("from_email", `%${input.from_email}%`);
+        }
+        query = query.order("date_received", { ascending: false }).limit(1);
+      } else {
+        return "Podaj email_id lub temat (subject) emaila do wyszukania.";
+      }
+
+      const { data: emails, error } = await query;
+
+      if (error) {
+        console.error("[EmailTools] get_full_email error:", error);
+        return "Blad pobierania emaila";
+      }
+      if (!emails?.length) {
+        return "Nie znaleziono emaila o podanych kryteriach.";
+      }
+
+      const e = emails[0];
+      const from = e.from_name
+        ? `${e.from_name} <${e.from_email}>`
+        : e.from_email;
+      const date = new Date(e.date_received).toLocaleString("pl-PL");
+
+      const lines: string[] = [
+        `Od: ${from}`,
+        `Do: ${(e.to_emails || []).join(", ")}`,
+        e.cc_emails?.length ? `CC: ${e.cc_emails.join(", ")}` : "",
+        `Data: ${date}`,
+        `Temat: ${e.subject || "(brak tematu)"}`,
+        `Kategoria: ${e.category || "?"} | Priorytet: ${e.priority || "?"}`,
+        `Kierunek: ${e.direction || "?"}`,
+        "",
+      ].filter(Boolean);
+
+      // Body text (truncate to 3000 chars for context window)
+      const body = (e.body_text || "").slice(0, 3000);
+      lines.push("--- TRESC ---");
+      lines.push(body || "(brak tresci)");
+      if ((e.body_text || "").length > 3000) {
+        lines.push("... (skrocone — pelna wersja dostepna w widoku emaila)");
+      }
+
+      // Attachments
+      if (e.has_attachments && e.attachment_names?.length) {
+        lines.push("");
+        lines.push(`--- ZALACZNIKI (${e.attachment_names.length}) ---`);
+        for (const name of e.attachment_names) {
+          lines.push(`- ${name}`);
+        }
+      }
+
+      // AI analysis
+      if (e.action_items?.length || e.key_facts?.length) {
+        lines.push("");
+        lines.push("--- ANALIZA AI ---");
+        if (e.action_items?.length) {
+          lines.push("Akcje:");
+          for (const item of e.action_items) {
+            const due = item.due_date ? ` (do: ${item.due_date})` : "";
+            lines.push(`  - ${item.text}${due}`);
+          }
+        }
+        if (e.key_facts?.length) {
+          lines.push("Kluczowe fakty:");
+          for (const fact of e.key_facts) {
+            lines.push(`  - ${fact.fact}`);
+          }
+        }
+      }
+
+      if (e.follow_up_needed) {
+        const followBy = e.follow_up_by
+          ? new Date(e.follow_up_by).toLocaleDateString("pl-PL")
+          : "nieokreslony termin";
+        lines.push(`\nFOLLOW-UP wymagany do: ${followBy}`);
+      }
+
+      return lines.join("\n");
     },
   },
 

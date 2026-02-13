@@ -222,8 +222,39 @@ async function extractPDF(fileData: Blob): Promise<string> {
 async function extractDOCX(fileData: Blob): Promise<string> {
   const mammoth = await import("mammoth");
   const buffer = Buffer.from(await fileData.arrayBuffer());
-  const result = await mammoth.extractRawText({ buffer });
-  return result.value;
+
+  // Use convertToHtml to preserve image locations (extractRawText silently discards images)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const options: any = {
+    buffer,
+    convertImage: mammoth.images.imgElement(
+      (image: {
+        contentType: string;
+        read: (encoding: string) => Promise<string>;
+      }) => {
+        return image.read("base64").then((base64: string) => ({
+          src: `data:${image.contentType};base64,${base64.slice(0, 50)}`,
+          alt: `[IMAGE: ${image.contentType}]`,
+        }));
+      },
+    ),
+  };
+  const result = await mammoth.convertToHtml(options);
+
+  // Convert HTML to text, replacing img tags with image markers
+  let text = result.value;
+  text = text.replace(/<img[^>]*alt="(\[IMAGE:[^"]*\])"[^>]*>/g, "\n$1\n");
+  text = text.replace(/<img[^>]*>/g, "\n[IMAGE]\n");
+  text = text
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return text;
 }
 
 async function extractXLSX(fileData: Blob): Promise<string> {

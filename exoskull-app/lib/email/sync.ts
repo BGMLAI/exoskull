@@ -217,6 +217,7 @@ async function syncSingleAccount(account: EmailAccount): Promise<SyncResult> {
           body_html: (email.bodyHtml || "").slice(0, 100_000),
           has_attachments: email.hasAttachments,
           attachment_names: email.attachmentNames,
+          attachment_metadata: email.attachmentMetadata || [],
           direction,
           is_read: email.isRead,
           labels: email.labels || [],

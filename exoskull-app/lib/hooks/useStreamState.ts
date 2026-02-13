@@ -6,6 +6,8 @@ import type {
   AIMessageData,
   FileUploadData,
   ThinkingStep,
+  ThinkingStepData,
+  ToolAction,
 } from "@/lib/stream/types";
 
 // ---------------------------------------------------------------------------
@@ -46,6 +48,7 @@ type StreamAction =
       durationMs?: number;
     }
   | { type: "UPDATE_THINKING_STEPS"; id: string; steps: ThinkingStep[] }
+  | { type: "UPDATE_THINKING_TOOLS"; id: string; toolActions: ToolAction[] }
   | {
       type: "UPDATE_FILE_UPLOAD";
       id: string;
@@ -127,6 +130,22 @@ function streamReducer(state: StreamState, action: StreamAction): StreamState {
         ),
       };
 
+    case "UPDATE_THINKING_TOOLS":
+      return {
+        ...state,
+        events: state.events.map((e) =>
+          e.id === action.id && e.data.type === "thinking_step"
+            ? {
+                ...e,
+                data: {
+                  ...e.data,
+                  toolActions: action.toolActions,
+                } as ThinkingStepData,
+              }
+            : e,
+        ),
+      };
+
     case "UPDATE_FILE_UPLOAD":
       return {
         ...state,
@@ -199,6 +218,12 @@ export function useStreamState() {
     [],
   );
 
+  const updateThinkingTools = useCallback(
+    (id: string, toolActions: ToolAction[]) =>
+      dispatch({ type: "UPDATE_THINKING_TOOLS", id, toolActions }),
+    [],
+  );
+
   const updateFileUpload = useCallback(
     (id: string, status: FileUploadData["status"], chunks?: number) =>
       dispatch({ type: "UPDATE_FILE_UPLOAD", id, status, chunks }),
@@ -232,6 +257,7 @@ export function useStreamState() {
     finalizeAIMessage,
     updateAgentAction,
     updateThinkingSteps,
+    updateThinkingTools,
     updateFileUpload,
     setLoading,
     setConversationId,

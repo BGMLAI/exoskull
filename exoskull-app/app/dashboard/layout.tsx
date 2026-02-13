@@ -16,6 +16,7 @@ export const metadata: Metadata = {
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { CollapsibleSidebar } from "@/components/dashboard/CollapsibleSidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { FloatingCallButton } from "@/components/voice/FloatingCallButton";
 
 // react-grid-layout CSS — loaded in globals.css via @import or inline here
 // Note: exports field doesn't expose CSS, so we'll add styles inline in the client component
@@ -97,6 +98,9 @@ export default async function DashboardLayout({
           ))}
         </nav>
       </div>
+
+      {/* Floating call button — visible on ALL dashboard pages */}
+      <FloatingCallButton tenantId={user.id} />
     </div>
   );
 }

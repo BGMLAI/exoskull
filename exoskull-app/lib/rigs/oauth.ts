@@ -111,7 +111,7 @@ const GOOGLE_MINIMAL_SCOPES = [
   "https://www.googleapis.com/auth/userinfo.profile",
 ];
 
-// Core Google Scopes (Gmail + Calendar - primary use case)
+// Core Google Scopes (Gmail + Calendar + Fit — primary use case)
 const GOOGLE_CORE_SCOPES = [
   ...GOOGLE_MINIMAL_SCOPES,
 
@@ -122,6 +122,13 @@ const GOOGLE_CORE_SCOPES = [
   // Calendar
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/calendar.events",
+
+  // Google Fit (read-only — needed for health data sync)
+  "https://www.googleapis.com/auth/fitness.activity.read",
+  "https://www.googleapis.com/auth/fitness.sleep.read",
+  "https://www.googleapis.com/auth/fitness.heart_rate.read",
+  "https://www.googleapis.com/auth/fitness.body.read",
+  "https://www.googleapis.com/auth/fitness.location.read",
 ];
 
 // Full Google Scopes (enable after OAuth confirmed working + APIs enabled in GCP)
