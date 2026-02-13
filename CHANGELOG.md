@@ -4,6 +4,79 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-13] Workstream A+B: Fix Integrations + Unified Thread Improvements
+
+### What was done
+
+**Workstream A — Fix Integrations:**
+- **A1: Google Fit OAuth** — Added Fit scopes to core `google` rig config, added retry logic with exponential backoff + rate limiting in `google-fit/client.ts`
+- **A2: Email Search** — Added `body_text` to search_emails OR filter, new `get_full_email` IORS tool for full email body retrieval, analyzer retry logic (3 attempts before marking failed), Gmail cursor fix (epoch-based `after:`)
+- **A3: Full Email View** — New `/api/emails/[id]` endpoint, new `/api/emails/[id]/attachments/[filename]` for Gmail attachment download, `AttachmentMeta` type + `extractAttachmentMetadata()` in gmail provider, migration for `attachment_metadata` JSONB column
+- **A4: DOCX Images** — Replaced `mammoth.extractRawText()` with `convertToHtml()` + image handler, images marked as `[IMAGE: type]` in extracted text for knowledge pipeline
+
+**Workstream B — Unified Thread:**
+- **B1: ThinkingProcess** — Rewrote ThinkingIndicator as rich process view, tool events folded into thinking events (not separate agent_action), shows durations + success/failure + result summaries, auto-collapse 5s
+- **B2: Media Previews** — Syntax-highlighted code blocks (Prism + oneDark), copy button, inline image rendering for image URLs, external link icons
+- **B3: Auto-Stop Dictation** — 5s silence → auto-send, 2min max recording limit, countdown display
+- **B4: Color Notifications** — 6 category colors (task=blue, insight=purple, alert=red, health=green, email=amber, system=gray), Sonner toast integration for background events
+- **B5: Floating Call Button** — `FloatingCallButton.tsx` in dashboard layout, visible on ALL pages, toggles VoiceInterface overlay
+
+### Files changed
+- 23 files: 4 new, 19 modified (see commit cc020eb)
+- Migration: `20260225000001_email_attachment_metadata.sql`
+- New deps: `react-syntax-highlighter`, `@types/react-syntax-highlighter`
+
+### How to verify
+1. Google Fit: Reconnect google rig → sync → check health metrics
+2. Email: Chat "znajdz email o [word-only-in-body]" → should find on first attempt
+3. Full email: Chat "pokaz caly email" → AI uses get_full_email tool
+4. DOCX: Upload .docx with images → check [IMAGE: ...] in chunks
+5. Thinking: Send chat message → see collapsible thinking process with tool details
+6. Code blocks: AI response with code → syntax highlighted + copy button
+7. Dictation: Hold mic → speak → stop → 5s silence → auto-sends
+8. Notifications: System event → color-coded toast appears
+9. Floating button: Navigate to any dashboard page → phone icon visible bottom-right
+
+### Notes for future agents
+- `mammoth.convertToHtml` options typed as `any` due to TypeScript type limitation (convertImage not in Input type)
+- `oneDark` style cast to `Record<string, React.CSSProperties>` for SyntaxHighlighter
+- Pre-existing `kimi-code.ts` TypeScript error (not from this workstream)
+- Files from other agent teams (lib/agents/, lib/autonomy/, etc.) left unstaged intentionally
+
+---
+
+## [2026-02-13] Cleanup: Remove Dead Code (ThinkingProcess, useThinkingState)
+
+### What was done
+
+- Deleted `components/stream/ThinkingProcess.tsx` — unused prototype, replaced by `ThinkingIndicator.tsx`
+- Deleted `lib/hooks/useThinkingState.ts` — unused prototype, replaced by `useStreamState.ts`
+- Both files were untracked (never committed), zero imports across codebase
+
+### Why
+
+- Leftover prototypes from stream system build, cluttering the working tree
+
+---
+
+## [2026-02-13] Phase 3b Deploy: Dual-Write/Read Live on Production
+
+### What was done
+
+- Pushed 2 commits to GitHub main: `8de2140` (22 files wiring) + `9cfa106` (changelog)
+- Deployed to Vercel production: <https://exoskull.xyz> (build OK, 2min)
+- All dual-write/read infrastructure is now live
+- Feature flags default to `false` — no data flows to Tyrolka yet until manually enabled
+
+### Next steps
+
+1. Enable `quest_system_dual_write: true` → new tasks go to both systems
+2. Run migration: `npm run migrate-tyrolka -- --dry-run` → verify → `--execute`
+3. Enable `quest_system_dual_read: true` → reads from Tyrolka first
+4. Enable `quest_system_enabled: true` → native Tyrolka IORS tools active
+
+---
+
 ## [2026-02-13] Phase 3b: Wire Dual-Write/Read to All Critical Paths
 
 ### What was done
