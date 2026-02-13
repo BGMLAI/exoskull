@@ -97,8 +97,8 @@ export function ConversationPanel({
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(clean);
       utterance.lang = "pl-PL";
-      utterance.rate = 1.05;
-      utterance.pitch = 1.0;
+      utterance.rate = 1.25;
+      utterance.pitch = 0.95;
       if (polishVoiceRef.current) {
         utterance.voice = polishVoiceRef.current;
       }

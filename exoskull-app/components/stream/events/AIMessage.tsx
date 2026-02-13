@@ -46,7 +46,7 @@ export function AIMessage({ event }: AIMessageProps) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(clean);
     utterance.lang = "pl-PL";
-    utterance.rate = 1.05;
+    utterance.rate = 1.25;
     if (polishVoiceRef.current) utterance.voice = polishVoiceRef.current;
     window.speechSynthesis.speak(utterance);
   }, []);
