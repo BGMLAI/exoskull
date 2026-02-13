@@ -8,6 +8,7 @@
 
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { logger } from "@/lib/logger";
+import { getTasks } from "@/lib/tasks/task-service";
 
 export interface CrossDomainInsight {
   domains: [string, string];
@@ -46,13 +47,13 @@ export async function analyzeCrossDomain(
         .eq("tenant_id", tenantId)
         .gte("date", fourteenDaysAgo.slice(0, 10))
         .order("date", { ascending: true }),
-      // Tasks completed per day
-      supabase
-        .from("exo_tasks")
-        .select("completed_at")
-        .eq("tenant_id", tenantId)
-        .eq("status", "completed")
-        .gte("completed_at", fourteenDaysAgo),
+      // Tasks completed per day — via task-service
+      getTasks(tenantId, { status: "done" }, supabase).then((tasks) => ({
+        data: tasks
+          .filter((t) => t.completed_at && t.completed_at >= fourteenDaysAgo)
+          .map((t) => ({ completed_at: t.completed_at })),
+        error: null,
+      })),
       // Messages per day (engagement proxy)
       supabase
         .from("exo_unified_messages")

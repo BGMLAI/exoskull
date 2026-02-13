@@ -7,6 +7,11 @@
 
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { logger } from "@/lib/logger";
+import {
+  getTasks,
+  getTaskStats,
+  getOverdueTasks,
+} from "@/lib/tasks/task-service";
 
 export interface CoachingSignals {
   // Tasks
@@ -76,28 +81,25 @@ export async function collectCoachingSignals(
     loopConfigResult,
     usageResult,
   ] = await Promise.allSettled([
-    // 1. Overdue tasks
-    supabase
-      .from("exo_tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending")
-      .lt("due_date", now.toISOString()),
+    // 1. Overdue tasks — via task-service
+    getOverdueTasks(tenantId, undefined, supabase).then((tasks) => ({
+      count: tasks.length,
+      error: null,
+    })),
 
-    // 2. Stalled tasks (pending > 3 days)
-    supabase
-      .from("exo_tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending")
-      .lt("created_at", threeDaysAgo.toISOString()),
+    // 2. Stalled tasks (pending > 3 days) — via task-service
+    getTasks(tenantId, { status: "pending" }, supabase).then((tasks) => ({
+      count: tasks.filter(
+        (t) => t.created_at && t.created_at < threeDaysAgo.toISOString(),
+      ).length,
+      error: null,
+    })),
 
-    // 3. Total pending
-    supabase
-      .from("exo_tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending"),
+    // 3. Total pending — via task-service
+    getTaskStats(tenantId, supabase).then((stats) => ({
+      count: stats.pending,
+      error: null,
+    })),
 
     // 4. Goals with status
     supabase

@@ -11,6 +11,7 @@
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { logAdminError } from "@/lib/admin/logger";
 import { classifyEvent, isUrgent } from "./loop-classifier";
+import { getOverdueTasks } from "@/lib/tasks/task-service";
 import type {
   PetlaEvent,
   PetlaWorkItem,
@@ -261,38 +262,34 @@ export async function quickStateCheck(tenantId: string): Promise<{
   const supabase = getServiceSupabase();
 
   // Run checks in parallel
-  const [interventions, tasks, insights, lastMsg] = await Promise.all([
-    supabase
-      .from("exo_interventions")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "proposed"),
+  const [interventions, overdueTasksList, insights, lastMsg] =
+    await Promise.all([
+      supabase
+        .from("exo_interventions")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("status", "proposed"),
 
-    supabase
-      .from("exo_tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "active")
-      .lte("due_date", new Date().toISOString()),
+      getOverdueTasks(tenantId, undefined, supabase),
 
-    supabase
-      .from("exo_insight_deliveries")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .is("delivered_at", null),
+      supabase
+        .from("exo_insight_deliveries")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .is("delivered_at", null),
 
-    supabase
-      .from("exo_unified_messages")
-      .select("created_at")
-      .eq("tenant_id", tenantId)
-      .eq("direction", "inbound")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
+      supabase
+        .from("exo_unified_messages")
+        .select("created_at")
+        .eq("tenant_id", tenantId)
+        .eq("direction", "inbound")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
   const pendingInterventions = interventions.count || 0;
-  const overdueTasks = tasks.count || 0;
+  const overdueTasks = overdueTasksList.length;
   const undeliveredInsights = insights.count || 0;
 
   const lastContactTime = lastMsg.data?.created_at

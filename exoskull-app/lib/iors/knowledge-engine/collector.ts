@@ -16,6 +16,11 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { logger } from "@/lib/logger";
 import { createHash } from "crypto";
 import type { TenantKnowledgeSnapshot, TrendDirection } from "./types";
+import {
+  getTasks,
+  getTaskStats,
+  getOverdueTasks,
+} from "@/lib/tasks/task-service";
 
 const WINDOW_DAYS = 30;
 
@@ -137,36 +142,36 @@ export async function collectKnowledgeSnapshot(
       .is("delivered_at", null)
       .gt("expires_at", now.toISOString()),
 
-    // R3. Tasks completed (30d)
-    supabase
-      .from("exo_tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "done")
-      .gte("completed_at", windowStart),
+    // R3. Tasks completed (30d) — via task-service
+    getTasks(tenantId, { status: "done" }, supabase).then((tasks) => ({
+      data: null,
+      error: null,
+      count: tasks.filter(
+        (t) => t.completed_at && t.completed_at >= windowStart,
+      ).length,
+    })),
 
-    // R4. Tasks pending
-    supabase
-      .from("exo_tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending"),
+    // R4. Tasks pending — via task-service
+    getTaskStats(tenantId, supabase).then((stats) => ({
+      data: null,
+      error: null,
+      count: stats.pending,
+    })),
 
-    // R5. Tasks overdue
-    supabase
-      .from("exo_tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending")
-      .lt("due_date", now.toISOString()),
+    // R5. Tasks overdue — via task-service
+    getOverdueTasks(tenantId, undefined, supabase).then((tasks) => ({
+      data: null,
+      error: null,
+      count: tasks.length,
+    })),
 
-    // R6. Tasks stalled (pending > 3d)
-    supabase
-      .from("exo_tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending")
-      .lt("created_at", threeDaysAgo),
+    // R6. Tasks stalled (pending > 3d) — via task-service
+    getTasks(tenantId, { status: "pending" }, supabase).then((tasks) => ({
+      data: null,
+      error: null,
+      count: tasks.filter((t) => t.created_at && t.created_at < threeDaysAgo)
+        .length,
+    })),
 
     // R7. Goal statuses
     supabase

@@ -8,6 +8,7 @@
 import { createServiceClient } from "@/lib/supabase/service-client";
 import { aiChat } from "@/lib/ai";
 import { createGoal as createGoalService } from "@/lib/goals/goal-service";
+import { getGoal as getGoalById } from "@/lib/goals/goal-service";
 import { dualReadGoal, dualReadGoals } from "@/lib/tasks/dual-read";
 import type {
   UserGoal,
@@ -68,18 +69,14 @@ export async function defineGoal(
     throw new Error(`Failed to create goal: ${result.error || "unknown"}`);
   }
 
-  // Reload the full goal object for return
-  const { data } = await supabase
-    .from("exo_user_goals")
-    .select("*")
-    .eq("id", result.id)
-    .single();
-
-  if (!data) {
+  // Reload the full goal object for return (via goal-service: dual-read Tyrolka first, legacy fallback)
+  const reloaded = await getGoalById(result.id, tenantId, supabase);
+  if (!reloaded) {
     throw new Error(`Goal created but could not reload: ${result.id}`);
   }
 
-  return data as UserGoal;
+  // Cast to UserGoal — goal-service returns Goal which covers base fields
+  return reloaded as unknown as UserGoal;
 }
 
 /**
@@ -157,7 +154,8 @@ export async function logProgress(
     throw new Error(`Goal not found: ${goalId}`);
   }
 
-  // Also load full legacy record for checkpoint calculation (has extra fields)
+  // TODO Phase 4: migrate to goal-service when Goal interface enriched with target_value, baseline_value, direction, frequency
+  // Needs full UserGoal fields (target_value, baseline_value, direction, frequency) not available in Goal interface
   const { data: goal } = await supabase
     .from("exo_user_goals")
     .select("*")
@@ -178,6 +176,7 @@ export async function logProgress(
 
   const today = new Date().toISOString().split("T")[0];
 
+  // TODO Phase 4: migrate when checkpoint service exists
   const { data, error } = await supabase
     .from("exo_goal_checkpoints")
     .upsert(
@@ -402,7 +401,8 @@ export async function getGoalStatus(tenantId: string): Promise<GoalStatus[]> {
     const dualG = await dualReadGoal(row.goal_id as string, tenantId);
     if (!dualG) continue;
 
-    // Also load legacy record for full UserGoal fields
+    // TODO Phase 4: migrate to goal-service when Goal interface enriched with target_value, baseline_value, direction, frequency
+    // Needs full UserGoal fields for forecastCompletion + trajectory calculation
     const { data: goal } = await supabase
       .from("exo_user_goals")
       .select("*")

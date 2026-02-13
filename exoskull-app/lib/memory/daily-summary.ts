@@ -14,6 +14,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { getModelRouter } from "../ai/model-router";
 import { getUserHighlights } from "./highlights";
+import { getTasks } from "@/lib/tasks/task-service";
+import type { Task } from "@/lib/tasks/task-service";
 
 import { logger } from "@/lib/logger";
 // Types
@@ -110,26 +112,25 @@ async function getTodayTasks(tenantId: string): Promise<{
 }> {
   const supabase = getAdminClient();
   const today = new Date().toISOString().split("T")[0];
+  const todayStart = `${today}T00:00:00`;
+
+  // Fetch all tasks via task-service (dual-read: Tyrolka first, legacy fallback)
+  const allTasks = await getTasks(tenantId, undefined, supabase);
 
   // Tasks created today
-  const { data: created } = await supabase
-    .from("exo_tasks")
-    .select("title, status")
-    .eq("tenant_id", tenantId)
-    .gte("created_at", `${today}T00:00:00`);
+  const createdToday = allTasks.filter(
+    (t) => t.created_at && t.created_at >= todayStart,
+  );
 
-  // Tasks completed today
-  const { data: completed } = await supabase
-    .from("exo_tasks")
-    .select("title, status")
-    .eq("tenant_id", tenantId)
-    .eq("status", "completed")
-    .gte("updated_at", `${today}T00:00:00`);
+  // Tasks completed today (status "done" — service handles mapping)
+  const completedToday = allTasks.filter(
+    (t) => t.status === "done" && t.updated_at && t.updated_at >= todayStart,
+  );
 
   return {
-    created: created?.length || 0,
-    completed: completed?.length || 0,
-    tasks: created || [],
+    created: createdToday.length,
+    completed: completedToday.length,
+    tasks: createdToday.map((t) => ({ title: t.title, status: t.status })),
   };
 }
 

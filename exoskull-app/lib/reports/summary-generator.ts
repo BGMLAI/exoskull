@@ -14,6 +14,8 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { ModelRouter } from "@/lib/ai/model-router";
 import { getUserHighlights } from "@/lib/memory/highlights";
+import { getTasks } from "@/lib/tasks/task-service";
+import type { Task } from "@/lib/tasks/task-service";
 
 // ============================================================================
 // TYPES
@@ -148,45 +150,47 @@ async function getMessageStats(
   return { total: rows.length, inbound, outbound, byChannel };
 }
 
-async function getTaskStats(
+async function getTaskStatsForPeriod(
   supabase: SupabaseClient,
   tenantId: string,
   since: Date,
   until: Date,
 ): Promise<TaskStats> {
-  // Tasks created in the period
-  const { data: created, error: createdErr } = await supabase
-    .from("exo_tasks")
-    .select("id, status, due_date, completed_at")
-    .eq("tenant_id", tenantId)
-    .gte("created_at", since.toISOString())
-    .lte("created_at", until.toISOString());
+  try {
+    // Fetch all tasks via task-service (dual-read: Tyrolka first, legacy fallback)
+    const allTasks = await getTasks(tenantId, undefined, supabase);
 
-  if (createdErr) {
+    const sinceISO = since.toISOString();
+    const untilISO = until.toISOString();
+    const now = new Date();
+
+    // Filter to tasks created in the period
+    const rows = allTasks.filter(
+      (t) =>
+        t.created_at && t.created_at >= sinceISO && t.created_at <= untilISO,
+    );
+
+    return {
+      created: rows.length,
+      completed: rows.filter((t) => t.status === "done").length,
+      inProgress: rows.filter(
+        (t) => t.status === "in_progress" || t.status === "pending",
+      ).length,
+      overdue: rows.filter(
+        (t) =>
+          t.status !== "done" &&
+          t.status !== "cancelled" &&
+          t.due_date &&
+          new Date(t.due_date) < now,
+      ).length,
+    };
+  } catch (error) {
     console.error("[SummaryGenerator] Tasks query failed:", {
       tenantId,
-      error: createdErr.message,
+      error: error instanceof Error ? error.message : String(error),
     });
     return { created: 0, completed: 0, inProgress: 0, overdue: 0 };
   }
-
-  const rows = created || [];
-  const now = new Date();
-
-  return {
-    created: rows.length,
-    completed: rows.filter((t) => t.status === "done").length,
-    inProgress: rows.filter(
-      (t) => t.status === "in_progress" || t.status === "pending",
-    ).length,
-    overdue: rows.filter(
-      (t) =>
-        t.status !== "done" &&
-        t.status !== "cancelled" &&
-        t.due_date &&
-        new Date(t.due_date) < now,
-    ).length,
-  };
 }
 
 // ============================================================================
@@ -423,7 +427,7 @@ export async function generateWeeklySummary(tenantId: string): Promise<string> {
   const [conversations, messages, tasks, highlightRows] = await Promise.all([
     getConversationStats(supabase, tenantId, since, now),
     getMessageStats(supabase, tenantId, since, now),
-    getTaskStats(supabase, tenantId, since, now),
+    getTaskStatsForPeriod(supabase, tenantId, since, now),
     getUserHighlights(supabase, tenantId, 5),
   ]);
 
@@ -503,7 +507,7 @@ export async function generateMonthlySummary(
   const [conversations, messages, tasks, highlightRows] = await Promise.all([
     getConversationStats(supabase, tenantId, since, now),
     getMessageStats(supabase, tenantId, since, now),
-    getTaskStats(supabase, tenantId, since, now),
+    getTaskStatsForPeriod(supabase, tenantId, since, now),
     getUserHighlights(supabase, tenantId, 10),
   ]);
 

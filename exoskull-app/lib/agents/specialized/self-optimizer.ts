@@ -16,6 +16,8 @@ import {
 } from "../types";
 import { BaseAgent } from "../core/base-agent";
 import { logger } from "@/lib/logger";
+import { getTasks } from "@/lib/tasks/task-service";
+import type { Task } from "@/lib/tasks/task-service";
 import {
   OptimizationTarget,
   OptimizationResult,
@@ -407,18 +409,20 @@ export class SelfOptimizerAgent extends BaseAgent {
     }
 
     // Analyze task completion patterns
-    const { data: tasks } = await this.supabase
-      .from("exo_tasks")
-      .select("created_at, completed_at, priority")
-      .eq("tenant_id", tenantId)
-      .not("completed_at", "is", null)
-      .gte("created_at", cutoff.toISOString());
+    const allDoneTasks = await getTasks(
+      tenantId,
+      { status: "done" },
+      this.supabase,
+    );
+    const tasks = allDoneTasks.filter(
+      (t: Task) => t.completed_at !== null && new Date(t.created_at) >= cutoff,
+    );
 
     if (tasks && tasks.length > 5) {
       // Calculate average completion time
-      const completionTimes = tasks.map((t) => {
+      const completionTimes = tasks.map((t: Task) => {
         const created = new Date(t.created_at).getTime();
-        const completed = new Date(t.completed_at).getTime();
+        const completed = new Date(t.completed_at!).getTime();
         return (completed - created) / (1000 * 60 * 60); // hours
       });
 

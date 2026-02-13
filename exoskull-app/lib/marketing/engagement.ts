@@ -3,6 +3,7 @@
 // ============================================================================
 
 import { createClient } from "@supabase/supabase-js";
+import { getTasks } from "@/lib/tasks/task-service";
 
 function getServiceClient() {
   return createClient(
@@ -55,12 +56,12 @@ export async function calculateEngagementScore(
         .eq("tenant_id", tenantId)
         .gte("created_at", sevenDaysAgo),
 
-      // Tasks created/completed in last 7 days
-      supabase
-        .from("exo_tasks")
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .gte("created_at", sevenDaysAgo),
+      // Tasks created/completed in last 7 days (via task-service: dual-read Tyrolka first, legacy fallback)
+      getTasks(tenantId, undefined, supabase).then((allTasks) => ({
+        count: allTasks.filter(
+          (t) => t.created_at && t.created_at >= sevenDaysAgo,
+        ).length,
+      })),
 
       // Health logs in last 7 days
       supabase
@@ -200,9 +201,7 @@ export async function calculateAllEngagementScores(): Promise<{
 /**
  * Get users with high churn risk.
  */
-export async function getChurnRiskUsers(
-  threshold: number = 0.5,
-): Promise<
+export async function getChurnRiskUsers(threshold: number = 0.5): Promise<
   Array<{
     tenant_id: string;
     churn_risk: number;

@@ -6,6 +6,8 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { MonitorData } from "./types";
 import { collectSystemMetrics } from "../optimization/system-metrics";
 import { logger } from "@/lib/logger";
+import { getTasks, getOverdueTasks } from "@/lib/tasks/task-service";
+import type { Task } from "@/lib/tasks/task-service";
 
 /**
  * Collect monitor data for a tenant (M phase of MAPE-K).
@@ -18,12 +20,15 @@ export async function collectMonitorData(
   const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  // Run all queries in parallel
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  // Run all queries in parallel — task queries via task-service, rest via supabase
   const [
     conversationsResult,
-    tasksCreatedResult,
-    tasksDueResult,
-    tasksOverdueResult,
+    allTasks,
+    overdueTasks,
     sleepResult,
     activityResult,
     lastInteractionResult,
@@ -31,7 +36,6 @@ export async function collectMonitorData(
     alertsResult,
     patternsResult,
     moodResult,
-    upcomingTasksResult,
   ] = await Promise.all([
     // Conversations last 24h
     supabase
@@ -40,29 +44,11 @@ export async function collectMonitorData(
       .eq("tenant_id", tenantId)
       .gte("created_at", dayAgo.toISOString()),
 
-    // Tasks created last 24h
-    supabase
-      .from("exo_tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .gte("created_at", dayAgo.toISOString()),
+    // All tasks (service handles dual-read) — filter client-side for counts
+    getTasks(tenantId, undefined, supabase),
 
-    // Tasks due today
-    supabase
-      .from("exo_tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending")
-      .lte("due_date", now.toISOString())
-      .gte("due_date", new Date(now.setHours(0, 0, 0, 0)).toISOString()),
-
-    // Overdue tasks
-    supabase
-      .from("exo_tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending")
-      .lt("due_date", new Date(now.setHours(0, 0, 0, 0)).toISOString()),
+    // Overdue tasks via service
+    getOverdueTasks(tenantId, undefined, supabase),
 
     // Sleep data last 7 days
     supabase
@@ -121,19 +107,26 @@ export async function collectMonitorData(
       .order("logged_at", { ascending: false })
       .limit(1)
       .single(),
-
-    // Tasks due in next 24h (proxy for calendar events)
-    supabase
-      .from("exo_tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending")
-      .gte("due_date", now.toISOString())
-      .lte(
-        "due_date",
-        new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
-      ),
   ]);
+
+  // Derive task counts from service results (client-side filtering)
+  const tasksCreatedCount = allTasks.filter(
+    (t: Task) => new Date(t.created_at) >= dayAgo,
+  ).length;
+
+  const tasksDueCount = allTasks.filter((t: Task) => {
+    if (t.status !== "pending" || !t.due_date) return false;
+    const d = new Date(t.due_date);
+    return d >= todayStart && d <= now;
+  }).length;
+
+  const tasksOverdueCount = overdueTasks.length;
+
+  const upcomingTasksCount = allTasks.filter((t: Task) => {
+    if (t.status !== "pending" || !t.due_date) return false;
+    const d = new Date(t.due_date);
+    return d >= now && d <= tomorrow;
+  }).length;
 
   // Process sleep data into hours array
   const sleepHoursLast7d: number[] = [];
@@ -178,9 +171,9 @@ export async function collectMonitorData(
 
   return {
     conversationsLast24h: conversationsResult.count || 0,
-    tasksCreated: tasksCreatedResult.count || 0,
-    tasksDue: tasksDueResult.count || 0,
-    tasksOverdue: tasksOverdueResult.count || 0,
+    tasksCreated: tasksCreatedCount,
+    tasksDue: tasksDueCount,
+    tasksOverdue: tasksOverdueCount,
     sleepHoursLast7d,
     activityMinutesLast7d,
     hrvTrend,
@@ -191,8 +184,8 @@ export async function collectMonitorData(
       moodResult.data?.emotions?.[0] ||
       (moodResult.data?.mood_value ? `${moodResult.data.mood_value}/10` : null),
     energyLevel: moodResult.data?.energy_level || null,
-    upcomingEvents24h: upcomingTasksResult.count || 0,
-    freeTimeBlocks: Math.max(0, 8 - (upcomingTasksResult.count || 0)),
+    upcomingEvents24h: upcomingTasksCount,
+    freeTimeBlocks: Math.max(0, 8 - upcomingTasksCount),
     connectedRigs: rigsResult.data?.map((r) => r.rig_slug) || [],
     lastSyncTimes,
     systemMetrics,

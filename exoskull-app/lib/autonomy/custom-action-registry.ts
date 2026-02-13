@@ -4,6 +4,7 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
+import { getTasks, updateTask } from "@/lib/tasks/task-service";
 
 export type CustomActionHandler = (
   tenantId: string,
@@ -190,23 +191,44 @@ export function buildCustomActionRegistry(
         const cutoffDays = olderThanDays || 7;
         const cutoffDate = new Date(
           Date.now() - cutoffDays * 24 * 60 * 60 * 1000,
-        ).toISOString();
+        );
 
-        const { data, error } = await supabase
-          .from("exo_tasks")
-          .update({
-            status: "archived",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("tenant_id", tenantId)
-          .eq("status", "completed")
-          .lt("completed_at", cutoffDate)
-          .select("id");
-        if (error) return { success: false, error: error.message };
-        return {
-          success: true,
-          data: { archivedCount: data?.length || 0, cutoffDays },
-        };
+        try {
+          const doneTasks = await getTasks(
+            tenantId,
+            { status: "done" },
+            supabase,
+          );
+
+          const toArchive = doneTasks.filter(
+            (t) => t.completed_at && new Date(t.completed_at) < cutoffDate,
+          );
+
+          let archivedCount = 0;
+          for (const task of toArchive) {
+            const result = await updateTask(
+              task.id,
+              tenantId,
+              { status: "archived" as never },
+              supabase,
+            );
+            if (result.success) archivedCount++;
+          }
+
+          return {
+            success: true,
+            data: { archivedCount, cutoffDays },
+          };
+        } catch (error) {
+          console.error("[CustomAction] archive_completed_tasks failed:", {
+            error: error instanceof Error ? error.message : String(error),
+            tenantId,
+          });
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : "Archive failed",
+          };
+        }
       },
     },
   };

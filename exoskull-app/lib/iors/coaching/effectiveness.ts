@@ -8,6 +8,7 @@
 
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { logger } from "@/lib/logger";
+import { getTasks } from "@/lib/tasks/task-service";
 
 export interface CoachingEffectivenessResult {
   /** Total coaching interventions in period */
@@ -67,13 +68,13 @@ export async function measureEffectiveness(
         .eq("tenant_id", tenantId)
         .in("feedback_type", ["response_quality", "personality"])
         .gte("created_at", thirtyDaysAgo),
-      // Tasks completed (proxy for action)
-      supabase
-        .from("exo_tasks")
-        .select("completed_at")
-        .eq("tenant_id", tenantId)
-        .eq("status", "completed")
-        .gte("completed_at", thirtyDaysAgo),
+      // Tasks completed (proxy for action) — via task-service
+      getTasks(tenantId, { status: "done" }, supabase).then((tasks) => ({
+        data: tasks
+          .filter((t) => t.completed_at && t.completed_at >= thirtyDaysAgo)
+          .map((t) => ({ completed_at: t.completed_at })),
+        error: null,
+      })),
       // User messages within 2h of coaching (acknowledgement proxy)
       supabase
         .from("exo_unified_messages")

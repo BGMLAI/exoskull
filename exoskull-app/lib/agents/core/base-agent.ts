@@ -18,6 +18,12 @@ import {
   ExecutionResult,
   AgentExecutionLog,
 } from "../types";
+import {
+  getTasks,
+  getTaskStats as getTaskStatsService,
+  getOverdueTasks,
+} from "@/lib/tasks/task-service";
+import type { Task } from "@/lib/tasks/task-service";
 
 // ============================================================================
 // ABSTRACT BASE AGENT
@@ -253,12 +259,8 @@ export abstract class BaseAgent implements IAgent {
   }
 
   private async countTasks(tenantId: string): Promise<number> {
-    const { count } = await this.supabase
-      .from("exo_tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending");
-    return count || 0;
+    const stats = await getTaskStatsService(tenantId, this.supabase);
+    return stats.pending;
   }
 
   private async countMits(tenantId: string): Promise<number> {
@@ -296,32 +298,18 @@ export abstract class BaseAgent implements IAgent {
   private async getTaskStats(
     tenantId: string,
   ): Promise<{ pending: number; urgent: number; overdue: number }> {
-    const now = new Date().toISOString();
-
-    const [pending, urgent, overdue] = await Promise.all([
-      this.supabase
-        .from("exo_tasks")
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .eq("status", "pending"),
-      this.supabase
-        .from("exo_tasks")
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .eq("status", "pending")
-        .eq("priority", "high"),
-      this.supabase
-        .from("exo_tasks")
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .eq("status", "pending")
-        .lt("due_date", now),
+    const [pendingTasks, overdueTasks] = await Promise.all([
+      getTasks(tenantId, { status: "pending" }, this.supabase),
+      getOverdueTasks(tenantId, undefined, this.supabase),
     ]);
 
+    // priority >= 7 = high/urgent in Tyrolka scale (1-10)
+    const urgent = pendingTasks.filter((t: Task) => t.priority >= 7).length;
+
     return {
-      pending: pending.count || 0,
-      urgent: urgent.count || 0,
-      overdue: overdue.count || 0,
+      pending: pendingTasks.length,
+      urgent,
+      overdue: overdueTasks.length,
     };
   }
 
@@ -375,15 +363,17 @@ export abstract class BaseAgent implements IAgent {
     const now = new Date();
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    const { count } = await this.supabase
-      .from("exo_tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending")
-      .gte("due_date", now.toISOString())
-      .lte("due_date", tomorrow.toISOString());
-
-    return count || 0;
+    const pendingTasks = await getTasks(
+      tenantId,
+      { status: "pending" },
+      this.supabase,
+    );
+    return pendingTasks.filter(
+      (t: Task) =>
+        t.due_date &&
+        new Date(t.due_date) >= now &&
+        new Date(t.due_date) <= tomorrow,
+    ).length;
   }
 
   private async getLastProcessingTime(

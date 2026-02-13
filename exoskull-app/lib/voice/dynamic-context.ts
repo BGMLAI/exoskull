@@ -9,6 +9,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { getThreadSummary } from "../unified-thread";
 import { getPendingSuggestions } from "../skills/detector";
 import { listConnections } from "@/lib/integrations/composio-adapter";
+import { getTaskStats } from "@/lib/tasks/task-service";
 
 import { logger } from "@/lib/logger";
 /** Per-provider configuration stored in iors_ai_config.providers */
@@ -98,12 +99,8 @@ export async function buildDynamicContext(
       )
       .eq("id", tenantId)
       .single(),
-    // 2. Pending tasks count
-    supabase
-      .from("exo_tasks")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending"),
+    // 2. Pending tasks count (via task-service: dual-read Tyrolka first, legacy fallback)
+    getTaskStats(tenantId, supabase).then((s) => ({ count: s.pending })),
     // 3. Installed mods
     supabase
       .from("exo_tenant_mods")
@@ -399,11 +396,8 @@ export async function buildVoiceContext(
         )
         .eq("id", tenantId)
         .single(),
-      supabase
-        .from("exo_tasks")
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .eq("status", "pending"),
+      // Pending tasks count (via task-service: dual-read Tyrolka first, legacy fallback)
+      getTaskStats(tenantId, supabase).then((s) => ({ count: s.pending })),
       getThreadSummary(tenantId),
     ]);
 

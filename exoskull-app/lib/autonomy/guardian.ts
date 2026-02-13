@@ -21,6 +21,7 @@ import type {
 import type { PlannedIntervention } from "./types";
 
 import { logger } from "@/lib/logger";
+import { getTasks } from "@/lib/tasks/task-service";
 let _instance: AlignmentGuardian | null = null;
 
 export function getAlignmentGuardian(): AlignmentGuardian {
@@ -639,18 +640,13 @@ export class AlignmentGuardian {
     ).toISOString();
 
     // Parallel data collection
-    const [conversations, tasks, interventions] = await Promise.all([
+    const [conversations, doneTasks, interventions] = await Promise.all([
       this.supabase
         .from("exo_conversations")
         .select("*", { count: "exact", head: true })
         .eq("tenant_id", tenantId)
         .gte("created_at", yesterday),
-      this.supabase
-        .from("exo_tasks")
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .eq("status", "done")
-        .gte("completed_at", yesterday),
+      getTasks(tenantId, { status: "done" }, this.supabase),
       this.supabase
         .from("exo_interventions")
         .select("*", { count: "exact", head: true })
@@ -658,9 +654,13 @@ export class AlignmentGuardian {
         .gte("created_at", now.toISOString().split("T")[0] + "T00:00:00Z"),
     ]);
 
+    const tasksCompleted24h = doneTasks.filter(
+      (t) => t.completed_at && new Date(t.completed_at) >= new Date(yesterday),
+    ).length;
+
     return {
       conversations_24h: conversations.count || 0,
-      tasks_completed_24h: tasks.count || 0,
+      tasks_completed_24h: tasksCompleted24h,
       interventions_today: interventions.count || 0,
       timestamp: now.getTime(),
     };

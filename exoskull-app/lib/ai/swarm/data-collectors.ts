@@ -6,6 +6,12 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
+import {
+  getTasks,
+  getTaskStats,
+  getOverdueTasks,
+} from "@/lib/tasks/task-service";
+import { getGoals } from "@/lib/goals/goal-service";
 
 // =====================================================
 // TYPES
@@ -174,32 +180,22 @@ export async function collectTaskData(
   tenantId: string,
   days: number,
 ): Promise<TaskContext> {
-  const since = daysAgo(days);
+  const since = new Date(daysAgo(days)).toISOString();
 
-  const { count: activeCount } = await supabase
-    .from("exo_tasks")
-    .select("*", { count: "exact", head: true })
-    .eq("tenant_id", tenantId)
-    .in("status", ["pending", "in_progress"]);
+  const [stats, doneTasks, overdueTasks] = await Promise.all([
+    getTaskStats(tenantId, supabase),
+    getTasks(tenantId, { status: "done" }, supabase),
+    getOverdueTasks(tenantId, undefined, supabase),
+  ]);
 
-  const { count: completedCount } = await supabase
-    .from("exo_tasks")
-    .select("*", { count: "exact", head: true })
-    .eq("tenant_id", tenantId)
-    .eq("status", "done")
-    .gte("completed_at", new Date(since).toISOString());
-
-  const { count: overdueCount } = await supabase
-    .from("exo_tasks")
-    .select("*", { count: "exact", head: true })
-    .eq("tenant_id", tenantId)
-    .in("status", ["pending", "in_progress"])
-    .lt("due_date", new Date().toISOString());
+  const completedRecently = doneTasks.filter(
+    (t) => t.completed_at && t.completed_at >= since,
+  ).length;
 
   return {
-    totalActive: activeCount || 0,
-    completedRecently: completedCount || 0,
-    overdueCount: overdueCount || 0,
+    totalActive: stats.pending + stats.in_progress,
+    completedRecently,
+    overdueCount: overdueTasks.length,
   };
 }
 
@@ -207,29 +203,25 @@ export async function collectGoalData(
   supabase: SupabaseClient,
   tenantId: string,
 ): Promise<GoalContext> {
-  const { data: goals } = await supabase
-    .from("exo_user_goals")
-    .select("name, category, current_value, target_value, target_date")
-    .eq("tenant_id", tenantId)
-    .eq("is_active", true)
-    .limit(20);
+  const goals = await getGoals(tenantId, { is_active: true }, supabase);
 
-  if (!goals || goals.length === 0) return { goals: [] };
+  if (goals.length === 0) return { goals: [] };
 
+  // TODO Phase 4: migrate when checkpoint service exists
   // Get latest checkpoint for each goal
   const enriched = await Promise.all(
     goals.map(async (goal) => {
       const { data: cp } = await supabase
         .from("exo_goal_checkpoints")
         .select("progress_percent, trajectory")
-        .eq("goal_id", goal.name) // actually need goal id, but we don't have it here
+        .eq("goal_id", goal.id)
         .order("checkpoint_date", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       return {
         name: goal.name,
-        category: goal.category,
+        category: goal.category || "",
         progress_percent: cp?.progress_percent ?? null,
         trajectory: cp?.trajectory ?? null,
         target_date: goal.target_date,

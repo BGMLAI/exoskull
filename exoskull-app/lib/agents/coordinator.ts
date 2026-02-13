@@ -30,6 +30,12 @@ import { HighlightExtractorAgent } from "./specialized/highlight-extractor";
 import { PatternLearnerAgent } from "./specialized/pattern-learner";
 
 import { logger } from "@/lib/logger";
+import {
+  getTasks,
+  getTaskStats,
+  getOverdueTasks,
+} from "@/lib/tasks/task-service";
+import type { Task } from "@/lib/tasks/task-service";
 // ============================================================================
 // COORDINATOR CLASS
 // ============================================================================
@@ -338,12 +344,13 @@ export class MetaCoordinator {
   // ============================================================================
 
   private async analyzeResources(tenantId: string): Promise<ResourceAnalysis> {
-    const [conversations, highlights, tasks, mits] = await Promise.all([
+    const [conversations, highlights, taskStats, mits] = await Promise.all([
       this.count("exo_conversations", tenantId),
       this.count("user_memory_highlights", tenantId, "user_id"),
-      this.count("exo_tasks", tenantId),
+      getTaskStats(tenantId, this.supabase),
       this.count("user_mits", tenantId),
     ]);
+    const tasks = taskStats.total;
 
     const { data: rigs } = await this.supabase
       .from("rig_connections")
@@ -390,17 +397,15 @@ export class MetaCoordinator {
       .limit(1)
       .single();
 
-    const { data: taskStats } = await this.supabase
-      .from("exo_tasks")
-      .select("status, priority, due_date")
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending");
+    const [pendingTasks, overdueTasks] = await Promise.all([
+      getTasks(tenantId, { status: "pending" }, this.supabase),
+      getOverdueTasks(tenantId, undefined, this.supabase),
+    ]);
 
-    const pending = taskStats?.length || 0;
-    const urgent = taskStats?.filter((t) => t.priority === "high").length || 0;
-    const overdue =
-      taskStats?.filter((t) => t.due_date && new Date(t.due_date) < now)
-        .length || 0;
+    const pending = pendingTasks.length;
+    // priority >= 7 = high/urgent in Tyrolka scale (1-10)
+    const urgent = pendingTasks.filter((t: Task) => t.priority >= 7).length;
+    const overdue = overdueTasks.length;
 
     return {
       timeOfDay: this.getTimeOfDay(hour),
