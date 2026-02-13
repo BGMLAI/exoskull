@@ -1,12 +1,9 @@
-import type { Metadata } from "next";
-import { ChatLayout } from "@/components/stream/ChatLayout";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Chat" };
-
+/**
+ * Chat page — redirects to main dashboard.
+ * Chat River is now the primary interface on /dashboard.
+ */
 export default function ChatPage() {
-  return (
-    <div className="h-[calc(100vh-4rem)]">
-      <ChatLayout />
-    </div>
-  );
+  redirect("/dashboard");
 }

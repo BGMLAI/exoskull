@@ -66,18 +66,113 @@ export async function classifyTask(
 }
 
 /**
- * Check health status of all models
+ * Check health status of all models via lightweight API calls.
+ * Uses a fast timeout (5s) - if model doesn't respond, mark as degraded/down.
  */
 export async function checkModelsHealth(): Promise<
   Record<CodeModel, "healthy" | "degraded" | "down">
 > {
-  // TODO: Implement actual health checks via API
-  // For now, return mock data
-  return {
-    "claude-code": "healthy",
-    "kimi-code": "healthy",
-    "gpt-o1-code": "healthy",
+  const results: Record<CodeModel, "healthy" | "degraded" | "down"> = {
+    "claude-code": "down",
+    "kimi-code": "down",
+    "gpt-o1-code": "down",
   };
+
+  const TIMEOUT_MS = 5000;
+
+  // Check Claude (Anthropic)
+  const claudeCheck = async (): Promise<"healthy" | "degraded" | "down"> => {
+    const key = process.env.ANTHROPIC_API_KEY;
+    if (!key) return "down";
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": key,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1,
+          messages: [{ role: "user", content: "ping" }],
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (res.ok) return "healthy";
+      if (res.status === 429) return "degraded"; // Rate limited but alive
+      return "down";
+    } catch {
+      return "down";
+    }
+  };
+
+  // Check Kimi (Moonshot)
+  const kimiCheck = async (): Promise<"healthy" | "degraded" | "down"> => {
+    const key = process.env.KIMI_API_KEY;
+    if (!key) return "down";
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      const res = await fetch("https://api.moonshot.cn/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "kimi-latest",
+          max_tokens: 1,
+          messages: [{ role: "user", content: "ping" }],
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (res.ok) return "healthy";
+      if (res.status === 429) return "degraded";
+      return "down";
+    } catch {
+      return "down";
+    }
+  };
+
+  // Check OpenAI (GPT-o1)
+  const openaiCheck = async (): Promise<"healthy" | "degraded" | "down"> => {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) return "down";
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      const res = await fetch("https://api.openai.com/v1/models", {
+        headers: { Authorization: `Bearer ${key}` },
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (res.ok) return "healthy";
+      if (res.status === 429) return "degraded";
+      return "down";
+    } catch {
+      return "down";
+    }
+  };
+
+  // Run all health checks in parallel
+  const [claude, kimi, openai] = await Promise.allSettled([
+    claudeCheck(),
+    kimiCheck(),
+    openaiCheck(),
+  ]);
+
+  results["claude-code"] =
+    claude.status === "fulfilled" ? claude.value : "down";
+  results["kimi-code"] = kimi.status === "fulfilled" ? kimi.value : "down";
+  results["gpt-o1-code"] =
+    openai.status === "fulfilled" ? openai.value : "down";
+
+  return results;
 }
 
 /**

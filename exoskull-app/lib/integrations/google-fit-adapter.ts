@@ -17,101 +17,43 @@
  */
 
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { ensureFreshToken } from "@/lib/rigs/oauth";
 
 const GOOGLE_FIT_BASE = "https://www.googleapis.com/fitness/v1/users/me";
 
 // ============================================================================
-// TOKEN MANAGEMENT
+// TOKEN MANAGEMENT (unified via exo_rig_connections)
 // ============================================================================
 
-interface GoogleTokens {
-  access_token: string;
-  refresh_token: string;
-  expiry_date: number;
-}
-
-async function getTokensForTenant(
-  tenantId: string,
-): Promise<GoogleTokens | null> {
-  const supabase = getServiceSupabase();
-  const { data } = await supabase
-    .from("exo_integration_tokens")
-    .select("access_token, refresh_token, expiry_date")
-    .eq("tenant_id", tenantId)
-    .eq("provider", "google_fit")
-    .maybeSingle();
-
-  return data as GoogleTokens | null;
-}
-
-async function refreshAccessToken(
-  tenantId: string,
-  refreshToken: string,
-): Promise<string | null> {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    console.error(
-      "[GoogleFit] Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET",
-    );
-    return null;
-  }
-
-  try {
-    const res = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        refresh_token: refreshToken,
-        grant_type: "refresh_token",
-      }),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("[GoogleFit:refreshToken:failed]", {
-        status: res.status,
-        body: errText,
-      });
-      return null;
-    }
-
-    const data = await res.json();
-    const newExpiry = Date.now() + (data.expires_in || 3600) * 1000;
-
-    // Update stored tokens
-    const supabase = getServiceSupabase();
-    await supabase
-      .from("exo_integration_tokens")
-      .update({
-        access_token: data.access_token,
-        expiry_date: newExpiry,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("tenant_id", tenantId)
-      .eq("provider", "google_fit");
-
-    return data.access_token;
-  } catch (err) {
-    console.error("[GoogleFit:refreshToken:error]", err);
-    return null;
-  }
-}
+// Google Fit tokens are stored in exo_rig_connections with rig_slug
+// matching one of: "google", "google-fit", "google-workspace"
+// (all include fitness scopes)
+const GOOGLE_RIG_SLUGS = ["google", "google-fit", "google-workspace"];
 
 async function getValidToken(tenantId: string): Promise<string | null> {
-  const tokens = await getTokensForTenant(tenantId);
-  if (!tokens) return null;
+  const supabase = getServiceSupabase();
 
-  // Token still valid (with 5 min buffer)
-  if (tokens.expiry_date > Date.now() + 5 * 60_000) {
-    return tokens.access_token;
+  // Try each possible Google rig slug (unified google first)
+  for (const slug of GOOGLE_RIG_SLUGS) {
+    const { data: connection } = await supabase
+      .from("exo_rig_connections")
+      .select("id, rig_slug, access_token, refresh_token, expires_at")
+      .eq("tenant_id", tenantId)
+      .eq("rig_slug", slug)
+      .maybeSingle();
+
+    if (connection?.access_token) {
+      try {
+        // ensureFreshToken handles refresh if needed and updates DB
+        return await ensureFreshToken(connection);
+      } catch (err) {
+        console.error(`[GoogleFit] Token refresh failed for ${slug}:`, err);
+        continue; // Try next slug
+      }
+    }
   }
 
-  // Refresh
-  return refreshAccessToken(tenantId, tokens.refresh_token);
+  return null;
 }
 
 // ============================================================================

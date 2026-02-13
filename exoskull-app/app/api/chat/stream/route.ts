@@ -93,6 +93,10 @@ export async function POST(request: NextRequest) {
             },
           };
 
+          // Track streamed text to assemble final result
+          let streamedText = "";
+          let thinkingText = "";
+
           // Build processing callback to pipe events through SSE
           const processingCallback: ProcessingCallback = {
             onThinkingStep: (step, status) => {
@@ -122,23 +126,51 @@ export async function POST(request: NextRequest) {
                 ),
               );
             },
+            // Stream thinking tokens (extended thinking / reasoning trace)
+            onThinkingToken: (token) => {
+              thinkingText += token;
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ type: "thinking_token", text: token })}\n\n`,
+                ),
+              );
+            },
+            // Stream text response tokens
+            onTextDelta: (delta) => {
+              streamedText += delta;
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ type: "delta", text: delta })}\n\n`,
+                ),
+              );
+            },
           };
 
-          // Process through full pipeline (28 tools, memory, emotion detection)
+          // Process through full pipeline (70+ tools, memory, emotion detection)
           const result = await handleInboundMessage(
             gatewayMsg,
             processingCallback,
           );
 
-          // Send response in chunks for smoother UX
+          // If text wasn't streamed token-by-token, chunk it now
           const responseText = result.text;
-          const chunkSize = 50; // characters per chunk
+          if (!streamedText && responseText) {
+            const chunkSize = 50;
+            for (let i = 0; i < responseText.length; i += chunkSize) {
+              const chunk = responseText.slice(i, i + chunkSize);
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ type: "delta", text: chunk })}\n\n`,
+                ),
+              );
+            }
+          }
 
-          for (let i = 0; i < responseText.length; i += chunkSize) {
-            const chunk = responseText.slice(i, i + chunkSize);
+          // Send thinking summary if there was thinking
+          if (thinkingText) {
             controller.enqueue(
               encoder.encode(
-                `data: ${JSON.stringify({ type: "delta", text: chunk })}\n\n`,
+                `data: ${JSON.stringify({ type: "thinking_done", summary: thinkingText.slice(0, 2000) })}\n\n`,
               ),
             );
           }
@@ -148,7 +180,7 @@ export async function POST(request: NextRequest) {
             encoder.encode(
               `data: ${JSON.stringify({
                 type: "done",
-                fullText: responseText,
+                fullText: streamedText || responseText,
                 toolsUsed: result.toolsUsed,
               })}\n\n`,
             ),

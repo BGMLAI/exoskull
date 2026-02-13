@@ -423,6 +423,373 @@ export async function checkTwilioHealth(tenantId: string): Promise<boolean> {
   }
 }
 
+// ============================================================================
+// ADDITIONAL HEALTH CHECKERS
+// ============================================================================
+
+export async function checkGoogleFitHealth(
+  tenantId: string,
+  accessToken: string,
+): Promise<boolean> {
+  const startTime = Date.now();
+  try {
+    const response = await fetch(
+      "https://www.googleapis.com/fitness/v1/users/me/dataSources",
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+
+    const durationMs = Date.now() - startTime;
+    const success = response.ok;
+
+    if (!success) {
+      const errorData = await response.json().catch(() => ({}));
+      await recordHealthCheck(tenantId, "google_fit", false, {
+        message: errorData.error?.message || "Google Fit API error",
+        code: String(response.status),
+      });
+      return false;
+    }
+
+    await recordHealthCheck(tenantId, "google_fit", true);
+    await logIntegrationEvent(tenantId, {
+      integration_type: "google_fit",
+      event_type: "health_check",
+      success: true,
+      duration_ms: durationMs,
+    });
+    return true;
+  } catch (error) {
+    const durationMs = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await recordHealthCheck(tenantId, "google_fit", false, {
+      message: errorMessage,
+      code: "NETWORK_ERROR",
+    });
+    await logIntegrationEvent(tenantId, {
+      integration_type: "google_fit",
+      event_type: "health_check",
+      success: false,
+      duration_ms: durationMs,
+      error_message: errorMessage,
+      error_code: "NETWORK_ERROR",
+    });
+    return false;
+  }
+}
+
+export async function checkGoogleDriveHealth(
+  tenantId: string,
+  accessToken: string,
+): Promise<boolean> {
+  const startTime = Date.now();
+  try {
+    const response = await fetch(
+      "https://www.googleapis.com/drive/v3/about?fields=user",
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+
+    const durationMs = Date.now() - startTime;
+    const success = response.ok;
+
+    if (!success) {
+      const errorData = await response.json().catch(() => ({}));
+      await recordHealthCheck(tenantId, "google_drive", false, {
+        message: errorData.error?.message || "Google Drive API error",
+        code: String(response.status),
+      });
+      return false;
+    }
+
+    await recordHealthCheck(tenantId, "google_drive", true);
+    await logIntegrationEvent(tenantId, {
+      integration_type: "google_drive",
+      event_type: "health_check",
+      success: true,
+      duration_ms: durationMs,
+    });
+    return true;
+  } catch (error) {
+    const durationMs = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await recordHealthCheck(tenantId, "google_drive", false, {
+      message: errorMessage,
+      code: "NETWORK_ERROR",
+    });
+    await logIntegrationEvent(tenantId, {
+      integration_type: "google_drive",
+      event_type: "health_check",
+      success: false,
+      duration_ms: durationMs,
+      error_message: errorMessage,
+      error_code: "NETWORK_ERROR",
+    });
+    return false;
+  }
+}
+
+export async function checkOuraHealth(
+  tenantId: string,
+  accessToken: string,
+): Promise<boolean> {
+  const startTime = Date.now();
+  try {
+    const response = await fetch(
+      "https://api.ouraring.com/v2/usercollection/personal_info",
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+
+    const durationMs = Date.now() - startTime;
+    const success = response.ok;
+
+    if (!success) {
+      const errorData = await response.json().catch(() => ({}));
+      await recordHealthCheck(tenantId, "oura", false, {
+        message: errorData.detail || "Oura API error",
+        code: String(response.status),
+      });
+      return false;
+    }
+
+    await recordHealthCheck(tenantId, "oura", true);
+    await logIntegrationEvent(tenantId, {
+      integration_type: "oura",
+      event_type: "health_check",
+      success: true,
+      duration_ms: durationMs,
+    });
+    return true;
+  } catch (error) {
+    const durationMs = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await recordHealthCheck(tenantId, "oura", false, {
+      message: errorMessage,
+      code: "NETWORK_ERROR",
+    });
+    await logIntegrationEvent(tenantId, {
+      integration_type: "oura",
+      event_type: "health_check",
+      success: false,
+      duration_ms: durationMs,
+      error_message: errorMessage,
+      error_code: "NETWORK_ERROR",
+    });
+    return false;
+  }
+}
+
+export async function checkFitbitHealth(
+  tenantId: string,
+  accessToken: string,
+): Promise<boolean> {
+  const startTime = Date.now();
+  try {
+    const response = await fetch(
+      "https://api.fitbit.com/1/user/-/profile.json",
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+
+    const durationMs = Date.now() - startTime;
+    const success = response.ok;
+
+    if (!success) {
+      const errorData = await response.json().catch(() => ({}));
+      await recordHealthCheck(tenantId, "fitbit", false, {
+        message: errorData.errors?.[0]?.message || "Fitbit API error",
+        code: String(response.status),
+      });
+      return false;
+    }
+
+    await recordHealthCheck(tenantId, "fitbit", true);
+    await logIntegrationEvent(tenantId, {
+      integration_type: "fitbit",
+      event_type: "health_check",
+      success: true,
+      duration_ms: durationMs,
+    });
+    return true;
+  } catch (error) {
+    const durationMs = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await recordHealthCheck(tenantId, "fitbit", false, {
+      message: errorMessage,
+      code: "NETWORK_ERROR",
+    });
+    await logIntegrationEvent(tenantId, {
+      integration_type: "fitbit",
+      event_type: "health_check",
+      success: false,
+      duration_ms: durationMs,
+      error_message: errorMessage,
+      error_code: "NETWORK_ERROR",
+    });
+    return false;
+  }
+}
+
+export async function checkSlackHealth(tenantId: string): Promise<boolean> {
+  const startTime = Date.now();
+  try {
+    const token = process.env.SLACK_BOT_TOKEN;
+    if (!token) {
+      throw new Error("Slack bot token not configured");
+    }
+
+    const response = await fetch("https://slack.com/api/auth.test", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const durationMs = Date.now() - startTime;
+    const data = await response.json();
+    const success = response.ok && data.ok === true;
+
+    if (!success) {
+      await recordHealthCheck(tenantId, "slack", false, {
+        message: data.error || "Slack API error",
+        code: data.error || String(response.status),
+      });
+      return false;
+    }
+
+    await recordHealthCheck(tenantId, "slack", true);
+    await logIntegrationEvent(tenantId, {
+      integration_type: "slack",
+      event_type: "health_check",
+      success: true,
+      duration_ms: durationMs,
+    });
+    return true;
+  } catch (error) {
+    const durationMs = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await recordHealthCheck(tenantId, "slack", false, {
+      message: errorMessage,
+      code: "NETWORK_ERROR",
+    });
+    await logIntegrationEvent(tenantId, {
+      integration_type: "slack",
+      event_type: "health_check",
+      success: false,
+      duration_ms: durationMs,
+      error_message: errorMessage,
+      error_code: "NETWORK_ERROR",
+    });
+    return false;
+  }
+}
+
+export async function checkTelegramHealth(tenantId: string): Promise<boolean> {
+  const startTime = Date.now();
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) {
+      throw new Error("Telegram bot token not configured");
+    }
+
+    const response = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+
+    const durationMs = Date.now() - startTime;
+    const data = await response.json();
+    const success = response.ok && data.ok === true;
+
+    if (!success) {
+      await recordHealthCheck(tenantId, "telegram", false, {
+        message: data.description || "Telegram API error",
+        code: String(data.error_code || response.status),
+      });
+      return false;
+    }
+
+    await recordHealthCheck(tenantId, "telegram", true);
+    await logIntegrationEvent(tenantId, {
+      integration_type: "telegram",
+      event_type: "health_check",
+      success: true,
+      duration_ms: durationMs,
+    });
+    return true;
+  } catch (error) {
+    const durationMs = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await recordHealthCheck(tenantId, "telegram", false, {
+      message: errorMessage,
+      code: "NETWORK_ERROR",
+    });
+    await logIntegrationEvent(tenantId, {
+      integration_type: "telegram",
+      event_type: "health_check",
+      success: false,
+      duration_ms: durationMs,
+      error_message: errorMessage,
+      error_code: "NETWORK_ERROR",
+    });
+    return false;
+  }
+}
+
+export async function checkDiscordHealth(tenantId: string): Promise<boolean> {
+  const startTime = Date.now();
+  try {
+    const token = process.env.DISCORD_BOT_TOKEN;
+    if (!token) {
+      throw new Error("Discord bot token not configured");
+    }
+
+    const response = await fetch("https://discord.com/api/v10/users/@me", {
+      headers: { Authorization: `Bot ${token}` },
+    });
+
+    const durationMs = Date.now() - startTime;
+    const success = response.ok;
+
+    if (!success) {
+      const errorData = await response.json().catch(() => ({}));
+      await recordHealthCheck(tenantId, "discord", false, {
+        message: errorData.message || "Discord API error",
+        code: String(response.status),
+      });
+      return false;
+    }
+
+    await recordHealthCheck(tenantId, "discord", true);
+    await logIntegrationEvent(tenantId, {
+      integration_type: "discord",
+      event_type: "health_check",
+      success: true,
+      duration_ms: durationMs,
+    });
+    return true;
+  } catch (error) {
+    const durationMs = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await recordHealthCheck(tenantId, "discord", false, {
+      message: errorMessage,
+      code: "NETWORK_ERROR",
+    });
+    await logIntegrationEvent(tenantId, {
+      integration_type: "discord",
+      event_type: "health_check",
+      success: false,
+      duration_ms: durationMs,
+      error_message: errorMessage,
+      error_code: "NETWORK_ERROR",
+    });
+    return false;
+  }
+}
+
 /**
  * Run health checks for all configured integrations
  */
@@ -451,16 +818,59 @@ export async function runAllHealthChecks(tenantId: string): Promise<void> {
     // Check Twilio (voice/SMS)
     await checkTwilioHealth(tenantId);
 
-    // TODO: Add more integration health checks as needed
-    // - Google Fit
-    // - Google Drive
-    // - Oura
-    // - Whoop
-    // - Fitbit
-    // - Apple Health
-    // - Slack
-    // - Telegram
-    // - Discord
+    // Get rig connections for OAuth-based integrations
+    const { data: rigConnections } = await supabase
+      .from("exo_rig_connections")
+      .select("rig_slug, access_token")
+      .eq("tenant_id", tenantId)
+      .not("access_token", "is", null);
+
+    if (rigConnections) {
+      const connMap = new Map(
+        rigConnections.map((c) => [c.rig_slug, c.access_token as string]),
+      );
+
+      // Google Fit — check via unified google or google-fit connection
+      const googleFitToken =
+        connMap.get("google-fit") ||
+        connMap.get("google") ||
+        connMap.get("google-workspace");
+      if (googleFitToken) {
+        await checkGoogleFitHealth(tenantId, googleFitToken);
+      }
+
+      // Google Drive — check via unified google or google-workspace connection
+      const googleDriveToken =
+        connMap.get("google") || connMap.get("google-workspace");
+      if (googleDriveToken) {
+        await checkGoogleDriveHealth(tenantId, googleDriveToken);
+      }
+
+      // Oura
+      const ouraToken = connMap.get("oura");
+      if (ouraToken) {
+        await checkOuraHealth(tenantId, ouraToken);
+      }
+
+      // Fitbit
+      const fitbitToken = connMap.get("fitbit");
+      if (fitbitToken) {
+        await checkFitbitHealth(tenantId, fitbitToken);
+      }
+    }
+
+    // Check bot-based integrations (use env tokens, not per-user)
+    if (process.env.SLACK_BOT_TOKEN) {
+      await checkSlackHealth(tenantId);
+    }
+
+    if (process.env.TELEGRAM_BOT_TOKEN) {
+      await checkTelegramHealth(tenantId);
+    }
+
+    if (process.env.DISCORD_BOT_TOKEN) {
+      await checkDiscordHealth(tenantId);
+    }
   } catch (error) {
     console.error("[IntegrationHealth] runAllHealthChecks error:", {
       tenantId,

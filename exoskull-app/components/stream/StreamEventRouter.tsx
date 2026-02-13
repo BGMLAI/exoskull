@@ -137,6 +137,7 @@ export function StreamEventRouter({ event, onReply }: StreamEventRouterProps) {
 
   return (
     <div
+      id={`stream-event-${event.id}`}
       className={cn(
         "group relative transition-colors duration-150",
         // Thread indentation for replies

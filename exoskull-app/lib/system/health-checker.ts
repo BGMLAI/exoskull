@@ -717,3 +717,127 @@ function errorCheck(
     checkedAt: new Date().toISOString(),
   };
 }
+
+// ============================================================================
+// PER-INTEGRATION CALL TRACKING (last 10 calls per integration)
+// ============================================================================
+
+interface IntegrationCallRecord {
+  toolkit: string;
+  toolSlug: string;
+  success: boolean;
+  durationMs: number;
+  error?: string;
+  timestamp: number;
+}
+
+const integrationCallHistory = new Map<string, IntegrationCallRecord[]>();
+const MAX_CALL_HISTORY = 10;
+
+/**
+ * Record an integration call for health tracking
+ */
+export function recordIntegrationCall(
+  tenantId: string,
+  toolkit: string,
+  toolSlug: string,
+  success: boolean,
+  durationMs: number,
+  error?: string,
+): void {
+  const key = `${tenantId}:${toolkit}`;
+  const history = integrationCallHistory.get(key) || [];
+
+  history.push({
+    toolkit,
+    toolSlug,
+    success,
+    durationMs,
+    error,
+    timestamp: Date.now(),
+  });
+
+  // Keep only last N calls
+  if (history.length > MAX_CALL_HISTORY) {
+    history.splice(0, history.length - MAX_CALL_HISTORY);
+  }
+
+  integrationCallHistory.set(key, history);
+}
+
+/**
+ * Get integration health per toolkit (for dashboard widget)
+ */
+export function getIntegrationCallHealth(tenantId: string): Array<{
+  toolkit: string;
+  recentCalls: number;
+  successRate: number;
+  avgDurationMs: number;
+  lastCall?: IntegrationCallRecord;
+  status: "healthy" | "degraded" | "down" | "unknown";
+}> {
+  const results: Array<{
+    toolkit: string;
+    recentCalls: number;
+    successRate: number;
+    avgDurationMs: number;
+    lastCall?: IntegrationCallRecord;
+    status: "healthy" | "degraded" | "down" | "unknown";
+  }> = [];
+
+  const toolkits = [
+    "GMAIL",
+    "GOOGLECALENDAR",
+    "NOTION",
+    "TODOIST",
+    "SLACK",
+    "GITHUB",
+    "GOOGLEDRIVE",
+    "OUTLOOK",
+    "TRELLO",
+    "LINEAR",
+  ];
+
+  for (const toolkit of toolkits) {
+    const key = `${tenantId}:${toolkit}`;
+    const history = integrationCallHistory.get(key) || [];
+
+    if (history.length === 0) {
+      results.push({
+        toolkit,
+        recentCalls: 0,
+        successRate: 0,
+        avgDurationMs: 0,
+        status: "unknown",
+      });
+      continue;
+    }
+
+    const successes = history.filter((c) => c.success).length;
+    const successRate = successes / history.length;
+    const avgDuration = Math.round(
+      history.reduce((s, c) => s + c.durationMs, 0) / history.length,
+    );
+
+    let status: "healthy" | "degraded" | "down" = "healthy";
+    if (successRate < 0.5) status = "down";
+    else if (successRate < 0.8) status = "degraded";
+
+    // Check if recent calls are all failures
+    const last3 = history.slice(-3);
+    if (last3.length >= 3 && last3.every((c) => !c.success)) {
+      status = "down";
+    }
+
+    results.push({
+      toolkit,
+      recentCalls: history.length,
+      successRate: Math.round(successRate * 100),
+      avgDurationMs: avgDuration,
+      lastCall: history[history.length - 1],
+      status,
+    });
+  }
+
+  return results.filter((r) => r.recentCalls > 0 || r.status !== "unknown");
+}

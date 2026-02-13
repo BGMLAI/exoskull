@@ -85,6 +85,10 @@ export interface ProcessingCallback {
     durationMs: number,
     meta?: { success?: boolean; resultSummary?: string },
   ) => void;
+  /** Stream thinking tokens (extended thinking / reasoning trace) */
+  onThinkingToken?: (token: string) => void;
+  /** Stream text response tokens */
+  onTextDelta?: (delta: string) => void;
 }
 
 // ============================================================================

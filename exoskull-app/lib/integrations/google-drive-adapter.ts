@@ -7,66 +7,42 @@
  */
 
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { ensureFreshToken } from "@/lib/rigs/oauth";
 
 const DRIVE_BASE = "https://www.googleapis.com/drive/v3";
 
 // ============================================================================
-// TOKEN MANAGEMENT (shared pattern with Google Fit)
+// TOKEN MANAGEMENT (unified via exo_rig_connections)
 // ============================================================================
+
+// Google Drive tokens stored in exo_rig_connections with rig_slug
+// matching one of: "google", "google-workspace" (both include drive scopes)
+const GOOGLE_DRIVE_SLUGS = ["google", "google-workspace"];
 
 async function getValidToken(tenantId: string): Promise<string | null> {
   const supabase = getServiceSupabase();
-  const { data: tokens } = await supabase
-    .from("exo_integration_tokens")
-    .select("access_token, refresh_token, expiry_date")
-    .eq("tenant_id", tenantId)
-    .eq("provider", "google_drive")
-    .maybeSingle();
 
-  if (!tokens) return null;
-
-  // Token still valid (5 min buffer)
-  if (
-    (tokens as { expiry_date: number }).expiry_date >
-    Date.now() + 5 * 60_000
-  ) {
-    return (tokens as { access_token: string }).access_token;
-  }
-
-  // Refresh token
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
-
-  try {
-    const res = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        refresh_token: (tokens as { refresh_token: string }).refresh_token,
-        grant_type: "refresh_token",
-      }),
-    });
-
-    if (!res.ok) return null;
-    const data = await res.json();
-
-    await supabase
-      .from("exo_integration_tokens")
-      .update({
-        access_token: data.access_token,
-        expiry_date: Date.now() + (data.expires_in || 3600) * 1000,
-        updated_at: new Date().toISOString(),
-      })
+  // Try each possible Google rig slug (unified google first)
+  for (const slug of GOOGLE_DRIVE_SLUGS) {
+    const { data: connection } = await supabase
+      .from("exo_rig_connections")
+      .select("id, rig_slug, access_token, refresh_token, expires_at")
       .eq("tenant_id", tenantId)
-      .eq("provider", "google_drive");
+      .eq("rig_slug", slug)
+      .maybeSingle();
 
-    return data.access_token;
-  } catch {
-    return null;
+    if (connection?.access_token) {
+      try {
+        // ensureFreshToken handles refresh if needed and updates DB
+        return await ensureFreshToken(connection);
+      } catch (err) {
+        console.error(`[GoogleDrive] Token refresh failed for ${slug}:`, err);
+        continue; // Try next slug
+      }
+    }
   }
+
+  return null;
 }
 
 async function driveFetch(

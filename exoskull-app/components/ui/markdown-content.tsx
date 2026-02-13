@@ -126,6 +126,26 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
               />
             </a>
           ),
+          table: ({ children }) => (
+            <div className="overflow-x-auto my-2 rounded-lg border">
+              <table className="w-full text-xs">{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => (
+            <thead className="bg-muted/50 border-b">{children}</thead>
+          ),
+          th: ({ children }) => (
+            <th className="px-3 py-1.5 text-left font-medium">{children}</th>
+          ),
+          td: ({ children }) => (
+            <td className="px-3 py-1.5 border-t">{children}</td>
+          ),
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-2 border-primary/40 pl-3 my-2 text-muted-foreground italic">
+              {children}
+            </blockquote>
+          ),
+          hr: () => <hr className="my-3 border-border/50" />,
           code: ({ className: codeClassName, children }) => {
             const match = /language-(\w+)/.exec(codeClassName || "");
             const codeStr = String(children).replace(/\n$/, "");

@@ -20,6 +20,7 @@
 import { Composio } from "@composio/core";
 
 import { logger } from "@/lib/logger";
+import { recordIntegrationCall } from "@/lib/system/health-checker";
 
 let _client: Composio | null = null;
 
@@ -324,9 +325,8 @@ export async function executeAction(
   needsReconnect?: boolean;
 }> {
   const client = getClient();
-
-  // Extract toolkit from tool slug (e.g., GMAIL_SEND_EMAIL -> GMAIL)
   const toolkit = toolSlug.split("_")[0];
+  const actionStart = Date.now();
 
   logger.info("[Composio:executeAction:start]", {
     toolSlug,
@@ -335,19 +335,57 @@ export async function executeAction(
     argKeys: Object.keys(args),
   });
 
-  // Pre-flight health check
+  // Pre-flight: ensure connection is active (with circuit breaker probe)
   const health = await checkConnectionHealth(tenantId, toolkit);
   if (!health.ok) {
-    logger.warn("[Composio:executeAction:healthCheckFailed]", {
-      toolSlug,
-      tenantId,
-      reason: health.reason,
-    });
-    return {
-      success: false,
-      error: health.reason,
-      needsReconnect: health.needsReconnect,
-    };
+    // Probe: try re-checking in case circuit recovered
+    if (health.needsReconnect) {
+      try {
+        const probe = await hasConnection(tenantId, toolkit);
+        if (probe) {
+          recordSuccess(tenantId, toolkit);
+          logger.info("[Composio:executeAction:circuitRecovered]", {
+            toolSlug,
+            tenantId,
+          });
+          // Fall through to execute
+        } else {
+          recordIntegrationCall(
+            tenantId,
+            toolkit,
+            toolSlug,
+            false,
+            Date.now() - actionStart,
+            health.reason,
+          );
+          return { success: false, error: health.reason, needsReconnect: true };
+        }
+      } catch {
+        recordIntegrationCall(
+          tenantId,
+          toolkit,
+          toolSlug,
+          false,
+          Date.now() - actionStart,
+          health.reason,
+        );
+        return { success: false, error: health.reason, needsReconnect: true };
+      }
+    } else {
+      recordIntegrationCall(
+        tenantId,
+        toolkit,
+        toolSlug,
+        false,
+        Date.now() - actionStart,
+        health.reason,
+      );
+      return {
+        success: false,
+        error: health.reason,
+        needsReconnect: health.needsReconnect,
+      };
+    }
   }
 
   try {
@@ -358,23 +396,52 @@ export async function executeAction(
       }),
     );
 
-    // Record success
+    const dur = Date.now() - actionStart;
     recordSuccess(tenantId, toolkit);
-
+    recordIntegrationCall(tenantId, toolkit, toolSlug, true, dur);
     logger.info("[Composio:executeAction:success]", {
       toolSlug,
       tenantId,
+      durationMs: dur,
     });
 
     return { success: true, data: result };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    const is401 =
+      msg.includes("401") ||
+      msg.includes("Unauthorized") ||
+      msg.includes("expired");
 
-    // Record failure
+    // Auto-retry on 401 (token expiry)
+    if (is401) {
+      logger.warn("[Composio:executeAction:401Retry]", { toolSlug, tenantId });
+      try {
+        const recheck = await hasConnection(tenantId, toolkit);
+        if (recheck) {
+          const retryResult = await client.tools.execute(toolSlug, {
+            userId: tenantId,
+            arguments: args,
+          });
+          const dur = Date.now() - actionStart;
+          recordSuccess(tenantId, toolkit);
+          recordIntegrationCall(tenantId, toolkit, toolSlug, true, dur);
+          return { success: true, data: retryResult };
+        }
+      } catch (retryErr) {
+        logger.warn("[Composio:executeAction:401RetryFailed]", {
+          error: retryErr,
+        });
+      }
+    }
+
     recordFailure(tenantId, toolkit);
+    const dur = Date.now() - actionStart;
+    recordIntegrationCall(tenantId, toolkit, toolSlug, false, dur, msg);
 
     const currentHealth = getHealth(tenantId, toolkit);
-    const needsReconnect = (currentHealth?.consecutiveFailures ?? 0) >= 3;
+    const needsReconnect =
+      (currentHealth?.consecutiveFailures ?? 0) >= 3 || is401;
 
     console.error("[Composio:executeAction:failed]", {
       toolSlug,
@@ -416,9 +483,7 @@ export async function disconnectAccount(
 /**
  * Get health status for all connected integrations (for dashboard widget).
  */
-export function getConnectionHealthSummary(
-  tenantId: string,
-): Array<{
+export function getConnectionHealthSummary(tenantId: string): Array<{
   toolkit: string;
   consecutiveFailures: number;
   lastSuccessAt: number;

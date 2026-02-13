@@ -506,6 +506,65 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
                   break;
                 }
 
+                case "thinking_token": {
+                  // Stream thinking text (like Claude Code visible reasoning)
+                  const ttThinkingId = `thinking-${aiEventId}`;
+                  const ttExisting = state.events.find(
+                    (e) => e.id === ttThinkingId,
+                  );
+                  if (!ttExisting) {
+                    addEvent({
+                      id: ttThinkingId,
+                      timestamp: new Date(),
+                      data: {
+                        type: "thinking_step",
+                        steps: [
+                          {
+                            label: data.text || "",
+                            status: "running",
+                            detail: data.text || "",
+                          },
+                        ],
+                        startedAt: Date.now(),
+                      },
+                    });
+                  } else if (ttExisting.data.type === "thinking_step") {
+                    // Append to first step's detail (streaming)
+                    const steps = [...ttExisting.data.steps];
+                    if (steps.length > 0) {
+                      steps[0] = {
+                        ...steps[0],
+                        detail: (steps[0].detail || "") + (data.text || ""),
+                        status: "running",
+                      };
+                    } else {
+                      steps.push({
+                        label: "Rozumowanie...",
+                        status: "running",
+                        detail: data.text || "",
+                      });
+                    }
+                    updateThinkingSteps(ttThinkingId, steps);
+                  }
+                  break;
+                }
+
+                case "thinking_done": {
+                  // Mark thinking as complete
+                  const tdThinkingId = `thinking-${aiEventId}`;
+                  const tdExisting = state.events.find(
+                    (e) => e.id === tdThinkingId,
+                  );
+                  if (tdExisting && tdExisting.data.type === "thinking_step") {
+                    const steps = tdExisting.data.steps.map((s) => ({
+                      ...s,
+                      status: "done" as const,
+                    }));
+                    updateThinkingSteps(tdThinkingId, steps);
+                  }
+                  break;
+                }
+
                 case "tool_start": {
                   // Fold tool into thinking event (grouped process view)
                   const tsThinkingId = `thinking-${aiEventId}`;

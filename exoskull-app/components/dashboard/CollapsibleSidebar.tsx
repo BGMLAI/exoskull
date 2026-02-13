@@ -8,6 +8,7 @@ import {
   Settings,
   FolderTree,
   TreePine,
+  Mail,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard/knowledge", label: "Wiedza", icon: FolderTree },
+  { href: "/dashboard/emails", label: "Skrzynka", icon: Mail },
   { href: "/dashboard/values", label: "Wartosci", icon: TreePine },
   { href: "/dashboard/settings", label: "Ustawienia", icon: Settings },
 ];

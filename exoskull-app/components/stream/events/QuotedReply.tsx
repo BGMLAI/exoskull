@@ -8,6 +8,8 @@ interface QuotedReplyProps {
   replyTo: NonNullable<StreamEvent["replyTo"]>;
   /** Whether this is a compact inline display or full thread branch */
   compact?: boolean;
+  /** Click handler — scrolls to and highlights original message */
+  onClick?: () => void;
 }
 
 const ROLE_CONFIG = {
@@ -34,18 +36,44 @@ const ROLE_CONFIG = {
   },
 };
 
-export function QuotedReply({ replyTo, compact = false }: QuotedReplyProps) {
+export function QuotedReply({
+  replyTo,
+  compact = false,
+  onClick,
+}: QuotedReplyProps) {
   const config = ROLE_CONFIG[replyTo.senderRole] || ROLE_CONFIG.system;
   const Icon = config.icon;
+
+  const handleClick = () => {
+    if (onClick) {
+      onClick();
+      return;
+    }
+    // Default: scroll to original message and highlight
+    const el = document.getElementById(`stream-event-${replyTo.id}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-primary/50", "transition-all");
+      setTimeout(
+        () =>
+          el.classList.remove("ring-2", "ring-primary/50", "transition-all"),
+        2000,
+      );
+    }
+  };
 
   return (
     <div
       className={cn(
-        "flex items-start gap-1.5 border-l-2 pl-2 rounded-r-sm transition-colors",
+        "flex items-start gap-1.5 border-l-2 pl-2 rounded-r-sm transition-colors cursor-pointer hover:brightness-95",
         config.borderColor,
         config.bgColor,
         compact ? "py-0.5 mb-0.5" : "py-1.5 mb-1.5",
       )}
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      title="Kliknij, aby przejsc do oryginalnej wiadomosci"
     >
       {/* Thread branch indicator */}
       <CornerDownRight className="w-3 h-3 mt-0.5 flex-shrink-0 text-muted-foreground/30" />
