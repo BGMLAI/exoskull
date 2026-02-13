@@ -90,6 +90,7 @@ export async function buildDynamicContext(
     connectionsResult,
     appsResult,
     proactiveResult,
+    memoryResult,
   ] = await Promise.allSettled([
     // 1. User profile + custom instructions + presets + AI config + prompt override
     supabase
@@ -141,6 +142,23 @@ export async function buildDynamicContext(
       )
       .order("created_at", { ascending: false })
       .limit(10),
+    // 11. Memory stats — daily summaries + highlights count
+    Promise.all([
+      supabase
+        .from("exo_daily_summaries")
+        .select("summary_date, mood_score", { count: "exact" })
+        .eq("tenant_id", tenantId)
+        .order("summary_date", { ascending: false })
+        .limit(1),
+      supabase
+        .from("user_memory_highlights")
+        .select("id", { count: "exact" })
+        .eq("user_id", tenantId),
+      supabase
+        .from("exo_unified_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId),
+    ]).catch(() => [null, null, null]),
   ]);
 
   // ── Extract results safely ──
@@ -192,6 +210,25 @@ export async function buildDynamicContext(
           created_at: string;
         }> | null)
       : null;
+
+  // Extract memory stats
+  const memoryData =
+    memoryResult.status === "fulfilled"
+      ? (memoryResult.value as [
+          {
+            count: number | null;
+            data: Array<{
+              summary_date: string;
+              mood_score: number | null;
+            }> | null;
+          } | null,
+          { count: number | null } | null,
+          { count: number | null } | null,
+        ])
+      : [null, null, null];
+  const summariesInfo = memoryData[0];
+  const highlightsInfo = memoryData[1];
+  const messagesInfo = memoryData[2];
 
   // ── Build context string ──
   const now = new Date();
@@ -295,6 +332,31 @@ export async function buildDynamicContext(
     ).length;
     context += `- Baza wiedzy: ${totalDocs} dokumentow (${readyDocs} gotowych do przeszukania)\n`;
     context += `  → Gdy user pyta o COKOLWIEK co mogl wgrac w plikach, ZAWSZE uzyj "search_knowledge" ZANIM powiesz "nie wiem".\n`;
+  }
+
+  // Memory system — daily summaries, highlights, conversation history
+  const summaryCount = summariesInfo?.count ?? 0;
+  const highlightCount = highlightsInfo?.count ?? 0;
+  const messageCount = messagesInfo?.count ?? 0;
+  if (summaryCount > 0 || highlightCount > 0 || messageCount > 0) {
+    context += `\n## PAMIĘĆ\n`;
+    context += `Masz dostęp do pełnej pamięci użytkownika:\n`;
+    if (messageCount > 0) {
+      context += `- Historia rozmów: ${messageCount} wiadomości (wszystkie kanały)\n`;
+    }
+    if (summaryCount > 0) {
+      const lastDate = summariesInfo?.data?.[0]?.summary_date;
+      context += `- Podsumowania dzienne: ${summaryCount} dni${lastDate ? ` (ostatnie: ${lastDate})` : ""}\n`;
+    }
+    if (highlightCount > 0) {
+      context += `- Zapamiętane fakty: ${highlightCount} wpisów\n`;
+    }
+    context += `\n→ ZAWSZE gdy user pyta o przeszłość, wspomnienia, "kiedy mówiłem o...", "co robiłem...", "czy pamiętasz..." — użyj "search_memory".\n`;
+    context += `→ Gdy user pyta o podsumowanie dnia — użyj "get_daily_summary".\n`;
+    context += `→ NIGDY nie mów "nie mam dostępu do pamięci" ani "nie pamiętam". MASZ PAMIĘĆ. Przeszukaj ją.\n`;
+  } else {
+    // Even with no data yet, tell AI it HAS memory tools
+    context += `- Pamięć: aktywna (brak danych — to nowy użytkownik). Narzędzia "search_memory" i "get_daily_summary" dostępne.\n`;
   }
 
   // Connected integrations (Composio)
