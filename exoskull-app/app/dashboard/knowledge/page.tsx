@@ -3,407 +3,694 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
-  FileUp,
-  File,
-  FileText,
-  Trash2,
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  Clock,
-} from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-type Document = {
+// Knowledge components
+import { KnowledgeHeader } from "@/components/knowledge/KnowledgeHeader";
+import { HierarchyView } from "@/components/knowledge/HierarchyView";
+import { NotesView } from "@/components/knowledge/NotesView";
+import { FileUploadZone } from "@/components/knowledge/FileUploadZone";
+import { DocumentsList } from "@/components/knowledge/DocumentsList";
+
+// Form dialogs
+import { LoopFormDialog } from "@/components/knowledge/LoopFormDialog";
+import { CampaignFormDialog } from "@/components/knowledge/CampaignFormDialog";
+import { QuestFormDialog } from "@/components/knowledge/QuestFormDialog";
+import { OpFormDialog } from "@/components/knowledge/OpFormDialog";
+import { NoteEditor, NoteEditorData } from "@/components/knowledge/NoteEditor";
+
+// Types
+import {
+  Loop,
+  Campaign,
+  Quest,
+  Op,
+  Note,
+  NoteType,
+  CreateLoopInput,
+  CreateCampaignInput,
+  CreateQuestInput,
+  CreateOpInput,
+} from "@/lib/types/knowledge";
+
+// API helpers
+import {
+  createLoop,
+  updateLoop,
+  createCampaign,
+  updateCampaign,
+  createQuest,
+  updateQuest,
+  createOp,
+  updateOp,
+  toggleOpStatus,
+  createNote,
+  updateNote,
+} from "@/lib/api/knowledge";
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type TabType = "hierarchy" | "notes" | "documents";
+
+interface Document {
   id: string;
+  filename: string;
   original_name: string;
   file_type: string;
   file_size: number;
   category: string;
-  status: "uploading" | "uploaded" | "processing" | "ready" | "failed";
+  status: string;
   created_at: string;
-};
-
-const STATUS_CONFIG = {
-  uploading: {
-    label: "Wgrywanie...",
-    color: "bg-yellow-100 text-yellow-800",
-    icon: Loader2,
-  },
-  uploaded: {
-    label: "Wgrane",
-    color: "bg-blue-100 text-blue-800",
-    icon: Clock,
-  },
-  processing: {
-    label: "Przetwarzanie...",
-    color: "bg-blue-100 text-blue-800",
-    icon: Loader2,
-  },
-  ready: {
-    label: "Gotowe",
-    color: "bg-green-100 text-green-800",
-    icon: CheckCircle2,
-  },
-  failed: { label: "Blad", color: "bg-red-100 text-red-800", icon: XCircle },
-};
-
-const ALLOWED_EXTENSIONS = [
-  "pdf",
-  "txt",
-  "md",
-  "csv",
-  "docx",
-  "doc",
-  "xlsx",
-  "xls",
-  "pptx",
-  "ppt",
-  "json",
-];
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+// ============================================================================
+// PAGE
+// ============================================================================
 
 export default function KnowledgePage() {
   const supabase = createClient();
+
+  // Auth state
+  const [tenantId, setTenantId] = useState<string | null>(null);
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<TabType>("hierarchy");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Hierarchy data
+  const [loops, setLoops] = useState<Loop[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [quests, setQuests] = useState<Quest[]>([]);
+  const [ops, setOps] = useState<Op[]>([]);
+
+  // Loading states
+  const [loopsLoading, setLoopsLoading] = useState(true);
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [questsLoading, setQuestsLoading] = useState(false);
+  const [opsLoading, setOpsLoading] = useState(false);
+
+  // Selection state
+  const [selectedLoop, setSelectedLoop] = useState<Loop | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(
+    null,
+  );
+  const [selectedQuest, setSelectedQuest] = useState<Quest | null>(null);
+
+  // Notes state
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesTotal, setNotesTotal] = useState(0);
+  const [noteTypeFilter, setNoteTypeFilter] = useState<NoteType | null>(null);
+
+  // Documents state
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+
+  // Dialog state
+  const [loopDialogOpen, setLoopDialogOpen] = useState(false);
+  const [editingLoop, setEditingLoop] = useState<Loop | undefined>();
+  const [campaignDialogOpen, setCampaignDialogOpen] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<
+    Campaign | undefined
+  >();
+  const [questDialogOpen, setQuestDialogOpen] = useState(false);
+  const [editingQuest, setEditingQuest] = useState<Quest | undefined>();
+  const [opDialogOpen, setOpDialogOpen] = useState(false);
+  const [editingOp, setEditingOp] = useState<Op | undefined>();
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | undefined>();
+
+  // ============================================================================
+  // AUTH
+  // ============================================================================
 
   useEffect(() => {
-    loadDocuments();
+    async function loadUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        setTenantId(user.id);
+      }
+    }
+    loadUser();
   }, []);
 
-  async function loadDocuments() {
+  // ============================================================================
+  // DATA LOADING
+  // ============================================================================
+
+  const fetchLoops = useCallback(async () => {
+    if (!tenantId) return;
+    setLoopsLoading(true);
     try {
-      setLoading(true);
+      const res = await fetch(
+        `/api/knowledge/loops?tenantId=${tenantId}&withStats=true`,
+      );
+      if (!res.ok) throw new Error("Failed to fetch loops");
+      const data = await res.json();
+      setLoops(data.loops || []);
+    } catch (error) {
+      console.error("[Knowledge] Fetch loops error:", error);
+      toast.error("Nie udalo sie zaladowac loopow");
+    } finally {
+      setLoopsLoading(false);
+    }
+  }, [tenantId]);
+
+  const fetchCampaigns = useCallback(
+    async (loopSlug?: string) => {
+      if (!tenantId) return;
+      setCampaignsLoading(true);
+      try {
+        const params = new URLSearchParams({ tenantId });
+        if (loopSlug) params.set("loopSlug", loopSlug);
+        const res = await fetch(`/api/knowledge/campaigns?${params}`);
+        if (!res.ok) throw new Error("Failed to fetch campaigns");
+        const data = await res.json();
+        setCampaigns(data.campaigns || []);
+      } catch (error) {
+        console.error("[Knowledge] Fetch campaigns error:", error);
+      } finally {
+        setCampaignsLoading(false);
+      }
+    },
+    [tenantId],
+  );
+
+  const fetchQuests = useCallback(
+    async (campaignId?: string, loopSlug?: string) => {
+      if (!tenantId) return;
+      setQuestsLoading(true);
+      try {
+        const params = new URLSearchParams({ tenantId });
+        if (campaignId) params.set("campaignId", campaignId);
+        if (loopSlug) params.set("loopSlug", loopSlug);
+        const res = await fetch(`/api/knowledge/quests?${params}`);
+        if (!res.ok) throw new Error("Failed to fetch quests");
+        const data = await res.json();
+        setQuests(data.quests || []);
+      } catch (error) {
+        console.error("[Knowledge] Fetch quests error:", error);
+      } finally {
+        setQuestsLoading(false);
+      }
+    },
+    [tenantId],
+  );
+
+  const fetchOps = useCallback(
+    async (questId?: string, loopSlug?: string) => {
+      if (!tenantId) return;
+      setOpsLoading(true);
+      try {
+        const params = new URLSearchParams({ tenantId });
+        if (questId) params.set("questId", questId);
+        if (loopSlug) params.set("loopSlug", loopSlug);
+        const res = await fetch(`/api/knowledge/ops?${params}`);
+        if (!res.ok) throw new Error("Failed to fetch ops");
+        const data = await res.json();
+        setOps(data.ops || []);
+      } catch (error) {
+        console.error("[Knowledge] Fetch ops error:", error);
+      } finally {
+        setOpsLoading(false);
+      }
+    },
+    [tenantId],
+  );
+
+  const fetchNotes = useCallback(
+    async (type?: NoteType | null) => {
+      if (!tenantId) return;
+      setNotesLoading(true);
+      try {
+        const params = new URLSearchParams({ tenantId });
+        if (type) params.set("type", type);
+        const res = await fetch(`/api/knowledge/notes?${params}`);
+        if (!res.ok) throw new Error("Failed to fetch notes");
+        const data = await res.json();
+        setNotes(data.notes || []);
+        setNotesTotal(data.total || 0);
+      } catch (error) {
+        console.error("[Knowledge] Fetch notes error:", error);
+        toast.error("Nie udalo sie zaladowac notatek");
+      } finally {
+        setNotesLoading(false);
+      }
+    },
+    [tenantId],
+  );
+
+  const fetchDocuments = useCallback(async () => {
+    if (!tenantId) return;
+    setDocumentsLoading(true);
+    try {
       const { data, error } = await supabase
         .from("exo_user_documents")
         .select(
-          "id, original_name, file_type, file_size, category, status, created_at",
+          "id, filename, original_name, file_type, file_size, category, status, created_at",
         )
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       setDocuments(data || []);
     } catch (error) {
-      console.error("[Knowledge] Load failed:", error);
-      toast.error("Nie udalo sie zaladowac dokumentow");
+      console.error("[Knowledge] Fetch documents error:", error);
     } finally {
-      setLoading(false);
+      setDocumentsLoading(false);
     }
-  }
+  }, [tenantId]);
 
-  async function uploadFile(file: File) {
-    const ext = file.name.split(".").pop()?.toLowerCase() || "";
-    if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      toast.error(`Nieobslugiwany format: .${ext}`);
-      return;
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+
+  // Load initial data when tenantId is available
+  useEffect(() => {
+    if (!tenantId) return;
+    fetchLoops();
+    // Also init default loops if none exist
+    fetch(`/api/knowledge/loops?tenantId=${tenantId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.loops || data.loops.length === 0) {
+          // Create default loops
+          fetch("/api/knowledge/loops", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tenantId, initDefaults: true }),
+          }).then(() => fetchLoops());
+        }
+      })
+      .catch(() => {});
+  }, [tenantId, fetchLoops]);
+
+  // Load campaigns when loop selected
+  useEffect(() => {
+    if (selectedLoop) {
+      fetchCampaigns(selectedLoop.slug);
+    } else {
+      setCampaigns([]);
+      fetchCampaigns(); // Load all campaigns
     }
+    setSelectedCampaign(null);
+    setSelectedQuest(null);
+    setQuests([]);
+    setOps([]);
+  }, [selectedLoop, fetchCampaigns]);
 
-    setUploading(true);
-    try {
-      // 1. Get presigned upload URL
-      const urlRes = await fetch("/api/knowledge/upload-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type,
-          fileSize: file.size,
-        }),
-      });
-
-      if (!urlRes.ok) {
-        const err = await urlRes.json();
-        throw new Error(err.error || "Nie udalo sie uzyskac URL uploadu");
-      }
-
-      const { signedUrl, token, documentId, mimeType } = await urlRes.json();
-
-      // 2. Upload directly to Supabase Storage
-      const uploadRes = await fetch(signedUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": mimeType || file.type,
-          "x-upsert": "true",
-        },
-        body: file,
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error(`Upload failed: ${uploadRes.status}`);
-      }
-
-      // 3. Confirm upload (triggers processing pipeline)
-      const confirmRes = await fetch("/api/knowledge/confirm-upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId }),
-      });
-
-      if (!confirmRes.ok) {
-        const err = await confirmRes.json();
-        throw new Error(err.error || "Potwierdzenie uploadu nie powiodlo sie");
-      }
-
-      toast.success(`Wgrano: ${file.name}. Przetwarzanie w toku...`);
-      await loadDocuments();
-    } catch (error) {
-      console.error("[Knowledge] Upload failed:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Upload nie powiodl sie",
-      );
-    } finally {
-      setUploading(false);
+  // Load quests when campaign selected
+  useEffect(() => {
+    if (selectedCampaign) {
+      fetchQuests(selectedCampaign.id);
+    } else if (selectedLoop) {
+      fetchQuests(undefined, selectedLoop.slug);
+    } else {
+      setQuests([]);
     }
-  }
+    setSelectedQuest(null);
+    setOps([]);
+  }, [selectedCampaign, selectedLoop, fetchQuests]);
 
-  async function deleteDocument(docId: string, name: string) {
-    if (!confirm(`Usunac "${name}"?`)) return;
-
-    try {
-      const { error } = await supabase
-        .from("exo_user_documents")
-        .delete()
-        .eq("id", docId);
-
-      if (error) throw error;
-      toast.success("Dokument usuniety");
-      await loadDocuments();
-    } catch (error) {
-      console.error("[Knowledge] Delete failed:", error);
-      toast.error("Nie udalo sie usunac dokumentu");
+  // Load ops when quest selected
+  useEffect(() => {
+    if (selectedQuest) {
+      fetchOps(selectedQuest.id);
+    } else if (selectedLoop) {
+      fetchOps(undefined, selectedLoop.slug);
+    } else {
+      setOps([]);
     }
-  }
+  }, [selectedQuest, selectedLoop, fetchOps]);
 
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
+  // Load notes when tab switches to notes
+  useEffect(() => {
+    if (activeTab === "notes") {
+      fetchNotes(noteTypeFilter);
     }
-  }, []);
+  }, [activeTab, noteTypeFilter, fetchNotes]);
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setDragActive(false);
-
-      if (e.dataTransfer.files?.length) {
-        Array.from(e.dataTransfer.files).forEach(uploadFile);
-      }
-    },
-    [uploadFile],
-  );
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.length) {
-      Array.from(e.target.files).forEach(uploadFile);
+  // Load documents when tab switches to documents
+  useEffect(() => {
+    if (activeTab === "documents") {
+      fetchDocuments();
     }
-    e.target.value = "";
+  }, [activeTab, fetchDocuments]);
+
+  // ============================================================================
+  // HANDLERS — CRUD
+  // ============================================================================
+
+  const handleSaveLoop = async (input: CreateLoopInput) => {
+    if (!tenantId) return;
+    if (editingLoop) {
+      await updateLoop(tenantId, editingLoop.id, input);
+      toast.success("Loop zaktualizowany");
+    } else {
+      await createLoop(tenantId, input);
+      toast.success("Loop utworzony");
+    }
+    setEditingLoop(undefined);
+    fetchLoops();
   };
 
-  const stats = {
-    total: documents.length,
-    ready: documents.filter((d) => d.status === "ready").length,
-    processing: documents.filter(
-      (d) =>
-        d.status === "processing" ||
-        d.status === "uploading" ||
-        d.status === "uploaded",
-    ).length,
-    failed: documents.filter((d) => d.status === "failed").length,
+  const handleSaveCampaign = async (input: CreateCampaignInput) => {
+    if (!tenantId) return;
+    if (editingCampaign) {
+      await updateCampaign(tenantId, editingCampaign.id, input);
+      toast.success("Kampania zaktualizowana");
+    } else {
+      await createCampaign(tenantId, input);
+      toast.success("Kampania utworzona");
+    }
+    setEditingCampaign(undefined);
+    fetchCampaigns(selectedLoop?.slug);
   };
+
+  const handleSaveQuest = async (input: CreateQuestInput) => {
+    if (!tenantId) return;
+    if (editingQuest) {
+      await updateQuest(tenantId, editingQuest.id, input);
+      toast.success("Quest zaktualizowany");
+    } else {
+      await createQuest(tenantId, input);
+      toast.success("Quest utworzony");
+    }
+    setEditingQuest(undefined);
+    fetchQuests(selectedCampaign?.id, selectedLoop?.slug);
+  };
+
+  const handleSaveOp = async (input: CreateOpInput) => {
+    if (!tenantId) return;
+    if (editingOp) {
+      await updateOp(tenantId, editingOp.id, input);
+      toast.success("Op zaktualizowany");
+    } else {
+      await createOp(tenantId, input);
+      toast.success("Op utworzony");
+    }
+    setEditingOp(undefined);
+    fetchOps(selectedQuest?.id, selectedLoop?.slug);
+  };
+
+  const handleToggleOpStatus = async (op: Op) => {
+    if (!tenantId) return;
+    try {
+      await toggleOpStatus(tenantId, op.id, op.status);
+      fetchOps(selectedQuest?.id, selectedLoop?.slug);
+    } catch (error) {
+      console.error("[Knowledge] Toggle op status error:", error);
+      toast.error("Nie udalo sie zmienic statusu");
+    }
+  };
+
+  const handleSaveNote = async (data: NoteEditorData) => {
+    if (!tenantId) return;
+    try {
+      if (editingNote) {
+        await updateNote(tenantId, editingNote.id, {
+          type: data.type,
+          title: data.title || undefined,
+          content: data.content || undefined,
+          tags: data.tags,
+          isResearch: data.isResearch,
+          isExperience: data.isExperience,
+          loopSlug: data.loopSlug || undefined,
+          questId: data.questId || undefined,
+          opId: data.opId || undefined,
+        });
+        toast.success("Notatka zaktualizowana");
+      } else {
+        await createNote(tenantId, {
+          type: data.type,
+          title: data.title || undefined,
+          content: data.content || undefined,
+          tags: data.tags,
+          isResearch: data.isResearch,
+          isExperience: data.isExperience,
+          loopSlug: data.loopSlug || undefined,
+          questId: data.questId || undefined,
+          opId: data.opId || undefined,
+        });
+        toast.success("Notatka utworzona");
+      }
+      setNoteDialogOpen(false);
+      setEditingNote(undefined);
+      fetchNotes(noteTypeFilter);
+    } catch (error) {
+      console.error("[Knowledge] Save note error:", error);
+      toast.error("Nie udalo sie zapisac notatki");
+    }
+  };
+
+  // ============================================================================
+  // DIALOG OPENERS
+  // ============================================================================
+
+  const openAddLoop = () => {
+    setEditingLoop(undefined);
+    setLoopDialogOpen(true);
+  };
+
+  const openEditLoop = (loop: Loop) => {
+    setEditingLoop(loop);
+    setLoopDialogOpen(true);
+  };
+
+  const openAddCampaign = () => {
+    setEditingCampaign(undefined);
+    setCampaignDialogOpen(true);
+  };
+
+  const openEditCampaign = (campaign: Campaign) => {
+    setEditingCampaign(campaign);
+    setCampaignDialogOpen(true);
+  };
+
+  const openAddQuest = () => {
+    setEditingQuest(undefined);
+    setQuestDialogOpen(true);
+  };
+
+  const openEditQuest = (quest: Quest) => {
+    setEditingQuest(quest);
+    setQuestDialogOpen(true);
+  };
+
+  const openAddOp = () => {
+    setEditingOp(undefined);
+    setOpDialogOpen(true);
+  };
+
+  const openEditOp = (op: Op) => {
+    setEditingOp(op);
+    setOpDialogOpen(true);
+  };
+
+  const openAddNote = () => {
+    setEditingNote(undefined);
+    setNoteDialogOpen(true);
+  };
+
+  const openEditNote = (note: Note) => {
+    setEditingNote(note);
+    setNoteDialogOpen(true);
+  };
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+
+  if (!tenantId) {
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <p className="text-muted-foreground">Ladowanie...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Baza Wiedzy</h1>
-        <p className="text-muted-foreground">
-          Wgraj dokumenty — IORS bedzie z nich korzystac w rozmowach
-        </p>
-      </div>
+      {/* Header with tabs */}
+      <KnowledgeHeader
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onAddLoop={openAddLoop}
+        onAddCampaign={openAddCampaign}
+        onAddQuest={openAddQuest}
+        onAddOp={openAddOp}
+        onAddNote={openAddNote}
+      />
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Dokumenty</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Gotowe</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {stats.ready}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Przetwarzanie</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {stats.processing}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Bledy</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {stats.failed}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Tab content */}
+      {activeTab === "hierarchy" && (
+        <HierarchyView
+          loops={loops}
+          campaigns={campaigns}
+          quests={quests}
+          ops={ops}
+          loopsLoading={loopsLoading}
+          campaignsLoading={campaignsLoading}
+          questsLoading={questsLoading}
+          opsLoading={opsLoading}
+          selectedLoop={selectedLoop}
+          selectedCampaign={selectedCampaign}
+          selectedQuest={selectedQuest}
+          onSelectLoop={setSelectedLoop}
+          onSelectCampaign={setSelectedCampaign}
+          onSelectQuest={setSelectedQuest}
+          onEditLoop={openEditLoop}
+          onEditCampaign={openEditCampaign}
+          onEditQuest={openEditQuest}
+          onEditOp={openEditOp}
+          onToggleOpStatus={handleToggleOpStatus}
+          onAddLoop={openAddLoop}
+          onAddCampaign={openAddCampaign}
+          onAddQuest={openAddQuest}
+          onAddOp={openAddOp}
+        />
+      )}
 
-      {/* Upload Zone */}
-      <Card>
-        <CardContent className="p-6">
-          <div
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
-              dragActive
-                ? "border-primary bg-primary/5"
-                : "border-muted-foreground/25 hover:border-primary/50"
-            }`}
-          >
-            {uploading ? (
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">
-                  Wgrywanie i przetwarzanie...
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-3">
-                <FileUp className="h-10 w-10 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">
-                    Przeciagnij pliki tutaj lub{" "}
-                    <label className="text-primary cursor-pointer hover:underline">
-                      wybierz z dysku
-                      <input
-                        type="file"
-                        className="hidden"
-                        multiple
-                        accept={ALLOWED_EXTENSIONS.map((e) => `.${e}`).join(
-                          ",",
-                        )}
-                        onChange={handleFileSelect}
-                      />
-                    </label>
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    PDF, DOCX, TXT, MD, CSV, JSON, XLSX — max 500MB
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {activeTab === "notes" && (
+        <NotesView
+          notes={notes}
+          loading={notesLoading}
+          total={notesTotal}
+          typeFilter={noteTypeFilter}
+          onTypeFilterChange={setNoteTypeFilter}
+          onEditNote={openEditNote}
+          onAddNote={openAddNote}
+        />
+      )}
 
-      {/* Documents List */}
-      <div className="space-y-3">
-        {loading ? (
-          <Card>
-            <CardContent className="p-6 text-center text-muted-foreground">
-              Ladowanie dokumentow...
-            </CardContent>
-          </Card>
-        ) : documents.length === 0 ? (
-          <Card>
-            <CardContent className="p-6 text-center text-muted-foreground">
-              Brak dokumentow. Wgraj pierwszy plik powyzej.
-            </CardContent>
-          </Card>
-        ) : (
-          documents.map((doc) => {
-            const statusCfg = STATUS_CONFIG[doc.status];
-            const StatusIcon = statusCfg.icon;
+      {activeTab === "documents" && (
+        <div className="space-y-6">
+          <FileUploadZone
+            tenantId={tenantId}
+            onUploadComplete={fetchDocuments}
+          />
+          <DocumentsList
+            documents={documents}
+            loading={documentsLoading}
+            tenantId={tenantId}
+            onRefresh={fetchDocuments}
+          />
+        </div>
+      )}
 
-            return (
-              <Card key={doc.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-4">
-                    {/* File icon */}
-                    <div className="flex-shrink-0">
-                      {doc.file_type === "pdf" ? (
-                        <FileText className="h-8 w-8 text-red-500" />
-                      ) : (
-                        <File className="h-8 w-8 text-blue-500" />
-                      )}
-                    </div>
+      {/* ── Form Dialogs ── */}
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">
-                        {doc.original_name}
-                      </p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        <span className="text-xs text-muted-foreground">
-                          {formatFileSize(doc.file_size)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(doc.created_at).toLocaleDateString("pl-PL")}
-                        </span>
-                      </div>
-                    </div>
+      <LoopFormDialog
+        open={loopDialogOpen}
+        onOpenChange={(open) => {
+          setLoopDialogOpen(open);
+          if (!open) setEditingLoop(undefined);
+        }}
+        loop={editingLoop}
+        onSave={handleSaveLoop}
+      />
 
-                    {/* Status */}
-                    <Badge className={statusCfg.color}>
-                      <StatusIcon
-                        className={`h-3 w-3 mr-1 ${
-                          doc.status === "processing" ||
-                          doc.status === "uploading"
-                            ? "animate-spin"
-                            : ""
-                        }`}
-                      />
-                      {statusCfg.label}
-                    </Badge>
+      <CampaignFormDialog
+        open={campaignDialogOpen}
+        onOpenChange={(open) => {
+          setCampaignDialogOpen(open);
+          if (!open) setEditingCampaign(undefined);
+        }}
+        campaign={editingCampaign}
+        loops={loops}
+        defaultLoopSlug={selectedLoop?.slug}
+        onSave={handleSaveCampaign}
+      />
 
-                    {/* Delete */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteDocument(doc.id, doc.original_name)}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-600" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
+      <QuestFormDialog
+        open={questDialogOpen}
+        onOpenChange={(open) => {
+          setQuestDialogOpen(open);
+          if (!open) setEditingQuest(undefined);
+        }}
+        quest={editingQuest}
+        loops={loops}
+        campaigns={campaigns}
+        defaultCampaignId={selectedCampaign?.id}
+        defaultLoopSlug={selectedLoop?.slug}
+        onSave={handleSaveQuest}
+      />
+
+      <OpFormDialog
+        open={opDialogOpen}
+        onOpenChange={(open) => {
+          setOpDialogOpen(open);
+          if (!open) setEditingOp(undefined);
+        }}
+        op={editingOp}
+        loops={loops}
+        quests={quests}
+        defaultQuestId={selectedQuest?.id}
+        defaultLoopSlug={selectedLoop?.slug}
+        onSave={handleSaveOp}
+      />
+
+      {/* Note editor in a dialog */}
+      <Dialog
+        open={noteDialogOpen}
+        onOpenChange={(open) => {
+          setNoteDialogOpen(open);
+          if (!open) setEditingNote(undefined);
+        }}
+      >
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingNote ? "Edytuj notatke" : "Nowa notatka"}
+            </DialogTitle>
+          </DialogHeader>
+          <NoteEditor
+            loops={loops}
+            quests={quests}
+            ops={ops}
+            initial={
+              editingNote
+                ? {
+                    type: editingNote.type,
+                    title: editingNote.title || "",
+                    content: editingNote.content || "",
+                    tags: editingNote.tags || [],
+                    isResearch: editingNote.is_research,
+                    isExperience: editingNote.is_experience,
+                    loopSlug: editingNote.loop_slug,
+                    questId: editingNote.quest_id,
+                    opId: editingNote.op_id,
+                  }
+                : {
+                    type: "text" as NoteType,
+                    title: "",
+                    content: "",
+                    tags: [],
+                    isResearch: false,
+                    isExperience: false,
+                    loopSlug: selectedLoop?.slug || null,
+                    questId: selectedQuest?.id || null,
+                    opId: null,
+                  }
+            }
+            onSave={handleSaveNote}
+            onCancel={() => {
+              setNoteDialogOpen(false);
+              setEditingNote(undefined);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import {
   Settings,
   CheckSquare,
   Target,
-  FileUp,
+  FolderTree,
   Sparkles,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard/tasks", label: "Zadania", icon: CheckSquare },
   { href: "/dashboard/goals", label: "Cele", icon: Target },
-  { href: "/dashboard/knowledge", label: "Wiedza", icon: FileUp },
+  { href: "/dashboard/knowledge", label: "Wiedza", icon: FolderTree },
   { href: "/dashboard/skills", label: "Skills", icon: Sparkles },
   { href: "/dashboard/memory", label: "Pamiec", icon: Brain },
   { href: "/dashboard/settings", label: "Ustawienia", icon: Settings },
