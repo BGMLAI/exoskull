@@ -1,49 +1,31 @@
 /**
- * DualInterface — The core of ExoSkull's new UX paradigm
+ * DualInterface — The core TAU layout for ExoSkull
  *
- * Two interpenetrating interfaces:
+ * Two always-visible panels separated by a draggable Gamma boundary:
  *
- * MODE: CHAT (default)
- * ┌─────────────────────────────┐
- * │                             │
- * │        Chat River           │
- * │       (full screen)         │
- * │                             │
- * │                    ┌──────┐ │
- * │                    │ Mini │ │
- * │                    │ Graph│ │
- * │                    └──────┘ │
- * │  [input bar]                │
- * └─────────────────────────────┘
+ * ┌────────────────────────║────────────────────────┐
+ * │   Consciousness        ║       6 Worlds         │
+ * │     Stream              ║        Graph           │
+ * │  (Chat + Forge)        ║   (Poles + Trees)      │
+ * │                        ║                        │
+ * │   splitRatio →         ║   ← (1 - splitRatio)   │
+ * └────────────────────────║────────────────────────┘
  *
- * MODE: GRAPH (after clicking miniature / poles)
- * ┌─────────────────────────────┐
- * │                             │
- * │       Tree / Graph          │
- * │      (full screen)          │
- * │                             │
- * │                             │
- * │ ┌────┐                      │
- * │ │Chat│                      │
- * │ │ ☁️ │                      │
- * │ └────┘                      │
- * └─────────────────────────────┘
+ * No discrete "modes" — both panels are always present.
+ * The SplitHandle (Gamma border) controls the ratio.
  *
- * No menu, no settings page, no home.
- * Everything flows from Chat or the Tree system.
+ * - Ctrl+\ cycles through split presets (stream-focused / balanced / graph-focused)
+ * - Double-click the handle → reset to 50/50
  */
 "use client";
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef } from "react";
 import { useInterfaceStore } from "@/lib/stores/useInterfaceStore";
-import { cn } from "@/lib/utils";
-import { UnifiedStream } from "@/components/stream/UnifiedStream";
-import { TreeGraph, type TreeNode } from "./TreeGraph";
-import { GraphMiniature } from "./GraphMiniature";
-import { ChatBubble } from "./ChatBubble";
+import { ConsciousnessStream } from "./ConsciousnessStream";
+import { WorldsGraph, type WorldNode } from "./WorldsGraph";
+import { SplitHandle } from "./SplitHandle";
 import { NeuralBackground } from "@/components/ui/NeuralBackground";
 import { FloatingCallButton } from "@/components/voice/FloatingCallButton";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface DualInterfaceProps {
   tenantId: string;
@@ -51,106 +33,50 @@ interface DualInterfaceProps {
 }
 
 export function DualInterface({ tenantId, iorsName }: DualInterfaceProps) {
-  const { mode, isTransitioning } = useInterfaceStore();
-  const [recentMessages, setRecentMessages] = useState<
-    Array<{ id: string; role: "user" | "ai"; content: string; timestamp: Date }>
-  >([]);
+  const splitRatio = useInterfaceStore((s) => s.splitRatio);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Track chat messages for the bubble preview
-  // This is a simplified version — in production, share state with UnifiedStream
-  const handleChatAboutNode = useCallback((node: TreeNode) => {
-    // This will trigger a message in chat context
-    // For now, we set focus and switch to chat mode
-    console.log("[DualInterface] Chat about node:", node.name);
+  // When user clicks "Chat about this node" in the graph
+  const handleChatAboutNode = useCallback((node: WorldNode) => {
+    // Future: inject node context into chat input
+    console.log("[DualInterface] Chat about node:", node.name, node.worldId);
   }, []);
 
   return (
-    <div className="fixed inset-0 overflow-hidden">
-      {/* Neural background — always present, subtle */}
+    <div ref={containerRef} className="fixed inset-0 overflow-hidden">
+      {/* Neural background — always present, very subtle */}
       <NeuralBackground
-        nodeCount={8}
+        nodeCount={6}
         pulseIntensity="subtle"
         className="fixed inset-0 z-0"
       />
 
-      {/* ============================================================ */}
-      {/* CHAT MODE: Chat is primary, graph miniature in corner        */}
-      {/* ============================================================ */}
-      <div
-        className={cn(
-          "absolute inset-0 z-10",
-          "transition-all duration-500 ease-out-expo",
-          mode === "chat"
-            ? "opacity-100 scale-100 pointer-events-auto"
-            : "opacity-0 scale-95 pointer-events-none",
-        )}
-      >
-        {/* Chat title bar — minimal, non-intrusive */}
-        <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 py-2.5 bg-background/60 backdrop-blur-md border-b border-border/30">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              <h1 className="text-sm font-semibold text-foreground">
-                {iorsName || "ExoSkull"}
-              </h1>
-            </div>
-            <span className="text-[10px] text-muted-foreground/50 hidden sm:inline">
-              wpisz / aby zobaczyć komendy
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-          </div>
+      {/* ── Main split layout ──────────────────────────────────── */}
+      <div className="relative z-10 flex h-full w-full">
+        {/* LEFT: Consciousness Stream */}
+        <div
+          className="h-full min-w-0 transition-[flex] duration-150 ease-out"
+          style={{ flex: `${splitRatio} 1 0%` }}
+        >
+          <ConsciousnessStream iorsName={iorsName} />
         </div>
 
-        {/* Chat river — full height below the minimal bar */}
-        <div className="absolute inset-0 pt-11">
-          <UnifiedStream className="h-full" />
+        {/* CENTER: Gamma boundary handle */}
+        <SplitHandle containerRef={containerRef} />
+
+        {/* RIGHT: 6 Worlds Graph */}
+        <div
+          className="h-full min-w-0 transition-[flex] duration-150 ease-out"
+          style={{ flex: `${1 - splitRatio} 1 0%` }}
+        >
+          <WorldsGraph onChatAboutNode={handleChatAboutNode} />
         </div>
-
-        {/* Graph miniature — bottom right corner */}
-        <GraphMiniature />
       </div>
 
-      {/* ============================================================ */}
-      {/* GRAPH MODE: Graph is primary, chat bubble in corner          */}
-      {/* ============================================================ */}
-      <div
-        className={cn(
-          "absolute inset-0 z-10",
-          "transition-all duration-500 ease-out-expo",
-          mode === "graph"
-            ? "opacity-100 scale-100 pointer-events-auto"
-            : "opacity-0 scale-105 pointer-events-none",
-        )}
-      >
-        {/* Full screen tree graph */}
-        <TreeGraph onChatAboutNode={handleChatAboutNode} />
-
-        {/* Chat bubble — bottom left */}
-        <ChatBubble recentMessages={recentMessages} unreadCount={0} />
-      </div>
-
-      {/* ============================================================ */}
-      {/* SHARED ELEMENTS — always visible                             */}
-      {/* ============================================================ */}
-
-      {/* Floating voice call button — adapts position based on mode */}
-      <div
-        className={cn(
-          "fixed z-50 transition-all duration-500",
-          mode === "chat" ? "bottom-6 left-6" : "bottom-6 right-6",
-        )}
-      >
+      {/* ── Floating voice call button ─────────────────────────── */}
+      <div className="fixed z-50 bottom-5 left-5">
         <FloatingCallButton tenantId={tenantId} />
       </div>
-
-      {/* Transition overlay — brief flash during mode switch */}
-      {isTransitioning && (
-        <div className="fixed inset-0 z-[100] pointer-events-none">
-          <div className="absolute inset-0 bg-background/20 backdrop-blur-sm animate-pulse" />
-        </div>
-      )}
     </div>
   );
 }

@@ -233,8 +233,13 @@ export function TreeGraph({
   links: customLinks,
   onChatAboutNode,
 }: TreeGraphProps) {
-  const { focusedNode, setFocusedNode, graphFilter, setGraphFilter, setMode } =
-    useInterfaceStore();
+  const {
+    focusedNode,
+    setFocusedNode,
+    graphFilter,
+    setGraphFilter,
+    expandStream,
+  } = useInterfaceStore();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fgRef = useRef<any>(null);
@@ -593,7 +598,7 @@ export function TreeGraph({
                   const node = rawNodes.find((n) => n.id === focusedNode.id);
                   if (node && onChatAboutNode) {
                     onChatAboutNode(node);
-                    setMode("chat");
+                    expandStream();
                   }
                 }}
                 className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl bg-primary/20 hover:bg-primary/30 text-primary text-xs font-medium transition-colors"
