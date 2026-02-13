@@ -47,6 +47,7 @@ import { AutonomySection } from "./AutonomySection";
 import { MyDataSection } from "./MyDataSection";
 import { SystemPromptSection } from "./SystemPromptSection";
 import { SectionErrorBoundary } from "./SectionErrorBoundary";
+import { VoiceSettingsSection } from "./VoiceSettingsSection";
 
 interface PersonalityFormState {
   name: string;
@@ -403,6 +404,10 @@ export default function SettingsPage() {
           saving={savingNotifications}
           saved={notificationsSaved}
         />
+      </SectionErrorBoundary>
+
+      <SectionErrorBoundary sectionName="Glos i komunikacja">
+        <VoiceSettingsSection />
       </SectionErrorBoundary>
 
       <SectionErrorBoundary sectionName="Instrukcje">

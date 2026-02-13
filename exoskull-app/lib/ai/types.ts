@@ -38,6 +38,8 @@ export type TaskCategory =
   | "reasoning" // Tier 3: Complex reasoning
   | "swarm" // Tier 3: Multi-agent coordination
   | "code_generation" // Tier 3: Code generation, skill creation
+  | "content_generation" // Tier 3: Documents, presentations, marketing content
+  | "strategic" // Tier 4: Coaching, mentoring, planning, life strategy
   | "meta_coordination" // Tier 4: Strategic decisions
   | "crisis"; // Tier 4: Crisis intervention
 

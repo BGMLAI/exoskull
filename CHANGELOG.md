@@ -4,6 +4,199 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-13] VPS Executor Deployed to OVH — Live Docker Sandbox
+
+### What was done
+
+- **Deployed VPS Executor to OVH VPS** (`57.128.253.15:3500`, Warsaw DC)
+  - Ubuntu 24.04 LTS, 4 vCores, 8GB RAM, 75GB SSD
+  - Docker + Node.js 22 installed, runner images built (node + python)
+  - systemd service `exoskull-executor.service` with auto-restart
+  - Bearer token auth configured
+- **OVH VPS Recovery**: OS reinstall via OVH API (Ubuntu 24.04), SSH key injection, password rotation
+- **Bug Fixes During Deployment**:
+  - `server.ts`: Express `req.headers.authorization` type fix (`string | string[]` → `Array.isArray` check)
+  - `server.ts`: `req.params.id` type cast (`as string`)
+  - `docker-runner.ts`: Container user set to `root` (was `runner` — EACCES on workspace files)
+  - `docker-runner.ts`: Conditional `npm install` / `pip install` (only if `package.json` / `requirements.txt` exists)
+  - `docker-runner.ts`: Use `npx tsx` for TypeScript entry points (instead of `node`)
+- **Environment configured**: `VPS_EXECUTOR_URL` + `VPS_EXECUTOR_SECRET` added to `.env.local`
+- **Verified**: Node.js and Python code execution tested end-to-end on live VPS
+
+### Files changed
+
+- `vps-executor/src/server.ts` (2 TS type fixes)
+- `vps-executor/src/docker-runner.ts` (3 runtime fixes: user, conditional install, tsx)
+- `exoskull-app/.env.local` (added VPS env vars)
+
+### Pending
+
+- Add `VPS_EXECUTOR_URL` + `VPS_EXECUTOR_SECRET` to Vercel production env vars
+- Consider DigitalOcean migration later (user preference: OVH for now)
+
+---
+
+## [2026-02-13] VPS Executor Stack — Docker Code Execution
+
+### What was done
+
+- **VPS Executor Server** (`vps-executor/`): Express API server with Docker SDK for sandboxed code execution
+  - `POST /execute`: run code in isolated Docker containers (Node.js or Python)
+  - `GET /health`: server + Docker daemon health check
+  - `GET /jobs/:id`: async job status and results
+  - Bearer token auth via `VPS_EXECUTOR_SECRET`
+  - Resource limits: 512MB RAM, 50% CPU, 100 PIDs per container
+  - Network isolation (default: no outbound), 5min max timeout
+  - Multiplexed Docker log parsing (stdout/stderr separation)
+  - Output file collection from containers (max 1MB/file)
+  - Automatic container cleanup after execution
+- **Docker Runner Images**: Node.js 22 + Python 3.12 slim images with dev tooling pre-installed
+  - Node: TypeScript, tsx, ESLint, Prettier
+  - Python: pytest, ruff, mypy, black
+- **VPS Client Library** (`lib/code-generation/vps-executor.ts`): HTTP client for calling remote VPS
+  - `isVPSAvailable()`, `executeOnVPS()`, `runTestsOnVPS()`, `typecheckOnVPS()`, `buildAndDeployOnVPS()`
+  - Graceful fallback: if VPS unavailable, tools fall back to AI-based analysis
+  - `formatVPSResult()` for human-readable output in IORS
+- **Enhanced IORS Tools**:
+  - `run_tests`: tries Docker sandbox first, falls back to AI analysis
+  - `deploy_app`: added `platform: "vps"` option alongside vercel/manual
+  - `execute_code` (NEW): run arbitrary code in Docker sandbox (Node.js/Python)
+  - Tool count: 5 code gen tools (was 4), 61 total IORS tools (was 56)
+- **Deployment Script** (`vps-executor/setup.sh`): Full DigitalOcean droplet provisioning
+  - System updates, Docker install, Node.js 22, build images, systemd service
+  - Auto-generates secret if not set
+- Zero new TypeScript errors
+
+### Files changed
+
+- `vps-executor/` (NEW directory — server, Docker configs, deployment script)
+  - `src/server.ts`, `src/docker-runner.ts`, `Dockerfile`, `docker-compose.yml`
+  - `runners/node.Dockerfile`, `runners/python.Dockerfile`
+  - `setup.sh`, `package.json`, `tsconfig.json`
+- `lib/code-generation/vps-executor.ts` (NEW — VPS client library)
+- `lib/iors/tools/code-generation-tools.ts` (enhanced run_tests, deploy_app + new execute_code)
+- `lib/voice/system-prompt.ts` (updated tool count and sections)
+
+### How to deploy
+
+1. Create DigitalOcean droplet (2GB RAM, 50GB SSD, Ubuntu 24.04)
+2. SSH in and run: `bash setup.sh`
+3. Set env vars in ExoSkull: `VPS_EXECUTOR_URL`, `VPS_EXECUTOR_SECRET`
+4. VPS tools auto-detect availability and use Docker sandbox when available
+
+---
+
+## [2026-02-13] System Health Reporting Service
+
+### What was done
+
+- **Health Checker Engine** (`lib/system/health-checker.ts`): Active health monitoring with 6 check categories:
+  - CRON staleness — detects when critical CRONs stop running on schedule
+  - Tool failure spikes — monitors failure rate per tool (>30% = warning, >50% = critical)
+  - Integration circuit breakers — checks for tripped circuits across all integrations
+  - Generated app table health — verifies app tables are accessible, flags 30+ day unused apps
+  - Database connectivity & latency — tests response time, alerts on slow/unreachable DB
+  - Watchdog — detects missing MAPEK configs, error storms (20+ errors/2h), silent failures
+- **System Report CRON** (`app/api/cron/system-report/route.ts`): Every 15 minutes, runs all health checks
+  - Critical issues trigger proactive message to all active tenants
+  - Alert deduplication — same issue not re-alerted within 1 hour
+  - Full logging via `withCronGuard` + system events
+  - Polish-language health alerts with severity badges
+- **Self-monitoring** — system-report monitors itself (30min staleness threshold)
+- Registered in System Manifest catalog (37 CRONs total, was 36)
+- Zero new TypeScript errors
+
+### Files changed
+
+- `lib/system/health-checker.ts` (NEW — 430 lines)
+- `app/api/cron/system-report/route.ts` (NEW — 140 lines)
+- `lib/system/manifest.ts` (added system-report to CRON catalog)
+
+---
+
+## [2026-02-13] Masterplan "Cywilizowany Claude Code" — 6 Workstreams
+
+### WORKSTREAM A: Fix Integrations
+- Email tools (`email-tools.ts`): enhanced reliability, full email view, retry logic
+- Composio adapter (`composio-adapter.ts`): health checks, auto-reconnect, retry wrapper
+- Integration Health Widget (`IntegrationHealthWidget.tsx`): status badges, last sync, reconnect
+- Canvas widget type `integration_health` registered
+
+### WORKSTREAM B: Unified Thread = Claude Code for Everyone
+- **Thinking Process Display** (`ThinkingIndicator.tsx`): expandable panel showing reasoning steps, tool calls with spinner/result badge, time elapsed — collapsible by default
+- **Thread Branching** (`QuotedReply.tsx`): reply-to-message with `reply_to_id` column, visual quoted original
+- **Voice Input** (`VoiceInputBar.tsx`): auto-stop on 5s silence (Web Audio API frequency analysis), improved recording UX
+- Stream types: added `reply_to_id`, `thinking_steps` to message types
+- StreamEventRouter: enhanced with thinking display and quote rendering
+- Migration: `20260227000001_thread_branching.sql`
+
+### WORKSTREAM C: Value Hierarchy + Onboarding
+- **Value hierarchy schema**: `user_values`, `user_areas`, `user_missions` tables
+- API routes: `/api/knowledge/values` CRUD
+- Value Tree Widget (`ValueTreeWidget.tsx`): tree visualization
+- IORS tools: `manage_values`, `view_value_tree`
+- Birth flow enhanced: auto-create Areas from discovered values
+- Migration: `20260227000001_value_hierarchy_extended.sql`
+
+### WORKSTREAM D: System Self-Awareness
+- **System Manifest** (`lib/system/manifest.ts`): auto-discovers 36 CRONs, 56 IORS tools, 19 widgets, integrations, apps, adapters
+- Admin API: `/api/admin/system-manifest` + `/api/admin/system-health`
+- System Health Widget (`SystemHealthWidget.tsx`): 6 subsystems with traffic light status
+- **Ralph Loop enhanced** (`ralph-loop.ts`): manifest awareness, lateral thinking mode (stuck 3+ cycles), new actions: `heal_integration`, `generate_content`, `lateral_experiment`
+- Migration: `20260226000002_system_self_awareness.sql`
+
+### WORKSTREAM E: Skill Engine (.md format)
+- **Skill Catalog** (`lib/skills/catalog/`): Claude Code-style `.md` skills with YAML frontmatter
+- 4 initial skills: `build-app`, `write-document`, `post-social`, `strategic-review`, `analyze-market`
+- Catalog parser (`lib/skills/catalog/index.ts`): reads/indexes .md files at runtime
+- `getSkillCatalogSummary()` injected into dynamic context for system prompt
+
+### WORKSTREAM F: AI Personality + Dashboard
+- **Dashboard Cleanup**: 8→5 nav items (Home, Chat, Wiedza, Wartosci, Ustawienia). Mobile tabs updated.
+- **Agent Debate Engine** (`lib/ai/agent-debate.ts`): 4 agents (Optymista, Krytyk, Szaleniec, Pragmatyk) with De Bono lateral thinking, structured rounds, parallel execution
+- IORS tool `start_debate` registered (120s timeout, ~$0.30-0.60/debate)
+- **System Prompt Rewrite**: 3 modes (MENTOR, STRATEG, WYKONAWCA) with natural switching
+- **Opus Usage Increase**: `strategic` + `content_generation` task categories → routes to Tier 4 (Opus) for coaching, values, life strategy
+- Task classifier: new keyword detection for strategic/content tasks
+- **Code Generation** (`code-generation-tools.ts`): enhanced with response parser, multi-adapter support
+
+### Files changed (summary)
+- 33 files modified, ~2800 lines added, ~580 removed
+- 5 new migrations
+- 10+ new files (components, tools, skills, engine)
+- Zero new TypeScript errors (3 pre-existing in email-tools.ts)
+
+---
+
+## [2026-02-13] Tyrolka Framework Migration — COMPLETE
+
+### What was done
+- **Phase 3b:** Dual-write/read infrastructure deployed (task-service.ts, goal-service.ts, dual-write.ts, dual-read.ts)
+- **Phase 3c:** 17 files migrated from legacy `exo_tasks`/`exo_user_goals` queries to service layer
+  - Agent framework: base-agent.ts, coordinator.ts, self-optimizer.ts
+  - Autonomy/MAPEK: mape-k-monitor.ts, guardian.ts, custom-action-registry.ts, loop.ts
+  - Data/Coaching: data-collectors.ts, collector.ts, signal-collector.ts, effectiveness.ts, cross-domain.ts
+  - Reporting/Context: daily-summary.ts, summary-generator.ts, dynamic-context.ts, engagement.ts, engine.ts
+- **Feature flags activated:** dual_write, dual_read, quest_system_enabled — ALL ON for 5 tenants
+- Migration script executed: 5 tenants, 4 goals, 24 tasks migrated to Tyrolka tables
+
+### How it works now
+- New tasks/goals write to BOTH legacy + Tyrolka (dual-write)
+- Reads go to Tyrolka first, legacy fallback (dual-read)
+- 5 native Tyrolka IORS tools active (loops, campaigns, quests, ops, notes)
+- Rollback: set flags to false → instant revert to legacy
+
+### Deferred to Phase 4
+- `exo_goal_checkpoints` queries (need Goal interface enrichment)
+- `exo_user_goals` queries needing trajectory, wellbeing_weight, target_value fields
+- Legacy table cleanup (drop exo_tasks, exo_user_goals after confidence period)
+
+### Files changed
+- 17 migration files (commit 7372714)
+- Services: task-service.ts, goal-service.ts, dual-write.ts, dual-read.ts (commit 8de2140)
+
+---
+
 ## [2026-02-13] Workstream A+B: Fix Integrations + Unified Thread Improvements
 
 ### What was done

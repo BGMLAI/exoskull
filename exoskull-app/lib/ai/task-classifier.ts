@@ -66,6 +66,60 @@ export function classifyTask(options: AIRequestOptions): TaskClassification {
     };
   }
 
+  // Check for strategic/coaching keywords → Tier 4 (Opus for quality)
+  if (containsKeywords(allText, CLASSIFICATION_KEYWORDS.tier4_strategic)) {
+    return {
+      complexity: "complex",
+      category: "strategic",
+      suggestedTier: 4,
+      confidence: 0.75,
+      reasoning: "Strategic/coaching/values keywords detected → Opus",
+    };
+  }
+
+  // Check for content generation → Tier 3 minimum (Sonnet for quality content)
+  // High-quality content (documents, posts, presentations) → Tier 4 (Opus)
+  if (containsKeywords(allText, CLASSIFICATION_KEYWORDS.tier3_content)) {
+    const isHighQuality =
+      allText.includes("dokument") ||
+      allText.includes("prezentacj") ||
+      allText.includes("raport") ||
+      allText.includes("artykuł") ||
+      allText.includes("strategia") ||
+      allText.includes("plan marketing") ||
+      allText.includes("opowiadani") ||
+      allText.includes("publikacj");
+    return {
+      complexity: "complex",
+      category: "content_generation",
+      suggestedTier: isHighQuality ? 4 : 3,
+      confidence: 0.8,
+      reasoning: isHighQuality
+        ? "High-quality content → Opus for best output"
+        : "Content generation keywords detected",
+    };
+  }
+
+  // Analysis, reasoning, coaching → Tier 3+ (not Haiku/Flash)
+  if (
+    allText.includes("analiz") ||
+    allText.includes("wytłumacz") ||
+    allText.includes("wyjaśnij") ||
+    allText.includes("porównaj") ||
+    allText.includes("oceń") ||
+    allText.includes("zaplanuj") ||
+    allText.includes("scenariusz") ||
+    allText.includes("mentor")
+  ) {
+    return {
+      complexity: "complex",
+      category: "reasoning",
+      suggestedTier: 3,
+      confidence: 0.7,
+      reasoning: "Analysis/reasoning keywords → Sonnet minimum",
+    };
+  }
+
   // 4. Check for Tier 1 (simple) patterns
   if (totalLength < 500 && !hasTools) {
     if (containsKeywords(allText, CLASSIFICATION_KEYWORDS.tier1)) {
@@ -166,7 +220,9 @@ function getCategoryComplexity(category: TaskCategory): TaskComplexity {
       return "moderate";
     case "reasoning":
     case "code_generation":
+    case "content_generation":
     case "swarm":
+    case "strategic":
       return "complex";
     case "meta_coordination":
     case "crisis":

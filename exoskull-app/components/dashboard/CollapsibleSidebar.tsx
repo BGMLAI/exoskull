@@ -5,27 +5,23 @@ import { usePathname } from "next/navigation";
 import {
   Home,
   MessageSquare,
-  Brain,
   Settings,
-  CheckSquare,
-  Target,
   FolderTree,
-  Sparkles,
+  TreePine,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 // ============================================================================
 // NAVIGATION CONFIG
+// Simplified: 5 items (was 8). Tasks/Goals/Skills merged into Wartosci.
+// Memory merged into Wiedza.
 // ============================================================================
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
-  { href: "/dashboard/tasks", label: "Zadania", icon: CheckSquare },
-  { href: "/dashboard/goals", label: "Cele", icon: Target },
   { href: "/dashboard/knowledge", label: "Wiedza", icon: FolderTree },
-  { href: "/dashboard/skills", label: "Skills", icon: Sparkles },
-  { href: "/dashboard/memory", label: "Pamiec", icon: Brain },
+  { href: "/dashboard/values", label: "Wartosci", icon: TreePine },
   { href: "/dashboard/settings", label: "Ustawienia", icon: Settings },
 ];
 

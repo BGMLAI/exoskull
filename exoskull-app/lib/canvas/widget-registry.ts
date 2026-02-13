@@ -148,6 +148,38 @@ export const WIDGET_REGISTRY: Record<string, WidgetMeta> = {
     minSize: { w: 2, h: 2 },
     category: "iors",
   },
+  value_tree: {
+    type: "value_tree",
+    label: "Drzewo wartosci",
+    icon: "TreePine",
+    defaultSize: { w: 2, h: 3 },
+    minSize: { w: 2, h: 2 },
+    category: "core",
+  },
+  system_health: {
+    type: "system_health",
+    label: "Zdrowie systemu",
+    icon: "HeartPulse",
+    defaultSize: { w: 2, h: 2 },
+    minSize: { w: 2, h: 2 },
+    category: "iors",
+  },
+  integration_health: {
+    type: "integration_health",
+    label: "Zdrowie integracji",
+    icon: "Activity",
+    defaultSize: { w: 2, h: 3 },
+    minSize: { w: 2, h: 2 },
+    category: "core",
+  },
+  process_monitor: {
+    type: "process_monitor",
+    label: "Monitor procesow",
+    icon: "Activity",
+    defaultSize: { w: 2, h: 3 },
+    minSize: { w: 2, h: 2 },
+    category: "iors",
+  },
 };
 
 /** Get metadata for a widget type. Falls back to a generic entry for dynamic_mod types. */

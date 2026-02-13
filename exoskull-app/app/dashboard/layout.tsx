@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Home, MessageSquare, Sparkles, Settings } from "lucide-react";
+import { Home, MessageSquare, TreePine, Settings } from "lucide-react";
 
 export const metadata: Metadata = {
   title: {
@@ -17,15 +17,16 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { CollapsibleSidebar } from "@/components/dashboard/CollapsibleSidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { FloatingCallButton } from "@/components/voice/FloatingCallButton";
+import { NeuralBackground } from "@/components/ui/NeuralBackground";
 
 // react-grid-layout CSS — loaded in globals.css via @import or inline here
 // Note: exports field doesn't expose CSS, so we'll add styles inline in the client component
 
-// Canvas-first: 4 tabs on mobile
+// Mobile bottom tabs — 4 core items (matching simplified sidebar)
 const MOBILE_TAB_ITEMS = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
-  { href: "/dashboard/skills", label: "Skills", icon: Sparkles },
+  { href: "/dashboard/values", label: "Wartosci", icon: TreePine },
   { href: "/dashboard/settings", label: "Ustawienia", icon: Settings },
 ];
 
@@ -59,7 +60,14 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex relative">
+      {/* Neural network background — subtle ambient animation */}
+      <NeuralBackground
+        nodeCount={12}
+        pulseIntensity="subtle"
+        className="fixed inset-0 z-0"
+      />
+
       {/* Sidebar — with IORS badge */}
       <CollapsibleSidebar
         userEmail={user.email || ""}

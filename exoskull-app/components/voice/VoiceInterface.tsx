@@ -42,6 +42,16 @@ export function VoiceInterface({
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // Emit voice state events for FloatingCallButton audio level ring
+  useEffect(() => {
+    const isActive = state === "listening" || state === "speaking";
+    window.dispatchEvent(
+      new CustomEvent("exoskull:voice-state", {
+        detail: { active: isActive, state },
+      }),
+    );
+  }, [state]);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);

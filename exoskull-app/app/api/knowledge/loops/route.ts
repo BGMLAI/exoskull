@@ -204,6 +204,7 @@ export async function PATCH(request: NextRequest) {
       dbUpdates.attention_score = updates.attentionScore;
     if (updates.lastActivityAt !== undefined)
       dbUpdates.last_activity_at = updates.lastActivityAt;
+    if (updates.valueId !== undefined) dbUpdates.value_id = updates.valueId;
 
     const { data, error } = await supabase
       .from("user_loops")

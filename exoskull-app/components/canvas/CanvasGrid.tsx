@@ -29,6 +29,13 @@ import { OptimizationWidget } from "@/components/widgets/OptimizationWidget";
 import { InterventionInboxWidget } from "@/components/widgets/InterventionInboxWidget";
 import { InsightHistoryWidget } from "@/components/widgets/InsightHistoryWidget";
 import { KnowledgeInsightsWidget } from "@/components/widgets/KnowledgeInsightsWidget";
+import { ValueTreeWidget } from "@/components/widgets/ValueTreeWidget";
+import { SystemHealthWidget } from "@/components/widgets/SystemHealthWidget";
+import {
+  IntegrationHealthWidget,
+  type IntegrationHealthItem,
+} from "@/components/widgets/IntegrationHealthWidget";
+import { ProcessMonitorWidget } from "@/components/widgets/ProcessMonitorWidget";
 import { AppWidget } from "@/components/widgets/AppWidget";
 import {
   EmailAnalyticsWidget,
@@ -183,6 +190,23 @@ function CanvasInterventionInboxWidget() {
       needsFeedback={data.needsFeedback}
     />
   );
+}
+
+function CanvasIntegrationHealthWidget() {
+  const [integrations, setIntegrations] = useState<IntegrationHealthItem[]>([]);
+  useEffect(() => {
+    const load = () =>
+      fetch("/api/canvas/data/integration-health")
+        .then((r) => r.json())
+        .then((d) => setIntegrations(d.integrations || []))
+        .catch((e) =>
+          console.error("[CanvasIntegrationHealth] Fetch error:", e),
+        );
+    load();
+    const interval = setInterval(load, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+  return <IntegrationHealthWidget integrations={integrations} />;
 }
 
 function CanvasInsightHistoryWidget() {
@@ -376,6 +400,14 @@ export function CanvasGrid({
         return <KnowledgeInsightsWidget />;
       case "email_inbox":
         return <CanvasEmailWidget />;
+      case "value_tree":
+        return <ValueTreeWidget />;
+      case "system_health":
+        return <SystemHealthWidget />;
+      case "integration_health":
+        return <CanvasIntegrationHealthWidget />;
+      case "process_monitor":
+        return <ProcessMonitorWidget />;
       default:
         // Generated app widgets (app:slug-name)
         if (widget.widget_type.startsWith("app:")) {

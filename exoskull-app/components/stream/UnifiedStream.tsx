@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useEffect, useCallback, useState } from "react";
+import { useRef, useEffect, useCallback, useState, useMemo } from "react";
 import { useStreamState } from "@/lib/hooks/useStreamState";
 import { StreamEventRouter } from "./StreamEventRouter";
 import { VoiceInputBar } from "./VoiceInputBar";
 import { EmptyState } from "./EmptyState";
-import { Loader2 } from "lucide-react";
+import { ThreadBranch, ThreadSidebar } from "./ThreadBranch";
+import { Loader2, X, Reply, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type {
@@ -13,6 +14,9 @@ import type {
   AIMessageData,
   ChannelType,
   SystemNotificationData,
+  CodeBlockData,
+  MediaContentData,
+  ToolExecutionData,
 } from "@/lib/stream/types";
 
 // ---------------------------------------------------------------------------
@@ -61,10 +65,13 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
     updateThinkingSteps,
     updateThinkingTools,
     updateFileUpload,
+    updateToolExecution,
     setLoading,
     setConversationId,
     setError,
     loadHistory,
+    setReplyTo,
+    setActiveThread,
   } = useStreamState();
 
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -335,6 +342,35 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
   }, [historyLoaded, loadHistory]);
 
   // ---------------------------------------------------------------------------
+  // Reply handler — sets reply-to context for next message
+  // ---------------------------------------------------------------------------
+
+  const handleReply = useCallback(
+    (event: StreamEvent) => {
+      let preview = "";
+      const d = event.data;
+      if (d.type === "user_message") preview = d.content;
+      else if (d.type === "user_voice") preview = d.transcript;
+      else if (d.type === "ai_message") preview = d.content;
+      else if (d.type === "channel_message") preview = d.content;
+
+      const senderRole: "user" | "ai" | "system" =
+        d.type === "user_message" || d.type === "user_voice"
+          ? "user"
+          : d.type === "ai_message"
+            ? "ai"
+            : "system";
+
+      setReplyTo({
+        id: event.id,
+        preview: preview.slice(0, 100) + (preview.length > 100 ? "..." : ""),
+        senderRole,
+      });
+    },
+    [setReplyTo],
+  );
+
+  // ---------------------------------------------------------------------------
   // Send message via SSE
   // ---------------------------------------------------------------------------
 
@@ -347,6 +383,10 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
       const controller = new AbortController();
       abortRef.current = controller;
 
+      // Capture and clear reply-to context
+      const currentReplyTo = state.replyTo;
+      setReplyTo(null);
+
       // 1. Add user event
       const userEvent: StreamEvent = {
         id: `user-${Date.now()}`,
@@ -355,6 +395,7 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
           type === "voice_transcript"
             ? { type: "user_voice", transcript: text.trim() }
             : { type: "user_message", content: text.trim() },
+        ...(currentReplyTo ? { replyTo: currentReplyTo } : {}),
       };
       addEvent(userEvent);
 
@@ -544,6 +585,87 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
                   break;
                 }
 
+                // Workstream B: new inline event types
+                case "code_block": {
+                  addEvent({
+                    id: `code-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                    timestamp: new Date(),
+                    data: {
+                      type: "code_block",
+                      language: data.language || "text",
+                      code: data.code || "",
+                      filename: data.filename,
+                      executable: data.executable,
+                      highlightLines: data.highlightLines,
+                    } as CodeBlockData,
+                  });
+                  break;
+                }
+
+                case "media_content": {
+                  addEvent({
+                    id: `media-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                    timestamp: new Date(),
+                    data: {
+                      type: "media_content",
+                      mediaType: data.mediaType || "image",
+                      url: data.url || "",
+                      title: data.title,
+                      caption: data.caption,
+                      mimeType: data.mimeType,
+                      fileSize: data.fileSize,
+                      thumbnailUrl: data.thumbnailUrl,
+                      dimensions: data.dimensions,
+                    } as MediaContentData,
+                  });
+                  break;
+                }
+
+                case "tool_execution": {
+                  const existingTool = state.events.find(
+                    (e) =>
+                      e.data.type === "tool_execution" &&
+                      (e.data as ToolExecutionData).toolName ===
+                        data.toolName &&
+                      (e.data as ToolExecutionData).status === "running",
+                  );
+
+                  if (existingTool) {
+                    // Update existing running tool execution via reducer
+                    updateToolExecution(
+                      existingTool.id,
+                      data.status || "running",
+                      {
+                        outputPreview: data.outputPreview,
+                        durationMs: data.durationMs,
+                        progress: data.progress,
+                        logs: data.logs,
+                      },
+                    );
+                  } else {
+                    addEvent({
+                      id: `toolexec-${data.toolName || "unknown"}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                      timestamp: new Date(),
+                      data: {
+                        type: "tool_execution",
+                        toolName: data.toolName || data.tool || "unknown",
+                        displayLabel:
+                          data.displayLabel ||
+                          data.label ||
+                          data.toolName ||
+                          "Tool",
+                        status: data.status || "running",
+                        inputPreview: data.inputPreview,
+                        outputPreview: data.outputPreview,
+                        durationMs: data.durationMs,
+                        progress: data.progress,
+                        logs: data.logs,
+                      } as ToolExecutionData,
+                    });
+                  }
+                  break;
+                }
+
                 case "error":
                   finalizeAIMessage(
                     aiEventId,
@@ -572,14 +694,17 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
       state.isLoading,
       state.conversationId,
       state.events,
+      state.replyTo,
       addEvent,
       updateAIMessage,
       finalizeAIMessage,
       updateAgentAction,
       updateThinkingSteps,
       updateThinkingTools,
+      updateToolExecution,
       setLoading,
       setConversationId,
+      setReplyTo,
       speakText,
     ],
   );
@@ -722,6 +847,33 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
   }, [state.events]);
 
   // ---------------------------------------------------------------------------
+  // Thread computation — group replies by parent event
+  // ---------------------------------------------------------------------------
+
+  const threadMap = useMemo(() => {
+    const map = new Map<string, StreamEvent[]>();
+    for (const event of state.events) {
+      if (event.replyTo) {
+        const parentId = event.replyTo.id;
+        if (!map.has(parentId)) map.set(parentId, []);
+        map.get(parentId)!.push(event);
+      }
+    }
+    return map;
+  }, [state.events]);
+
+  // Active thread sidebar data
+  const activeThreadEvent = useMemo(() => {
+    if (!state.activeThread) return null;
+    return state.events.find((e) => e.id === state.activeThread) || null;
+  }, [state.activeThread, state.events]);
+
+  const activeThreadReplies = useMemo(() => {
+    if (!state.activeThread) return [];
+    return threadMap.get(state.activeThread) || [];
+  }, [state.activeThread, threadMap]);
+
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
@@ -739,77 +891,134 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
         </div>
       )}
 
-      {/* Stream area */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-3 space-y-2"
-      >
-        {!historyLoaded && (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
-          </div>
-        )}
+      {/* Main content area (stream + optional thread sidebar) */}
+      <div className="flex flex-1 min-h-0">
+        {/* Stream area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto px-4 py-3 space-y-2"
+          >
+            {!historyLoaded && (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+              </div>
+            )}
 
-        {historyLoaded && state.events.length === 0 && !state.isLoading && (
-          <EmptyState onQuickAction={(text) => sendMessage(text, "text")} />
-        )}
+            {historyLoaded && state.events.length === 0 && !state.isLoading && (
+              <EmptyState onQuickAction={(text) => sendMessage(text, "text")} />
+            )}
 
-        {state.events.map((event, idx) => {
-          // Time separator: show when gap > 1 hour between events
-          let timeSeparator: React.ReactNode = null;
-          if (idx > 0) {
-            const prev = state.events[idx - 1];
-            const gap = event.timestamp.getTime() - prev.timestamp.getTime();
-            if (gap > 60 * 60 * 1000) {
-              const now = new Date();
-              const isToday =
-                event.timestamp.toDateString() === now.toDateString();
-              const isYesterday =
-                event.timestamp.toDateString() ===
-                new Date(now.getTime() - 86400000).toDateString();
-              const label = isToday
-                ? `Dzisiaj, ${event.timestamp.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}`
-                : isYesterday
-                  ? `Wczoraj, ${event.timestamp.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}`
-                  : event.timestamp.toLocaleDateString("pl-PL", {
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    });
-              timeSeparator = (
-                <div className="flex items-center gap-3 py-2">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="text-[10px] text-muted-foreground/60">
-                    {label}
-                  </span>
-                  <div className="flex-1 h-px bg-border" />
+            {state.events.map((event, idx) => {
+              // Skip events that are inline replies (they're shown via ThreadBranch)
+              // But still render them if thread sidebar is not active
+              const isReplyEvent = !!event.replyTo;
+
+              // Time separator: show when gap > 1 hour between events
+              let timeSeparator: React.ReactNode = null;
+              if (idx > 0 && !isReplyEvent) {
+                const prev = state.events[idx - 1];
+                const gap =
+                  event.timestamp.getTime() - prev.timestamp.getTime();
+                if (gap > 60 * 60 * 1000) {
+                  const now = new Date();
+                  const isToday =
+                    event.timestamp.toDateString() === now.toDateString();
+                  const isYesterday =
+                    event.timestamp.toDateString() ===
+                    new Date(now.getTime() - 86400000).toDateString();
+                  const label = isToday
+                    ? `Dzisiaj, ${event.timestamp.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}`
+                    : isYesterday
+                      ? `Wczoraj, ${event.timestamp.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}`
+                      : event.timestamp.toLocaleDateString("pl-PL", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        });
+                  timeSeparator = (
+                    <div className="flex items-center gap-3 py-2">
+                      <div className="flex-1 h-px bg-border" />
+                      <span className="text-[10px] text-muted-foreground/60">
+                        {label}
+                      </span>
+                      <div className="flex-1 h-px bg-border" />
+                    </div>
+                  );
+                }
+              }
+
+              // Get replies for this event
+              const replies = threadMap.get(event.id) || [];
+
+              return (
+                <div key={event.id}>
+                  {timeSeparator}
+                  <StreamEventRouter event={event} onReply={handleReply} />
+                  {/* Thread branch indicator (inline expandable) */}
+                  {replies.length > 0 && (
+                    <ThreadBranch
+                      parentEvent={event}
+                      replies={replies}
+                      onReply={handleReply}
+                    />
+                  )}
                 </div>
               );
-            }
-          }
-          return (
-            <div key={event.id}>
-              {timeSeparator}
-              <StreamEventRouter event={event} />
-            </div>
-          );
-        })}
-      </div>
+            })}
+          </div>
 
-      {/* Input bar */}
-      <VoiceInputBar
-        onSendText={(text) => sendMessage(text, "text")}
-        onSendVoice={(transcript) =>
-          sendMessage(transcript, "voice_transcript")
-        }
-        onFileUpload={handleFileUpload}
-        isLoading={state.isLoading}
-        ttsEnabled={ttsEnabled}
-        isSpeaking={isSpeaking}
-        onToggleTTS={toggleTTS}
-      />
+          {/* Reply-to preview strip */}
+          {state.replyTo && (
+            <div className="flex items-center gap-2 px-4 py-2 border-t bg-muted/30">
+              <Reply className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] font-medium text-primary">
+                  {state.replyTo.senderRole === "user"
+                    ? "Ty"
+                    : state.replyTo.senderRole === "ai"
+                      ? "ExoSkull"
+                      : "System"}
+                </span>
+                <p className="text-xs text-muted-foreground truncate">
+                  {state.replyTo.preview}
+                </p>
+              </div>
+              <button
+                onClick={() => setReplyTo(null)}
+                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Input bar */}
+          <VoiceInputBar
+            onSendText={(text) => sendMessage(text, "text")}
+            onSendVoice={(transcript) =>
+              sendMessage(transcript, "voice_transcript")
+            }
+            onFileUpload={handleFileUpload}
+            isLoading={state.isLoading}
+            ttsEnabled={ttsEnabled}
+            isSpeaking={isSpeaking}
+            onToggleTTS={toggleTTS}
+          />
+        </div>
+
+        {/* Thread sidebar (Slack-like, slides in when active) */}
+        {activeThreadEvent && (
+          <ThreadSidebar
+            parentEvent={activeThreadEvent}
+            replies={activeThreadReplies}
+            onClose={() => setActiveThread(null)}
+            onReply={handleReply}
+          />
+        )}
+      </div>
     </div>
   );
 }

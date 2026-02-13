@@ -27,6 +27,8 @@ export interface CodeGenerationTask {
     requiresDeployment?: boolean;
   };
   tenantId: string;
+  workspaceId?: string; // For modifications to existing workspace
+  existingCode?: Array<{ path: string; content: string }>; // For context
 }
 
 export interface CodeGenerationResult {
@@ -35,6 +37,7 @@ export interface CodeGenerationResult {
   files: Array<{
     path: string;
     content: string;
+    language?: string;
     operation: "create" | "modify" | "delete";
   }>;
   gitCommit?: {
@@ -44,6 +47,8 @@ export interface CodeGenerationResult {
   deploymentUrl?: string;
   duration: number;
   error?: string;
+  summary?: string;
+  dependencies?: string[];
 }
 
 export interface CodeExecutor {

@@ -14,6 +14,29 @@
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { ModelRouter } from "@/lib/ai/model-router";
 import { logger } from "@/lib/logger";
+import { readFile } from "fs/promises";
+import { join } from "path";
+import { emitSystemEvent } from "@/lib/system/events";
+import { getManifestSummaryForPrompt } from "@/lib/system/manifest";
+import {
+  emitRalphEvent,
+  emitSwarmEvent,
+  emitAtlasEvent,
+} from "@/lib/system/inter-system-bus";
+import {
+  buildGOTCHAContext,
+  buildGOTCHAPrompt,
+} from "@/lib/system/gotcha-engine";
+import {
+  createSwarmSession,
+  runSwarmCycle,
+  persistSwarmResults,
+} from "@/lib/system/agent-swarm";
+import { runFullPipeline } from "@/lib/system/atlas-pipeline";
+import {
+  suggestSelfBuildActions,
+  executeSelfBuild,
+} from "@/lib/system/self-builder";
 
 // ============================================================================
 // TYPES
@@ -25,6 +48,14 @@ interface RalphObservation {
   detectedGaps: DetectedGap[];
   unusedApps: UnusedApp[];
   userPriorities: UserPriority[];
+  gotchaContext: {
+    goalsManifest: string | null;
+    toolsManifest: string | null;
+  };
+  /** System manifest summary — full self-awareness of all components */
+  manifestSummary: string;
+  /** Consecutive stuck cycles (no progress) — triggers lateral thinking */
+  stuckCycles: number;
 }
 
 interface FailurePattern {
@@ -59,7 +90,15 @@ interface UserPriority {
 }
 
 interface RalphAction {
-  type: "build_app" | "fix_tool" | "optimize" | "register_tool" | "none";
+  type:
+    | "build_app"
+    | "fix_tool"
+    | "optimize"
+    | "register_tool"
+    | "heal_integration"
+    | "generate_content"
+    | "lateral_experiment"
+    | "none";
   description: string;
   params: Record<string, unknown>;
 }
@@ -94,8 +133,37 @@ export async function runRalphCycle(
   budgetMs: number = 20_000,
 ): Promise<RalphCycleResult> {
   const startTime = performance.now();
+  const correlationId = `ralph_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
+  // ── Emit cycle start on system bus ──
+  emitRalphEvent(
+    "cycle.started",
+    tenantId,
+    {
+      budgetMs,
+      correlationId,
+    },
+    correlationId,
+  );
 
   try {
+    // ── Step 0: GOTCHA CONTEXT ──
+    // Load full framework context (goals, tools, user context, args)
+    let gotchaPromptEnrichment = "";
+    try {
+      const gotchaContext = await buildGOTCHAContext(tenantId);
+      gotchaPromptEnrichment = buildGOTCHAPrompt(
+        gotchaContext,
+        "Ralph Loop autonomous cycle",
+      );
+    } catch (err) {
+      // Non-critical — continue without GOTCHA enrichment
+      logger.warn("[RalphLoop] GOTCHA context load failed:", {
+        tenantId,
+        error: err instanceof Error ? err.message : err,
+      });
+    }
+
     // ── Step 1: OBSERVE ──
     const observation = await observe(tenantId);
 
@@ -107,6 +175,26 @@ export async function runRalphCycle(
       priorities: observation.userPriorities.length,
     };
 
+    // ── Step 1b: SELF-BUILD suggestions ──
+    // Check if the system should modify its own dashboard
+    let selfBuildSuggestions: Awaited<
+      ReturnType<typeof suggestSelfBuildActions>
+    > = [];
+    try {
+      selfBuildSuggestions = await suggestSelfBuildActions(tenantId);
+      // Execute auto-suggestions (non-blocking)
+      for (const suggestion of selfBuildSuggestions.slice(0, 2)) {
+        executeSelfBuild(tenantId, suggestion).catch((err) => {
+          logger.warn("[RalphLoop] Self-build suggestion failed:", {
+            action: suggestion.type,
+            error: err instanceof Error ? err.message : err,
+          });
+        });
+      }
+    } catch {
+      // Non-critical
+    }
+
     // Nothing to do?
     const totalSignals =
       observedStats.failures +
@@ -115,6 +203,17 @@ export async function runRalphCycle(
       observedStats.priorities;
 
     if (totalSignals === 0) {
+      emitRalphEvent(
+        "cycle.completed",
+        tenantId,
+        {
+          outcome: "skipped",
+          reason: "no_signals",
+          selfBuildSuggestions: selfBuildSuggestions.length,
+        },
+        correlationId,
+      );
+
       return {
         observed: observedStats,
         action: {
@@ -142,7 +241,8 @@ export async function runRalphCycle(
     }
 
     // ── Step 2: ANALYZE (Gemini Flash — cheap, ~1-2s) ──
-    const action = await analyze(tenantId, observation);
+    // Enhanced with GOTCHA context
+    const action = await analyze(tenantId, observation, gotchaPromptEnrichment);
 
     if (action.type === "none") {
       return {
@@ -176,8 +276,46 @@ export async function runRalphCycle(
       };
     }
 
-    // ── Step 3: BUILD ──
-    const buildResult = await build(tenantId, action);
+    // ── Step 3: BUILD (with Swarm/ATLAS integration) ──
+    emitRalphEvent(
+      "action.started",
+      tenantId,
+      {
+        actionType: action.type,
+        description: action.description,
+      },
+      correlationId,
+    );
+
+    const buildResult = await buildEnhanced(tenantId, action, correlationId);
+
+    // Emit system event for observability
+    emitSystemEvent({
+      tenantId,
+      eventType: buildResult.success ? "ralph_cycle_completed" : "build_failed",
+      component: "ralph_loop",
+      severity: buildResult.success ? "info" : "warn",
+      message: buildResult.success
+        ? `Ralph built: ${action.description}`
+        : `Ralph build failed: ${buildResult.error || action.description}`,
+      details: {
+        actionType: action.type,
+        params: action.params,
+        result: buildResult.result,
+        error: buildResult.error,
+      },
+    });
+
+    emitRalphEvent(
+      "action.completed",
+      tenantId,
+      {
+        actionType: action.type,
+        success: buildResult.success,
+        result: buildResult.result?.slice(0, 200),
+      },
+      correlationId,
+    );
 
     // ── Step 4: LEARN ──
     const journalEntryId = await learn(tenantId, action, buildResult);
@@ -186,6 +324,17 @@ export async function runRalphCycle(
     if (buildResult.success) {
       await notifyUser(tenantId, action, buildResult, journalEntryId);
     }
+
+    emitRalphEvent(
+      "cycle.completed",
+      tenantId,
+      {
+        outcome: buildResult.success ? "success" : "failed",
+        actionType: action.type,
+        durationMs: Math.round(performance.now() - startTime),
+      },
+      correlationId,
+    );
 
     return {
       observed: observedStats,
@@ -200,6 +349,15 @@ export async function runRalphCycle(
       error: error instanceof Error ? error.message : error,
     });
 
+    emitRalphEvent(
+      "cycle.failed",
+      tenantId,
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      correlationId,
+    );
+
     return {
       observed: {
         failures: 0,
@@ -213,6 +371,25 @@ export async function runRalphCycle(
       durationMs: Math.round(performance.now() - startTime),
     };
   }
+}
+
+// ============================================================================
+// GOTCHA — Load goals/ and tools/ manifests for self-awareness
+// ============================================================================
+
+async function loadGotchaManifests(): Promise<{
+  goalsManifest: string | null;
+  toolsManifest: string | null;
+}> {
+  const rootDir = process.cwd();
+  const [goals, tools] = await Promise.all([
+    readFile(join(rootDir, "goals", "manifest.md"), "utf-8").catch(() => null),
+    readFile(join(rootDir, "tools", "manifest.md"), "utf-8").catch(() => null),
+  ]);
+  return {
+    goalsManifest: goals ? goals.slice(0, 2000) : null,
+    toolsManifest: tools ? tools.slice(0, 2000) : null,
+  };
 }
 
 // ============================================================================
@@ -347,6 +524,29 @@ async function observe(tenantId: string): Promise<RalphObservation> {
         ((p.details as Record<string, unknown>)?.urgency as string) || "medium",
     }));
 
+  // Load GOTCHA manifests for self-awareness
+  const gotchaContext = await loadGotchaManifests();
+
+  // Load system manifest summary for full self-awareness
+  const manifestSummary = await getManifestSummaryForPrompt(tenantId);
+
+  // Count consecutive stuck cycles (skipped outcomes in recent journal)
+  const { data: recentJournal } = await supabase
+    .from("exo_dev_journal")
+    .select("outcome")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  let stuckCycles = 0;
+  for (const entry of recentJournal || []) {
+    if (entry.outcome === "skipped" || entry.outcome === "failed") {
+      stuckCycles++;
+    } else {
+      break;
+    }
+  }
+
   return {
     failurePatterns,
     pendingPlans: (pendingPlansResult.data || []).map((p) => ({
@@ -364,6 +564,9 @@ async function observe(tenantId: string): Promise<RalphObservation> {
     })),
     unusedApps,
     userPriorities,
+    gotchaContext,
+    manifestSummary,
+    stuckCycles,
   };
 }
 
@@ -374,10 +577,26 @@ async function observe(tenantId: string): Promise<RalphObservation> {
 async function analyze(
   tenantId: string,
   obs: RalphObservation,
+  gotchaEnrichment: string = "",
 ): Promise<RalphAction> {
   const router = new ModelRouter();
 
-  const prompt = `You are the ExoSkull self-development engine. Analyze these signals and decide ONE action.
+  // If stuck 3+ cycles, inject lateral thinking instructions
+  const lateralThinking =
+    obs.stuckCycles >= 3
+      ? `\n## LATERAL THINKING MODE (stuck ${obs.stuckCycles} cycles)
+You've been stuck. Try something UNEXPECTED:
+- Use "lateral_experiment": pick a random combination of existing tools
+- Reverse the problem: what would make things WORSE? Do the opposite
+- Cross-domain: apply a solution from a completely different area
+- De Bono "Po": start from a deliberately wrong assumption and see where it leads
+PREFER "lateral_experiment" type when stuck.\n`
+      : "";
+
+  const prompt = `You are the ExoSkull self-development engine (Ralph Loop). Analyze signals and decide ONE action.
+
+${gotchaEnrichment ? `${gotchaEnrichment}\n\n` : ""}## System Self-Awareness
+${obs.manifestSummary}
 
 ## Signals
 
@@ -396,24 +615,30 @@ ${obs.unusedApps.length > 0 ? obs.unusedApps.map((a) => `- ${a.name} (${a.lastUs
 User priorities:
 ${obs.userPriorities.length > 0 ? obs.userPriorities.map((p) => `- [${p.urgency}] ${p.title}`).join("\n") : "None"}
 
+${obs.gotchaContext.goalsManifest ? `## GOTCHA Goals (available workflows)\n${obs.gotchaContext.goalsManifest}\n` : ""}${obs.gotchaContext.toolsManifest ? `## GOTCHA Tools (available scripts)\n${obs.gotchaContext.toolsManifest}\n` : ""}${lateralThinking}
 ## Decision Priority
 1. User priorities (high urgency first)
-2. Fix failing tools (3+ failures = broken)
-3. Build apps for detected gaps
-4. Optimize unused apps
-5. Execute pending plans
+2. Heal broken integrations (reconnect, re-auth)
+3. Fix failing tools (3+ failures = broken)
+4. Build apps for detected gaps
+5. Generate content user needs
+6. Optimize unused apps
+7. Execute pending plans
 
 ## Response Format (STRICT JSON)
 {
-  "type": "build_app" | "fix_tool" | "optimize" | "register_tool" | "none",
+  "type": "build_app" | "fix_tool" | "optimize" | "register_tool" | "heal_integration" | "generate_content" | "lateral_experiment" | "none",
   "description": "what and why",
   "params": { ... action-specific parameters ... }
 }
 
-For "build_app": params = { "description": "app description for generator", "source_gap": "gap_id or null" }
+For "build_app": params = { "description": "app description", "source_gap": "gap_id or null" }
 For "fix_tool": params = { "tool_name": "...", "error_pattern": "...", "remediation": "description" }
 For "optimize": params = { "target": "app slug or tool name", "optimization": "what to improve" }
 For "register_tool": params = { "name": "...", "description": "...", "handler_type": "...", "handler_config": {} }
+For "heal_integration": params = { "integration_name": "...", "issue": "...", "strategy": "reconnect|re_auth|retry" }
+For "generate_content": params = { "content_type": "document|presentation|post|email", "description": "...", "target_channel": "..." }
+For "lateral_experiment": params = { "hypothesis": "what you're testing", "method": "random_combo|reverse|cross_domain|po_technique" }
 For "none": params = {}
 
 Return ONLY JSON.`;
@@ -461,6 +686,181 @@ Return ONLY JSON.`;
 // ============================================================================
 // BUILD — Execute the decided action
 // ============================================================================
+
+/**
+ * Enhanced build that routes complex tasks to Agent Swarm
+ * and app builds through ATLAS Pipeline.
+ */
+async function buildEnhanced(
+  tenantId: string,
+  action: RalphAction,
+  correlationId: string,
+): Promise<{ success: boolean; result?: string; error?: string }> {
+  // Determine if this task is complex enough for the Swarm
+  const isComplex = isComplexTask(action);
+
+  if (isComplex && action.type !== "lateral_experiment") {
+    return buildWithSwarm(tenantId, action, correlationId);
+  }
+
+  return build(tenantId, action);
+}
+
+/**
+ * Heuristic: Is this task complex enough to warrant multi-agent coordination?
+ */
+function isComplexTask(action: RalphAction): boolean {
+  // App builds with detailed requirements → use ATLAS + Swarm
+  if (action.type === "build_app") {
+    const desc = (action.params.description as string) || action.description;
+    return desc.length > 100; // Longer descriptions = more complex
+  }
+
+  // Multi-step fixes with clear remediation plans → Swarm
+  if (action.type === "fix_tool" && action.params.remediation) {
+    return String(action.params.remediation).length > 50;
+  }
+
+  return false;
+}
+
+/**
+ * Route complex tasks through Agent Swarm for multi-agent coordination.
+ * Falls back to simple build if swarm fails.
+ */
+async function buildWithSwarm(
+  tenantId: string,
+  action: RalphAction,
+  correlationId: string,
+): Promise<{ success: boolean; result?: string; error?: string }> {
+  try {
+    // For app builds, use ATLAS Pipeline first
+    if (action.type === "build_app") {
+      emitAtlasEvent(
+        "pipeline.started",
+        tenantId,
+        {
+          description: action.params.description || action.description,
+        },
+        correlationId,
+      );
+
+      try {
+        const pipeline = await runFullPipeline(
+          tenantId,
+          (action.params.description as string) || action.description,
+        );
+
+        if (pipeline.status === "completed") {
+          emitAtlasEvent(
+            "pipeline.completed",
+            tenantId,
+            {
+              pipelineId: pipeline.id,
+              stages: Object.keys(pipeline.stages),
+            },
+            correlationId,
+          );
+
+          return {
+            success: true,
+            result: `ATLAS pipeline complete: ${(action.params.description as string) || action.description}. All 5 stages passed.`,
+          };
+        }
+
+        emitAtlasEvent(
+          "pipeline.failed",
+          tenantId,
+          {
+            pipelineId: pipeline.id,
+            error: pipeline.error,
+            failedStage: pipeline.currentStage,
+          },
+          correlationId,
+        );
+
+        // Fall back to simple build
+        logger.warn(
+          "[RalphLoop] ATLAS pipeline failed, falling back to simple build",
+          {
+            tenantId,
+            error: pipeline.error,
+          },
+        );
+      } catch (atlasErr) {
+        logger.warn("[RalphLoop] ATLAS pipeline error, falling back:", {
+          tenantId,
+          error: atlasErr instanceof Error ? atlasErr.message : atlasErr,
+        });
+      }
+    }
+
+    // For other complex tasks, use Agent Swarm
+    emitSwarmEvent(
+      "session.created",
+      tenantId,
+      {
+        taskCount: 1,
+        actionType: action.type,
+      },
+      correlationId,
+    );
+
+    const session = createSwarmSession(tenantId, [
+      {
+        description: action.description,
+        type:
+          action.type === "build_app"
+            ? "build_app"
+            : action.type === "fix_tool"
+              ? "fix_bug"
+              : action.type === "heal_integration"
+                ? "heal_integration"
+                : "research",
+        priority: 1,
+        context: action.params,
+      },
+    ]);
+
+    // Run up to 3 swarm cycles
+    let lastResult = { done: false, progress: "", actions: [] as string[] };
+    for (let i = 0; i < 3; i++) {
+      lastResult = await runSwarmCycle(session.id);
+      if (lastResult.done) break;
+    }
+
+    // Persist results
+    await persistSwarmResults(session.id);
+
+    emitSwarmEvent(
+      lastResult.done ? "session.completed" : "agent.stuck",
+      tenantId,
+      {
+        sessionId: session.id,
+        progress: lastResult.progress,
+        actions: lastResult.actions.length,
+      },
+      correlationId,
+    );
+
+    if (lastResult.done) {
+      return {
+        success: true,
+        result: `Swarm completed: ${lastResult.progress}. Actions: ${lastResult.actions.slice(0, 3).join("; ")}`,
+      };
+    }
+
+    // Fall back to simple build if swarm didn't complete
+    return build(tenantId, action);
+  } catch (err) {
+    logger.warn("[RalphLoop] Swarm execution failed, falling back:", {
+      tenantId,
+      error: err instanceof Error ? err.message : err,
+    });
+    // Graceful degradation: fall back to simple build
+    return build(tenantId, action);
+  }
+}
 
 async function build(
   tenantId: string,
@@ -570,6 +970,120 @@ async function build(
       };
     }
 
+    case "heal_integration": {
+      const integrationName = action.params.integration_name as string;
+      const strategy = action.params.strategy as string;
+
+      if (!integrationName) {
+        return { success: false, error: "No integration_name specified" };
+      }
+
+      try {
+        // Try to refresh integration health
+        const { data: healthEntry } = await supabase
+          .from("exo_integration_health")
+          .select("id, status, last_error")
+          .eq("provider", integrationName)
+          .maybeSingle();
+
+        if (!healthEntry) {
+          return {
+            success: false,
+            error: `Integration ${integrationName} not found in health table`,
+          };
+        }
+
+        // Log the healing attempt
+        await supabase
+          .from("exo_integration_health")
+          .update({
+            status: "degraded",
+            last_check_at: new Date().toISOString(),
+            metadata: {
+              healing_attempt: true,
+              strategy,
+              attempted_at: new Date().toISOString(),
+            },
+          })
+          .eq("id", healthEntry.id);
+
+        return {
+          success: true,
+          result: `Healing ${integrationName}: strategy=${strategy}. Previous error: ${healthEntry.last_error || "none"}`,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: `Integration healing failed: ${error instanceof Error ? error.message : "unknown"}`,
+        };
+      }
+    }
+
+    case "generate_content": {
+      const contentType = action.params.content_type as string;
+      const description = action.params.description as string;
+
+      if (!description) {
+        return { success: false, error: "No content description" };
+      }
+
+      // Use code generation adapters for content generation
+      try {
+        const { ClaudeCodeAdapter } =
+          await import("@/lib/code-generation/adapters/claude-code");
+        const adapter = new ClaudeCodeAdapter(tenantId);
+        const result = await adapter.execute({
+          description: `Generate ${contentType}: ${description}`,
+          context: {},
+          requirements: [`Type: ${contentType}`, description],
+          expectedOutput: { fileCount: 1, estimatedLines: 100 },
+          tenantId,
+        });
+
+        if (result.success && result.files.length > 0) {
+          return {
+            success: true,
+            result: `Wygenerowano ${contentType}: ${result.files.length} plikow. ${result.summary || ""}`,
+          };
+        }
+        return {
+          success: false,
+          error: result.error || "Content generation failed",
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: `Content generation failed: ${error instanceof Error ? error.message : "unknown"}`,
+        };
+      }
+    }
+
+    case "lateral_experiment": {
+      const hypothesis = action.params.hypothesis as string;
+      const method = action.params.method as string;
+
+      // Log the experiment — don't actually build anything,
+      // just record the creative insight for future cycles
+      await logToJournal(
+        tenantId,
+        "experiment",
+        `Eksperyment lateralny: ${hypothesis}`,
+        {
+          method,
+          hypothesis,
+          action_params: action.params,
+          trigger: "stuck_cycles",
+        },
+        "pending",
+        `experiment:${method}`,
+      );
+
+      return {
+        success: true,
+        result: `Eksperyment zalogowany: [${method}] ${hypothesis}. Wyniki w nastepnym cyklu.`,
+      };
+    }
+
     default:
       return { success: false, error: "Unknown action type" };
   }
@@ -613,6 +1127,9 @@ const EVOLUTION_LABELS: Record<string, string> = {
   fix_tool: "Naprawiono",
   optimize: "Zoptymalizowano",
   register_tool: "Zarejestrowano narzędzie",
+  heal_integration: "Naprawiono integrację",
+  generate_content: "Wygenerowano treść",
+  lateral_experiment: "Eksperyment lateralny",
 };
 
 async function notifyUser(

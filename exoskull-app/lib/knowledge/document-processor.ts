@@ -6,17 +6,23 @@
  * Supported formats: TXT, MD, CSV, JSON, PDF, DOCX, XLSX, XLS, PPTX, PPT
  * Uses: unpdf (PDF), mammoth (DOCX), xlsx (Excel), jszip (PPTX),
  *        OpenAI text-embedding-3-small (embeddings)
+ *
+ * Integrates with:
+ * - Chunking pipeline (lib/memory/chunking-pipeline.ts)
+ * - Vector store (lib/memory/vector-store.ts)
+ * - Knowledge graph (lib/memory/knowledge-graph.ts)
+ * - Ingestion jobs (exo_ingestion_jobs table)
  */
 
 import { getServiceSupabase } from "@/lib/supabase/service";
 import OpenAI from "openai";
+import { chunkText } from "@/lib/memory/chunking-pipeline";
+import { hashContent } from "@/lib/memory/chunking-pipeline";
 
 import { logger } from "@/lib/logger";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY!;
 const EMBEDDING_MODEL = "text-embedding-3-small"; // 1536 dims
-const CHUNK_SIZE = 500; // ~500 tokens per chunk
-const CHUNK_OVERLAP = 50; // overlap between chunks
 
 // ============================================================================
 // MAIN PROCESSOR
@@ -25,12 +31,22 @@ const CHUNK_OVERLAP = 50; // overlap between chunks
 /**
  * Process a document: extract text, chunk, embed, store.
  * Call after upload to make the document searchable.
+ * Now tracks progress via exo_ingestion_jobs if a job exists.
  */
 export async function processDocument(
   documentId: string,
   tenantId: string,
 ): Promise<{ success: boolean; chunks: number; error?: string }> {
   const supabase = getServiceSupabase();
+
+  // Helper to update ingestion job if one exists for this document
+  async function updateIngestionJob(update: Record<string, unknown>) {
+    await supabase
+      .from("exo_ingestion_jobs")
+      .update(update)
+      .eq("source_id", documentId)
+      .eq("tenant_id", tenantId);
+  }
 
   // 1. Get document record
   const { data: doc, error: docError } = await supabase
@@ -53,6 +69,13 @@ export async function processDocument(
     .from("exo_user_documents")
     .update({ status: "processing" })
     .eq("id", documentId);
+
+  await updateIngestionJob({
+    status: "extracting",
+    current_step: 1,
+    step_label: "Extracting text...",
+    started_at: new Date().toISOString(),
+  });
 
   try {
     // 2. Download file from storage
@@ -89,6 +112,11 @@ export async function processDocument(
           extracted_text: `[Plik ${fileType} — ekstrakcja tekstu niedostępna]`,
         })
         .eq("id", documentId);
+      await updateIngestionJob({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        step_label: "No text to extract (unsupported format)",
+      });
       return { success: true, chunks: 0 };
     }
 
@@ -100,8 +128,17 @@ export async function processDocument(
           extracted_text: "[Plik pusty lub nie zawiera tekstu]",
         })
         .eq("id", documentId);
+      await updateIngestionJob({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        step_label: "File is empty or contains no text",
+      });
       return { success: true, chunks: 0 };
     }
+
+    await updateIngestionJob({
+      step_label: `Text extracted (${extractedText.length} chars)`,
+    });
 
     // 4. Generate summary with Claude (fire quick request)
     let summary = "";
@@ -121,26 +158,54 @@ export async function processDocument(
       })
       .eq("id", documentId);
 
-    // 6. Chunk text
-    const chunks = chunkText(extractedText, CHUNK_SIZE, CHUNK_OVERLAP);
+    // 6. Chunk text using the unified chunking pipeline
+    await updateIngestionJob({
+      status: "chunking",
+      current_step: 2,
+      step_label: "Chunking content...",
+    });
 
-    if (chunks.length === 0) {
+    const textChunks = chunkText(extractedText, {
+      sourceType: "document",
+      sourceId: documentId,
+      sourceName: doc.original_name,
+    });
+
+    if (textChunks.length === 0) {
       await supabase
         .from("exo_user_documents")
         .update({ status: "ready" })
         .eq("id", documentId);
+      await updateIngestionJob({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        step_label: "No chunks to embed",
+      });
       return { success: true, chunks: 0 };
     }
 
-    // 7. Generate embeddings
-    const embeddings = await generateEmbeddings(chunks);
+    await updateIngestionJob({
+      chunks_total: textChunks.length,
+      step_label: `${textChunks.length} chunks created`,
+    });
 
-    // 8. Store chunks with embeddings
-    const chunkRecords = chunks.map((content, index) => ({
+    // 7. Generate embeddings
+    await updateIngestionJob({
+      status: "embedding",
+      current_step: 3,
+      step_label: `Generating embeddings for ${textChunks.length} chunks...`,
+    });
+
+    const embeddings = await generateEmbeddings(
+      textChunks.map((c) => c.content),
+    );
+
+    // 8. Store chunks with embeddings (in exo_document_chunks for document-specific search)
+    const chunkRecords = textChunks.map((tc, index) => ({
       document_id: documentId,
       tenant_id: tenantId,
       chunk_index: index,
-      content,
+      content: tc.content,
       embedding: JSON.stringify(embeddings[index]),
     }));
 
@@ -159,20 +224,114 @@ export async function processDocument(
       }
     }
 
-    // 9. Mark as ready
+    // 9. Also store in exo_vector_embeddings for unified search (with dedup)
+    let duplicatesSkipped = 0;
+    const vectorRows = textChunks.map((tc, index) => ({
+      tenant_id: tenantId,
+      content: tc.content,
+      content_hash: hashContent(tc.content),
+      embedding: JSON.stringify(embeddings[index]),
+      source_type: "document",
+      source_id: documentId,
+      chunk_index: index,
+      total_chunks: textChunks.length,
+      metadata: {
+        source_name: doc.original_name,
+        section_heading: tc.sectionHeading,
+        strategy: tc.metadata.strategy,
+      },
+    }));
+
+    // Dedup check
+    const hashes = vectorRows.map((r) => r.content_hash);
+    const { data: existing } = await supabase
+      .from("exo_vector_embeddings")
+      .select("content_hash")
+      .eq("tenant_id", tenantId)
+      .in("content_hash", hashes);
+
+    const existingHashes = new Set((existing || []).map((e) => e.content_hash));
+    const newVectorRows = vectorRows.filter(
+      (r) => !existingHashes.has(r.content_hash),
+    );
+    duplicatesSkipped = vectorRows.length - newVectorRows.length;
+
+    // Insert new vector rows
+    for (let i = 0; i < newVectorRows.length; i += 50) {
+      const batch = newVectorRows.slice(i, i + 50);
+      const { error: vectorInsertError } = await supabase
+        .from("exo_vector_embeddings")
+        .insert(batch);
+
+      if (vectorInsertError) {
+        console.error("[DocProcessor] Vector insert failed:", {
+          batch: i,
+          error: vectorInsertError.message,
+        });
+      }
+    }
+
+    await updateIngestionJob({
+      embeddings_stored: newVectorRows.length,
+      chunks_processed: textChunks.length,
+      step_label: `${newVectorRows.length} embeddings stored, ${duplicatesSkipped} duplicates skipped`,
+    });
+
+    // 10. Knowledge graph extraction (for content with meaningful entities)
+    if (extractedText.length > 200) {
+      await updateIngestionJob({
+        status: "graph_extracting",
+        current_step: 4,
+        step_label: "Extracting entities and relationships...",
+      });
+
+      try {
+        const { processContentForGraph } =
+          await import("@/lib/memory/knowledge-graph");
+        // Process first 10K chars for entity extraction
+        const graphResult = await processContentForGraph(
+          tenantId,
+          extractedText.slice(0, 10000),
+          "document",
+          documentId,
+        );
+
+        await updateIngestionJob({
+          entities_extracted: graphResult.entities,
+          relationships_extracted: graphResult.relationships,
+          step_label: `${graphResult.entities} entities, ${graphResult.relationships} relationships`,
+        });
+      } catch (graphErr) {
+        console.warn("[DocProcessor] Graph extraction failed:", graphErr);
+        await updateIngestionJob({
+          step_label: "Graph extraction skipped (non-critical error)",
+        });
+      }
+    }
+
+    // 11. Mark as ready
     await supabase
       .from("exo_user_documents")
       .update({ status: "ready" })
       .eq("id", documentId);
 
+    await updateIngestionJob({
+      status: "completed",
+      current_step: 5,
+      completed_at: new Date().toISOString(),
+      step_label: "Ingestion complete",
+    });
+
     logger.info("[DocProcessor] Document processed:", {
       documentId,
       filename: doc.original_name,
       textLength: extractedText.length,
-      chunks: chunks.length,
+      chunks: textChunks.length,
+      embeddings: newVectorRows.length,
+      duplicatesSkipped,
     });
 
-    return { success: true, chunks: chunks.length };
+    return { success: true, chunks: textChunks.length };
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : "Unknown error";
     console.error("[DocProcessor] Processing failed:", {
@@ -184,6 +343,13 @@ export async function processDocument(
       .from("exo_user_documents")
       .update({ status: "failed", error_message: errMsg })
       .eq("id", documentId);
+
+    await updateIngestionJob({
+      status: "failed",
+      error_message: errMsg,
+      step_label: `Failed: ${errMsg}`,
+      completed_at: new Date().toISOString(),
+    });
 
     return { success: false, chunks: 0, error: errMsg };
   }
@@ -303,31 +469,6 @@ async function extractPPTX(fileData: Blob): Promise<string> {
 }
 
 // ============================================================================
-// CHUNKING
-// ============================================================================
-
-/**
- * Split text into chunks with overlap.
- * Uses word boundaries for clean splits.
- */
-function chunkText(text: string, chunkSize: number, overlap: number): string[] {
-  const words = text.split(/\s+/);
-  if (words.length <= chunkSize) return [text.trim()];
-
-  const chunks: string[] = [];
-  let start = 0;
-
-  while (start < words.length) {
-    const end = Math.min(start + chunkSize, words.length);
-    const chunk = words.slice(start, end).join(" ").trim();
-    if (chunk) chunks.push(chunk);
-    start += chunkSize - overlap;
-  }
-
-  return chunks;
-}
-
-// ============================================================================
 // EMBEDDINGS
 // ============================================================================
 
@@ -340,14 +481,21 @@ async function generateEmbeddings(chunks: string[]): Promise<number[][]> {
   }
 
   const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+  const allEmbeddings: number[][] = [];
 
-  // OpenAI supports batch embedding (up to 2048 inputs)
-  const response = await openai.embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: chunks,
-  });
+  // Process in batches of 100 (OpenAI supports up to 2048 but we limit for reliability)
+  for (let i = 0; i < chunks.length; i += 100) {
+    const batch = chunks.slice(i, i + 100);
+    const response = await openai.embeddings.create({
+      model: EMBEDDING_MODEL,
+      input: batch.map((c) => c.slice(0, 8000)), // Safety limit
+    });
 
-  return response.data.map((item) => item.embedding);
+    const sorted = response.data.sort((a, b) => a.index - b.index);
+    allEmbeddings.push(...sorted.map((item) => item.embedding));
+  }
+
+  return allEmbeddings;
 }
 
 // ============================================================================

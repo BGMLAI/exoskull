@@ -11,7 +11,12 @@ import {
   GetObjectCommand,
   ListObjectsV2Command,
   HeadObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 // Environment variables (set in .env.local and Vercel)
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
@@ -300,5 +305,282 @@ export async function getBronzeStats(tenantId?: string): Promise<{
   } catch (error) {
     console.error("[R2] Failed to get stats:", error);
     return stats;
+  }
+}
+
+// ============================================================================
+// MULTIPART UPLOAD — for large files up to 10GB
+// ============================================================================
+
+/** Minimum part size for S3 multipart: 5MB */
+const MIN_PART_SIZE = 5 * 1024 * 1024;
+/** Default part size: 100MB (good for large files) */
+const DEFAULT_PART_SIZE = 100 * 1024 * 1024;
+/** Maximum file size: 10GB */
+export const MAX_MULTIPART_SIZE = 10 * 1024 * 1024 * 1024;
+
+export interface MultipartUploadInit {
+  tenantId: string;
+  key: string;
+  contentType?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface MultipartUploadSession {
+  uploadId: string;
+  key: string;
+  partSize: number;
+  totalParts: number;
+}
+
+/**
+ * Initiate a multipart upload on R2.
+ * Returns the uploadId and key for subsequent part uploads.
+ */
+export async function initiateMultipartUpload(
+  params: MultipartUploadInit,
+): Promise<{
+  success: boolean;
+  session?: MultipartUploadSession;
+  error?: string;
+}> {
+  try {
+    const command = new CreateMultipartUploadCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: params.key,
+      ContentType: params.contentType || "application/octet-stream",
+      Metadata: {
+        "tenant-id": params.tenantId,
+        "created-at": new Date().toISOString(),
+        ...params.metadata,
+      },
+    });
+
+    const response = await r2Client.send(command);
+
+    if (!response.UploadId) {
+      return { success: false, error: "No UploadId returned from R2" };
+    }
+
+    return {
+      success: true,
+      session: {
+        uploadId: response.UploadId,
+        key: params.key,
+        partSize: DEFAULT_PART_SIZE,
+        totalParts: 0, // Will be set by caller
+      },
+    };
+  } catch (error) {
+    console.error("[R2:multipart:init:failed]", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to initiate multipart upload",
+    };
+  }
+}
+
+/**
+ * Generate a presigned URL for uploading a single part.
+ * Client uploads directly to R2 using this URL.
+ */
+export async function getPresignedPartUrl(
+  key: string,
+  uploadId: string,
+  partNumber: number,
+  expiresIn: number = 3600,
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const command = new UploadPartCommand({
+      Bucket: R2_BUCKET_NAME,
+      Key: key,
+      UploadId: uploadId,
+      PartNumber: partNumber,
+    });
+
+    const url = await getSignedUrl(r2Client, command, { expiresIn });
+
+    return { success: true, url };
+  } catch (error) {
+    console.error("[R2:multipart:presign:failed]", { key, partNumber, error });
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to generate presigned URL",
+    };
+  }
+}
+
+/**
+ * Generate presigned URLs for all parts of a multipart upload.
+ * Returns array of { partNumber, url } for client-side parallel upload.
+ */
+export async function getPresignedPartUrls(
+  key: string,
+  uploadId: string,
+  totalParts: number,
+  expiresIn: number = 3600,
+): Promise<{
+  success: boolean;
+  parts?: Array<{ partNumber: number; url: string }>;
+  error?: string;
+}> {
+  try {
+    const parts: Array<{ partNumber: number; url: string }> = [];
+
+    for (let i = 1; i <= totalParts; i++) {
+      const result = await getPresignedPartUrl(key, uploadId, i, expiresIn);
+      if (!result.success || !result.url) {
+        return {
+          success: false,
+          error: `Failed to generate URL for part ${i}: ${result.error}`,
+        };
+      }
+      parts.push({ partNumber: i, url: result.url });
+    }
+
+    return { success: true, parts };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to generate presigned URLs",
+    };
+  }
+}
+
+export interface CompletedPart {
+  partNumber: number;
+  etag: string;
+}
+
+/**
+ * Complete a multipart upload after all parts have been uploaded.
+ */
+export async function completeMultipartUpload(
+  key: string,
+  uploadId: string,
+  parts: CompletedPart[],
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await r2Client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: {
+          Parts: parts
+            .sort((a, b) => a.partNumber - b.partNumber)
+            .map((p) => ({
+              PartNumber: p.partNumber,
+              ETag: p.etag,
+            })),
+        },
+      }),
+    );
+
+    return { success: true };
+  } catch (error) {
+    console.error("[R2:multipart:complete:failed]", { key, uploadId, error });
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to complete multipart upload",
+    };
+  }
+}
+
+/**
+ * Abort a multipart upload (cleanup on failure).
+ */
+export async function abortMultipartUpload(
+  key: string,
+  uploadId: string,
+): Promise<{ success: boolean }> {
+  try {
+    await r2Client.send(
+      new AbortMultipartUploadCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: key,
+        UploadId: uploadId,
+      }),
+    );
+    return { success: true };
+  } catch (error) {
+    console.error("[R2:multipart:abort:failed]", { key, uploadId, error });
+    return { success: false };
+  }
+}
+
+/**
+ * Upload a buffer directly using multipart (server-side, for large processing).
+ * Splits buffer into parts and uploads sequentially.
+ */
+export async function uploadLargeBuffer(
+  key: string,
+  data: Buffer,
+  tenantId: string,
+  contentType?: string,
+): Promise<{ success: boolean; error?: string }> {
+  const partSize = Math.max(MIN_PART_SIZE, Math.ceil(data.length / 10000));
+  const totalParts = Math.ceil(data.length / partSize);
+
+  const initResult = await initiateMultipartUpload({
+    tenantId,
+    key,
+    contentType,
+    metadata: {
+      "file-size": String(data.length),
+      "total-parts": String(totalParts),
+    },
+  });
+
+  if (!initResult.success || !initResult.session) {
+    return { success: false, error: initResult.error };
+  }
+
+  const { uploadId } = initResult.session;
+  const completedParts: CompletedPart[] = [];
+
+  try {
+    for (let i = 0; i < totalParts; i++) {
+      const start = i * partSize;
+      const end = Math.min(start + partSize, data.length);
+      const partData = data.subarray(start, end);
+
+      const response = await r2Client.send(
+        new UploadPartCommand({
+          Bucket: R2_BUCKET_NAME,
+          Key: key,
+          UploadId: uploadId,
+          PartNumber: i + 1,
+          Body: partData,
+        }),
+      );
+
+      if (!response.ETag) {
+        throw new Error(`Part ${i + 1} upload returned no ETag`);
+      }
+
+      completedParts.push({ partNumber: i + 1, etag: response.ETag });
+    }
+
+    return await completeMultipartUpload(key, uploadId, completedParts);
+  } catch (error) {
+    // Cleanup on failure
+    await abortMultipartUpload(key, uploadId);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Multipart upload failed",
+    };
   }
 }

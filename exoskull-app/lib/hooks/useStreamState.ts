@@ -8,6 +8,7 @@ import type {
   ThinkingStep,
   ThinkingStepData,
   ToolAction,
+  ToolExecutionData,
 } from "@/lib/stream/types";
 
 // ---------------------------------------------------------------------------
@@ -19,6 +20,10 @@ interface StreamState {
   isLoading: boolean;
   conversationId: string | null;
   error: string | null;
+  /** Active reply-to context (user is composing a reply) */
+  replyTo: StreamEvent["replyTo"] | null;
+  /** Active thread sidebar event id */
+  activeThread: string | null;
 }
 
 const initialState: StreamState = {
@@ -26,6 +31,8 @@ const initialState: StreamState = {
   isLoading: false,
   conversationId: null,
   error: null,
+  replyTo: null,
+  activeThread: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -55,10 +62,21 @@ type StreamAction =
       status: FileUploadData["status"];
       chunks?: number;
     }
+  | {
+      type: "UPDATE_TOOL_EXECUTION";
+      id: string;
+      status: ToolExecutionData["status"];
+      progress?: number;
+      outputPreview?: string;
+      durationMs?: number;
+      logs?: string[];
+    }
   | { type: "SET_LOADING"; loading: boolean }
   | { type: "SET_CONVERSATION_ID"; id: string }
   | { type: "SET_ERROR"; error: string | null }
-  | { type: "LOAD_HISTORY"; events: StreamEvent[] };
+  | { type: "LOAD_HISTORY"; events: StreamEvent[] }
+  | { type: "SET_REPLY_TO"; replyTo: StreamEvent["replyTo"] | null }
+  | { type: "SET_ACTIVE_THREAD"; threadId: string | null };
 
 // ---------------------------------------------------------------------------
 // Reducer
@@ -177,6 +195,38 @@ function streamReducer(state: StreamState, action: StreamAction): StreamState {
     case "LOAD_HISTORY":
       return { ...state, events: [...action.events, ...state.events] };
 
+    case "UPDATE_TOOL_EXECUTION":
+      return {
+        ...state,
+        events: state.events.map((e) =>
+          e.id === action.id && e.data.type === "tool_execution"
+            ? {
+                ...e,
+                data: {
+                  ...e.data,
+                  status: action.status,
+                  ...(action.progress !== undefined
+                    ? { progress: action.progress }
+                    : {}),
+                  ...(action.outputPreview !== undefined
+                    ? { outputPreview: action.outputPreview }
+                    : {}),
+                  ...(action.durationMs !== undefined
+                    ? { durationMs: action.durationMs }
+                    : {}),
+                  ...(action.logs !== undefined ? { logs: action.logs } : {}),
+                } as ToolExecutionData,
+              }
+            : e,
+        ),
+      };
+
+    case "SET_REPLY_TO":
+      return { ...state, replyTo: action.replyTo };
+
+    case "SET_ACTIVE_THREAD":
+      return { ...state, activeThread: action.threadId };
+
     default:
       return state;
   }
@@ -250,6 +300,38 @@ export function useStreamState() {
     [],
   );
 
+  const updateToolExecution = useCallback(
+    (
+      id: string,
+      status: ToolExecutionData["status"],
+      extra?: {
+        progress?: number;
+        outputPreview?: string;
+        durationMs?: number;
+        logs?: string[];
+      },
+    ) =>
+      dispatch({
+        type: "UPDATE_TOOL_EXECUTION",
+        id,
+        status,
+        ...extra,
+      }),
+    [],
+  );
+
+  const setReplyTo = useCallback(
+    (replyTo: StreamEvent["replyTo"] | null) =>
+      dispatch({ type: "SET_REPLY_TO", replyTo }),
+    [],
+  );
+
+  const setActiveThread = useCallback(
+    (threadId: string | null) =>
+      dispatch({ type: "SET_ACTIVE_THREAD", threadId }),
+    [],
+  );
+
   return {
     state,
     addEvent,
@@ -259,9 +341,12 @@ export function useStreamState() {
     updateThinkingSteps,
     updateThinkingTools,
     updateFileUpload,
+    updateToolExecution,
     setLoading,
     setConversationId,
     setError,
     loadHistory,
+    setReplyTo,
+    setActiveThread,
   };
 }

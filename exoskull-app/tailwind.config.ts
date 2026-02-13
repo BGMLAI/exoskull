@@ -83,11 +83,23 @@ const config = {
           "0%, 100%": { height: "8px" },
           "50%": { height: "24px" },
         },
+        "neural-pulse": {
+          "0%": { transform: "translateX(0%)", opacity: "0" },
+          "10%": { opacity: "1" },
+          "90%": { opacity: "1" },
+          "100%": { transform: "translateX(300%)", opacity: "0" },
+        },
+        "neural-dot": {
+          "0%, 100%": { opacity: "0.3", transform: "scale(1)" },
+          "50%": { opacity: "1", transform: "scale(1.4)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "wave-bar": "wave-bar 1s ease-in-out infinite",
+        "neural-pulse": "neural-pulse 1.8s ease-in-out infinite",
+        "neural-dot": "neural-dot 2s ease-in-out infinite",
       },
     },
   },

@@ -165,6 +165,79 @@ export async function handleMaintenance(
         break;
       }
 
+      case "system_health_check": {
+        const { emitSystemEvent, getSystemHealthSnapshot } =
+          await import("@/lib/system/events");
+        const { runAllHealthChecks } =
+          await import("@/lib/autonomy/integration-health");
+
+        // 1. Run integration health checks for this tenant
+        try {
+          await runAllHealthChecks(tenant_id);
+        } catch (healthErr) {
+          logger.error("[Petla:Maintenance] Health check error:", {
+            tenantId: tenant_id,
+            error: healthErr instanceof Error ? healthErr.message : healthErr,
+          });
+        }
+
+        // 2. Get system health snapshot
+        const snapshot = await getSystemHealthSnapshot(tenant_id);
+
+        // 3. Emit system event
+        emitSystemEvent({
+          tenantId: tenant_id,
+          eventType:
+            snapshot.overall_status === "critical"
+              ? "health_check_failed"
+              : "health_check_passed",
+          component: "maintenance:system_health_check",
+          severity: snapshot.overall_status === "critical" ? "error" : "info",
+          message: `System health: ${snapshot.overall_status}`,
+          details: {
+            subsystems: Object.fromEntries(
+              Object.entries(snapshot.subsystems).map(([k, v]) => [
+                k,
+                v.status,
+              ]),
+            ),
+            alerts: snapshot.alerts,
+          },
+        });
+
+        // 4. Auto-alert user if critical
+        if (
+          snapshot.overall_status === "critical" &&
+          snapshot.alerts.length > 0
+        ) {
+          try {
+            const { sendProactiveMessage } =
+              await import("@/lib/cron/tenant-utils");
+            await sendProactiveMessage(
+              tenant_id,
+              `System zdegradowany: ${snapshot.alerts.slice(0, 3).join("; ")}`,
+              "system_health_alert",
+              "system_health_check",
+            );
+          } catch {
+            // Non-critical — don't break maintenance
+          }
+        }
+
+        // 5. Clean up expired system events
+        const supabaseCleanup = getServiceSupabase();
+        const { data: cleanedCount } = await supabaseCleanup.rpc(
+          "cleanup_system_events",
+        );
+        logger.info("[Petla:Maintenance] System health check completed:", {
+          tenantId: tenant_id,
+          status: snapshot.overall_status,
+          alerts: snapshot.alerts.length,
+          cleanedEvents: cleanedCount || 0,
+        });
+        break;
+      }
+
       default:
         logger.info("[Petla:Maintenance] Unknown handler:", item.handler);
     }

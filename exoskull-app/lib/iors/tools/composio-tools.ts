@@ -169,14 +169,21 @@ export const composioTools: ToolDefinition[] = [
               : "OK";
           return `Wykonano ${toolSlug}. Wynik: ${dataStr}`;
         }
-        return `Nie udało się wykonać ${toolSlug}: ${result.error}`;
+
+        // If reconnect needed, provide actionable message
+        if (result.needsReconnect) {
+          const toolkit = toolSlug.split("_")[0];
+          return `Nie udalo sie wykonac ${toolSlug}: ${result.error}\n\nPolaczenie z ${toolkit} wymaga odnowienia. Uzyj composio_connect z toolkit="${toolkit}" zeby polaczyc ponownie.`;
+        }
+
+        return `Nie udalo sie wykonac ${toolSlug}: ${result.error}`;
       } catch (err) {
-        console.error("[ComposioTools] composio_action error:", {
+        console.error("[ComposioTools:composio_action:failed]", {
           toolSlug,
           tenantId,
           error: err instanceof Error ? err.message : err,
         });
-        return `Błąd: ${err instanceof Error ? err.message : "nieznany"}`;
+        return `Blad: ${err instanceof Error ? err.message : "nieznany"}`;
       }
     },
   },

@@ -38,7 +38,8 @@ const EXT_TO_MIME: Record<string, string> = {
 
 const ALLOWED_EXTENSIONS = Object.keys(EXT_TO_MIME);
 
-const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB (Supabase storage limit)
+const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB (Supabase storage limit for signed URLs)
+// For files >500MB, use /api/knowledge/multipart-upload (R2 direct, up to 10GB)
 
 export async function POST(req: NextRequest) {
   try {
@@ -70,11 +71,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate size
+    // Validate size — redirect large files to multipart endpoint
     if (fileSize && fileSize > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: `File too large. Max: ${MAX_FILE_SIZE / 1024 / 1024}MB` },
-        { status: 400 },
+        {
+          error: `File too large for signed URL upload (max ${MAX_FILE_SIZE / 1024 / 1024}MB). Use /api/knowledge/multipart-upload for files up to 10GB.`,
+          useMultipart: true,
+          multipartEndpoint: "/api/knowledge/multipart-upload",
+        },
+        { status: 413 },
       );
     }
 

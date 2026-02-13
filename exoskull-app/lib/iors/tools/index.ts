@@ -24,6 +24,8 @@ export interface ToolDefinition {
     input: Record<string, unknown>,
     tenantId: string,
   ) => Promise<string>;
+  /** Override default timeout (ms). Code-gen tools need 55s vs 10s default. */
+  timeoutMs?: number;
 }
 
 // Import from per-domain files
@@ -50,6 +52,15 @@ import { webTools } from "./web-tools";
 import { ralphTools } from "./ralph-tools";
 import { codeGenerationTools } from "./code-generation-tools";
 import { tyrolkaTools } from "./tyrolka-tools";
+import { valueTools } from "./value-tools";
+import { debateTools } from "./debate-tools";
+
+// New tools — Phase 2 (Total Overhaul)
+import { googleFitTools } from "./google-fit-tools";
+import { googleDriveTools } from "./google-drive-tools";
+import { contentTools } from "./content-tools";
+import { strategyTools } from "./strategy-tools";
+import { outboundTools } from "./outbound-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -78,6 +89,14 @@ export const IORS_EXTENSION_TOOLS: ToolDefinition[] = [
   ...ralphTools,
   ...codeGenerationTools,
   ...tyrolkaTools,
+  ...valueTools,
+  ...debateTools,
+  // Phase 2 tools
+  ...googleFitTools,
+  ...googleDriveTools,
+  ...contentTools,
+  ...strategyTools,
+  ...outboundTools,
 ];
 
 /**
@@ -143,17 +162,14 @@ export async function executeExtensionTool(
   const startMs = Date.now();
 
   try {
+    const timeout = tool.timeoutMs ?? TOOL_TIMEOUT_MS;
     const result = await Promise.race([
       tool.execute(input, tenantId),
       new Promise<string>((_, reject) =>
         setTimeout(
           () =>
-            reject(
-              new Error(
-                `Tool ${toolName} timed out after ${TOOL_TIMEOUT_MS}ms`,
-              ),
-            ),
-          TOOL_TIMEOUT_MS,
+            reject(new Error(`Tool ${toolName} timed out after ${timeout}ms`)),
+          timeout,
         ),
       ),
     ]);

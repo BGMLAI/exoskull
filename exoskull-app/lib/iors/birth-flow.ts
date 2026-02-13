@@ -147,6 +147,14 @@ export async function completeBirth(
     language?: string;
     user_insights?: string[];
     proposed_mods?: string[];
+    discovered_values?: Array<{
+      name: string;
+      priority?: number;
+      icon?: string;
+      areas?: string[];
+      first_quest?: string;
+      first_challenge?: string;
+    }>;
   };
 
   try {
@@ -227,10 +235,193 @@ export async function completeBirth(
     });
   }
 
+  // Initialize full value hierarchy (values + loops + links + starter quests)
+  try {
+    // seed_value_hierarchy handles everything in one call
+    const { error: seedErr } = await supabase.rpc("seed_value_hierarchy", {
+      p_tenant_id: tenantId,
+    });
+
+    if (seedErr) {
+      // Fallback: use individual RPCs if seed RPC not yet available
+      console.warn(
+        "[BirthFlow] seed_value_hierarchy failed, using fallback:",
+        seedErr.message,
+      );
+      await supabase.rpc("create_default_values", { p_tenant_id: tenantId });
+      await supabase.rpc("create_default_loops", { p_tenant_id: tenantId });
+      await supabase.rpc("link_default_values_to_loops", {
+        p_tenant_id: tenantId,
+      });
+    }
+  } catch (err) {
+    console.error("[BirthFlow] Hierarchy seed failed:", {
+      tenantId,
+      error: err instanceof Error ? err.message : err,
+    });
+  }
+
+  // Create discovered values from birth conversation (if any)
+  // Enhanced format supports: areas, first_quest, first_challenge per value
+  if (birthData.discovered_values && birthData.discovered_values.length > 0) {
+    for (const v of birthData.discovered_values) {
+      try {
+        // Upsert discovered value
+        const { data: upserted } = await supabase
+          .from("exo_values")
+          .upsert(
+            {
+              tenant_id: tenantId,
+              name: v.name,
+              icon: v.icon || null,
+              priority: v.priority || 5,
+              is_default: false,
+            },
+            { onConflict: "tenant_id,name" },
+          )
+          .select("id")
+          .single();
+
+        if (!upserted) continue;
+
+        // Create areas (loops) for this value
+        const areas = v.areas || [];
+        const createdLoops: Array<{ id: string; slug: string; name: string }> =
+          [];
+
+        if (areas.length > 0) {
+          for (const areaName of areas) {
+            const slug = (areaName as string)
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "_")
+              .replace(/^_|_$/g, "")
+              .substring(0, 30);
+
+            const { data: newLoop } = await supabase
+              .from("user_loops")
+              .upsert(
+                {
+                  tenant_id: tenantId,
+                  slug,
+                  name: areaName as string,
+                  icon: v.icon || null,
+                  value_id: upserted.id,
+                  priority: v.priority || 5,
+                  is_default: false,
+                },
+                { onConflict: "tenant_id,slug" },
+              )
+              .select("id, slug, name")
+              .single();
+
+            if (newLoop) {
+              createdLoops.push(newLoop);
+            }
+          }
+        } else {
+          // Fallback: create a single area matching the value name
+          const slug = v.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "_")
+            .replace(/^_|_$/g, "")
+            .substring(0, 30);
+
+          // Check if a loop already links to this value
+          const { data: existingLoop } = await supabase
+            .from("user_loops")
+            .select("id, slug, name")
+            .eq("tenant_id", tenantId)
+            .eq("value_id", upserted.id)
+            .limit(1)
+            .single();
+
+          if (existingLoop) {
+            createdLoops.push(existingLoop);
+          } else {
+            const { data: newLoop } = await supabase
+              .from("user_loops")
+              .insert({
+                tenant_id: tenantId,
+                slug,
+                name: v.name,
+                icon: v.icon || null,
+                value_id: upserted.id,
+                priority: v.priority || 5,
+                is_default: false,
+              })
+              .select("id, slug, name")
+              .single();
+
+            if (newLoop) {
+              createdLoops.push(newLoop);
+            }
+          }
+        }
+
+        // Create first quest (attached to the first created loop)
+        const questTitle = v.first_quest || `Pierwszy krok: ${v.name}`;
+        const targetLoop = createdLoops[0];
+
+        if (targetLoop) {
+          const { data: newQuest } = await supabase
+            .from("user_quests")
+            .insert({
+              tenant_id: tenantId,
+              loop_id: targetLoop.id,
+              loop_slug: targetLoop.slug,
+              title: questTitle as string,
+              status: "active",
+            })
+            .select("id")
+            .single();
+
+          // Create first challenge (attached to a mission under the quest)
+          if (newQuest && v.first_challenge) {
+            // Create a starter mission
+            const { data: newMission } = await supabase
+              .from("user_missions")
+              .insert({
+                tenant_id: tenantId,
+                quest_id: newQuest.id,
+                title: questTitle as string,
+                loop_slug: targetLoop.slug,
+                status: "active",
+              })
+              .select("id")
+              .single();
+
+            if (newMission) {
+              // Create the first challenge
+              await supabase
+                .from("user_challenges")
+                .insert({
+                  tenant_id: tenantId,
+                  mission_id: newMission.id,
+                  quest_id: newQuest.id,
+                  title: v.first_challenge as string,
+                  loop_slug: targetLoop.slug,
+                  difficulty: 1,
+                  status: "active",
+                })
+                .single();
+            }
+          }
+        }
+      } catch (err) {
+        console.error("[BirthFlow] Discovered value insert failed:", {
+          tenantId,
+          value: v.name,
+          error: err instanceof Error ? err.message : err,
+        });
+      }
+    }
+  }
+
   logger.info("[BirthFlow] Birth complete:", {
     tenantId,
     iors_name: personality.name,
     insights: birthData.user_insights?.length ?? 0,
     proposed_mods: birthData.proposed_mods?.length ?? 0,
+    discovered_values: birthData.discovered_values?.length ?? 0,
   });
 }
