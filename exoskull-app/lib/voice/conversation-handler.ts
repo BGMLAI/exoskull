@@ -23,6 +23,7 @@ import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
 import { logEmotion } from "@/lib/emotion/logger";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { callOpenAIChatWithTools } from "./openai-chat-provider";
+import { callGeminiChatWithTools } from "./gemini-chat-provider";
 import {
   runAgentLoop,
   runAgentLoopStreaming,
@@ -37,15 +38,27 @@ import { logger } from "@/lib/logger";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY!;
 
-const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514"; // Fast + capable
+/** Fallback Anthropic model when Gemini fails */
+const DEFAULT_CLAUDE_MODEL = "claude-3-5-haiku-20241022";
 
-/** Map user model preference string to actual Anthropic model ID */
+/**
+ * Model selection map — user picks in Settings → AI Providers.
+ * Keys starting with "gemini" route through Gemini provider.
+ * All others route through Anthropic provider.
+ */
 const CHAT_MODEL_MAP: Record<string, string> = {
-  auto: "claude-sonnet-4-20250514",
+  auto: "gemini-3-flash-preview", // Default: Gemini 3 Flash (fast, capable, cheap)
+  "gemini-3-flash": "gemini-3-flash-preview",
+  "gemini-2.5-flash": "gemini-2.5-flash", // Thinking model (slower, smarter)
   haiku: "claude-3-5-haiku-20241022",
   sonnet: "claude-sonnet-4-20250514",
   opus: "claude-opus-4-20250514",
 };
+
+/** Check if a resolved model ID is a Gemini model */
+function isGeminiModel(modelId: string): boolean {
+  return modelId.startsWith("gemini");
+}
 
 // ============================================================================
 // TYPES
@@ -407,7 +420,8 @@ export async function processUserMessage(
   // Voice uses Haiku for streaming speed (token-by-token TTS), web uses user preference
   const resolvedModel = isVoiceChannel
     ? VOICE_MODEL
-    : CHAT_MODEL_MAP[chatModelPref] || DEFAULT_CLAUDE_MODEL;
+    : CHAT_MODEL_MAP[chatModelPref] || CHAT_MODEL_MAP["auto"];
+  const useGemini = !isVoiceChannel && isGeminiModel(resolvedModel);
   // Tools already loaded in parallel above
   const { definitions, dynamicCount } = toolsResult;
   const activeTools: Anthropic.Tool[] = definitions.map((tool, i, arr) =>
@@ -612,8 +626,9 @@ export async function processUserMessage(
     // system + tools use cache_control for ~6K cached tokens (90% input savings)
     const effectiveMaxTokens = session.maxTokens || maxTokensOverride || 300;
 
-    logger.info("[ConversationHandler] Calling Claude API:", {
+    logger.info("[ConversationHandler] Calling AI:", {
       model: resolvedModel,
+      provider: useGemini ? "gemini" : "anthropic",
       temperature: userTemperature,
       maxTokens: effectiveMaxTokens,
       messageCount: messages.length,
@@ -628,12 +643,13 @@ export async function processUserMessage(
       streaming: !!options?.onTextDelta,
     });
 
-    // ── Agent Loop Context (shared between streaming and non-streaming) ──
-    // Same agent config for all channels (voice runs on Railway — no 60s timeout)
+    // ── Agent Loop Context (for Anthropic paths: streaming + fallback) ──
     const agentConfig = WEB_AGENT_CONFIG;
     const agentCtx = {
       anthropic,
-      model: resolvedModel,
+      model: isGeminiModel(resolvedModel)
+        ? DEFAULT_CLAUDE_MODEL
+        : resolvedModel,
       temperature: userTemperature,
       systemBlocks,
       tools: activeTools,
@@ -643,7 +659,7 @@ export async function processUserMessage(
       callback: options?.callback,
     };
 
-    // ── STREAMING PATH (voice with onTextDelta) ──
+    // ── STREAMING PATH (voice with onTextDelta) — always Anthropic ──
     if (options?.onTextDelta) {
       const streamConfig = {
         ...agentConfig,
@@ -678,9 +694,63 @@ export async function processUserMessage(
       };
     }
 
-    // ── NON-STREAMING PATH (web chat) ──
+    // ── NON-STREAMING PATH ──
+
+    // ── GEMINI PATH (web chat default) ──
+    if (useGemini) {
+      try {
+        const geminiStartTime = Date.now();
+        const geminiResult = await callGeminiChatWithTools(
+          {
+            model: resolvedModel,
+            systemBlocks,
+            messages: messages as any, // Anthropic.MessageParam[] → translated inside provider
+            tools: activeTools,
+            maxTokens: session.maxTokens || maxTokensOverride || 1024,
+            temperature: userTemperature,
+          },
+          executeTool,
+          session.tenantId,
+          options?.callback?.onToolStart,
+          options?.callback?.onToolEnd,
+        );
+
+        logger.info("[ConversationHandler] Gemini done:", {
+          tools: geminiResult.toolsUsed,
+          textLength: geminiResult.text.length,
+          tenantId: session.tenantId,
+          durationMs: Date.now() - geminiStartTime,
+        });
+
+        options?.callback?.onThinkingStep?.("Generuję odpowiedź", "done");
+
+        return {
+          text: geminiResult.text,
+          toolsUsed: geminiResult.toolsUsed,
+          shouldEndCall: false,
+          emotion: emotionState,
+        };
+      } catch (geminiError) {
+        console.error(
+          "[ConversationHandler] Gemini failed, falling back to Anthropic:",
+          {
+            error:
+              geminiError instanceof Error
+                ? geminiError.message
+                : String(geminiError),
+            tenantId: session.tenantId,
+          },
+        );
+        // Fall through to Anthropic path below
+      }
+    }
+
+    // ── ANTHROPIC PATH (explicit user selection OR Gemini fallback) ──
+    const anthropicModel = isGeminiModel(resolvedModel)
+      ? DEFAULT_CLAUDE_MODEL
+      : resolvedModel;
     const response = await anthropic.messages.create({
-      model: resolvedModel,
+      model: anthropicModel,
       max_tokens: effectiveMaxTokens,
       temperature: userTemperature,
       system: systemBlocks,
@@ -692,6 +762,7 @@ export async function processUserMessage(
       stopReason: response.stop_reason,
       contentTypes: response.content.map((c) => c.type),
       tenantId: session.tenantId,
+      model: anthropicModel,
     });
 
     // Run agent loop (handles multi-step tool execution)
@@ -700,12 +771,10 @@ export async function processUserMessage(
       followUpMaxTokens: session.maxTokens || maxTokensOverride || 1024,
     };
 
-    const agentResult = await runAgentLoop(
-      response,
-      messages,
-      loopConfig,
-      agentCtx,
-    );
+    const agentResult = await runAgentLoop(response, messages, loopConfig, {
+      ...agentCtx,
+      model: anthropicModel,
+    });
 
     logger.info("[ConversationHandler] Agent loop done:", {
       rounds: agentResult.roundsExecuted,

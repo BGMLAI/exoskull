@@ -426,6 +426,16 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
 
         if (!res.ok) {
           const errBody = await res.json().catch(() => ({}));
+          if (res.status === 401) {
+            throw new Error(
+              "Sesja wygasla. Odswiez strone lub zaloguj sie ponownie.",
+            );
+          }
+          if (res.status === 429) {
+            throw new Error(
+              errBody.error || "Zbyt wiele zapytan. Odczekaj chwile.",
+            );
+          }
           throw new Error(
             errBody.error || errBody.message || `Blad serwera (${res.status})`,
           );

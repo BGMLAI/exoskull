@@ -574,12 +574,89 @@ export async function searchDocuments(
   });
 
   if (error) {
-    console.error("[DocProcessor] Search failed:", {
+    console.error("[DocProcessor] Vector search failed:", {
       tenantId,
       error: error.message,
     });
-    return [];
+    // Fall through to keyword fallback
   }
 
-  return data || [];
+  if (data && data.length > 0) {
+    return data;
+  }
+
+  // ── Keyword fallback — if vector search returns 0, try text search ──
+  // This handles: broken index (IVFFlat bug), missing embeddings, low similarity
+  logger.info("[DocProcessor] Vector search empty, trying keyword fallback:", {
+    tenantId,
+    query,
+  });
+
+  try {
+    // Search in document chunks using ILIKE (works without vector index)
+    const keywords = query
+      .split(/\s+/)
+      .filter((w) => w.length > 2)
+      .slice(0, 5);
+
+    if (keywords.length === 0) return [];
+
+    // Build OR condition for keyword matching
+    const orCondition = keywords.map((k) => `content.ilike.%${k}%`).join(",");
+
+    const { data: textResults, error: textError } = await supabase
+      .from("exo_document_chunks")
+      .select("id, document_id, content")
+      .eq("tenant_id", tenantId)
+      .or(orCondition)
+      .limit(limit);
+
+    if (textError || !textResults || textResults.length === 0) {
+      // Last resort: search extracted_text on exo_user_documents directly
+      const { data: docResults } = await supabase
+        .from("exo_user_documents")
+        .select("id, original_name, category, extracted_text")
+        .eq("tenant_id", tenantId)
+        .eq("status", "ready")
+        .or(keywords.map((k) => `extracted_text.ilike.%${k}%`).join(","))
+        .limit(limit);
+
+      if (docResults && docResults.length > 0) {
+        return docResults.map((d) => ({
+          chunk_id: d.id,
+          document_id: d.id,
+          content: (d.extracted_text || "").slice(0, 800),
+          filename: d.original_name,
+          category: d.category || "general",
+          similarity: 0.4, // synthetic score for keyword match
+        }));
+      }
+
+      return [];
+    }
+
+    // Fetch filenames for chunk results
+    const docIds = [...new Set(textResults.map((r) => r.document_id))];
+    const { data: docs } = await supabase
+      .from("exo_user_documents")
+      .select("id, original_name, category")
+      .in("id", docIds);
+
+    const docMap = new Map((docs || []).map((d) => [d.id, d]));
+
+    return textResults.map((r) => ({
+      chunk_id: r.id,
+      document_id: r.document_id,
+      content: r.content,
+      filename: docMap.get(r.document_id)?.original_name || "Unknown",
+      category: docMap.get(r.document_id)?.category || "general",
+      similarity: 0.5, // synthetic score for keyword match
+    }));
+  } catch (fallbackErr) {
+    console.error("[DocProcessor] Keyword fallback failed:", {
+      tenantId,
+      error: fallbackErr instanceof Error ? fallbackErr.message : fallbackErr,
+    });
+    return [];
+  }
 }

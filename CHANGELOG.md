@@ -4,6 +4,88 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-13] Chat Performance + Memory Access + Voice Config
+
+### What was done
+- **Memory access fix:** Added 11th parallel query to `buildDynamicContext` — fetches daily summary count, memory highlights count, total message count. New `## PAMIĘĆ` section in dynamic context explicitly tells AI about memory tools and data. Strengthened system prompt: memory tools marked CRITICAL with explicit ban on "nie mam dostępu do pamięci".
+- **Chat speed optimization:**
+  - Parallelized `getToolsForTenant` into main `Promise.all` (was sequential — wasted 100-200ms)
+  - Added 1.5s AbortController timeout to HuggingFace emotion API (cold starts took 10-30s)
+  - Reduced thread context from 50 to 25 messages (fewer tokens = faster Claude response)
+- **Voice config changes:**
+  - ElevenLabs voice ID changed to `3kPofxWv5xLwBvMVraip`
+  - 2-second silence disconnect added to voice-ws.ts (auto "Do usłyszenia!" + end)
+  - voice.yaml silence_timeout_ms: 30000 → 2000
+
+### Files changed
+- `lib/voice/dynamic-context.ts` — 11th query (memory stats), PAMIĘĆ context section
+- `lib/voice/system-prompt.ts` — memory tools marked CRITICAL
+- `lib/voice/conversation-handler.ts` — parallelized tools, thread 50→25
+- `lib/emotion/text-analyzer.ts` — HuggingFace 1.5s timeout
+- `server/voice-ws.ts` — silence timer, auto-disconnect
+- `app/api/tts/route.ts` — new voice ID fallback
+- `args/voice.yaml` — silence_timeout_ms 2000
+- `.env.local` — new voice ID
+
+### Notes for future agents
+- HuggingFace emotion API has cold starts (10-30s) — always use timeout with keyword fallback
+- Voice WS silence timer: resets on user prompt, cleared on ws close
+- Vercel env `ELEVENLABS_VOICE_ID` updated to `3kPofxWv5xLwBvMVraip`
+
+---
+
+## [2026-02-13] TAU Dual Interface — Continuous Split-Panel with Gamma Boundary
+
+### What was done
+
+- **Replaced discrete Chat/Graph toggle** with always-visible split-panel layout (TAU philosophy)
+- **5 new components:**
+  - `ConsciousnessStream.tsx` — left panel: Chat + Forge + Preview tabs
+  - `WorldsGraph.tsx` — right panel: 6 Worlds force-directed graph with poles
+  - `SplitHandle.tsx` — draggable Gamma boundary (Ctrl+\ presets, dbl-click reset)
+  - `FractalPattern.tsx` — mandala visualization of completed goals
+  - `ForgeView.tsx` — IORS build process visualization
+- **Removed 2 obsolete components:** `ChatBubble.tsx`, `GraphMiniature.tsx`
+- **Rewritten:** `useInterfaceStore.ts` (Zustand store for TAU split ratio state)
+- **Expanded:** `globals.css` with TAU theme variables + Gamma animations
+- **Updated:** `DualInterface.tsx` (new layout), `index.ts` (exports), `ChatLayout.tsx` (simplified)
+- **Added:** `lib/ghl/client.ts` stub
+
+### Why
+- TAU philosophy: both panels always visible, no modal switching
+- Better UX: user sees chat and graph simultaneously
+- Gamma boundary: intuitive drag-to-resize with keyboard presets
+
+### Files changed
+- `exoskull-app/components/dual-interface/ConsciousnessStream.tsx` (new)
+- `exoskull-app/components/dual-interface/WorldsGraph.tsx` (new)
+- `exoskull-app/components/dual-interface/SplitHandle.tsx` (new)
+- `exoskull-app/components/dual-interface/FractalPattern.tsx` (new)
+- `exoskull-app/components/dual-interface/ForgeView.tsx` (new)
+- `exoskull-app/components/dual-interface/ChatBubble.tsx` (deleted)
+- `exoskull-app/components/dual-interface/GraphMiniature.tsx` (deleted)
+- `exoskull-app/components/dual-interface/DualInterface.tsx` (rewritten)
+- `exoskull-app/components/dual-interface/TreeGraph.tsx` (minor)
+- `exoskull-app/components/dual-interface/index.ts` (updated exports)
+- `exoskull-app/components/stream/ChatLayout.tsx` (simplified)
+- `exoskull-app/lib/stores/useInterfaceStore.ts` (rewritten)
+- `exoskull-app/app/globals.css` (TAU theme)
+- `exoskull-app/.env.example` (expanded)
+- `exoskull-app/lib/ghl/client.ts` (stub)
+
+### How to verify
+- Open dashboard — split-panel layout visible
+- Drag Gamma boundary — panels resize
+- Ctrl+\ — cycles through presets (stream-focused / balanced / graph-focused)
+- Double-click handle — resets to 50/50
+
+### Notes for future agents
+- Commit: `ab169c2`
+- 15 files changed, +4411 / -803 lines
+- `lib/ghl/client.ts` is an empty stub — needs implementation later
+
+---
+
 ## [2026-02-13] VPS Executor Deployed to OVH — Live Docker Sandbox
 
 ### What was done
