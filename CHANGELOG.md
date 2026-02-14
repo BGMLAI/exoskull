@@ -4,6 +4,47 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-14] Gemini-First Model Router + Claude Agent SDK Engine
+
+### What was done
+
+**Claude Agent SDK Engine:**
+- New IORS MCP server (`lib/agent-sdk/iors-mcp-server.ts`) wraps 60+ tools as in-process MCP with zero network overhead
+- ExoSkull Agent orchestrator (`lib/agent-sdk/exoskull-agent.ts`) replaces `processUserMessage()` for SDK-enabled paths
+- Gateway dual-path: `AGENT_SDK_ENABLED` flag routes web_chat through SDK, legacy as fallback
+- SSE streaming preserved: tool_start, tool_end, delta events pass through
+
+**Model Router Migration (Phase 1-3):**
+- New 4-tier system: T1=Gemini 3 Flash, T2=Gemini 3 Pro, T3=Codex 5.2, T4=Claude Opus 4.6
+- Gemini provider rewritten from deprecated `@google/generative-ai` to `@google/genai` SDK
+- New Codex 5.2 provider using OpenAI Responses API (`/v1/responses`)
+- Anthropic provider: added Opus 4.6 (`claude-opus-4-6-20260201`)
+- Voice model switched from Haiku to Gemini 3 Flash (all channels use same Gemini pipeline)
+- Code generation: Codex 5.2 as default (was Claude Code)
+- Removed `@google/generative-ai` dependency
+
+### Cost Impact
+- Tier 4: $15/$75 (Opus 4.5) → $5/$25 (Opus 4.6) = **-67% cost reduction**
+- Voice: Haiku ($0.80/$4) → Gemini 3 Flash ($0.50/$3) = **-38% cost reduction**
+
+### Files changed
+- `lib/agent-sdk/` (3 new files: iors-mcp-server.ts, exoskull-agent.ts, index.ts)
+- `lib/ai/types.ts`, `lib/ai/config.ts`, `lib/ai/model-router.ts`, `lib/ai/index.ts`
+- `lib/ai/providers/` (gemini rewrite, codex new, anthropic updated, index updated)
+- `lib/code-generation/types.ts`, `model-selector.ts`, `executor.ts`
+- `lib/voice/conversation-handler.ts`
+- `lib/system/agent-swarm.ts`, `lib/system/atlas-pipeline.ts`, `lib/ai/industry-tracker.ts`
+- `lib/gateway/gateway.ts`
+
+### Notes for future agents
+- Set `AGENT_SDK_ENABLED=true` in env to activate Agent SDK path
+- Codex 5.2 model ID: `codex-mini-latest` (uses OpenAI Responses API, NOT chat completions)
+- Gemini models: `gemini-3-flash-preview`, `gemini-3-pro-preview` (preview suffix required)
+- Claude Opus 4.6 model ID: `claude-opus-4-6-20260201`
+- Old `@google/generative-ai` SDK removed — all Gemini now uses `@google/genai`
+
+---
+
 ## [2026-02-14] Fix: WorldsGraph interaction blocked by CSS stacking
 
 ### What was done
