@@ -276,7 +276,7 @@ export function planInterventionForIssue(
           },
         },
         priority: issue.severity === "high" ? "high" : "medium",
-        requiresApproval: true,
+        requiresApproval: !hasAnyGrants,
         reasoning: "Many overdue tasks may indicate need for prioritization",
       };
 
@@ -293,7 +293,7 @@ export function planInterventionForIssue(
           },
         },
         priority: "low",
-        requiresApproval: true,
+        requiresApproval: !hasAnyGrants,
         reasoning: "Low activity may benefit from gentle nudge",
       };
 
@@ -310,7 +310,7 @@ export function planInterventionForIssue(
           },
         },
         priority: issue.severity === "high" ? "high" : "medium",
-        requiresApproval: true,
+        requiresApproval: !hasAnyGrants,
         reasoning: "Goal off-track or at-risk — user may benefit from review",
       };
 
@@ -327,7 +327,7 @@ export function planInterventionForIssue(
           },
         },
         priority: "low",
-        requiresApproval: true,
+        requiresApproval: !hasAnyGrants,
         reasoning: "Low activity + low energy may indicate user needs support",
       };
 
@@ -345,7 +345,7 @@ export function planInterventionForIssue(
           },
         },
         priority: "low",
-        requiresApproval: true,
+        requiresApproval: !hasAnyGrants,
         reasoning: "Extended isolation may affect wellbeing",
       };
 

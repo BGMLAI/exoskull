@@ -285,7 +285,9 @@ export class MAPEKLoop {
             p_priority: planned.priority,
             p_source_agent: "mape-k-loop",
             p_requires_approval: planned.requiresApproval,
-            p_scheduled_for: null,
+            p_scheduled_for: planned.requiresApproval
+              ? new Date(Date.now() + 30 * 60 * 1000).toISOString() // auto-approve after 30min
+              : null,
           });
 
         if (createError) {
