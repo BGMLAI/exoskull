@@ -14,6 +14,7 @@ All notable changes to ExoSkull are documented here.
 3. **monthly-summary CRON optimization** — Changed from sequential to parallel tenant processing (batches of 5 via `Promise.allSettled`). Expected: 55s → ~15s.
 4. **loop-daily CRON optimization** — Batch-insert autonomy permissions instead of individual `grantPermission()` calls (saves 3-4s). Reduced coaching analysis from 20 to 10 tenants (saves 8-12s). Expected: 35s → ~15-20s.
 5. **business-metrics missing POST handler** — Added `POST` export alongside `GET` to prevent Vercel Cron failures.
+6. **0% intervention approval rate** — All 57 interventions stuck in "proposed" status. Root causes: (a) `requiresApproval: true` hardcoded on 5/6 intervention types ignoring user grants; (b) `scheduled_for: null` preventing auto-timeout. Fix: all types now use `!hasAnyGrants` (auto-execute when user has autonomy grants); `scheduled_for` set to +30min for approval-required interventions enabling auto-timeout fallback.
 
 ### P2 Fixes (Auth hardening)
 6. **voice/notes auth** — Added `verifyTenantAuth()` to all 3 handlers (POST, GET, DELETE)
@@ -35,6 +36,8 @@ All notable changes to ExoSkull are documented here.
 - `app/api/voice/notes/route.ts` — Added verifyTenantAuth
 - `app/api/schedule/route.ts` — Added verifyTenantAuth
 - `app/api/emotion/history/route.ts` — Added verifyTenantAuth
+- `lib/autonomy/mape-k-analyze.ts` — Changed requiresApproval to !hasAnyGrants on all types
+- `lib/autonomy/mape-k-loop.ts` — Set scheduled_for to +30min for approval-required interventions
 
 ---
 
