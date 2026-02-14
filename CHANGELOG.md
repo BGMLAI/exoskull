@@ -4,6 +4,67 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-14] Fix: WorldsGraph interaction blocked by CSS stacking
+
+### What was done
+- **CSS stacking fix:** ForceGraph2D canvas was `position: static` — painted below FractalPattern (`absolute z-0` + CSS transform creating stacking context). Wrapped canvas in `absolute inset-0 z-[1]` div so it paints above background layers and receives pointer events.
+- **Dimension race condition:** Changed initial canvas dimensions from `800x600` to `0x0`. ForceGraph2D now waits for ResizeObserver to provide real container dimensions before rendering.
+- **SplitHandle hit area leak:** Extended hit area div had no `pointer-events-none` — was blocking 8px strip on left edge of graph. Fixed.
+- **FractalPattern SVG defense:** Added explicit `pointer-events: none` on SVG element.
+
+### Files changed
+- `exoskull-app/components/dual-interface/WorldsGraph.tsx`
+- `exoskull-app/components/dual-interface/SplitHandle.tsx`
+- `exoskull-app/components/dual-interface/FractalPattern.tsx`
+
+### Notes for future agents
+- ForceGraph2D renders wrapper div as `position: static` — always wrap in positioned container with z-index when using with absolutely-positioned overlays
+- CSS `transform` creates new stacking context — elements behind it won't receive events even with `pointer-events: none`
+
+---
+
+## [2026-02-14] Gemini 3 Flash Provider + Knowledge Search Fix
+
+### What was done
+- **Gemini Chat Provider:** New `gemini-chat-provider.ts` — translates Anthropic SDK types → Gemini format, multi-round tool loop (10 rounds, 55s budget), parallel tool execution
+- **Model routing:** Web chat defaults to `gemini-3-flash-preview` via `CHAT_MODEL_MAP`. Voice unchanged (Anthropic Haiku for streaming). Gemini failure → automatic Anthropic Haiku fallback
+- **Knowledge search fix (3 changes):**
+  1. `list_documents` IORS tool — AI can see uploaded files and their processing status
+  2. `get_document_content` IORS tool — reads file content directly by name (bypasses vector search)
+  3. Keyword fallback in `searchDocuments()` — when vector search returns 0, falls back to ILIKE text search on chunks, then on extracted_text
+- **TTS:** Switched to `eleven_turbo_v2_5` for faster voice synthesis
+- **Error UX:** 401 → "Sesja wygasła" message, 429 → "Zbyt wiele zapytań" message in UnifiedStream
+- **IORS tool count:** 61 → 63
+
+### Why
+- Gemini 3 Flash is faster and cheaper than Anthropic for web chat (~10x cost reduction)
+- AI was calling `search_memory` instead of `search_knowledge` for uploaded files — now has `list_documents` + `get_document_content` as direct fallbacks
+- IVFFlat→HNSW migration was already applied but keyword fallback ensures search works even if embeddings fail
+
+### Files changed
+- `lib/voice/gemini-chat-provider.ts` (NEW) — Gemini SDK provider with tool loop
+- `lib/voice/conversation-handler.ts` — Model routing, Gemini path, fallback
+- `lib/iors/tools/knowledge-tools.ts` — 2 new tools (list_documents, get_document_content)
+- `lib/knowledge/document-processor.ts` — Keyword fallback in searchDocuments()
+- `components/stream/UnifiedStream.tsx` — 401/429 error messages
+- `app/api/tts/route.ts` — TTS model eleven_turbo_v2_5
+- `package.json` — @google/genai dependency
+
+### How to verify
+1. Web chat → "jakie mam pliki?" → AI calls list_documents
+2. Web chat → "pokaż co jest w X.xlsx" → AI calls get_document_content
+3. Web chat → "co mam w dokumentach o X?" → search_knowledge with keyword fallback
+4. Check Vercel logs: provider should show "gemini" for web chat
+
+### Notes for future agents
+- Gemini model IDs: `gemini-3-flash-preview` (current), `gemini-2.5-flash` (thinking model, slower)
+- `gemini-2.0-flash` is DEPRECATED (shutting down March 31, 2026) — do NOT use
+- Gemini 2.5 Flash adds 5-15s thinking overhead — avoid for latency-sensitive paths
+- HNSW index on `exo_document_chunks` confirmed in production (14MB, 4 scans)
+- Keyword fallback returns synthetic similarity 0.4-0.5 (vs real cosine scores)
+
+---
+
 ## [2026-02-13] Chat Performance + Memory Access + Voice Config
 
 ### What was done

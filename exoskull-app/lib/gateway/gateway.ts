@@ -16,6 +16,7 @@ import {
   findTenantByPhone,
 } from "../voice/conversation-handler";
 import type { ProcessingCallback } from "../voice/conversation-handler";
+import { runExoSkullAgent } from "@/lib/agent-sdk";
 import { appendMessage } from "../unified-thread";
 import { isBirthPending, handleBirthMessage } from "@/lib/iors/birth-flow";
 import { findOrCreateLead, handleLeadMessage } from "@/lib/iors/lead-manager";
@@ -31,6 +32,9 @@ import { logger } from "@/lib/logger";
 import { logActivity } from "@/lib/activity-log";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+/** Feature flag: route web_chat through Claude Agent SDK instead of direct Anthropic API */
+const USE_AGENT_SDK = process.env.AGENT_SDK_ENABLED === "true";
 
 // Map GatewayChannel → UnifiedChannel for unified-thread.ts
 // Now that UnifiedChannel includes telegram/slack/discord, this is a direct pass-through
@@ -400,26 +404,61 @@ export async function handleInboundMessage(
     }
 
     // 6. Sync path: process with timeout safety net
-    const session = await getOrCreateSession(sessionId, tenantId);
+    const SYNC_TIMEOUT_MS = 40_000; // 40s — leaves 20s buffer before Vercel's 60s
 
-    // Channel-aware settings: voice = short (200), text channels = rich (1500)
-    const isTextChannel = msg.channel !== "voice";
-    if (isTextChannel) {
+    let result: {
+      text: string;
+      toolsUsed: string[];
+      shouldEndCall?: boolean;
+    } | null = null;
+
+    // ── Agent SDK path (web_chat only, behind feature flag) ──
+    if (USE_AGENT_SDK && msg.channel !== "voice") {
+      logger.info("[Gateway] Using Agent SDK for:", {
+        channel: msg.channel,
+        tenantId,
+      });
+
+      const sdkResult = await Promise.race([
+        runExoSkullAgent({
+          tenantId,
+          sessionId,
+          userMessage: msg.text,
+          channel: "web_chat", // Gateway never sees "voice" (handled by WebSocket)
+          skipThreadAppend: true,
+          onTextDelta: callback?.onTextDelta,
+          onThinkingStep: callback?.onThinkingStep,
+          onToolStart: callback?.onToolStart,
+          onToolEnd: callback?.onToolEnd,
+          systemPromptPrefix: WEB_CHAT_SYSTEM_OVERRIDE,
+          maxTokens: 1500,
+          timeoutMs: SYNC_TIMEOUT_MS - 2_000, // 2s buffer for gateway overhead
+        }),
+        new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), SYNC_TIMEOUT_MS),
+        ),
+      ]);
+
+      result = sdkResult;
+    }
+
+    // ── Legacy path (fallback when SDK disabled or SDK result was null) ──
+    if (!result) {
+      const session = await getOrCreateSession(sessionId, tenantId);
       session.maxTokens = 1500;
       session.systemPromptPrefix = WEB_CHAT_SYSTEM_OVERRIDE;
       session.skipEndCallDetection = true;
-    }
 
-    const SYNC_TIMEOUT_MS = 40_000; // 40s — leaves 20s buffer before Vercel's 60s
-    const result = await Promise.race([
-      processUserMessage(session, msg.text, {
-        skipThreadAppend: true,
-        callback,
-      }),
-      new Promise<null>((resolve) =>
-        setTimeout(() => resolve(null), SYNC_TIMEOUT_MS),
-      ),
-    ]);
+      result = await Promise.race([
+        processUserMessage(session, msg.text, {
+          skipThreadAppend: true,
+          callback,
+        }),
+        new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), SYNC_TIMEOUT_MS),
+        ),
+      ]);
+    }
 
     // Timeout — escalate to async queue
     if (result === null) {
@@ -465,7 +504,10 @@ export async function handleInboundMessage(
     // updateSession only accepts "voice" | "web_chat", map other channels to "web_chat"
     const sessionChannel: "voice" | "web_chat" =
       msg.channel === "voice" ? "voice" : "web_chat";
-    await updateSession(session.id, msg.text, result.text, {
+
+    // SDK path doesn't create a VoiceSession — create one now for session tracking
+    const sessionForUpdate = await getOrCreateSession(sessionId, tenantId);
+    await updateSession(sessionForUpdate.id, msg.text, result.text, {
       channel: sessionChannel,
       skipUserAppend: true, // Gateway already wrote user message at step 2
     });
