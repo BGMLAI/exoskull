@@ -12,6 +12,26 @@ import { listConnections } from "@/lib/integrations/composio-adapter";
 import { getTaskStats } from "@/lib/tasks/task-service";
 
 import { logger } from "@/lib/logger";
+
+// ============================================================================
+// IN-MEMORY CONTEXT CACHE (30s TTL per tenant)
+// Eliminates repeated DB queries within same conversation burst.
+// Invalidated on write via invalidateContextCache().
+// ============================================================================
+
+interface CachedContext {
+  result: DynamicContextResult;
+  timestamp: number;
+}
+
+const CONTEXT_CACHE_TTL_MS = 30_000; // 30 seconds
+const contextCache = new Map<string, CachedContext>();
+
+/** Invalidate cached context for a tenant (call after task/goal/setting changes) */
+export function invalidateContextCache(tenantId: string): void {
+  contextCache.delete(tenantId);
+}
+
 /** Per-provider configuration stored in iors_ai_config.providers */
 export interface ProviderConfig {
   api_key?: string;
@@ -75,6 +95,15 @@ const DEFAULT_AI_CONFIG: TenantAIConfig = {
 export async function buildDynamicContext(
   tenantId: string,
 ): Promise<DynamicContextResult> {
+  // Cache hit — return immediately (~0ms vs ~300-600ms)
+  const cached = contextCache.get(tenantId);
+  if (cached && Date.now() - cached.timestamp < CONTEXT_CACHE_TTL_MS) {
+    logger.info(
+      `[DynamicContext] Cache hit for ${tenantId} (age: ${Date.now() - cached.timestamp}ms)`,
+    );
+    return cached.result;
+  }
+
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
@@ -116,10 +145,10 @@ export async function buildDynamicContext(
       .catch(() => []),
     // 6. Skill suggestions
     getPendingSuggestions(tenantId, 3).catch(() => []),
-    // 7. Knowledge base document count
+    // 7. Knowledge base document count (planned = uses index, not full table scan)
     supabase
       .from("exo_user_documents")
-      .select("status", { count: "exact" })
+      .select("status", { count: "planned" })
       .eq("tenant_id", tenantId),
     // 8. Composio connected integrations
     listConnections(tenantId).catch(() => []),
@@ -432,8 +461,15 @@ export async function buildDynamicContext(
       ? { ...DEFAULT_AI_CONFIG, ...(rawAiConfig as Partial<TenantAIConfig>) }
       : DEFAULT_AI_CONFIG;
 
-  logger.info(`[DynamicContext] Built in ${Date.now() - startTime}ms`);
-  return { context, systemPromptOverride, aiConfig };
+  const result = { context, systemPromptOverride, aiConfig };
+
+  // Cache for subsequent requests in same conversation burst
+  contextCache.set(tenantId, { result, timestamp: Date.now() });
+
+  logger.info(
+    `[DynamicContext] Built in ${Date.now() - startTime}ms (cached for ${CONTEXT_CACHE_TTL_MS / 1000}s)`,
+  );
+  return result;
 }
 
 /**

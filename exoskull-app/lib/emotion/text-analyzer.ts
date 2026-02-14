@@ -480,23 +480,7 @@ export async function analyzeEmotion(
     );
   }
 
-  // Strategy 1: HuggingFace API
-  const hfEmotions = await analyzeWithHuggingFace(text);
-  if (hfEmotions && hfEmotions.length > 0) {
-    // Also check Polish keywords for extra signal
-    const { matchedKeywords } = analyzeByKeywords(text);
-    return buildEmotionState(
-      hfEmotions[0].label,
-      hfEmotions[0].score,
-      hfEmotions,
-      matchedKeywords,
-      crisisFlags,
-      "text_hf",
-      voiceFeatures,
-    );
-  }
-
-  // Strategy 2: Polish keyword fallback
+  // Polish keyword analysis (fast, ~2ms — replaces HuggingFace API which added 200-1500ms latency)
   const { label, confidence, matchedKeywords } = analyzeByKeywords(text);
   return buildEmotionState(
     label,

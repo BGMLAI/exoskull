@@ -205,29 +205,71 @@ export async function initiateConnection(
 
 /**
  * List active connections for a tenant.
+ * Cached for 5 minutes per tenant (external API call, 100-300ms uncached).
  */
+
+const connectionsCache = new Map<
+  string,
+  {
+    data: Array<{
+      id: string;
+      toolkit: string;
+      status: string;
+      createdAt: string;
+    }>;
+    ts: number;
+  }
+>();
+const CONNECTIONS_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CONNECTIONS_TIMEOUT_MS = 500; // 500ms timeout (was unbounded)
+
 export async function listConnections(
   tenantId: string,
 ): Promise<
   Array<{ id: string; toolkit: string; status: string; createdAt: string }>
 > {
-  const client = getClient();
+  // Cache hit
+  const cached = connectionsCache.get(tenantId);
+  if (cached && Date.now() - cached.ts < CONNECTIONS_CACHE_TTL) {
+    return cached.data;
+  }
 
-  const response = await withRetry("listConnections", () =>
-    client.connectedAccounts.list({
-      userIds: [tenantId],
-      statuses: ["ACTIVE"],
-    }),
-  );
+  try {
+    const client = getClient();
 
-  const items = response?.items ?? [];
+    // Race with timeout — don't let Composio block context loading
+    const response = await Promise.race([
+      withRetry("listConnections", () =>
+        client.connectedAccounts.list({
+          userIds: [tenantId],
+          statuses: ["ACTIVE"],
+        }),
+      ),
+      new Promise<null>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Composio timeout")),
+          CONNECTIONS_TIMEOUT_MS,
+        ),
+      ),
+    ]);
 
-  return items.map((conn) => ({
-    id: conn.id || "",
-    toolkit: (conn as unknown as Record<string, string>).toolkitSlug || "",
-    status: conn.status || "unknown",
-    createdAt: conn.createdAt || "",
-  }));
+    const items = response?.items ?? [];
+
+    const result = items.map((conn) => ({
+      id: conn.id || "",
+      toolkit: (conn as unknown as Record<string, string>).toolkitSlug || "",
+      status: conn.status || "unknown",
+      createdAt: conn.createdAt || "",
+    }));
+
+    // Cache successful result
+    connectionsCache.set(tenantId, { data: result, ts: Date.now() });
+    return result;
+  } catch {
+    // On timeout/error, return stale cache if available, else empty
+    if (cached) return cached.data;
+    return [];
+  }
 }
 
 /**
