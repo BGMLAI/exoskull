@@ -4,6 +4,59 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-14] Android Edge Client + Self-hosted AI (Phase 1-2)
+
+### Architecture
+
+**Self-hosted AI Provider (Tier 0)** — new tier in model router for $0/token inference:
+
+- `lib/ai/providers/selfhosted-provider.ts` — OpenAI-compatible client for Ollama/vLLM
+- Qwen3-30B-A3B (Q4) for analysis, Gemma 3 4B for simple tasks
+- Model router auto-routes Tier 1-2 tasks through self-hosted when available
+- Fallback to cloud (Gemini Flash) when self-hosted is down
+- Health check cached 30s, 2-minute timeout for inference
+- New `ModelTier = 0`, `ModelProvider = "selfhosted"`, 2 new `ModelId` values
+
+**Mobile Sync API** — delta sync for Android offline-first architecture:
+
+- `GET /api/mobile/sync?tables=...&since=ISO` — returns changed records after timestamp
+- 10 syncable tables whitelisted, max 500 records/request, cursor pagination
+- `POST /api/mobile/push/register` — FCM token registration
+- `POST /api/mobile/push/send` — internal push trigger (CRON_SECRET auth)
+- Bearer JWT auth (verified in routes, added to `isPublicApi`)
+
+**FCM Push Notifications** — proactive messages reach Android devices:
+
+- `lib/push/fcm.ts` — Firebase Admin SDK wrapper with auto-cleanup of invalid tokens
+- `lib/push/types.ts` — PushNotification, PushResult, DeviceToken types
+- `sendProactiveMessage()` now also pushes to FCM (fire-and-forget)
+- DB: `exo_device_tokens` table with RLS policies
+
+**Android App** — `android/` directory with full Kotlin + Jetpack Compose project:
+
+- 32 Kotlin files, Hilt DI, Room DB (7 entities, 5 DAOs), Retrofit API client
+- 5 screens: Dashboard, Chat, Tasks, Health, Settings
+- Auth: Supabase email/password → EncryptedSharedPreferences JWT
+- SyncWorker: periodic 15-min delta sync via WorkManager
+- FCMService: push notification handling with deep linking
+- On-device AI stubs: LocalModelRouter, GemmaEngine, FunctionCallingEngine
+- Material 3 dark theme with ExoSkull brand colors
+
+**New channel**: `android_app` added to `GatewayChannel` union type
+
+### Files changed
+
+- Modified: `lib/ai/types.ts`, `lib/ai/config.ts`, `lib/ai/model-router.ts`, `lib/ai/providers/index.ts`
+- Modified: `lib/gateway/types.ts`, `lib/supabase/middleware.ts`, `lib/cron/tenant-utils.ts`
+- New: `lib/ai/providers/selfhosted-provider.ts`
+- New: `lib/push/fcm.ts`, `lib/push/types.ts`
+- New: `app/api/mobile/sync/route.ts`, `app/api/mobile/push/register/route.ts`, `app/api/mobile/push/send/route.ts`
+- New: `supabase/migrations/20260303000001_device_tokens.sql`
+- New: `android/` (40 files — full Android project scaffold)
+- Added: `firebase-admin` to package.json
+
+---
+
 ## [2026-02-12] Full Voice/Web Unification + IORS Self-Awareness
 
 ### What was done

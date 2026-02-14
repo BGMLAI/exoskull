@@ -11,16 +11,20 @@
  */
 
 // Model tiers as defined in ARCHITECTURE.md
-export type ModelTier = 1 | 2 | 3 | 4;
+// Tier 0: Self-hosted (Qwen3-30B, Gemma 4B) — $0/token, fixed monthly cost
+export type ModelTier = 0 | 1 | 2 | 3 | 4;
 
 export type ModelProvider =
   | "openai"
   | "anthropic"
   | "gemini"
   | "kimi"
-  | "codex";
+  | "codex"
+  | "selfhosted";
 
 export type ModelId =
+  | "selfhosted-qwen3-30b" // Tier 0 (self-hosted, primary)
+  | "selfhosted-gemma-4b" // Tier 0 (self-hosted, fast)
   | "gemini-2.5-flash" // Tier 1 (legacy)
   | "gemini-3-flash" // Tier 1 (primary)
   | "gemini-3-pro" // Tier 2 (primary)

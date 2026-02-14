@@ -14,6 +14,32 @@ import { ModelConfig, ModelId, ModelTier, TaskCategory } from "./types";
 
 // Model configurations
 export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
+  // ── Tier 0: Self-hosted ($0/token, fixed monthly GPU rental) ──
+  "selfhosted-qwen3-30b": {
+    id: "selfhosted-qwen3-30b",
+    provider: "selfhosted",
+    tier: 0,
+    displayName: "Qwen3 30B (self-hosted)",
+    inputCostPer1M: 0,
+    outputCostPer1M: 0,
+    maxTokens: 8192,
+    contextWindow: 32_000,
+    supportsTools: true,
+    supportsStreaming: false,
+  },
+  "selfhosted-gemma-4b": {
+    id: "selfhosted-gemma-4b",
+    provider: "selfhosted",
+    tier: 0,
+    displayName: "Gemma 3 4B (self-hosted)",
+    inputCostPer1M: 0,
+    outputCostPer1M: 0,
+    maxTokens: 4096,
+    contextWindow: 32_000,
+    supportsTools: true,
+    supportsStreaming: false,
+  },
+
   // ── Tier 1: Ultra-cheap, ultra-fast ──
   "gemini-3-flash": {
     id: "gemini-3-flash",
@@ -137,6 +163,7 @@ export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
 
 // Tier to model mapping (order = priority within tier)
 export const TIER_MODELS: Record<ModelTier, ModelId[]> = {
+  0: ["selfhosted-qwen3-30b", "selfhosted-gemma-4b"],
   1: ["gemini-3-flash", "gemini-2.5-flash"],
   2: ["gemini-3-pro", "claude-3-5-haiku"],
   3: ["codex-5-2", "claude-sonnet-4-5", "kimi-k2.5"],

@@ -25,6 +25,7 @@ import {
   AnthropicProvider,
   KimiProvider,
   CodexProvider,
+  SelfHostedProvider,
 } from "./providers";
 
 import { logger } from "@/lib/logger";
@@ -32,12 +33,47 @@ export class ModelRouter {
   private providers: Map<ModelProvider, IAIProvider> = new Map();
   private taskHistory: Map<string, ModelId[]> = new Map(); // tenant:category -> successful models
 
+  private selfHostedAvailable: boolean | null = null;
+  private selfHostedCheckTime = 0;
+
   constructor() {
     // Initialize providers
     this.providers.set("gemini", new GeminiProvider());
     this.providers.set("anthropic", new AnthropicProvider());
     this.providers.set("kimi", new KimiProvider());
     this.providers.set("codex", new CodexProvider());
+
+    // Self-hosted provider (Tier 0) — only if configured
+    if (process.env.SELFHOSTED_API_URL) {
+      this.providers.set("selfhosted", new SelfHostedProvider());
+    }
+  }
+
+  /**
+   * Check if self-hosted provider is available (cached 30s)
+   */
+  private async isSelfHostedAvailable(): Promise<boolean> {
+    if (
+      this.selfHostedAvailable !== null &&
+      Date.now() - this.selfHostedCheckTime < 30_000
+    ) {
+      return this.selfHostedAvailable;
+    }
+
+    const provider = this.providers.get("selfhosted");
+    if (!provider) {
+      this.selfHostedAvailable = false;
+      this.selfHostedCheckTime = Date.now();
+      return false;
+    }
+
+    try {
+      this.selfHostedAvailable = await provider.isAvailable();
+    } catch {
+      this.selfHostedAvailable = false;
+    }
+    this.selfHostedCheckTime = Date.now();
+    return this.selfHostedAvailable;
   }
 
   /**
@@ -70,7 +106,44 @@ export class ModelRouter {
       });
     }
 
-    // 3. Check task history for successful models
+    // 3. Try self-hosted (Tier 0) for Tier 1-2 tasks when available
+    // Skip for Tier 3-4 (code gen needs Codex, crisis needs Opus)
+    if (effectiveTier <= 2 && !options.forceModel && !options.forceTier) {
+      const selfHostedUp = await this.isSelfHostedAvailable();
+      if (selfHostedUp) {
+        try {
+          // Use Gemma 4B for simple tasks (Tier 1), Qwen3 30B for analysis (Tier 2)
+          const selfHostedModel: ModelId =
+            effectiveTier === 1
+              ? ("selfhosted-gemma-4b" as ModelId)
+              : ("selfhosted-qwen3-30b" as ModelId);
+
+          if (circuitBreaker.isAllowed(selfHostedModel)) {
+            const response = await this.executeWithModel(
+              options,
+              selfHostedModel,
+              attemptedModels,
+            );
+            this.recordSuccess(
+              options.tenantId,
+              classification.category,
+              selfHostedModel,
+            );
+            return response;
+          }
+        } catch (error) {
+          logger.warn(
+            "[ModelRouter] Self-hosted failed, falling back to cloud",
+            {
+              error: error instanceof Error ? error.message : "Unknown",
+            },
+          );
+          // Fall through to cloud routing
+        }
+      }
+    }
+
+    // 4. Check task history for successful models
     const historyKey = `${options.tenantId || "default"}:${classification.category}`;
     const pastSuccessfulModels = this.taskHistory.get(historyKey) || [];
 
@@ -90,7 +163,7 @@ export class ModelRouter {
       }
     }
 
-    // 4. Route to tier with fallback/escalation
+    // 5. Route to tier with fallback/escalation
     return this.routeToTier(
       options,
       effectiveTier,
@@ -276,6 +349,7 @@ export class ModelRouter {
    */
   async getProviderStatus(): Promise<Record<ModelProvider, boolean>> {
     const status: Record<ModelProvider, boolean> = {
+      selfhosted: false,
       gemini: false,
       anthropic: false,
       kimi: false,

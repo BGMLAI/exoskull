@@ -7,6 +7,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { dispatchReport } from "@/lib/reports/report-dispatcher";
 // appendMessage removed — dispatchReport already writes to unified thread
 import { logProactiveOutbound } from "@/lib/autonomy/outbound-triggers";
+import { pushNotifyTenant } from "@/lib/push/fcm";
 import { logger } from "@/lib/logger";
 
 export interface ActiveTenant {
@@ -107,6 +108,12 @@ export async function sendProactiveMessage(
   try {
     // dispatchReport already appends to unified thread — don't double-write
     const result = await dispatchReport(tenantId, message, "insight");
+
+    // Also push to mobile devices (fire-and-forget)
+    pushNotifyTenant(tenantId, "ExoSkull", message.slice(0, 200), {
+      type: triggerType,
+      source,
+    });
 
     await logProactiveOutbound(
       tenantId,

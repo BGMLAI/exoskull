@@ -19,7 +19,8 @@ export type GatewayChannel =
   | "instagram"
   | "signal"
   | "imessage"
-  | "web_chat";
+  | "web_chat"
+  | "android_app";
 
 /**
  * Normalized inbound message from any channel.

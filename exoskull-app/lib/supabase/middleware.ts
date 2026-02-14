@@ -85,7 +85,9 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/meta/") || // Meta deauth/pages (routes verify JWT internally)
     pathname === "/api/pulse" ||
     pathname === "/api/knowledge/reprocess" || // Has own CRON_SECRET auth
-    pathname === "/api/knowledge/reprocess-all"; // Has own CRON_SECRET auth
+    pathname === "/api/knowledge/reprocess-all" || // Has own CRON_SECRET auth
+    pathname.startsWith("/api/mobile/") || // Mobile app — Bearer JWT auth verified in routes
+    pathname.startsWith("/api/agent/"); // Local agent — Bearer JWT auth verified in routes
 
   // ============================================================================
   // AUTH GUARD: Redirect unauthenticated users to login
