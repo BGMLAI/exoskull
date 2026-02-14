@@ -732,14 +732,22 @@ export async function processUserMessage(
           emotion: emotionState,
         };
       } catch (geminiError) {
+        const gemErr = geminiError as Error & {
+          status?: number;
+          statusText?: string;
+        };
         console.error(
           "[ConversationHandler] Gemini failed, falling back to Anthropic:",
           {
-            error:
-              geminiError instanceof Error
-                ? geminiError.message
-                : String(geminiError),
+            error: gemErr.message,
+            status: gemErr.status,
+            statusText: gemErr.statusText,
+            name: gemErr.name,
             tenantId: session.tenantId,
+            toolCount: activeTools.length,
+            messageCount: messages.length,
+            modelUsed: resolvedModel,
+            stack: gemErr.stack?.split("\n").slice(0, 5).join("\n"),
           },
         );
         // Fall through to Anthropic path below
@@ -814,13 +822,8 @@ export async function processUserMessage(
     });
 
     // ── OpenAI fallback when Anthropic fails ──
-    const canFallback =
-      err.status === 400 ||
-      err.status === 401 ||
-      err.status === 403 ||
-      err.status === 429 ||
-      err.status === 503 ||
-      err.status === 529;
+    // Try fallback for ANY error (not just specific HTTP statuses)
+    const canFallback = true;
 
     if (canFallback) {
       const openaiKey =
@@ -877,7 +880,67 @@ export async function processUserMessage(
       }
     }
 
-    // All providers failed — show specific error message
+    // ── Emergency Gemini fallback (no tools, just conversation) ──
+    try {
+      const geminiKey = process.env.GOOGLE_AI_API_KEY;
+      if (geminiKey) {
+        logger.info(
+          "[ConversationHandler] All primary providers failed — emergency Gemini fallback (no tools)",
+          { tenantId: session.tenantId, originalError: err.message },
+        );
+        options?.callback?.onThinkingStep?.("Tryb awaryjny", "running");
+
+        const { GoogleGenAI } = await import("@google/genai");
+        const emergencyAI = new GoogleGenAI({ apiKey: geminiKey });
+        const emergencySystem = systemBlocks.map((b) => b.text).join("\n\n");
+        const emergencyContents = messages.map((m) => ({
+          role: m.role === "user" ? "user" : "model",
+          parts: [
+            {
+              text:
+                typeof m.content === "string"
+                  ? m.content
+                  : JSON.stringify(m.content),
+            },
+          ],
+        }));
+
+        const emergencyResponse = await emergencyAI.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: emergencyContents as any,
+          config: {
+            systemInstruction: emergencySystem.slice(0, 8000),
+            temperature: userTemperature,
+            maxOutputTokens: session.maxTokens || 1024,
+          },
+        });
+
+        const emergencyText = emergencyResponse.text || "";
+        options?.callback?.onThinkingStep?.("Tryb awaryjny", "done");
+
+        if (emergencyText) {
+          return {
+            text: emergencyText,
+            toolsUsed: ["emergency_fallback"],
+            shouldEndCall: false,
+            emotion: emotionState,
+          };
+        }
+      }
+    } catch (emergencyError) {
+      console.error(
+        "[ConversationHandler] Emergency Gemini fallback also failed:",
+        {
+          error:
+            emergencyError instanceof Error
+              ? emergencyError.message
+              : String(emergencyError),
+          tenantId: session.tenantId,
+        },
+      );
+    }
+
+    // All providers truly failed — show specific error message
     let userMessage = "Przepraszam, wystąpił problem. Spróbuj ponownie.";
     if (err.status === 400 && err.error?.message?.includes("credit balance")) {
       userMessage =
