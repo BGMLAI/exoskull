@@ -228,24 +228,28 @@ export const knowledgeTools: ToolDefinition[] = [
           return `Nie znalazłem dokumentu zawierającego "${docName}" w nazwie. Użyj list_documents żeby zobaczyć dostępne pliki.`;
         }
 
-        if (data.status === "failed") {
-          return `Dokument "${data.original_name}" — przetwarzanie nie powiodło się. Błąd: ${data.error_message || "nieznany"}. Użytkownik powinien przesłać plik ponownie.`;
-        }
-
-        if (data.status !== "ready") {
-          return `Dokument "${data.original_name}" ma status: ${data.status}. Przetwarzanie w toku lub nie powiodło się.`;
+        if (data.status === "processing") {
+          return `Dokument "${data.original_name}" jest w trakcie przetwarzania. Spróbuj za chwilę.`;
         }
 
         const text = data.extracted_text || "";
         if (!text) {
-          return `Dokument "${data.original_name}" jest oznaczony jako ready, ale nie ma wyekstrahowanego tekstu. Plik może być pusty lub w nieobsługiwanym formacie.`;
+          if (data.status === "failed") {
+            return `Dokument "${data.original_name}" — przetwarzanie nie powiodło się: ${data.error_message || "nieznany błąd"}. Brak wyekstrahowanego tekstu.`;
+          }
+          return `Dokument "${data.original_name}" nie ma wyekstrahowanego tekstu. Plik może być pusty lub w nieobsługiwanym formacie.`;
         }
+
+        const statusNote =
+          data.status === "failed"
+            ? " (uwaga: wyszukiwanie semantyczne niedostępne — tylko pełny tekst)"
+            : "";
 
         const slice = text.slice(offset, offset + PAGE_SIZE);
         const hasMore = text.length > offset + PAGE_SIZE;
         const header =
           offset === 0
-            ? `📄 **${data.original_name}** (${text.length} znaków)\n${data.summary ? `Podsumowanie: ${data.summary}\n` : ""}\n---\n`
+            ? `📄 **${data.original_name}** (${text.length} znaków)${statusNote}\n${data.summary ? `Podsumowanie: ${data.summary}\n` : ""}\n---\n`
             : `📄 **${data.original_name}** (kontynuacja od znaku ${offset})\n---\n`;
 
         return `${header}${slice}${hasMore ? `\n\n...(dalsze ${text.length - offset - PAGE_SIZE} znaków — użyj offset: ${offset + PAGE_SIZE} aby kontynuować)` : ""}`;

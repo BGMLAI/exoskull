@@ -189,24 +189,38 @@ export async function processDocument(
       step_label: `${textChunks.length} chunks created`,
     });
 
-    // 7. Generate embeddings
+    // 7. Generate embeddings (may fail if OpenAI has no credits)
     await updateIngestionJob({
       status: "embedding",
       current_step: 3,
       step_label: `Generating embeddings for ${textChunks.length} chunks...`,
     });
 
-    const embeddings = await generateEmbeddings(
-      textChunks.map((c) => c.content),
-    );
+    let embeddings: number[][] | null = null;
+    try {
+      embeddings = await generateEmbeddings(textChunks.map((c) => c.content));
+    } catch (embeddingErr) {
+      logger.warn(
+        "[DocProcessor] Embedding generation failed (OpenAI credits?), storing chunks without vectors:",
+        {
+          documentId,
+          error:
+            embeddingErr instanceof Error ? embeddingErr.message : embeddingErr,
+        },
+      );
+      await updateIngestionJob({
+        step_label:
+          "Embeddings skipped (API unavailable) — keyword search still works",
+      });
+    }
 
-    // 8. Store chunks with embeddings (in exo_document_chunks for document-specific search)
+    // 8. Store chunks in exo_document_chunks (with or without embeddings)
     const chunkRecords = textChunks.map((tc, index) => ({
       document_id: documentId,
       tenant_id: tenantId,
       chunk_index: index,
       content: tc.content,
-      embedding: JSON.stringify(embeddings[index]),
+      ...(embeddings ? { embedding: JSON.stringify(embeddings[index]) } : {}),
     }));
 
     // Insert in batches of 50
@@ -224,57 +238,64 @@ export async function processDocument(
       }
     }
 
-    // 9. Also store in exo_vector_embeddings for unified search (with dedup)
+    // 9. Also store in exo_vector_embeddings for unified search (only if embeddings available)
     let duplicatesSkipped = 0;
-    const vectorRows = textChunks.map((tc, index) => ({
-      tenant_id: tenantId,
-      content: tc.content,
-      content_hash: hashContent(tc.content),
-      embedding: JSON.stringify(embeddings[index]),
-      source_type: "document",
-      source_id: documentId,
-      chunk_index: index,
-      total_chunks: textChunks.length,
-      metadata: {
-        source_name: doc.original_name,
-        section_heading: tc.sectionHeading,
-        strategy: tc.metadata.strategy,
-      },
-    }));
+    let newVectorRowsCount = 0;
 
-    // Dedup check
-    const hashes = vectorRows.map((r) => r.content_hash);
-    const { data: existing } = await supabase
-      .from("exo_vector_embeddings")
-      .select("content_hash")
-      .eq("tenant_id", tenantId)
-      .in("content_hash", hashes);
+    if (embeddings) {
+      const vectorRows = textChunks.map((tc, index) => ({
+        tenant_id: tenantId,
+        content: tc.content,
+        content_hash: hashContent(tc.content),
+        embedding: JSON.stringify(embeddings[index]),
+        source_type: "document",
+        source_id: documentId,
+        chunk_index: index,
+        total_chunks: textChunks.length,
+        metadata: {
+          source_name: doc.original_name,
+          section_heading: tc.sectionHeading,
+          strategy: tc.metadata.strategy,
+        },
+      }));
 
-    const existingHashes = new Set((existing || []).map((e) => e.content_hash));
-    const newVectorRows = vectorRows.filter(
-      (r) => !existingHashes.has(r.content_hash),
-    );
-    duplicatesSkipped = vectorRows.length - newVectorRows.length;
-
-    // Insert new vector rows
-    for (let i = 0; i < newVectorRows.length; i += 50) {
-      const batch = newVectorRows.slice(i, i + 50);
-      const { error: vectorInsertError } = await supabase
+      // Dedup check
+      const hashes = vectorRows.map((r) => r.content_hash);
+      const { data: existing } = await supabase
         .from("exo_vector_embeddings")
-        .insert(batch);
+        .select("content_hash")
+        .eq("tenant_id", tenantId)
+        .in("content_hash", hashes);
 
-      if (vectorInsertError) {
-        console.error("[DocProcessor] Vector insert failed:", {
-          batch: i,
-          error: vectorInsertError.message,
-        });
+      const existingHashes = new Set(
+        (existing || []).map((e) => e.content_hash),
+      );
+      const newVectorRows = vectorRows.filter(
+        (r) => !existingHashes.has(r.content_hash),
+      );
+      duplicatesSkipped = vectorRows.length - newVectorRows.length;
+      newVectorRowsCount = newVectorRows.length;
+
+      // Insert new vector rows
+      for (let i = 0; i < newVectorRows.length; i += 50) {
+        const batch = newVectorRows.slice(i, i + 50);
+        const { error: vectorInsertError } = await supabase
+          .from("exo_vector_embeddings")
+          .insert(batch);
+
+        if (vectorInsertError) {
+          console.error("[DocProcessor] Vector insert failed:", {
+            batch: i,
+            error: vectorInsertError.message,
+          });
+        }
       }
     }
 
     await updateIngestionJob({
-      embeddings_stored: newVectorRows.length,
+      embeddings_stored: newVectorRowsCount,
       chunks_processed: textChunks.length,
-      step_label: `${newVectorRows.length} embeddings stored, ${duplicatesSkipped} duplicates skipped`,
+      step_label: `${newVectorRowsCount} embeddings stored, ${duplicatesSkipped} duplicates skipped${!embeddings ? " (embeddings skipped — API unavailable)" : ""}`,
     });
 
     // 10. Knowledge graph extraction (for content with meaningful entities)
@@ -327,7 +348,7 @@ export async function processDocument(
       filename: doc.original_name,
       textLength: extractedText.length,
       chunks: textChunks.length,
-      embeddings: newVectorRows.length,
+      embeddings: newVectorRowsCount,
       duplicatesSkipped,
     });
 
@@ -584,41 +605,52 @@ export async function searchDocuments(
     similarity: number;
   }[]
 > {
-  if (!OPENAI_API_KEY) {
-    throw new Error("[DocProcessor] Missing OPENAI_API_KEY for search");
-  }
-
-  const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
   const supabase = getServiceSupabase();
 
-  // Generate query embedding
-  const embResponse = await openai.embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: query,
-  });
-  const queryEmbedding = embResponse.data[0].embedding;
+  // Try vector search first (requires OpenAI for embedding)
+  try {
+    if (!OPENAI_API_KEY) {
+      throw new Error("Missing OPENAI_API_KEY");
+    }
 
-  // Call pgvector search function
-  const { data, error } = await supabase.rpc("search_user_documents", {
-    p_tenant_id: tenantId,
-    p_query_embedding: queryEmbedding,
-    p_limit: limit,
-    p_similarity_threshold: 0.3,
-  });
+    const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-  if (error) {
-    console.error("[DocProcessor] Vector search failed:", {
-      tenantId,
-      error: error.message,
+    const embResponse = await openai.embeddings.create({
+      model: EMBEDDING_MODEL,
+      input: query,
     });
-    // Fall through to keyword fallback
+    const queryEmbedding = embResponse.data[0].embedding;
+
+    const { data, error } = await supabase.rpc("search_user_documents", {
+      p_tenant_id: tenantId,
+      p_query_embedding: queryEmbedding,
+      p_limit: limit,
+      p_similarity_threshold: 0.3,
+    });
+
+    if (error) {
+      console.error("[DocProcessor] Vector search RPC failed:", {
+        tenantId,
+        error: error.message,
+      });
+      // Fall through to keyword fallback
+    }
+
+    if (data && data.length > 0) {
+      return data;
+    }
+  } catch (vectorErr) {
+    // OpenAI credits exhausted or other embedding error — fall through to keyword search
+    logger.warn(
+      "[DocProcessor] Vector search unavailable, using keyword fallback:",
+      {
+        tenantId,
+        error: vectorErr instanceof Error ? vectorErr.message : vectorErr,
+      },
+    );
   }
 
-  if (data && data.length > 0) {
-    return data;
-  }
-
-  // ── Keyword fallback — if vector search returns 0, try text search ──
+  // ── Keyword fallback — works without OpenAI credits ──
   // This handles: broken index (IVFFlat bug), missing embeddings, low similarity
   logger.info("[DocProcessor] Vector search empty, trying keyword fallback:", {
     tenantId,
