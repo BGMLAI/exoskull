@@ -1,13 +1,16 @@
 /**
- * ConversationRelay WebSocket Server
+ * Voice WebSocket Server
  *
- * Standalone WebSocket server that bridges Twilio ConversationRelay with
- * the ExoSkull voice pipeline (Claude + 49 IORS tools + emotion analysis).
+ * Standalone WebSocket server with two modes:
  *
- * Protocol:
- * - Receives TEXT from Twilio (Deepgram STT → transcript)
- * - Processes with Claude via processUserMessage()
- * - Sends TEXT back to Twilio (→ ElevenLabs TTS → audio to caller)
+ * 1. ConversationRelay (default) — Twilio handles STT/TTS, we handle text
+ *    Path: / (root)
+ *    Protocol: JSON text messages (setup, prompt, interrupt, text, end)
+ *
+ * 2. Media Streams (Gemini Live) — Raw audio, Gemini handles everything
+ *    Path: /media-streams
+ *    Protocol: Twilio Media Streams (connected, media, stop)
+ *    Requires: GEMINI_LIVE_ENABLED=true
  *
  * Run: npx tsx -r tsconfig-paths/register server/voice-ws.ts
  * Deploy: Railway / Render / any Node.js host
@@ -116,14 +119,35 @@ const server = http.createServer((req, res) => {
   res.end();
 });
 
-const wss = new WebSocketServer({ server });
+// Two WebSocket servers: one for ConversationRelay, one for Media Streams
+const wss = new WebSocketServer({ noServer: true });
+const wssMedia = new WebSocketServer({ noServer: true });
+
+// Route WebSocket upgrades by path
+server.on("upgrade", (request, socket, head) => {
+  const pathname = new URL(request.url || "/", `http://${request.headers.host}`)
+    .pathname;
+
+  if (pathname === "/media-streams") {
+    wssMedia.handleUpgrade(request, socket, head, (ws) => {
+      wssMedia.emit("connection", ws, request);
+    });
+  } else {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit("connection", ws, request);
+    });
+  }
+});
 
 // ============================================================================
-// WEBSOCKET HANDLERS
+// CONVERSATION RELAY WEBSOCKET HANDLERS (default path: /)
 // ============================================================================
 
 wss.on("connection", (ws: WebSocket, req) => {
-  logger.info("[VoiceWS] New connection from:", req.socket.remoteAddress);
+  logger.info(
+    "[VoiceWS] New ConversationRelay connection from:",
+    req.socket.remoteAddress,
+  );
 
   ws.on("message", async (raw: Buffer) => {
     try {
@@ -411,23 +435,225 @@ function handleInterrupt(ws: WebSocket, data: InterruptMessage): void {
 }
 
 // ============================================================================
+// MEDIA STREAMS WEBSOCKET HANDLER (path: /media-streams)
+// Bridges Twilio raw mulaw audio ↔ Gemini Live native audio
+// ============================================================================
+
+interface MediaStreamSession {
+  streamSid: string;
+  callSid: string;
+  tenantId: string;
+  sessionId: string;
+  geminiSession?: any; // ManagedLiveSession from gemini-live-provider
+}
+
+const mediaStreamSessions = new Map<WebSocket, MediaStreamSession>();
+
+wssMedia.on("connection", (ws: WebSocket, req) => {
+  logger.info("[MediaStreams] New connection from:", req.socket.remoteAddress);
+
+  ws.on("message", async (raw: Buffer) => {
+    try {
+      const data = JSON.parse(raw.toString());
+
+      switch (data.event) {
+        case "connected":
+          logger.info("[MediaStreams] Connected:", data.protocol);
+          break;
+
+        case "start": {
+          // Twilio sends stream metadata on start
+          const { streamSid, callSid, customParameters } = data.start;
+          const tenantId = customParameters?.tenantId || "anonymous";
+
+          logger.info("[MediaStreams] Stream started:", {
+            streamSid,
+            callSid,
+            tenantId,
+          });
+
+          // Create voice session in DB
+          const voiceSession = await getOrCreateSession(callSid, tenantId);
+
+          const msSession: MediaStreamSession = {
+            streamSid,
+            callSid,
+            tenantId,
+            sessionId: voiceSession.id,
+          };
+          mediaStreamSessions.set(ws, msSession);
+
+          // Create Gemini Live session (lazy import to avoid loading when not needed)
+          try {
+            const { createGeminiLiveSession, translateToolsForLive } =
+              await import("../lib/voice/gemini-live-provider");
+            const { twilioToGemini, geminiToTwilio } =
+              await import("../lib/voice/audio-codec");
+            const { getExtensionToolDefinitions, executeExtensionTool } =
+              await import("../lib/iors/tools");
+            const { buildDynamicContext } =
+              await import("../lib/voice/dynamic-context");
+
+            // Build context and tools
+            const dynamicCtx = await buildDynamicContext(tenantId);
+            const toolDefs = getExtensionToolDefinitions();
+            const geminiTools = translateToolsForLive(toolDefs as any);
+
+            const systemPrompt = `${dynamicCtx.context}\n\nMówisz po polsku. Jesteś IORS — inteligentny asystent systemu ExoSkull. Odpowiadaj krótko i naturalnie (rozmowa głosowa).`;
+
+            const geminiSession = await createGeminiLiveSession({
+              tenantId,
+              systemPrompt,
+              tools: geminiTools,
+              executeTool: async (name, input, tid) =>
+                (await executeExtensionTool(name, input, tid)) ?? "",
+              callbacks: {
+                onAudio: (pcm16_24k: Buffer) => {
+                  // Convert Gemini PCM16 24kHz → Twilio mulaw 8kHz
+                  if (ws.readyState !== WebSocket.OPEN) return;
+                  const mulaw = geminiToTwilio(pcm16_24k);
+
+                  // Send as Twilio media message
+                  ws.send(
+                    JSON.stringify({
+                      event: "media",
+                      streamSid: msSession.streamSid,
+                      media: {
+                        payload: mulaw.toString("base64"),
+                      },
+                    }),
+                  );
+                },
+                onInputTranscription: (text: string) => {
+                  logger.info("[MediaStreams] User said:", text);
+                  // Log to unified thread
+                  updateSession(msSession.sessionId, text, "").catch(() => {});
+                },
+                onOutputTranscription: (text: string) => {
+                  logger.info("[MediaStreams] IORS said:", text);
+                  // Log to unified thread
+                  updateSession(msSession.sessionId, "", text).catch(() => {});
+                },
+                onTurnComplete: () => {
+                  logger.info("[MediaStreams] Turn complete");
+                },
+                onInterrupted: () => {
+                  logger.info("[MediaStreams] Interrupted by user");
+                  // Clear Twilio's audio buffer
+                  if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(
+                      JSON.stringify({
+                        event: "clear",
+                        streamSid: msSession.streamSid,
+                      }),
+                    );
+                  }
+                },
+                onError: (error: Error) => {
+                  console.error("[MediaStreams] Gemini error:", error.message);
+                },
+                onClose: () => {
+                  logger.info("[MediaStreams] Gemini session closed");
+                },
+              },
+            });
+
+            msSession.geminiSession = geminiSession;
+            logger.info("[MediaStreams] Gemini Live session created:", {
+              tenantId,
+              toolCount: geminiTools.length,
+            });
+          } catch (geminiError) {
+            console.error("[MediaStreams] Failed to create Gemini session:", {
+              error:
+                geminiError instanceof Error
+                  ? geminiError.message
+                  : geminiError,
+            });
+            // Fall back — close the stream, Twilio will handle gracefully
+          }
+          break;
+        }
+
+        case "media": {
+          // Raw audio from Twilio (mulaw 8kHz, base64 encoded)
+          const msSession = mediaStreamSessions.get(ws);
+          if (!msSession?.geminiSession) break;
+
+          const { twilioToGemini } = await import("../lib/voice/audio-codec");
+
+          // Decode base64 mulaw → convert to PCM16 16kHz → send to Gemini
+          const mulawBuffer = Buffer.from(data.media.payload, "base64");
+          const pcm16_16k = twilioToGemini(mulawBuffer);
+          msSession.geminiSession.sendAudio(pcm16_16k);
+          break;
+        }
+
+        case "stop": {
+          logger.info("[MediaStreams] Stream stopped");
+          const msSession = mediaStreamSessions.get(ws);
+          if (msSession?.geminiSession) {
+            msSession.geminiSession.close();
+          }
+          if (msSession) {
+            endSession(msSession.sessionId).catch(() => {});
+            mediaStreamSessions.delete(ws);
+          }
+          break;
+        }
+
+        default:
+          // Ignore unknown events (mark, dtmf, etc.)
+          break;
+      }
+    } catch (error) {
+      console.error("[MediaStreams] Message error:", {
+        error: error instanceof Error ? error.message : error,
+      });
+    }
+  });
+
+  ws.on("close", () => {
+    const msSession = mediaStreamSessions.get(ws);
+    if (msSession) {
+      if (msSession.geminiSession) {
+        msSession.geminiSession.close();
+      }
+      endSession(msSession.sessionId).catch(() => {});
+      mediaStreamSessions.delete(ws);
+      logger.info("[MediaStreams] Connection closed:", {
+        callSid: msSession.callSid,
+      });
+    }
+  });
+
+  ws.on("error", (error) => {
+    console.error("[MediaStreams] WebSocket error:", error.message);
+  });
+});
+
+// ============================================================================
 // START SERVER
 // ============================================================================
+
+const geminiLiveEnabled = process.env.GEMINI_LIVE_ENABLED === "true";
 
 server.listen(PORT, () => {
   console.log(`
 ╔══════════════════════════════════════════════════╗
 ║  ExoSkull Voice WebSocket Server                 ║
-║  ConversationRelay handler                       ║
 ║                                                  ║
 ║  Port: ${String(PORT).padEnd(41)}║
 ║  Health: http://localhost:${String(PORT).padEnd(24)}║
 ║                                                  ║
+║  Modes:                                          ║
+║  [${geminiLiveEnabled ? "✓" : " "}] /media-streams  (Gemini Live audio)     ║
+║  [✓] /               (ConversationRelay text)    ║
+║                                                  ║
 ║  Stack:                                          ║
-║  STT:  Deepgram Nova (via ConversationRelay)     ║
-║  TTS:  ElevenLabs (via ConversationRelay)        ║
-║  LLM:  Claude Haiku 3.5 + streaming + 18 tools  ║
-║  EMO:  analyzeEmotion + crisis detection         ║
+║  ConvRelay: Deepgram STT + ElevenLabs TTS        ║
+║  MediaStr:  Gemini 2.5 Flash Native Audio        ║
+║  LLM:      Gemini 3 Flash + 60+ IORS tools       ║
 ╚══════════════════════════════════════════════════╝
 `);
 });

@@ -308,6 +308,61 @@ export function generateConversationRelayTwiML(
 }
 
 // ============================================================================
+// MEDIA STREAMS — Raw audio via WebSocket (for Gemini Live native audio)
+// ============================================================================
+
+export interface MediaStreamsOptions {
+  /** WebSocket server URL (wss://) — must handle raw audio */
+  wsUrl: string;
+  /** Action URL for post-call callback */
+  actionUrl?: string;
+  /** Custom parameters passed to WS connected message */
+  customParameters?: Record<string, string>;
+}
+
+/**
+ * Generate TwiML for Media Streams — raw audio via WebSocket.
+ *
+ * Unlike ConversationRelay (which handles STT/TTS and sends text),
+ * Media Streams sends raw mulaw 8kHz audio. Our server handles all
+ * processing (conversion to PCM16 → Gemini Live → back to mulaw).
+ *
+ * Used when GEMINI_LIVE_ENABLED=true for native audio pipeline.
+ */
+export function generateMediaStreamsTwiML(
+  options: MediaStreamsOptions,
+): string {
+  const { wsUrl, actionUrl, customParameters } = options;
+
+  const response = new VoiceResponse();
+
+  // Brief greeting via Twilio TTS while Gemini Live connects
+  response.say(
+    { voice: TWILIO_POLISH_VOICE, language: TWILIO_POLISH_LANGUAGE },
+    "Łączę.",
+  );
+
+  const connectAttrs: Record<string, string> = {};
+  if (actionUrl) {
+    connectAttrs.action = actionUrl;
+  }
+
+  const connect = response.connect(connectAttrs);
+
+  // Start bidirectional media stream
+  const stream = connect.stream({ url: wsUrl });
+
+  // Pass custom parameters
+  if (customParameters) {
+    for (const [name, value] of Object.entries(customParameters)) {
+      stream.parameter({ name, value });
+    }
+  }
+
+  return response.toString();
+}
+
+// ============================================================================
 // OUTBOUND CALLS
 // ============================================================================
 

@@ -17,6 +17,7 @@ import {
   generateEndCallTwiML,
   generateErrorTwiML,
   generateConversationRelayTwiML,
+  generateMediaStreamsTwiML,
   validateTwilioSignature,
 } from "@/lib/voice/twilio-client";
 import { textToSpeech, uploadTTSAudio } from "@/lib/voice/elevenlabs-tts";
@@ -147,8 +148,35 @@ export async function POST(req: NextRequest) {
         tenantId = tenant?.id || "anonymous";
       }
 
-      // ── ConversationRelay mode (real-time WebSocket pipeline) ──
+      // ── Gemini Live Media Streams mode (native audio, no separate STT/TTS) ──
+      const geminiLiveEnabled = process.env.GEMINI_LIVE_ENABLED === "true";
       const voiceWsUrl = process.env.VOICE_WS_URL;
+
+      if (geminiLiveEnabled && voiceWsUrl) {
+        // Media Streams sends raw audio — Gemini handles STT + LLM + TTS natively
+        const mediaWsUrl = voiceWsUrl.replace(/\/?$/, "/media-streams");
+
+        const twiml = generateMediaStreamsTwiML({
+          wsUrl: mediaWsUrl,
+          actionUrl: getActionUrl("end"),
+          customParameters: {
+            tenantId,
+            ...(jobType ? { jobType } : {}),
+          },
+        });
+
+        logger.info("[Twilio Voice] Media Streams TwiML generated:", {
+          tenantId,
+          wsUrl: mediaWsUrl,
+          mode: "gemini-live",
+        });
+
+        return new NextResponse(twiml, {
+          headers: { "Content-Type": "application/xml" },
+        });
+      }
+
+      // ── ConversationRelay mode (Deepgram STT + ElevenLabs TTS, text WebSocket) ──
       if (voiceWsUrl) {
         // Generate personalized greeting (ConversationRelay speaks it via ElevenLabs)
         const greeting = await generateGreeting(tenantId);
