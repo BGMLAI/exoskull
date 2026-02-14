@@ -37,9 +37,7 @@ export interface GeminiChatOptions {
  * Convert Anthropic tool definitions to Gemini FunctionDeclaration format.
  * Anthropic input_schema is standard JSON Schema — Gemini accepts the same format.
  */
-function translateTools(
-  anthropicTools: Anthropic.Tool[],
-): Array<{
+function translateTools(anthropicTools: Anthropic.Tool[]): Array<{
   name: string;
   description: string;
   parameters: Record<string, unknown>;
@@ -191,8 +189,8 @@ export async function callGeminiChatWithTools(
   // Build current contents array (will grow with tool results)
   let currentContents = [...contents];
 
-  const MAX_ROUNDS = 10;
-  const BUDGET_MS = 55_000; // Same as WEB_AGENT_CONFIG
+  const MAX_ROUNDS = 5;
+  const BUDGET_MS = 45_000; // Same as WEB_AGENT_CONFIG
   const startTime = Date.now();
 
   logger.info("[GeminiChatProvider] Starting tool loop:", {

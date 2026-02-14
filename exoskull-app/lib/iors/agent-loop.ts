@@ -79,14 +79,14 @@ export interface AgentState {
 // ============================================================================
 
 export const WEB_AGENT_CONFIG: AgentLoopConfig = {
-  maxSteps: 10,
-  budgetMs: 55_000, // 55s — Vercel 60s with 5s safety margin
+  maxSteps: 5,
+  budgetMs: 45_000, // 45s — Vercel 60s with 15s safety margin
   followUpMaxTokens: 1024,
 };
 
 export const VOICE_AGENT_CONFIG: AgentLoopConfig = {
-  maxSteps: 6, // Increased: same knowledge/tools as web, streaming mitigates latency
-  budgetMs: 40_000, // 40s — Railway has no hard timeout like Vercel
+  maxSteps: 3,
+  budgetMs: 30_000, // 30s — voice needs fast response
   followUpMaxTokens: 512,
 };
 
