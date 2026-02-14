@@ -15,6 +15,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { logCronStart, logCronComplete, logCronFailed } from "./logger";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import {
+  registerProcess,
+  completeProcess,
+} from "@/lib/conductor/process-registry";
 
 import { logger } from "@/lib/logger";
 type CronHandler = (req: NextRequest) => Promise<NextResponse>;
@@ -125,6 +129,18 @@ export function withCronGuard(
     // 4. Start logging
     const runId = await logCronStart(name);
 
+    // 4.5 Register in process registry (makes all CRONs visible to conductor)
+    const cronWorkerId = `cron-${name}-${Date.now()}`;
+    const processId = await registerProcess(
+      "cron",
+      name,
+      cronWorkerId,
+      undefined,
+      undefined,
+      {},
+      Math.ceil(timeoutMs / 1000) + 10,
+    );
+
     // 5. Execute with timeout
     try {
       const response = await Promise.race([
@@ -157,9 +173,13 @@ export function withCronGuard(
           p_failure_threshold: failureThreshold,
           p_cooldown_minutes: cooldownMinutes,
         });
+        if (processId)
+          await completeProcess(processId, "failed", null, errorMsg);
       } else {
         await logCronComplete(runId, resultSummary, status);
         await db.rpc("record_cron_success", { p_cron_name: name });
+        if (processId)
+          await completeProcess(processId, "completed", resultSummary);
       }
 
       return response;
@@ -172,6 +192,7 @@ export function withCronGuard(
         p_failure_threshold: failureThreshold,
         p_cooldown_minutes: cooldownMinutes,
       });
+      if (processId) await completeProcess(processId, "failed", null, errMsg);
 
       return NextResponse.json(
         { error: errMsg, cron: name, timestamp: new Date().toISOString() },

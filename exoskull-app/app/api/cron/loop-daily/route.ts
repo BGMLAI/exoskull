@@ -241,9 +241,24 @@ async function handler(req: NextRequest) {
     const prunedEvents = await pruneOldEvents(7);
     const prunedWork = await pruneOldWorkItems(7);
 
+    // Step 5.5: Prune old process registry entries (>7 days)
+    let prunedProcesses = 0;
+    try {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+      await supabase
+        .from("exo_process_registry")
+        .delete()
+        .in("status", ["completed", "failed", "expired"])
+        .lt("completed_at", sevenDaysAgo);
+      prunedProcesses = 1; // Pruned (exact count unavailable)
+    } catch {
+      // Table may not exist yet during migration rollout
+    }
+
     logger.info("[LoopDaily] Pruned:", {
       events: prunedEvents,
       workItems: prunedWork,
+      processes: prunedProcesses,
     });
 
     return NextResponse.json({
@@ -255,6 +270,7 @@ async function handler(req: NextRequest) {
       workProcessed,
       prunedEvents,
       prunedWork,
+      prunedProcesses,
       durationMs: Date.now() - startTime,
     });
   } catch (error) {
