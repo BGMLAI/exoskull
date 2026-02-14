@@ -56,7 +56,7 @@ export const knowledgeTools: ToolDefinition[] = [
         let response = `Znaleziono ${results.length} fragmentów w dokumentach:\n\n`;
         for (const r of results) {
           response += `📄 **${r.filename}** (${r.category}, trafność: ${Math.round(r.similarity * 100)}%)\n`;
-          response += `${r.content.slice(0, 500)}${r.content.length > 500 ? "..." : ""}\n\n`;
+          response += `${r.content.slice(0, 2000)}${r.content.length > 2000 ? "..." : ""}\n\n`;
         }
 
         return response;
@@ -132,7 +132,7 @@ export const knowledgeTools: ToolDefinition[] = [
         const { data, error } = await supabase
           .from("exo_user_documents")
           .select(
-            "id, original_name, status, category, created_at, summary, file_size",
+            "id, original_name, status, category, created_at, summary, file_size, error_message",
           )
           .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false })
@@ -153,7 +153,9 @@ export const knowledgeTools: ToolDefinition[] = [
             ? `${Math.round(doc.file_size / 1024)}KB`
             : "";
           response += `📄 **${doc.original_name}** | status: ${doc.status} | ${doc.category || "general"} | ${size}\n`;
-          if (doc.summary) {
+          if (doc.status === "failed" && doc.error_message) {
+            response += `   ❌ Błąd: ${doc.error_message.slice(0, 200)}\n`;
+          } else if (doc.summary) {
             response += `   Podsumowanie: ${doc.summary.slice(0, 200)}${doc.summary.length > 200 ? "..." : ""}\n`;
           }
           response += "\n";
@@ -179,7 +181,7 @@ export const knowledgeTools: ToolDefinition[] = [
     definition: {
       name: "get_document_content",
       description:
-        'Pobierz pełną treść konkretnego dokumentu po nazwie. Użyj gdy znasz nazwę pliku i chcesz zobaczyć co zawiera. Szybsze niż search_knowledge dla konkretnych plików. Przykłady: "pokaż co jest w produkty.xlsx", "przeczytaj ten plik".',
+        'Pobierz treść konkretnego dokumentu po nazwie. Użyj gdy znasz nazwę pliku i chcesz zobaczyć co zawiera. Obsługuje paginację — użyj offset jeśli plik jest duży. Przykłady: "pokaż co jest w produkty.xlsx", "przeczytaj ten plik".',
       input_schema: {
         type: "object" as const,
         properties: {
@@ -187,6 +189,11 @@ export const knowledgeTools: ToolDefinition[] = [
             type: "string",
             description:
               "Nazwa pliku lub jej fragment (np. 'produkty' znajdzie 'produkty_KOMPLETNE.xlsx')",
+          },
+          offset: {
+            type: "number",
+            description:
+              "Offset w znakach — użyj aby pobrać dalszą część dużego pliku (np. 16000 = zacznij od 16001 znaku)",
           },
         },
         required: ["document_name"],
@@ -197,8 +204,11 @@ export const knowledgeTools: ToolDefinition[] = [
       tenantId: string,
     ): Promise<string> => {
       const docName = input.document_name as string;
+      const offset = (input.offset as number) || 0;
+      const PAGE_SIZE = 16000;
       logger.info("[KnowledgeTools] get_document_content:", {
         docName,
+        offset,
         tenantId,
       });
 
@@ -206,7 +216,9 @@ export const knowledgeTools: ToolDefinition[] = [
         const supabase = getServiceSupabase();
         const { data, error } = await supabase
           .from("exo_user_documents")
-          .select("original_name, extracted_text, summary, status")
+          .select(
+            "original_name, extracted_text, summary, status, error_message",
+          )
           .eq("tenant_id", tenantId)
           .ilike("original_name", `%${docName}%`)
           .limit(1)
@@ -216,8 +228,12 @@ export const knowledgeTools: ToolDefinition[] = [
           return `Nie znalazłem dokumentu zawierającego "${docName}" w nazwie. Użyj list_documents żeby zobaczyć dostępne pliki.`;
         }
 
+        if (data.status === "failed") {
+          return `Dokument "${data.original_name}" — przetwarzanie nie powiodło się. Błąd: ${data.error_message || "nieznany"}. Użytkownik powinien przesłać plik ponownie.`;
+        }
+
         if (data.status !== "ready") {
-          return `Dokument "${data.original_name}" ma status: ${data.status}. Przetwarzanie mogło się nie udać — plik nie jest jeszcze gotowy do odczytu.`;
+          return `Dokument "${data.original_name}" ma status: ${data.status}. Przetwarzanie w toku lub nie powiodło się.`;
         }
 
         const text = data.extracted_text || "";
@@ -225,8 +241,14 @@ export const knowledgeTools: ToolDefinition[] = [
           return `Dokument "${data.original_name}" jest oznaczony jako ready, ale nie ma wyekstrahowanego tekstu. Plik może być pusty lub w nieobsługiwanym formacie.`;
         }
 
-        const truncated = text.length > 4000;
-        return `📄 **${data.original_name}**\n${data.summary ? `Podsumowanie: ${data.summary}\n` : ""}\n---\n${text.slice(0, 4000)}${truncated ? `\n\n...(obcięte — pełna treść: ${text.length} znaków)` : ""}`;
+        const slice = text.slice(offset, offset + PAGE_SIZE);
+        const hasMore = text.length > offset + PAGE_SIZE;
+        const header =
+          offset === 0
+            ? `📄 **${data.original_name}** (${text.length} znaków)\n${data.summary ? `Podsumowanie: ${data.summary}\n` : ""}\n---\n`
+            : `📄 **${data.original_name}** (kontynuacja od znaku ${offset})\n---\n`;
+
+        return `${header}${slice}${hasMore ? `\n\n...(dalsze ${text.length - offset - PAGE_SIZE} znaków — użyj offset: ${offset + PAGE_SIZE} aby kontynuować)` : ""}`;
       } catch (err) {
         console.error("[KnowledgeTools] get_document_content error:", err);
         return "Nie udało się pobrać treści dokumentu.";

@@ -509,24 +509,57 @@ async function generateSummary(
   text: string,
   filename: string,
 ): Promise<string> {
-  const Anthropic = (await import("@anthropic-ai/sdk")).default;
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+  const truncated = text.slice(0, 4000);
 
-  const truncated = text.slice(0, 4000); // Limit to ~1000 tokens
+  // Use Gemini Flash (free tier, no credit issues)
+  const geminiKey = process.env.GOOGLE_AI_API_KEY;
+  if (geminiKey) {
+    try {
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: geminiKey });
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: `Napisz krótkie podsumowanie (2-3 zdania, po polsku) tego dokumentu "${filename}":\n\n${truncated}`,
+              },
+            ],
+          },
+        ],
+        config: { maxOutputTokens: 200, temperature: 0.3 },
+      });
+      return response.text || truncated.slice(0, 300) + "...";
+    } catch (geminiErr) {
+      logger.error("[DocProcessor] Gemini summary failed:", {
+        error: geminiErr instanceof Error ? geminiErr.message : geminiErr,
+      });
+    }
+  }
 
-  const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 200,
-    messages: [
-      {
-        role: "user",
-        content: `Napisz krótkie podsumowanie (2-3 zdania, po polsku) tego dokumentu "${filename}":\n\n${truncated}`,
-      },
-    ],
-  });
-
-  const textBlock = response.content.find((c) => c.type === "text");
-  return (textBlock && "text" in textBlock ? textBlock.text : "") || "";
+  // Fallback to Anthropic
+  try {
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY!,
+    });
+    const response = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 200,
+      messages: [
+        {
+          role: "user",
+          content: `Napisz krótkie podsumowanie (2-3 zdania, po polsku) tego dokumentu "${filename}":\n\n${truncated}`,
+        },
+      ],
+    });
+    const textBlock = response.content.find((c) => c.type === "text");
+    return (textBlock && "text" in textBlock ? textBlock.text : "") || "";
+  } catch {
+    return truncated.slice(0, 300) + "...";
+  }
 }
 
 // ============================================================================
