@@ -631,7 +631,7 @@ export function WorldsGraph({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -1213,84 +1213,94 @@ export function WorldsGraph({
         />
       )}
 
-      {/* Force graph */}
-      <ForceGraph2D
-        ref={fgRef}
-        graphData={graphData}
-        width={dimensions.width}
-        height={dimensions.height}
-        backgroundColor="rgba(0,0,0,0)"
-        nodeCanvasObject={paintNode}
-        nodeCanvasObjectMode={() => "replace"}
-        nodePointerAreaPaint={(
-          node: Record<string, unknown>,
-          color: string,
-          ctx: CanvasRenderingContext2D,
-        ) => {
-          if ((node.type as string) === "world-region") return;
-          const s = NODE_SIZES[(node.type as WorldNodeType) || "task"] || 5;
-          ctx.beginPath();
-          ctx.arc(node.x as number, node.y as number, s + 4, 0, Math.PI * 2);
-          ctx.fillStyle = color;
-          ctx.fill();
-        }}
-        linkColor={(l: Record<string, unknown>) => {
-          switch (l.type as string) {
-            case "influence":
-              return "rgba(168,85,247,0.14)";
-            case "dependency":
-              return "rgba(6,182,212,0.14)";
-            case "reference":
-              return "rgba(245,158,11,0.10)";
-            default:
-              return "rgba(255,255,255,0.05)";
-          }
-        }}
-        linkWidth={(l: Record<string, unknown>) =>
-          (l.type as string) === "hierarchy" ? 1 : 0.5
-        }
-        linkCurvature={(l: Record<string, unknown>) => {
-          switch (l.type as string) {
-            case "influence":
-              return 0.2;
-            case "dependency":
-              return 0.15;
-            default:
-              return 0;
-          }
-        }}
-        linkDirectionalParticles={(l: Record<string, unknown>) => {
-          const t = l.type as string;
-          return t === "influence" || t === "dependency" ? 3 : 1;
-        }}
-        linkDirectionalParticleWidth={1.6}
-        linkDirectionalParticleSpeed={0.004}
-        linkDirectionalParticleColor={(l: Record<string, unknown>) => {
-          switch (l.type as string) {
-            case "influence":
-              return "rgba(168,85,247,0.45)";
-            case "dependency":
-              return "rgba(6,182,212,0.45)";
-            default:
-              return "rgba(139,92,246,0.25)";
-          }
-        }}
-        onNodeClick={handleNodeClick}
-        onNodeHover={(n: Record<string, unknown> | null) => {
-          if ((n?.type as string) === "world-region") {
-            setHoveredNode(null);
-            return;
-          }
-          setHoveredNode((n?.id as string) || null);
-        }}
-        warmupTicks={100}
-        cooldownTime={8000}
-        d3AlphaDecay={0.012}
-        d3VelocityDecay={0.3}
-        enableNodeDrag
-        enableZoomInteraction
-        enablePanInteraction
-      />
+      {/* Force graph — positioned above FractalPattern (z-0), below overlays */}
+      <div className="absolute inset-0 z-[1]">
+        {dimensions.width > 0 && dimensions.height > 0 && (
+          <ForceGraph2D
+            ref={fgRef}
+            graphData={graphData}
+            width={dimensions.width}
+            height={dimensions.height}
+            backgroundColor="rgba(0,0,0,0)"
+            nodeCanvasObject={paintNode}
+            nodeCanvasObjectMode={() => "replace"}
+            nodePointerAreaPaint={(
+              node: Record<string, unknown>,
+              color: string,
+              ctx: CanvasRenderingContext2D,
+            ) => {
+              if ((node.type as string) === "world-region") return;
+              const s = NODE_SIZES[(node.type as WorldNodeType) || "task"] || 5;
+              ctx.beginPath();
+              ctx.arc(
+                node.x as number,
+                node.y as number,
+                s + 4,
+                0,
+                Math.PI * 2,
+              );
+              ctx.fillStyle = color;
+              ctx.fill();
+            }}
+            linkColor={(l: Record<string, unknown>) => {
+              switch (l.type as string) {
+                case "influence":
+                  return "rgba(168,85,247,0.14)";
+                case "dependency":
+                  return "rgba(6,182,212,0.14)";
+                case "reference":
+                  return "rgba(245,158,11,0.10)";
+                default:
+                  return "rgba(255,255,255,0.05)";
+              }
+            }}
+            linkWidth={(l: Record<string, unknown>) =>
+              (l.type as string) === "hierarchy" ? 1 : 0.5
+            }
+            linkCurvature={(l: Record<string, unknown>) => {
+              switch (l.type as string) {
+                case "influence":
+                  return 0.2;
+                case "dependency":
+                  return 0.15;
+                default:
+                  return 0;
+              }
+            }}
+            linkDirectionalParticles={(l: Record<string, unknown>) => {
+              const t = l.type as string;
+              return t === "influence" || t === "dependency" ? 3 : 1;
+            }}
+            linkDirectionalParticleWidth={1.6}
+            linkDirectionalParticleSpeed={0.004}
+            linkDirectionalParticleColor={(l: Record<string, unknown>) => {
+              switch (l.type as string) {
+                case "influence":
+                  return "rgba(168,85,247,0.45)";
+                case "dependency":
+                  return "rgba(6,182,212,0.45)";
+                default:
+                  return "rgba(139,92,246,0.25)";
+              }
+            }}
+            onNodeClick={handleNodeClick}
+            onNodeHover={(n: Record<string, unknown> | null) => {
+              if ((n?.type as string) === "world-region") {
+                setHoveredNode(null);
+                return;
+              }
+              setHoveredNode((n?.id as string) || null);
+            }}
+            warmupTicks={100}
+            cooldownTime={8000}
+            d3AlphaDecay={0.012}
+            d3VelocityDecay={0.3}
+            enableNodeDrag
+            enableZoomInteraction
+            enablePanInteraction
+          />
+        )}
+      </div>
 
       {/* Top bar */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-3 py-2.5 pointer-events-none">

@@ -255,7 +255,7 @@ export function SplitHandle({ containerRef }: SplitHandleProps) {
       )}
 
       {/* ── Extended hit area — wider invisible zone for easier grab */}
-      <div className="absolute inset-y-0 -left-2 -right-2" />
+      <div className="absolute inset-y-0 -left-2 -right-2 pointer-events-none" />
     </div>
   );
 }

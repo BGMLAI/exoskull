@@ -537,6 +537,7 @@ export function FractalPattern({
         className="w-full h-full"
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="xMidYMid meet"
+        style={{ pointerEvents: "none" }}
       >
         <defs>
           {/* Soft glow filter for crystal halos */}
