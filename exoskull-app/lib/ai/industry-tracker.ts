@@ -119,7 +119,7 @@ User context (values/goals): ${userContext || "not specified"}
 Analyze current trends, identify opportunities (minimum effort → maximum impact), and suggest the top 3-5 strategic moves.`,
       },
     ],
-    { forceModel: "claude-opus-4-5", maxTokens: 4000 },
+    { forceModel: "claude-opus-4-6", maxTokens: 4000 },
   );
 
   // Parse response
@@ -210,7 +210,7 @@ Respond in JSON:
         content: `Goal: ${goal}${constraints ? `\nConstraints: ${constraints}` : ""}\n\nGenerate possible paths with probability estimates.`,
       },
     ],
-    { forceModel: "claude-opus-4-5", maxTokens: 4000 },
+    { forceModel: "claude-opus-4-6", maxTokens: 4000 },
   );
 
   try {

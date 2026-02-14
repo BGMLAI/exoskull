@@ -85,7 +85,7 @@ const AGENT_CONFIGS: Record<
   { model: string; maxIterations: number; systemPrompt: string }
 > = {
   coordinator: {
-    model: "claude-opus-4-5",
+    model: "claude-opus-4-6",
     maxIterations: 10,
     systemPrompt: `You are the Coordinator of an AI agent swarm. Your role:
 - Analyze tasks and break them into subtasks
@@ -244,7 +244,7 @@ export async function runSwarmCycle(sessionId: string): Promise<{
         { role: "system", content: AGENT_CONFIGS.coordinator.systemPrompt },
         { role: "user", content: coordPrompt },
       ],
-      { forceModel: "claude-opus-4-5", maxTokens: 2000 },
+      { forceModel: "claude-opus-4-6", maxTokens: 2000 },
     );
 
     coordinator.status = "idle";

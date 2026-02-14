@@ -1,44 +1,97 @@
 /**
  * Multi-Model AI Router - Configuration
  *
- * Model pricing and configuration for each tier.
+ * Model pricing and tier configuration.
  * Prices as of 2026-02.
+ *
+ * Tier 1: Gemini 3 Flash (cheap, fast) — classification, extraction, simple tasks
+ * Tier 2: Gemini 3 Pro (balanced) — analysis, summarization, reasoning
+ * Tier 3: Codex 5.2 + Sonnet (code) — code generation, app building
+ * Tier 4: Claude Opus 4.6 (strategic) — crisis, meta-coordination ONLY
  */
 
 import { ModelConfig, ModelId, ModelTier, TaskCategory } from "./types";
 
 // Model configurations
 export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
+  // ── Tier 1: Ultra-cheap, ultra-fast ──
+  "gemini-3-flash": {
+    id: "gemini-3-flash",
+    provider: "gemini",
+    tier: 1,
+    displayName: "Gemini 3 Flash",
+    inputCostPer1M: 0.5,
+    outputCostPer1M: 3.0,
+    maxTokens: 8192,
+    contextWindow: 1_000_000,
+    supportsTools: true,
+    supportsStreaming: true,
+    supportsVision: true,
+    supportsStructuredOutput: true,
+  },
   "gemini-2.5-flash": {
     id: "gemini-2.5-flash",
     provider: "gemini",
     tier: 1,
     displayName: "Gemini 2.5 Flash",
-    inputCostPer1M: 0.075, // $0.075 per 1M input tokens
-    outputCostPer1M: 0.3, // $0.30 per 1M output tokens
+    inputCostPer1M: 0.075,
+    outputCostPer1M: 0.3,
     maxTokens: 8192,
+    contextWindow: 1_000_000,
     supportsTools: true,
     supportsStreaming: true,
+  },
+
+  // ── Tier 2: Balanced analysis ──
+  "gemini-3-pro": {
+    id: "gemini-3-pro",
+    provider: "gemini",
+    tier: 2,
+    displayName: "Gemini 3 Pro",
+    inputCostPer1M: 2.0,
+    outputCostPer1M: 12.0,
+    maxTokens: 16384,
+    contextWindow: 2_000_000,
+    supportsTools: true,
+    supportsStreaming: true,
+    supportsVision: true,
+    supportsStructuredOutput: true,
   },
   "claude-3-5-haiku": {
     id: "claude-3-5-haiku",
     provider: "anthropic",
     tier: 2,
     displayName: "Claude 3.5 Haiku",
-    inputCostPer1M: 0.8, // $0.80 per 1M input tokens
-    outputCostPer1M: 4.0, // $4.00 per 1M output tokens
+    inputCostPer1M: 0.8,
+    outputCostPer1M: 4.0,
     maxTokens: 8192,
+    contextWindow: 200_000,
     supportsTools: true,
     supportsStreaming: true,
+  },
+
+  // ── Tier 3: Code generation + deep reasoning ──
+  "codex-5-2": {
+    id: "codex-5-2",
+    provider: "codex",
+    tier: 3,
+    displayName: "Codex 5.2",
+    inputCostPer1M: 1.75,
+    outputCostPer1M: 14.0,
+    maxTokens: 16384,
+    contextWindow: 200_000,
+    supportsTools: true,
+    supportsStreaming: false, // Responses API doesn't stream like chat
   },
   "claude-sonnet-4-5": {
     id: "claude-sonnet-4-5",
     provider: "anthropic",
     tier: 3,
     displayName: "Claude Sonnet 4.5",
-    inputCostPer1M: 3.0, // $3 per 1M input tokens
-    outputCostPer1M: 15.0, // $15 per 1M output tokens
+    inputCostPer1M: 3.0,
+    outputCostPer1M: 15.0,
     maxTokens: 16384,
+    contextWindow: 200_000,
     supportsTools: true,
     supportsStreaming: true,
   },
@@ -47,9 +100,24 @@ export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
     provider: "kimi",
     tier: 3,
     displayName: "Kimi K2.5",
-    inputCostPer1M: 0.6, // $0.60 per 1M input tokens
-    outputCostPer1M: 2.5, // $2.50 per 1M output tokens
-    maxTokens: 256000, // 256K context window
+    inputCostPer1M: 0.6,
+    outputCostPer1M: 2.5,
+    maxTokens: 256000,
+    contextWindow: 256_000,
+    supportsTools: true,
+    supportsStreaming: true,
+  },
+
+  // ── Tier 4: Strategic / Crisis ──
+  "claude-opus-4-6": {
+    id: "claude-opus-4-6",
+    provider: "anthropic",
+    tier: 4,
+    displayName: "Claude Opus 4.6",
+    inputCostPer1M: 5.0,
+    outputCostPer1M: 25.0,
+    maxTokens: 32000,
+    contextWindow: 200_000,
     supportsTools: true,
     supportsStreaming: true,
   },
@@ -57,10 +125,11 @@ export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
     id: "claude-opus-4-5",
     provider: "anthropic",
     tier: 4,
-    displayName: "Claude Opus 4.5",
-    inputCostPer1M: 15.0, // $15 per 1M input tokens
-    outputCostPer1M: 75.0, // $75 per 1M output tokens
+    displayName: "Claude Opus 4.5 (legacy)",
+    inputCostPer1M: 15.0,
+    outputCostPer1M: 75.0,
     maxTokens: 32000,
+    contextWindow: 200_000,
     supportsTools: true,
     supportsStreaming: true,
   },
@@ -68,10 +137,10 @@ export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
 
 // Tier to model mapping (order = priority within tier)
 export const TIER_MODELS: Record<ModelTier, ModelId[]> = {
-  1: ["gemini-2.5-flash"],
-  2: ["claude-3-5-haiku"],
-  3: ["claude-sonnet-4-5", "kimi-k2.5"],
-  4: ["claude-opus-4-5", "claude-sonnet-4-5"],
+  1: ["gemini-3-flash", "gemini-2.5-flash"],
+  2: ["gemini-3-pro", "claude-3-5-haiku"],
+  3: ["codex-5-2", "claude-sonnet-4-5", "kimi-k2.5"],
+  4: ["claude-opus-4-6", "claude-sonnet-4-5"],
 };
 
 // Category to tier mapping

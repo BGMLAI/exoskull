@@ -20,7 +20,12 @@ import {
 import { classifyTask } from "./task-classifier";
 import { getCircuitBreaker } from "./circuit-breaker";
 import { getModelsForTier, getModelConfig, ROUTER_CONFIG } from "./config";
-import { GeminiProvider, AnthropicProvider, KimiProvider } from "./providers";
+import {
+  GeminiProvider,
+  AnthropicProvider,
+  KimiProvider,
+  CodexProvider,
+} from "./providers";
 
 import { logger } from "@/lib/logger";
 export class ModelRouter {
@@ -32,6 +37,7 @@ export class ModelRouter {
     this.providers.set("gemini", new GeminiProvider());
     this.providers.set("anthropic", new AnthropicProvider());
     this.providers.set("kimi", new KimiProvider());
+    this.providers.set("codex", new CodexProvider());
   }
 
   /**
@@ -273,7 +279,8 @@ export class ModelRouter {
       gemini: false,
       anthropic: false,
       kimi: false,
-      openai: false, // Not used in router but included for completeness
+      openai: false,
+      codex: false,
     };
 
     for (const [provider, instance] of this.providers) {

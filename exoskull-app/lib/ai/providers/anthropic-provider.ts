@@ -1,15 +1,10 @@
 /**
- * Anthropic Provider - Tier 2 (Haiku) & Tier 4 (Opus)
+ * Anthropic Provider - Tier 2 (Haiku fallback) & Tier 3 (Sonnet fallback) & Tier 4 (Opus)
  *
- * Tier 2 (Claude 3.5 Haiku):
- * - Pattern detection
- * - Summarization
- * - Analysis
- *
- * Tier 4 (Claude Opus 4.5):
- * - Meta-coordination
- * - Crisis intervention
- * - Strategic decisions
+ * Claude 3.5 Haiku: Pattern detection, summarization (Tier 2 fallback)
+ * Claude Sonnet 4.5: Universal fallback, code generation (Tier 3)
+ * Claude Opus 4.6: Strategy, crisis, meta-coordination (Tier 4 primary)
+ * Claude Opus 4.5: Legacy Tier 4
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -29,6 +24,7 @@ const MODEL_MAP: Record<string, string> = {
   "claude-3-5-haiku": "claude-3-5-haiku-20241022",
   "claude-sonnet-4-5": "claude-sonnet-4-5-20250929",
   "claude-opus-4-5": "claude-opus-4-5-20251101",
+  "claude-opus-4-6": "claude-opus-4-6-20260201",
 };
 
 export class AnthropicProvider implements IAIProvider {
@@ -37,6 +33,7 @@ export class AnthropicProvider implements IAIProvider {
     "claude-3-5-haiku",
     "claude-sonnet-4-5",
     "claude-opus-4-5",
+    "claude-opus-4-6",
   ];
 
   private client: Anthropic | null = null;
@@ -124,7 +121,11 @@ export class AnthropicProvider implements IAIProvider {
         .filter((t) => t.name);
 
       const tier =
-        model === "claude-opus-4-5" ? 4 : model === "claude-sonnet-4-5" ? 3 : 2;
+        model === "claude-opus-4-6" || model === "claude-opus-4-5"
+          ? 4
+          : model === "claude-sonnet-4-5"
+            ? 3
+            : 2;
 
       return {
         content,

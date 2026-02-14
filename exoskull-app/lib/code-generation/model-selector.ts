@@ -1,9 +1,10 @@
 /**
  * Multi-Model Code Generation Router
- * Phase 2: Intelligent routing based on task complexity
+ * Phase 3: Intelligent routing based on task complexity
  *
  * Routing Logic:
- * - Claude Code (Sonnet 4.5): Default - full-stack, multi-file, git, deployment
+ * - Codex 5.2: Default - code generation, app building (cheapest for code)
+ * - Claude Code (Sonnet 4.5): Fallback, full-stack multi-file
  * - Kimi Code: Long context (>100K tokens, large repos)
  * - GPT-o1: Deep reasoning (algorithms, optimization, proofs)
  */
@@ -73,6 +74,7 @@ export async function checkModelsHealth(): Promise<
   Record<CodeModel, "healthy" | "degraded" | "down">
 > {
   const results: Record<CodeModel, "healthy" | "degraded" | "down"> = {
+    "codex-5-2": "down",
     "claude-code": "down",
     "kimi-code": "down",
     "gpt-o1-code": "down",
@@ -159,13 +161,18 @@ export async function checkModelsHealth(): Promise<
     }
   };
 
+  // Codex 5.2 uses same OpenAI key
+  const codexCheck = openaiCheck;
+
   // Run all health checks in parallel
-  const [claude, kimi, openai] = await Promise.allSettled([
+  const [codex, claude, kimi, openai] = await Promise.allSettled([
+    codexCheck(),
     claudeCheck(),
     kimiCheck(),
     openaiCheck(),
   ]);
 
+  results["codex-5-2"] = codex.status === "fulfilled" ? codex.value : "down";
   results["claude-code"] =
     claude.status === "fulfilled" ? claude.value : "down";
   results["kimi-code"] = kimi.status === "fulfilled" ? kimi.value : "down";
@@ -204,25 +211,34 @@ export async function selectCodeModel(opts: {
     }
   }
 
-  // Rule 2: Deep reasoning (algorithms, math, optimization) → GPT-o1
+  // Rule 2: Deep reasoning (algorithms, math, optimization) → Codex 5.2 (has reasoning)
   if (
     classification.requiresReasoning === "deep" ||
     classification.type === "optimization" ||
     task.description.match(/algorithm|optimize|proof|complexity|O\(/i)
   ) {
-    if (availability["gpt-o1-code"] === "healthy") {
-      console.log("[ModelSelector] Deep reasoning detected → GPT-o1");
+    if (availability["codex-5-2"] !== "down") {
+      console.log("[ModelSelector] Deep reasoning detected → Codex 5.2");
+      return "codex-5-2";
+    } else if (availability["gpt-o1-code"] === "healthy") {
+      console.log("[ModelSelector] Codex unavailable, fallback → GPT-o1");
       return "gpt-o1-code";
     } else {
       console.warn(
-        "[ModelSelector] GPT-o1 unavailable, falling back to Claude Code",
+        "[ModelSelector] Codex+GPT-o1 unavailable, falling back to Claude Code",
       );
       return "claude-code";
     }
   }
 
-  // Rule 3: Default → Claude Code (best general-purpose)
-  console.log("[ModelSelector] General task → Claude Code (default)");
+  // Rule 3: Default → Codex 5.2 (cheapest for code, best at code generation)
+  if (availability["codex-5-2"] !== "down") {
+    console.log("[ModelSelector] General task → Codex 5.2 (default)");
+    return "codex-5-2";
+  }
+
+  // Fallback → Claude Code
+  console.log("[ModelSelector] Codex unavailable → Claude Code (fallback)");
   return "claude-code";
 }
 

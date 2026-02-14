@@ -3,7 +3,11 @@
  * Phase 2: Multi-model code generation system
  */
 
-export type CodeModel = "claude-code" | "kimi-code" | "gpt-o1-code";
+export type CodeModel =
+  | "codex-5-2"
+  | "claude-code"
+  | "kimi-code"
+  | "gpt-o1-code";
 
 export type TaskComplexity =
   | "simple"

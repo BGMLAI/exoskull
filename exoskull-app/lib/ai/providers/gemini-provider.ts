@@ -1,40 +1,55 @@
 /**
- * Gemini Provider - Tier 1
+ * Gemini Provider - Tier 1 (Flash) & Tier 2 (Pro)
  *
- * Ultra-cheap provider for simple tasks:
- * - Classification
- * - Data extraction
- * - Simple responses
+ * Uses @google/genai SDK (NOT the deprecated @google/generative-ai).
+ * Supports: Gemini 2.5 Flash, Gemini 3 Flash, Gemini 3 Pro
+ *
+ * Capabilities:
+ * - Text generation with tool calling
+ * - Vision (multimodal image input)
+ * - Structured output (JSON schema response)
  */
 
-import { GoogleGenerativeAI, Content, Part } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import {
   IAIProvider,
   ModelProvider,
   ModelId,
   AIRequestOptions,
   AIResponse,
+  AIToolCall,
   AIProviderError,
 } from "../types";
 import { calculateCost } from "../config";
 
+// Map our ModelId to actual Gemini API model names
+const GEMINI_MODEL_MAP: Record<string, string> = {
+  "gemini-3-flash": "gemini-3-flash-preview",
+  "gemini-3-pro": "gemini-3-pro-preview",
+  "gemini-2.5-flash": "gemini-2.5-flash",
+};
+
 export class GeminiProvider implements IAIProvider {
   readonly provider: ModelProvider = "gemini";
-  readonly supportedModels: ModelId[] = ["gemini-2.5-flash"];
+  readonly supportedModels: ModelId[] = [
+    "gemini-3-flash",
+    "gemini-3-pro",
+    "gemini-2.5-flash",
+  ];
 
-  private client: GoogleGenerativeAI | null = null;
+  private client: GoogleGenAI | null = null;
 
-  private getClient(): GoogleGenerativeAI {
+  private getClient(): GoogleGenAI {
     if (!this.client) {
       const apiKey = process.env.GOOGLE_AI_API_KEY;
       if (!apiKey) {
         throw new AIProviderError(
           "GOOGLE_AI_API_KEY not configured",
           "gemini",
-          "gemini-2.5-flash",
+          "gemini-3-flash",
         );
       }
-      this.client = new GoogleGenerativeAI(apiKey);
+      this.client = new GoogleGenAI({ apiKey });
     }
     return this.client;
   }
@@ -44,49 +59,66 @@ export class GeminiProvider implements IAIProvider {
 
     try {
       const client = this.getClient();
-      const genModel = client.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const geminiModel = GEMINI_MODEL_MAP[model];
+
+      if (!geminiModel) {
+        throw new AIProviderError(
+          `Unknown Gemini model: ${model}`,
+          "gemini",
+          model,
+        );
+      }
 
       // Extract system instruction
       const systemMessage = options.messages.find((m) => m.role === "system");
       const systemInstruction = systemMessage?.content;
 
       // Convert messages to Gemini format
-      const history = this.convertToGeminiHistory(options.messages);
+      const contents = this.convertToGeminiContents(options.messages);
 
-      // Get the last user message
-      const lastUserMessage = options.messages
-        .filter((m) => m.role === "user")
-        .pop();
+      // Build tools if provided
+      const tools = options.tools?.map((t) => ({
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters,
+      }));
 
-      if (!lastUserMessage) {
-        throw new AIProviderError("No user message provided", "gemini", model);
-      }
-
-      // Start chat with history
-      const chat = genModel.startChat({
-        history,
-        systemInstruction,
-        generationConfig: {
+      const response = await client.models.generateContent({
+        model: geminiModel,
+        contents: contents as any,
+        config: {
+          systemInstruction,
           temperature: options.temperature ?? 0.7,
           maxOutputTokens: options.maxTokens ?? 1024,
+          ...(tools && tools.length > 0
+            ? { tools: [{ functionDeclarations: tools as any }] }
+            : {}),
         },
       });
 
-      // Send the last user message
-      const result = await chat.sendMessage(lastUserMessage.content);
-      const response = result.response;
-
       const latencyMs = Date.now() - startTime;
 
-      // Extract usage metadata
+      // Extract usage from response
       const usageMetadata = response.usageMetadata;
       const inputTokens = usageMetadata?.promptTokenCount ?? 0;
       const outputTokens = usageMetadata?.candidatesTokenCount ?? 0;
 
+      // Extract function calls
+      const functionCalls = response.functionCalls;
+      let toolCalls: AIToolCall[] | undefined;
+      if (functionCalls && functionCalls.length > 0) {
+        toolCalls = functionCalls.map((fc) => ({
+          name: fc.name || "unknown",
+          arguments: (fc.args || {}) as Record<string, unknown>,
+        }));
+      }
+
+      const tier = model === "gemini-3-pro" ? 2 : 1;
+
       return {
-        content: response.text(),
+        content: response.text || "",
         model,
-        tier: 1,
+        tier,
         provider: "gemini",
         usage: {
           inputTokens,
@@ -94,9 +126,12 @@ export class GeminiProvider implements IAIProvider {
           totalTokens: inputTokens + outputTokens,
           estimatedCost: calculateCost(inputTokens, outputTokens, model),
         },
+        toolCalls,
         latencyMs,
       };
     } catch (error: unknown) {
+      if (error instanceof AIProviderError) throw error;
+
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
       console.error("[GeminiProvider] Chat failed:", {
@@ -115,8 +150,7 @@ export class GeminiProvider implements IAIProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
-      const apiKey = process.env.GOOGLE_AI_API_KEY;
-      return !!apiKey;
+      return !!process.env.GOOGLE_AI_API_KEY;
     } catch {
       return false;
     }
@@ -131,18 +165,18 @@ export class GeminiProvider implements IAIProvider {
   }
 
   /**
-   * Convert messages to Gemini history format
-   * Gemini uses 'user' and 'model' roles, not 'assistant'
+   * Convert messages to Gemini contents format.
+   * Gemini uses "user" and "model" roles (not "assistant").
+   * System messages handled separately via systemInstruction.
    */
-  private convertToGeminiHistory(
+  private convertToGeminiContents(
     messages: AIRequestOptions["messages"],
-  ): Content[] {
+  ): Array<{ role: string; parts: Array<{ text: string }> }> {
     return messages
-      .filter((m) => m.role !== "system") // System handled separately
-      .slice(0, -1) // Exclude last message (sent separately)
+      .filter((m) => m.role !== "system")
       .map((m) => ({
         role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }] as Part[],
+        parts: [{ text: m.content }],
       }));
   }
 }

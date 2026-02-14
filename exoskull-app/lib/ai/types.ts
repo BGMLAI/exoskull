@@ -1,24 +1,35 @@
 /**
  * Multi-Model AI Router - Type Definitions
  *
- * Tier System:
- * - Tier 1: Gemini 2.0 Flash-Lite - Ultra-cheap for simple tasks
- * - Tier 2: Claude 3.5 Haiku - Pattern detection, summarization
- * - Tier 3: Kimi K2.5 - Complex reasoning (placeholder)
- * - Tier 4: Claude Opus 4.5 - Meta-coordination, crisis
+ * Tier System (2026-02):
+ * - Tier 1: Gemini 3 Flash - Classification, extraction, simple tasks
+ * - Tier 2: Gemini 3 Pro - Analysis, summarization, reasoning
+ * - Tier 3: Codex 5.2 + Gemini Flash - Code generation, app building
+ * - Tier 4: Claude Opus 4.6 - Strategy, crisis, meta-coordination ONLY
+ *
+ * Fallback: Claude Sonnet 4.5 (universal fallback, not primary anywhere)
  */
 
 // Model tiers as defined in ARCHITECTURE.md
 export type ModelTier = 1 | 2 | 3 | 4;
 
-export type ModelProvider = "openai" | "anthropic" | "gemini" | "kimi";
+export type ModelProvider =
+  | "openai"
+  | "anthropic"
+  | "gemini"
+  | "kimi"
+  | "codex";
 
 export type ModelId =
-  | "gemini-2.5-flash" // Tier 1
-  | "claude-3-5-haiku" // Tier 2
-  | "claude-sonnet-4-5" // Tier 3
-  | "kimi-k2.5" // Tier 3
-  | "claude-opus-4-5"; // Tier 4
+  | "gemini-2.5-flash" // Tier 1 (legacy)
+  | "gemini-3-flash" // Tier 1 (primary)
+  | "gemini-3-pro" // Tier 2 (primary)
+  | "claude-3-5-haiku" // Tier 2 (fallback)
+  | "claude-sonnet-4-5" // Tier 3 (fallback) + universal fallback
+  | "kimi-k2.5" // Tier 3 (long context)
+  | "codex-5-2" // Tier 3 (code generation)
+  | "claude-opus-4-5" // Tier 4 (legacy)
+  | "claude-opus-4-6"; // Tier 4 (primary)
 
 // Task complexity levels
 export type TaskComplexity =
@@ -152,8 +163,12 @@ export interface ModelConfig {
   inputCostPer1M: number; // USD per 1M input tokens
   outputCostPer1M: number; // USD per 1M output tokens
   maxTokens: number;
+  contextWindow?: number; // Max input context window (tokens)
   supportsTools: boolean;
   supportsStreaming: boolean;
+  supportsVision?: boolean;
+  supportsStructuredOutput?: boolean;
+  supportsNativeAudio?: boolean;
 }
 
 // Task classification result

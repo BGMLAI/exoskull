@@ -21,13 +21,13 @@
  * // Force specific tier
  * const analysis = await aiChat(
  *   [{ role: 'user', content: 'Analyze this complex data...' }],
- *   { forceTier: 3 } // Routes to Tier 3 (Kimi)
+ *   { forceTier: 3 } // Routes to Tier 3 (Codex 5.2)
  * )
  *
  * // Force specific model
  * const critical = await aiChat(
  *   [{ role: 'user', content: 'Handle this crisis...' }],
- *   { forceModel: 'claude-opus-4-5' }
+ *   { forceModel: 'claude-opus-4-6' }
  * )
  *
  * // Access router directly for status/debugging
@@ -36,21 +36,28 @@
  * ```
  */
 
-import { ModelRouter, getModelRouter } from './model-router'
-import { AIMessage, AIRequestOptions, AIResponse, ModelId, ModelTier, TaskCategory } from './types'
+import { ModelRouter, getModelRouter } from "./model-router";
+import {
+  AIMessage,
+  AIRequestOptions,
+  AIResponse,
+  ModelId,
+  ModelTier,
+  TaskCategory,
+} from "./types";
 
 // Re-export types
-export * from './types'
-export { MODEL_CONFIGS, TIER_MODELS, calculateCost } from './config'
-export { classifyTask, estimateTokenCount } from './task-classifier'
-export { getCircuitBreaker } from './circuit-breaker'
-export { getModelRouter } from './model-router'
+export * from "./types";
+export { MODEL_CONFIGS, TIER_MODELS, calculateCost } from "./config";
+export { classifyTask, estimateTokenCount } from "./task-classifier";
+export { getCircuitBreaker } from "./circuit-breaker";
+export { getModelRouter } from "./model-router";
 
 /**
  * Get the AI router instance
  */
 export function getAIRouter(): ModelRouter {
-  return getModelRouter()
+  return getModelRouter();
 }
 
 /**
@@ -62,13 +69,13 @@ export function getAIRouter(): ModelRouter {
  */
 export async function aiChat(
   messages: AIMessage[],
-  options?: Partial<Omit<AIRequestOptions, 'messages'>>
+  options?: Partial<Omit<AIRequestOptions, "messages">>,
 ): Promise<AIResponse> {
-  const router = getModelRouter()
+  const router = getModelRouter();
   return router.route({
     messages,
-    ...options
-  })
+    ...options,
+  });
 }
 
 /**
@@ -82,18 +89,18 @@ export async function aiChat(
 export async function aiComplete(
   prompt: string,
   systemPrompt?: string,
-  options?: Partial<Omit<AIRequestOptions, 'messages'>>
+  options?: Partial<Omit<AIRequestOptions, "messages">>,
 ): Promise<string> {
-  const messages: AIMessage[] = []
+  const messages: AIMessage[] = [];
 
   if (systemPrompt) {
-    messages.push({ role: 'system', content: systemPrompt })
+    messages.push({ role: "system", content: systemPrompt });
   }
 
-  messages.push({ role: 'user', content: prompt })
+  messages.push({ role: "user", content: prompt });
 
-  const response = await aiChat(messages, options)
-  return response.content
+  const response = await aiChat(messages, options);
+  return response.content;
 }
 
 /**
@@ -101,45 +108,45 @@ export async function aiComplete(
  */
 
 /**
- * Quick, cheap completion (Tier 1 - Gemini Flash)
+ * Quick, cheap completion (Tier 1 - Gemini 3 Flash)
  * Best for: Classification, extraction, simple responses
  */
 export async function aiQuick(
   prompt: string,
-  systemPrompt?: string
+  systemPrompt?: string,
 ): Promise<string> {
-  return aiComplete(prompt, systemPrompt, { forceTier: 1 })
+  return aiComplete(prompt, systemPrompt, { forceTier: 1 });
 }
 
 /**
- * Balanced completion (Tier 2 - Claude Haiku)
+ * Balanced completion (Tier 2 - Gemini 3 Pro)
  * Best for: Summarization, analysis, pattern detection
  */
 export async function aiBalanced(
   prompt: string,
-  systemPrompt?: string
+  systemPrompt?: string,
 ): Promise<string> {
-  return aiComplete(prompt, systemPrompt, { forceTier: 2 })
+  return aiComplete(prompt, systemPrompt, { forceTier: 2 });
 }
 
 /**
- * Deep reasoning (Tier 3 - Kimi K2.5)
- * Best for: Complex reasoning, long context, multi-step tasks
+ * Deep reasoning (Tier 3 - Codex 5.2 / Sonnet 4.5)
+ * Best for: Code generation, complex reasoning, multi-step tasks
  */
 export async function aiDeep(
   prompt: string,
-  systemPrompt?: string
+  systemPrompt?: string,
 ): Promise<string> {
-  return aiComplete(prompt, systemPrompt, { forceTier: 3 })
+  return aiComplete(prompt, systemPrompt, { forceTier: 3 });
 }
 
 /**
- * Critical/strategic (Tier 4 - Claude Opus)
+ * Critical/strategic (Tier 4 - Claude Opus 4.6)
  * Best for: Crisis situations, meta-coordination, strategic decisions
  */
 export async function aiCritical(
   prompt: string,
-  systemPrompt?: string
+  systemPrompt?: string,
 ): Promise<string> {
-  return aiComplete(prompt, systemPrompt, { forceTier: 4 })
+  return aiComplete(prompt, systemPrompt, { forceTier: 4 });
 }

@@ -49,10 +49,11 @@ const DEFAULT_CLAUDE_MODEL = "claude-3-5-haiku-20241022";
 const CHAT_MODEL_MAP: Record<string, string> = {
   auto: "gemini-3-flash-preview", // Default: Gemini 3 Flash (fast, capable, cheap)
   "gemini-3-flash": "gemini-3-flash-preview",
+  "gemini-3-pro": "gemini-3-pro-preview", // Tier 2: analysis, reasoning
   "gemini-2.5-flash": "gemini-2.5-flash", // Thinking model (slower, smarter)
   haiku: "claude-3-5-haiku-20241022",
   sonnet: "claude-sonnet-4-20250514",
-  opus: "claude-opus-4-20250514",
+  opus: "claude-opus-4-6-20260201", // Opus 4.6 (was 4.5)
 };
 
 /** Check if a resolved model ID is a Gemini model */
@@ -161,8 +162,8 @@ const VOICE_TOOLS: Anthropic.Tool[] = VOICE_TOOLS_RAW.map((tool, i, arr) =>
     : tool,
 );
 
-/** Haiku model for voice — 3-5x faster than Sonnet */
-const VOICE_MODEL = "claude-3-5-haiku-20241022";
+/** Voice model — Gemini 3 Flash for fast text generation (TTS is separate) */
+const VOICE_MODEL = "gemini-3-flash-preview";
 
 // ============================================================================
 // SESSION MANAGEMENT
@@ -417,11 +418,11 @@ export async function processUserMessage(
   const aiConfig = dynamicContextResult.aiConfig;
   const userTemperature = aiConfig?.temperature ?? 0.7;
   const chatModelPref = aiConfig?.model_preferences?.chat ?? "auto";
-  // Voice uses Haiku for streaming speed (token-by-token TTS), web uses user preference
+  // Voice uses Gemini 3 Flash (fast + cheap), web uses user preference
   const resolvedModel = isVoiceChannel
     ? VOICE_MODEL
     : CHAT_MODEL_MAP[chatModelPref] || CHAT_MODEL_MAP["auto"];
-  const useGemini = !isVoiceChannel && isGeminiModel(resolvedModel);
+  const useGemini = isGeminiModel(resolvedModel);
   // Tools already loaded in parallel above
   const { definitions, dynamicCount } = toolsResult;
   const activeTools: Anthropic.Tool[] = definitions.map((tool, i, arr) =>

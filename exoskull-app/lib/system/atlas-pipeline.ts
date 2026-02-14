@@ -212,7 +212,7 @@ export async function executeNextStage(pipelineId: string): Promise<{
       stage === "assemble"
         ? "claude-sonnet-4-5"
         : stage === "architect" || stage === "trace"
-          ? "claude-opus-4-5"
+          ? "claude-opus-4-6"
           : "claude-3-5-haiku";
 
     const result = await aiChat(

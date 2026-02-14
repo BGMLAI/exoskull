@@ -23,6 +23,9 @@ import { GPTo1CodeAdapter } from "./adapters/gpt-o1-code";
  */
 function getExecutor(model: CodeModel, tenantId: string) {
   switch (model) {
+    case "codex-5-2":
+      // Codex 5.2 uses the same adapter as Claude Code (routes through AI model router)
+      return new ClaudeCodeAdapter(tenantId);
     case "claude-code":
       return new ClaudeCodeAdapter(tenantId);
     case "kimi-code":
@@ -100,7 +103,12 @@ export async function executeCodeGeneration(
 export async function getModelsHealth(
   tenantId: string,
 ): Promise<Record<CodeModel, "healthy" | "degraded" | "down">> {
-  const models: CodeModel[] = ["claude-code", "kimi-code", "gpt-o1-code"];
+  const models: CodeModel[] = [
+    "codex-5-2",
+    "claude-code",
+    "kimi-code",
+    "gpt-o1-code",
+  ];
 
   const health = await Promise.all(
     models.map(async (model) => {
