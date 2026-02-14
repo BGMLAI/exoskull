@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
@@ -18,10 +19,13 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const formData = await req.formData();
     const audio = formData.get("audio") as File | null;
-    const tenantId = formData.get("tenant_id") as string | null;
     const duration = formData.get("duration") as string | null;
     const contextType = formData.get("context_type") as string | null;
     const linkedTaskId = formData.get("linked_task_id") as string | null;
@@ -29,13 +33,6 @@ export async function POST(req: NextRequest) {
     if (!audio) {
       return NextResponse.json(
         { error: "No audio file provided" },
-        { status: 400 },
-      );
-    }
-
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: "tenant_id required" },
         { status: 400 },
       );
     }
@@ -123,17 +120,13 @@ export async function POST(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
-    const tenantId = req.nextUrl.searchParams.get("tenant_id");
     const limit = parseInt(req.nextUrl.searchParams.get("limit") || "20");
     const contextType = req.nextUrl.searchParams.get("context_type");
-
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: "tenant_id required" },
-        { status: 400 },
-      );
-    }
 
     let query = supabase
       .from("exo_voice_notes")
@@ -186,15 +179,17 @@ export async function GET(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const body = await req.json();
-    const { tenant_id, voice_note_id } = body;
+    const { voice_note_id } = body;
 
-    if (!tenant_id || !voice_note_id) {
+    if (!voice_note_id) {
       return NextResponse.json(
-        {
-          error: "tenant_id and voice_note_id required",
-        },
+        { error: "voice_note_id required" },
         { status: 400 },
       );
     }
@@ -204,7 +199,7 @@ export async function DELETE(req: NextRequest) {
       .from("exo_voice_notes")
       .select("audio_path")
       .eq("id", voice_note_id)
-      .eq("tenant_id", tenant_id)
+      .eq("tenant_id", tenantId)
       .single();
 
     if (fetchError || !voiceNote) {
@@ -228,7 +223,7 @@ export async function DELETE(req: NextRequest) {
       .from("exo_voice_notes")
       .delete()
       .eq("id", voice_note_id)
-      .eq("tenant_id", tenant_id);
+      .eq("tenant_id", tenantId);
 
     if (deleteError) {
       return NextResponse.json({ error: deleteError.message }, { status: 500 });

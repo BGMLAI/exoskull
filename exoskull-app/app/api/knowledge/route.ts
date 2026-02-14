@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -16,17 +17,13 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
-    const tenantId = req.nextUrl.searchParams.get("tenant_id");
     const category = req.nextUrl.searchParams.get("category");
     const status = req.nextUrl.searchParams.get("status");
-
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: "tenant_id required" },
-        { status: 400 },
-      );
-    }
 
     let query = supabase
       .from("exo_user_documents")
@@ -79,15 +76,17 @@ export async function GET(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const body = await req.json();
-    const { tenant_id, document_id } = body;
+    const { document_id } = body;
 
-    if (!tenant_id || !document_id) {
+    if (!document_id) {
       return NextResponse.json(
-        {
-          error: "tenant_id and document_id required",
-        },
+        { error: "document_id required" },
         { status: 400 },
       );
     }
@@ -97,7 +96,7 @@ export async function DELETE(req: NextRequest) {
       .from("exo_user_documents")
       .select("storage_path")
       .eq("id", document_id)
-      .eq("tenant_id", tenant_id)
+      .eq("tenant_id", tenantId)
       .single();
 
     if (fetchError || !document) {
@@ -128,7 +127,7 @@ export async function DELETE(req: NextRequest) {
       .from("exo_user_documents")
       .delete()
       .eq("id", document_id)
-      .eq("tenant_id", tenant_id);
+      .eq("tenant_id", tenantId);
 
     if (deleteError) {
       return NextResponse.json({ error: deleteError.message }, { status: 500 });

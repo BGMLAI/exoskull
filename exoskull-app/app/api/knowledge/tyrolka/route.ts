@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -77,14 +78,13 @@ interface TyrolkaContext {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const { searchParams } = new URL(request.url);
-    const tenantId = searchParams.get("tenantId");
     const format = searchParams.get("format") || "full"; // 'full' | 'prompt' | 'minimal'
-
-    if (!tenantId) {
-      return NextResponse.json({ error: "tenantId required" }, { status: 400 });
-    }
 
     // Try using database function first
     const { data: dbContext, error: rpcError } = await supabase.rpc(

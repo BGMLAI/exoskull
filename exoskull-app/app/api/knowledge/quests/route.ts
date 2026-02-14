@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -15,18 +16,17 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const { searchParams } = new URL(request.url);
-    const tenantId = searchParams.get("tenantId");
     const campaignId = searchParams.get("campaignId");
     const loopSlug = searchParams.get("loop");
     const status = searchParams.get("status");
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = parseInt(searchParams.get("offset") || "0");
-
-    if (!tenantId) {
-      return NextResponse.json({ error: "tenantId required" }, { status: 400 });
-    }
 
     let query = supabase
       .from("user_quests")
@@ -67,10 +67,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const body = await request.json();
     const {
-      tenantId,
       title,
       description,
       campaignId,
@@ -81,11 +84,8 @@ export async function POST(request: NextRequest) {
       tags,
     } = body;
 
-    if (!tenantId || !title) {
-      return NextResponse.json(
-        { error: "tenantId and title required" },
-        { status: 400 },
-      );
+    if (!title) {
+      return NextResponse.json({ error: "title required" }, { status: 400 });
     }
 
     const { data, error } = await supabase
@@ -126,15 +126,16 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const body = await request.json();
-    const { questId, tenantId, ...updates } = body;
+    const { questId, ...updates } = body;
 
-    if (!questId || !tenantId) {
-      return NextResponse.json(
-        { error: "questId and tenantId required" },
-        { status: 400 },
-      );
+    if (!questId) {
+      return NextResponse.json({ error: "questId required" }, { status: 400 });
     }
 
     const dbUpdates: Record<string, unknown> = {
@@ -184,16 +185,16 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const { searchParams } = new URL(request.url);
     const questId = searchParams.get("questId");
-    const tenantId = searchParams.get("tenantId");
 
-    if (!questId || !tenantId) {
-      return NextResponse.json(
-        { error: "questId and tenantId required" },
-        { status: 400 },
-      );
+    if (!questId) {
+      return NextResponse.json({ error: "questId required" }, { status: 400 });
     }
 
     const { error } = await supabase

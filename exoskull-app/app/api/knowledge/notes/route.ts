@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +28,12 @@ type NoteType =
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const { searchParams } = new URL(request.url);
-    const tenantId = searchParams.get("tenantId");
     const type = searchParams.get("type") as NoteType | null;
     const loopSlug = searchParams.get("loop");
     const opId = searchParams.get("opId");
@@ -39,10 +43,6 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = parseInt(searchParams.get("offset") || "0");
-
-    if (!tenantId) {
-      return NextResponse.json({ error: "tenantId required" }, { status: 400 });
-    }
 
     let query = supabase
       .from("user_notes")
@@ -91,10 +91,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const body = await request.json();
     const {
-      tenantId,
       type,
       title,
       content,
@@ -112,11 +115,8 @@ export async function POST(request: NextRequest) {
       capturedAt,
     } = body;
 
-    if (!tenantId || !type) {
-      return NextResponse.json(
-        { error: "tenantId and type required" },
-        { status: 400 },
-      );
+    if (!type) {
+      return NextResponse.json({ error: "type required" }, { status: 400 });
     }
 
     // Validate type
@@ -182,15 +182,16 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const body = await request.json();
-    const { noteId, tenantId, ...updates } = body;
+    const { noteId, ...updates } = body;
 
-    if (!noteId || !tenantId) {
-      return NextResponse.json(
-        { error: "noteId and tenantId required" },
-        { status: 400 },
-      );
+    if (!noteId) {
+      return NextResponse.json({ error: "noteId required" }, { status: 400 });
     }
 
     // Map camelCase to snake_case
@@ -242,16 +243,16 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const { searchParams } = new URL(request.url);
     const noteId = searchParams.get("noteId");
-    const tenantId = searchParams.get("tenantId");
 
-    if (!noteId || !tenantId) {
-      return NextResponse.json(
-        { error: "noteId and tenantId required" },
-        { status: 400 },
-      );
+    if (!noteId) {
+      return NextResponse.json({ error: "noteId required" }, { status: 400 });
     }
 
     const { error } = await supabase

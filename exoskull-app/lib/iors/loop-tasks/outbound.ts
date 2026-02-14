@@ -7,7 +7,6 @@
 
 import { checkPermission } from "@/lib/iors/autonomy";
 import { dispatchReport } from "@/lib/reports/report-dispatcher";
-import { appendMessage } from "@/lib/unified-thread";
 import { completeWork, failWork } from "@/lib/iors/loop";
 import type { PetlaWorkItem, SubLoopResult } from "@/lib/iors/loop-types";
 import type { AutonomyActionType, AutonomyDomain } from "@/lib/iors/types";
@@ -69,23 +68,11 @@ export async function handleOutbound(
     }
 
     // 2. Execute the action
+    // NOTE: dispatchReport() already calls appendMessage() internally,
+    // so we do NOT call appendMessage() here to avoid duplicate messages.
     const message = (params.message as string) || "";
     if (message) {
       await dispatchReport(tenant_id, message, "insight");
-
-      await appendMessage(tenant_id, {
-        role: "assistant",
-        content: message,
-        channel: "web_chat",
-        direction: "outbound",
-        source_type: "web_chat",
-        metadata: {
-          petla_event: true,
-          sub_loop: "outbound",
-          action_type: actionType,
-          autonomous: true,
-        },
-      });
     }
 
     if (item.id && item.status === "processing") {

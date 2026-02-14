@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -16,16 +17,11 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   try {
-    const supabase = getServiceSupabase();
-    // Get tenant_id from query params or auth
-    const tenantId = req.nextUrl.searchParams.get("tenant_id");
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: "tenant_id required" },
-        { status: 400 },
-      );
-    }
+    const supabase = getServiceSupabase();
 
     // Get all active jobs
     const { data: jobs, error: jobsError } = await supabase
@@ -105,16 +101,13 @@ export async function GET(req: NextRequest) {
  */
 export async function PUT(req: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const body = await req.json();
-    const { tenant_id, job_id, preference, global_settings } = body;
-
-    if (!tenant_id) {
-      return NextResponse.json(
-        { error: "tenant_id required" },
-        { status: 400 },
-      );
-    }
+    const { job_id, preference, global_settings } = body;
 
     // Update job preference
     if (job_id && preference) {
@@ -122,7 +115,7 @@ export async function PUT(req: NextRequest) {
         .from("exo_user_job_preferences")
         .upsert(
           {
-            tenant_id,
+            tenant_id: tenantId,
             job_id,
             is_enabled: preference.is_enabled ?? true,
             custom_time: preference.custom_time || null,
@@ -158,7 +151,7 @@ export async function PUT(req: NextRequest) {
             skip_weekends: global_settings.skip_weekends,
           },
         })
-        .eq("id", tenant_id)
+        .eq("id", tenantId)
         .select()
         .single();
 
@@ -187,17 +180,16 @@ export async function PUT(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const body = await req.json();
-    const { tenant_id, job_name, channel } = body;
+    const { job_name, channel } = body;
 
-    if (!tenant_id || !job_name) {
-      return NextResponse.json(
-        {
-          error: "tenant_id and job_name required",
-        },
-        { status: 400 },
-      );
+    if (!job_name) {
+      return NextResponse.json({ error: "job_name required" }, { status: 400 });
     }
 
     // Get the job
@@ -215,7 +207,7 @@ export async function POST(req: NextRequest) {
     const { data: tenant, error: tenantError } = await supabase
       .from("exo_tenants")
       .select("*")
-      .eq("id", tenant_id)
+      .eq("id", tenantId)
       .single();
 
     if (tenantError || !tenant) {
@@ -251,7 +243,7 @@ export async function POST(req: NextRequest) {
     await supabase.rpc("log_job_execution", {
       p_job_id: job.id,
       p_job_name: job.job_name,
-      p_tenant_id: tenant_id,
+      p_tenant_id: tenantId,
       p_status: result.success ? "completed" : "failed",
       p_channel: result.channel,
       p_result: JSON.stringify(result),

@@ -4,6 +4,66 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-14] Bug Fixes — P0/P1/P2 from Functional Audit
+
+### P0 Fixes (Critical)
+1. **Chat message deduplication** — Removed duplicate `appendMessage()` call from `lib/iors/loop-tasks/outbound.ts`. The `dispatchReport()` function already logs messages internally; the second call in outbound handler created duplicates for every outbound message.
+2. **Knowledge endpoints auth** — Added `verifyTenantAuth()` to 7 knowledge routes: `/api/knowledge`, `/notes`, `/values`, `/campaigns`, `/loops`, `/quests`, `/tyrolka`. TenantId now comes from JWT (cookie/Bearer) instead of untrusted query params.
+
+### P1 Fixes (Performance & Reliability)
+3. **monthly-summary CRON optimization** — Changed from sequential to parallel tenant processing (batches of 5 via `Promise.allSettled`). Expected: 55s → ~15s.
+4. **loop-daily CRON optimization** — Batch-insert autonomy permissions instead of individual `grantPermission()` calls (saves 3-4s). Reduced coaching analysis from 20 to 10 tenants (saves 8-12s). Expected: 35s → ~15-20s.
+5. **business-metrics missing POST handler** — Added `POST` export alongside `GET` to prevent Vercel Cron failures.
+
+### P2 Fixes (Auth hardening)
+6. **voice/notes auth** — Added `verifyTenantAuth()` to all 3 handlers (POST, GET, DELETE)
+7. **schedule auth** — Added `verifyTenantAuth()` to all 3 handlers (GET, PUT, POST)
+8. **emotion/history auth** — Added `verifyTenantAuth()` to GET handler
+
+### Files changed
+- `lib/iors/loop-tasks/outbound.ts` — Removed duplicate appendMessage, removed unused import
+- `app/api/knowledge/route.ts` — Added verifyTenantAuth
+- `app/api/knowledge/notes/route.ts` — Added verifyTenantAuth
+- `app/api/knowledge/values/route.ts` — Added verifyTenantAuth
+- `app/api/knowledge/campaigns/route.ts` — Added verifyTenantAuth
+- `app/api/knowledge/loops/route.ts` — Added verifyTenantAuth
+- `app/api/knowledge/quests/route.ts` — Added verifyTenantAuth
+- `app/api/knowledge/tyrolka/route.ts` — Added verifyTenantAuth
+- `app/api/cron/monthly-summary/route.ts` — Parallel batch processing
+- `app/api/cron/loop-daily/route.ts` — Batch permissions, reduced coaching limit
+- `app/api/cron/business-metrics/route.ts` — Added POST handler
+- `app/api/voice/notes/route.ts` — Added verifyTenantAuth
+- `app/api/schedule/route.ts` — Added verifyTenantAuth
+- `app/api/emotion/history/route.ts` — Added verifyTenantAuth
+
+---
+
+## [2026-02-14] Functional Audit — 15 User Journeys, ~115 Endpoints Tested
+
+### What was done
+- Complete production audit of exoskull.xyz across 15 user journeys
+- Tested ~115 API endpoints (38 CRON, 60 protected, 12 admin, 11 public/webhook)
+- Tested 8 browser pages via Playwright
+- Results: 10 PASS, 4 PARTIAL, 1 FAIL, 0 SKIP
+- Found 2 P0 bugs, 5 P1 bugs, 8 P2 issues
+- Detailed report: `FUNCTIONAL_AUDIT_2026-02-14.md`
+
+### P0 Bugs Found
+1. **Chat message duplication**: ~25+ identical outbound messages in dashboard chat (petla/outbound loop)
+2. **Knowledge endpoints ignore auth**: 7 endpoints return 400 "tenantId required" for authenticated users
+
+### P1 Bugs Found
+3. monthly-summary CRON takes 55s (near 60s Vercel limit)
+4. loop-daily CRON takes 35s
+5. gold-etl perpetually skipped (dependency timing)
+6. business-metrics perpetually skipped (cascading from gold-etl)
+7. 0% intervention approval rate (57 interventions, 0 approved)
+
+### Files created
+- `FUNCTIONAL_AUDIT_2026-02-14.md` (comprehensive audit report)
+
+---
+
 ## [2026-02-14] Phase 6 — Settings UI + IORS Capability Tools + Env Cleanup
 
 ### What was done

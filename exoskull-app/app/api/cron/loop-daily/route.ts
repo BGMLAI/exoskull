@@ -26,7 +26,6 @@ import { claimQueuedWork } from "@/lib/iors/loop";
 import { analyzeHealthTrends } from "@/lib/iors/coaching/health-trends";
 import { analyzeCrossDomain } from "@/lib/iors/coaching/cross-domain";
 import { measureEffectiveness } from "@/lib/iors/coaching/effectiveness";
-import { grantPermission } from "@/lib/iors/autonomy";
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -78,16 +77,28 @@ async function handler(req: NextRequest) {
         (t) => !hasMessageSet.has(t.id),
       );
 
-      for (const t of tenantsNeedingPerms) {
-        await grantPermission(t.id, "message", "*", {
-          requires_confirmation: false,
-          granted_via: "birth",
-        });
-        await grantPermission(t.id, "call", "*", {
-          requires_confirmation: false,
-          granted_via: "birth",
-        });
-        permissionsBackfilled++;
+      if (tenantsNeedingPerms.length > 0) {
+        // Batch insert permissions instead of individual grantPermission() calls
+        const newPerms = tenantsNeedingPerms.flatMap((t) => [
+          {
+            tenant_id: t.id,
+            action_type: "message",
+            domain: "*",
+            granted: true,
+            requires_confirmation: false,
+            granted_via: "birth",
+          },
+          {
+            tenant_id: t.id,
+            action_type: "call",
+            domain: "*",
+            granted: true,
+            requires_confirmation: false,
+            granted_via: "birth",
+          },
+        ]);
+        await supabasePerms.from("exo_autonomy_permissions").insert(newPerms);
+        permissionsBackfilled = tenantsNeedingPerms.length;
       }
 
       if (permissionsBackfilled > 0) {
@@ -110,7 +121,7 @@ async function handler(req: NextRequest) {
         .from("exo_tenant_loop_config")
         .select("tenant_id")
         .in("activity_class", ["active", "normal"])
-        .limit(20);
+        .limit(10);
 
       if (activeTenants && activeTenants.length > 0) {
         for (const t of activeTenants) {

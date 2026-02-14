@@ -7,21 +7,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getEmotionHistory } from "@/lib/emotion";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const { searchParams } = new URL(req.url);
-    const tenantId = searchParams.get("tenant_id");
-
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: "Missing 'tenant_id' query parameter" },
-        { status: 400 },
-      );
-    }
-
     const limit = parseInt(searchParams.get("limit") || "50", 10);
     const crisisOnly = searchParams.get("crisis_only") === "true";
     const startDate = searchParams.get("start_date");

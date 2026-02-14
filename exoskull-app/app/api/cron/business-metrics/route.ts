@@ -45,3 +45,7 @@ export const GET = withCronGuard(
   { name: "business-metrics", dependencies: ["gold-etl"] },
   handler,
 );
+export const POST = withCronGuard(
+  { name: "business-metrics", dependencies: ["gold-etl"] },
+  handler,
+);

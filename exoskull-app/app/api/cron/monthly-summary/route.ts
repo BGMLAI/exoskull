@@ -44,38 +44,49 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     errors: [] as string[],
   };
 
-  for (const tenant of activeTenants) {
-    results.processed++;
+  // Process tenants in parallel batches of 5 (instead of sequential)
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < activeTenants.length; i += BATCH_SIZE) {
+    const batch = activeTenants.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.allSettled(
+      batch.map(async (tenant) => {
+        const summary = await generateMonthlySummary(tenant.id);
+        if (!summary) return { tenantId: tenant.id, status: "empty" as const };
 
-    try {
-      const summary = await generateMonthlySummary(tenant.id);
+        const dispatchResult = await dispatchReport(
+          tenant.id,
+          summary,
+          "monthly",
+        );
+        return {
+          tenantId: tenant.id,
+          status: dispatchResult.success
+            ? ("dispatched" as const)
+            : ("dispatch_failed" as const),
+          error: dispatchResult.error,
+        };
+      }),
+    );
 
-      if (!summary) {
+    for (const result of batchResults) {
+      results.processed++;
+      if (result.status === "rejected") {
+        const msg =
+          result.reason instanceof Error
+            ? result.reason.message
+            : String(result.reason);
+        results.errors.push(msg);
+      } else if (result.value.status === "empty") {
         results.skipped_empty++;
-        continue;
-      }
-
-      results.summaries_generated++;
-
-      const dispatchResult = await dispatchReport(
-        tenant.id,
-        summary,
-        "monthly",
-      );
-
-      if (dispatchResult.success) {
+      } else if (result.value.status === "dispatched") {
+        results.summaries_generated++;
         results.dispatched++;
       } else {
+        results.summaries_generated++;
         results.errors.push(
-          `${tenant.id}: dispatch failed — ${dispatchResult.error}`,
+          `${result.value.tenantId}: dispatch failed — ${result.value.error}`,
         );
       }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error(`[MonthlySummary] Error for tenant ${tenant.id}:`, {
-        error: msg,
-      });
-      results.errors.push(`${tenant.id}: ${msg}`);
     }
   }
 

@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -16,14 +17,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const { searchParams } = new URL(request.url);
-    const tenantId = searchParams.get("tenantId");
     const withStats = searchParams.get("withStats") === "true";
-
-    if (!tenantId) {
-      return NextResponse.json({ error: "tenantId required" }, { status: 400 });
-    }
 
     const { data, error } = await supabase
       .from("user_loops")
@@ -91,22 +91,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const body = await request.json();
-    const {
-      tenantId,
-      slug,
-      name,
-      description,
-      icon,
-      color,
-      priority,
-      initDefaults,
-    } = body;
-
-    if (!tenantId) {
-      return NextResponse.json({ error: "tenantId required" }, { status: 400 });
-    }
+    const { slug, name, description, icon, color, priority, initDefaults } =
+      body;
 
     // Initialize default loops
     if (initDefaults) {
@@ -178,15 +170,16 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const body = await request.json();
-    const { loopId, tenantId, ...updates } = body;
+    const { loopId, ...updates } = body;
 
-    if (!loopId || !tenantId) {
-      return NextResponse.json(
-        { error: "loopId and tenantId required" },
-        { status: 400 },
-      );
+    if (!loopId) {
+      return NextResponse.json({ error: "loopId required" }, { status: 400 });
     }
 
     const dbUpdates: Record<string, unknown> = {
@@ -235,16 +228,16 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const { searchParams } = new URL(request.url);
     const loopId = searchParams.get("loopId");
-    const tenantId = searchParams.get("tenantId");
 
-    if (!loopId || !tenantId) {
-      return NextResponse.json(
-        { error: "loopId and tenantId required" },
-        { status: 400 },
-      );
+    if (!loopId) {
+      return NextResponse.json({ error: "loopId required" }, { status: 400 });
     }
 
     // Check if it's a default loop
