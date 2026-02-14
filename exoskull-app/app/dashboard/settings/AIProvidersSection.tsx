@@ -54,21 +54,27 @@ const PROVIDER_INFO: Record<
     models?: { label: string; value: string }[];
   }
 > = {
-  anthropic: {
-    label: "Anthropic (Claude)",
-    description: "Claude Sonnet 4 / Haiku / Opus — glowny dostawca",
-  },
-  openai: {
-    label: "OpenAI (GPT)",
-    description: "GPT-4o / GPT-4o-mini — fallback",
-    models: [
-      { label: "GPT-4o", value: "gpt-4o" },
-      { label: "GPT-4o Mini", value: "gpt-4o-mini" },
-    ],
-  },
   gemini: {
     label: "Google Gemini",
-    description: "Gemini 1.5 Flash — szybki i tani",
+    description:
+      "Gemini 3 Flash / Pro — glowny dostawca (chat, analiza, wizja, TTS)",
+    models: [
+      { label: "Gemini 3 Flash", value: "gemini-3-flash" },
+      { label: "Gemini 3 Pro", value: "gemini-3-pro" },
+    ],
+  },
+  openai: {
+    label: "OpenAI",
+    description: "Codex 5.2 (generowanie kodu) + TTS fallback",
+    models: [
+      { label: "Codex 5.2", value: "codex-5-2" },
+      { label: "GPT-4o", value: "gpt-4o" },
+    ],
+  },
+  anthropic: {
+    label: "Anthropic (Claude)",
+    description:
+      "Opus 4.6 (strategia, kryzys) / Sonnet 4.5 (uniwersalny fallback)",
   },
 };
 
@@ -218,7 +224,7 @@ export function AIProvidersSection() {
     );
   }
 
-  const providerOrder: ProviderName[] = ["anthropic", "openai", "gemini"];
+  const providerOrder: ProviderName[] = ["gemini", "openai", "anthropic"];
   const fallbackChain = providerOrder.filter(
     (p) => config.providers[p]?.enabled && config.providers[p]?.has_key,
   );

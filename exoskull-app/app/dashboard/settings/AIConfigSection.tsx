@@ -43,32 +43,34 @@ interface UsageSummary {
 const MODEL_OPTIONS: Record<string, { label: string; value: string }[]> = {
   chat: [
     { label: "Auto", value: "auto" },
-    { label: "Flash", value: "flash" },
-    { label: "Haiku", value: "haiku" },
+    { label: "Gemini Flash", value: "gemini-flash" },
+    { label: "Gemini Pro", value: "gemini-pro" },
     { label: "Sonnet", value: "sonnet" },
-    { label: "Opus", value: "opus" },
+    { label: "Opus 4.6", value: "opus" },
   ],
   analysis: [
     { label: "Auto", value: "auto" },
-    { label: "Haiku", value: "haiku" },
+    { label: "Gemini Flash", value: "gemini-flash" },
+    { label: "Gemini Pro", value: "gemini-pro" },
     { label: "Sonnet", value: "sonnet" },
-    { label: "Opus", value: "opus" },
+    { label: "Opus 4.6", value: "opus" },
   ],
   coding: [
     { label: "Auto", value: "auto" },
+    { label: "Codex 5.2", value: "codex" },
     { label: "Sonnet", value: "sonnet" },
-    { label: "Opus", value: "opus" },
+    { label: "Opus 4.6", value: "opus" },
   ],
   creative: [
     { label: "Auto", value: "auto" },
-    { label: "Haiku", value: "haiku" },
+    { label: "Gemini Pro", value: "gemini-pro" },
     { label: "Sonnet", value: "sonnet" },
-    { label: "Opus", value: "opus" },
+    { label: "Opus 4.6", value: "opus" },
   ],
   crisis: [
     { label: "Auto", value: "auto" },
     { label: "Sonnet", value: "sonnet" },
-    { label: "Opus", value: "opus" },
+    { label: "Opus 4.6", value: "opus" },
   ],
 };
 
@@ -81,11 +83,17 @@ const TASK_LABELS: Record<string, string> = {
 };
 
 const MODEL_COLORS: Record<string, string> = {
-  flash: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  haiku: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  "gemini-flash":
+    "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  "gemini-pro":
+    "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
+  codex: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   sonnet:
     "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
   opus: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+  // Legacy keys (still used in usage tracking)
+  flash: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  haiku: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-400",
 };
 
 export function AIConfigSection() {

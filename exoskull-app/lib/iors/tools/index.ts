@@ -54,6 +54,7 @@ import { codeGenerationTools } from "./code-generation-tools";
 import { tyrolkaTools } from "./tyrolka-tools";
 import { valueTools } from "./value-tools";
 import { debateTools } from "./debate-tools";
+import { capabilitiesTools } from "./capabilities-tools";
 
 // New tools — Phase 2 (Total Overhaul)
 import { googleFitTools } from "./google-fit-tools";
@@ -91,6 +92,7 @@ export const IORS_EXTENSION_TOOLS: ToolDefinition[] = [
   ...tyrolkaTools,
   ...valueTools,
   ...debateTools,
+  ...capabilitiesTools,
   // Phase 2 tools
   ...googleFitTools,
   ...googleDriveTools,
