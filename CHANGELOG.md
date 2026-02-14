@@ -4,6 +4,43 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-14] Gemini Live Voice Pipeline + Vision + Structured Output
+
+### What was done
+
+**Phase 4: Voice Pipeline — Gemini Live API**
+- New `audio-codec.ts`: mulaw↔PCM16 conversion with ITU G.711 tables + linear interpolation resampling
+- New `gemini-live-provider.ts`: Managed Gemini Live sessions with bidirectional native audio, tool calling, transcription, session resumption, and VAD
+- Updated `voice-ws.ts`: Dual WebSocket server — ConversationRelay (/) + Media Streams (/media-streams) with HTTP upgrade routing
+- Full audio bridge: Twilio mulaw 8kHz → PCM16 16kHz → Gemini Live → PCM16 24kHz → mulaw 8kHz → Twilio
+- New `generateMediaStreamsTwiML()` for `<Connect><Stream>` TwiML
+- Feature-flagged: `GEMINI_LIVE_ENABLED=true` activates Media Streams path, falls back to ConversationRelay
+- TTS route: 3-tier fallback (ElevenLabs → OpenAI → Gemini TTS via `gemini-2.5-flash-preview-tts`)
+
+**Phase 5: Gemini Capabilities**
+- New `vision.ts`: Image analysis via Gemini 3 Flash multimodal (`analyzeImage`, `describeImage`, `extractTextFromImage`)
+- New `structured-output.ts`: JSON-constrained output with schema validation (`generateStructured<T>`, `extractData`, `classifyText`, `generateAppSpec`)
+
+### Files changed
+- `lib/voice/audio-codec.ts` (new)
+- `lib/voice/gemini-live-provider.ts` (new)
+- `lib/ai/capabilities/vision.ts` (new)
+- `lib/ai/capabilities/structured-output.ts` (new)
+- `app/api/tts/route.ts` (rewrite: 3-tier fallback + Gemini TTS)
+- `app/api/twilio/voice/route.ts` (Media Streams path added)
+- `lib/voice/twilio-client.ts` (generateMediaStreamsTwiML added)
+- `server/voice-ws.ts` (dual WS server + Media Streams handler)
+
+### Notes for future agents
+- Set `GEMINI_LIVE_ENABLED=true` + `VOICE_WS_URL` to activate native audio pipeline
+- Gemini Live model: `gemini-2.5-flash-native-audio-preview-12-2025`, voice: `Orus`
+- Audio formats: Gemini input=PCM16 16kHz mono, output=PCM16 24kHz mono, Twilio=mulaw 8kHz
+- Media Streams path: `/media-streams` on voice WS server
+- ConversationRelay still works as default (text-based, Deepgram STT + ElevenLabs TTS)
+- Vision and structured output capabilities ready — wire as IORS tools in next phase
+
+---
+
 ## [2026-02-14] Gemini-First Model Router + Claude Agent SDK Engine
 
 ### What was done
