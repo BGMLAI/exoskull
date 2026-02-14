@@ -4,6 +4,29 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-14] Phase 6 — Settings UI + IORS Capability Tools + Env Cleanup
+
+### What was done
+- `.env.example`: Added `GEMINI_LIVE_ENABLED`, `VPS_EXECUTOR_*`, `AGENT_SDK_ENABLED` with tier annotations
+- `AIConfigSection.tsx`: Gemini Flash/Pro, Codex 5.2, Opus 4.6 in model dropdowns (replaces Haiku/Flash)
+- `AIProvidersSection.tsx`: Gemini-first provider order, updated descriptions for new model stack
+- New IORS tools: `analyze_image` (vision), `extract_image_text` (OCR), `classify_text` (structured output)
+- Old `@google/generative-ai` SDK already removed (verified)
+
+### Files changed
+- `.env.example` (updated comments + new vars)
+- `app/dashboard/settings/AIConfigSection.tsx` (model options)
+- `app/dashboard/settings/AIProvidersSection.tsx` (provider info + order)
+- `lib/iors/tools/capabilities-tools.ts` (new — 3 tools)
+- `lib/iors/tools/index.ts` (register capabilities-tools)
+
+### Notes for future agents
+- IORS tool count: 66+ (was 63, +analyze_image, +extract_image_text, +classify_text)
+- AIConfigSection uses abstract model values (e.g. "gemini-flash") — backend maps to actual model IDs
+- AIProvidersSection provider order now matches tier priority: Gemini → OpenAI → Anthropic
+
+---
+
 ## [2026-02-14] Gemini Live Voice Pipeline + Vision + Structured Output
 
 ### What was done
