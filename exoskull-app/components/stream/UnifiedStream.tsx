@@ -427,9 +427,9 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
         if (!res.ok) {
           const errBody = await res.json().catch(() => ({}));
           if (res.status === 401) {
-            throw new Error(
-              "Sesja wygasla. Odswiez strone lub zaloguj sie ponownie.",
-            );
+            // Auto-redirect to login after session expiry
+            setTimeout(() => window.location.assign("/login"), 2000);
+            throw new Error("Sesja wygasla. Przekierowuję do logowania...");
           }
           if (res.status === 429) {
             throw new Error(
