@@ -45,7 +45,8 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 | **AI Router** | ✅ Live | 4-tier: Gemini 2.5 Flash → Haiku → Sonnet 4.5 → Opus 4.5 (de-escalation) |
 | **Mod System** | ✅ Live | 5 mods: task-manager, mood, habit, sleep, activity |
 | **Rig System** | ✅ Live | 6 rigs: Oura, Google Fit, Google Workspace, MS 365, Notion, Todoist |
-| **Knowledge** | ✅ Live | RAG pipeline (pgvector embeddings, cosine similarity search), web search (Tavily), URL import (Firecrawl v2) |
+| **Knowledge** | ✅ Live | RAG pipeline (pgvector embeddings, cosine similarity search), web search (Tavily), URL import (Firecrawl v2), local file sync (exo-agent CLI) |
+| **Local Agent** | ✅ New | Node.js CLI daemon: watches local folders → uploads to Knowledge Base via `/api/agent/upload` (Bearer JWT) |
 | **Admin Panel** | ✅ Live | 9 pages, self-optimization engine, CRON management |
 | **CRON System** | ✅ Live | 28 jobs: ETL, morning-briefing, evening-reflection, impulse (6 handlers), email-sync, email-analyze, MAPEK loop, and more |
 | **Onboarding** | ✅ Live | Discovery interview (~60 topics), profile extraction, in-chat onboarding |

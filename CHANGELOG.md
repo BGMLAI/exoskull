@@ -4,6 +4,68 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-15] Fix: IORS Outbound Spam Loop — 5 Interconnected Bugs
+
+### Problem
+IORS was spamming users with repeated "IORS chce wykonać akcję: message w domenie *" messages, "Unknown action type: send_notification" errors, and blind spot detection notifications flooding the chat every minute.
+
+### Root Cause Chain
+1. Events emitted with `actionType` (camelCase) but outbound handler read `action_type` (snake_case) → fell through to default `"message"`
+2. `"message"` is a valid autonomy type but NOT in the action definitions registry
+3. `checkPermission()` returned `requires_confirmation: true` for missing permissions → treated every unknown action as "ask user"
+4. No dedup on proposals → every petla cycle (1 min) re-sent the same permission request
+5. `dispatchAction()` missing `send_notification`, `trigger_checkin`, `gap_detection` cases → "Unknown action type" errors
+
+### Fixes
+| File | Change |
+|------|--------|
+| `lib/iors/loop-tasks/outbound.ts` | Accept both `action_type` and `actionType` keys; add 24h dedup cooldown for proposals |
+| `lib/iors/autonomy.ts` | No permission = `{ permitted: false, requires_confirmation: false }` — deny silently instead of spamming |
+| `lib/autonomy/executor.ts` | Emit `action_type` (snake_case); add `send_notification`, `trigger_checkin`, `gap_detection` to `dispatchAction()` switch |
+| `lib/iors/tools/planning-tools.ts` | Standardize payload key to `action_type` |
+| `lib/predictions/prediction-engine.ts` | Add `action_type: "send_notification"` to outbound_ready payload |
+
+### Architecture
+- **No schema changes** — all fixes are application-level logic
+- **Dedup mechanism** uses existing `exo_petla_queue` completed results (no new tables)
+- Permission model now correctly separates "no permission" from "needs confirmation"
+
+---
+
+## [2026-02-14] ExoSkull Local Agent — File Sync to Knowledge Base
+
+### Architecture: New Component
+Added `local-agent/` — a Node.js CLI daemon that watches local folders and uploads files to ExoSkull Knowledge Base via API.
+
+### New API Endpoint
+- **`POST /api/agent/upload`** — Unified endpoint combining get-url + confirm + status + batch-status actions. Uses Bearer JWT auth (same pattern as `/api/mobile/sync`).
+
+### Middleware
+- Added `/api/agent/*` to public API routes in `middleware.ts` (Bearer JWT verified internally in route handlers).
+
+### Local Agent (`local-agent/`)
+- **CLI commands:** `login`, `logout`, `start`, `stop`, `sync`, `status`, `add`, `remove`
+- **File watcher:** chokidar-based with debounce, pattern filtering, recursive folder support
+- **Dedup:** SHA-256 hash dedup — same content won't upload twice
+- **State:** JSON file store at `~/.exoskull/state.json` (replaced SQLite due to native compilation issues on Windows ARM64)
+- **Config:** YAML config at `~/.exoskull/config.yaml`
+- **Auth:** Supabase email/password login with JWT refresh
+- **Upload flow:** get-url → PUT to signed URL → confirm → processDocument (fire-and-forget)
+- **Retry:** Exponential backoff (1s, 2s, 4s, 8s, 16s, max 5 attempts)
+- **Daemon:** PID file management, background/foreground modes
+
+### Files Changed
+- `exoskull-app/lib/supabase/middleware.ts` — Added `/api/agent/` exemption
+- `exoskull-app/app/api/agent/upload/route.ts` — New unified upload endpoint
+- `local-agent/` — Entire new package (10 source files)
+
+### Design Decisions
+- JSON store instead of SQLite: avoids `better-sqlite3` native compilation issues on Windows ARM64
+- Supabase credentials from config.yaml or env vars: no hardcoded keys
+- Same MIME type mapping as ExoSkull web app: ensures bucket compatibility
+
+---
+
 ## [2026-02-14] Bug Fixes — P0/P1/P2 from Functional Audit
 
 ### P0 Fixes (Critical)

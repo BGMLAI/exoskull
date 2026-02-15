@@ -26,6 +26,12 @@ exoskull-app/.env.vercel-check
 # Windows artifacts
 nul
 
+# Logs & session artifacts
+debug.log
+SESSION_LOG.md
+FUNCTIONAL_AUDIT_*.md
+.playwright-mcp/
+
 # Word temp files
 ~$*.docx
 
@@ -35,3 +41,7 @@ Windows-MCP/
 boy burger/
 
 .vercel
+
+# Android secrets
+android/local.properties
+android/app/google-services.json
