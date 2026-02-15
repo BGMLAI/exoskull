@@ -1,0 +1,29 @@
+{
+  "name": "exo-agent",
+  "version": "0.1.0",
+  "description": "ExoSkull Local Agent - sync local files to Knowledge Base",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "exo-agent": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
+    "chalk": "^5.4.0",
+    "chokidar": "^4.0.0",
+    "commander": "^13.1.0",
+    "ora": "^8.2.0",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.12.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
