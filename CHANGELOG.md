@@ -4,6 +4,30 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-15] Fix: CRON Reliability — Gold-ETL Bypass + Monthly Summary Async
+
+### Problems
+
+1. **gold-etl perpetually skipped** — Dependency check on silver-etl failed even when silver-etl completed, blocking gold-etl and cascading to business-metrics (both permanently stuck).
+2. **monthly-summary near-timeout** — Processing 4 tenants inline took 55s (Vercel limit: 60s). Would fail with more tenants.
+
+### Fixes
+
+| File | Change |
+|------|--------|
+| `lib/admin/cron-guard.ts` | Add 24h staleness bypass to dependency check. If CRON hasn't succeeded in >24h and deps aren't met, bypass and run anyway (prevents permanent cascade blockage). |
+| `app/api/cron/monthly-summary/route.ts` | Refactor from inline processing to async dispatch. CRON now enqueues tasks to `exo_async_tasks` (<2s), processed by async-tasks CRON one per minute (~15s each). |
+| `app/api/cron/async-tasks/route.ts` | Add `[SYSTEM:*]` task routing. System tasks (monthly_summary) bypass AI pipeline and run dedicated handlers. |
+| `.gitignore` | Add debug.log, SESSION_LOG.md, FUNCTIONAL_AUDIT_*.md, .playwright-mcp/ |
+
+### Architecture
+- **No schema changes** — uses existing `exo_async_tasks` queue and `admin_cron_runs` tables
+- Staleness bypass is generic (applies to ALL CRONs with dependencies)
+- System task routing is extensible (add new `[SYSTEM:*]` prefixes for future CRON offloading)
+- monthly-summary now scales to any number of tenants without timeout risk
+
+---
+
 ## [2026-02-15] Fix: IORS Outbound Spam Loop — 5 Interconnected Bugs
 
 ### Problem
