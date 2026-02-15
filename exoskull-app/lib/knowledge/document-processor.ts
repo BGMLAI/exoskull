@@ -666,6 +666,34 @@ export async function searchDocuments(
 
     if (keywords.length === 0) return [];
 
+    // Try full phrase first (more specific)
+    const { data: phraseResults, error: phraseError } = await supabase
+      .from("exo_document_chunks")
+      .select("id, document_id, content")
+      .eq("tenant_id", tenantId)
+      .ilike("content", `%${query}%`)
+      .limit(limit);
+
+    if (!phraseError && phraseResults && phraseResults.length > 0) {
+      // Fetch filenames for phrase results
+      const docIds = [...new Set(phraseResults.map((r) => r.document_id))];
+      const { data: docs } = await supabase
+        .from("exo_user_documents")
+        .select("id, original_name, category")
+        .in("id", docIds);
+
+      const docMap = new Map((docs || []).map((d) => [d.id, d]));
+
+      return phraseResults.map((r) => ({
+        chunk_id: r.id,
+        document_id: r.document_id,
+        content: r.content,
+        filename: docMap.get(r.document_id)?.original_name || "Unknown",
+        category: docMap.get(r.document_id)?.category || "general",
+        similarity: 0.6, // synthetic score for phrase match (higher than keyword)
+      }));
+    }
+
     // Build OR condition for keyword matching
     const orCondition = keywords.map((k) => `content.ilike.%${k}%`).join(",");
 

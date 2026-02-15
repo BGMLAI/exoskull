@@ -20,7 +20,11 @@ export function ChatLayout() {
 
   return (
     <div className="flex h-full relative">
-      <UnifiedStream className="flex-1" />
+      <UnifiedStream
+        className="flex-1"
+        ttsEnabled={ttsEnabled}
+        onToggleTTS={toggleTTS}
+      />
       <div className="hidden lg:block">
         <ContextPanel ttsEnabled={ttsEnabled} onToggleTTS={toggleTTS} />
       </div>

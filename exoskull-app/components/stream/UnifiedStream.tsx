@@ -49,13 +49,19 @@ const THIRD_PARTY_TOOL_MAP: Record<
 
 interface UnifiedStreamProps {
   className?: string;
+  ttsEnabled?: boolean;
+  onToggleTTS?: () => void;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function UnifiedStream({ className }: UnifiedStreamProps) {
+export function UnifiedStream({
+  className,
+  ttsEnabled: ttsEnabledProp,
+  onToggleTTS: onToggleTTSProp,
+}: UnifiedStreamProps) {
   const {
     state,
     addEvent,
@@ -84,7 +90,8 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
   // TTS (Text-to-Speech) — reads AI responses aloud
   // ---------------------------------------------------------------------------
 
-  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [ttsEnabledInternal, setTtsEnabledInternal] = useState(false);
+  const ttsEnabled = ttsEnabledProp ?? ttsEnabledInternal;
   const [isSpeaking, setIsSpeaking] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ttsAbortRef = useRef<AbortController | null>(null);
@@ -92,8 +99,8 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
   // Load TTS preference
   useEffect(() => {
     try {
-      const stored = localStorage.getItem("exoskull-tts-enabled");
-      if (stored !== null) setTtsEnabled(stored === "true");
+      const stored = localStorage.getItem("exo-tts-enabled");
+      if (stored !== null) setTtsEnabledInternal(stored === "true");
     } catch {
       /* noop */
     }
@@ -168,6 +175,10 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
   );
 
   const toggleTTS = useCallback(() => {
+    if (onToggleTTSProp) {
+      onToggleTTSProp();
+      return;
+    }
     if (isSpeaking) {
       // Stop current playback
       ttsAbortRef.current?.abort();
@@ -177,10 +188,10 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
       }
       setIsSpeaking(false);
     } else {
-      const next = !ttsEnabled;
-      setTtsEnabled(next);
+      const next = !ttsEnabledInternal;
+      setTtsEnabledInternal(next);
       try {
-        localStorage.setItem("exoskull-tts-enabled", String(next));
+        localStorage.setItem("exo-tts-enabled", String(next));
       } catch {
         /* noop */
       }
@@ -190,7 +201,7 @@ export function UnifiedStream({ className }: UnifiedStreamProps) {
         setIsSpeaking(false);
       }
     }
-  }, [isSpeaking, ttsEnabled]);
+  }, [onToggleTTSProp, isSpeaking, ttsEnabledInternal]);
 
   // ---------------------------------------------------------------------------
   // Scroll management

@@ -354,15 +354,17 @@ export async function buildDynamicContext(
     context += `Gdy user pyta o cele, użyj "check_goals". Gdy raportuje postęp, użyj "log_goal_progress".\n`;
   }
 
-  // Knowledge base
+  // Knowledge base — ALWAYS mention tools exist
+  context += `\n## Baza wiedzy\n`;
   if (docsData && "count" in docsData && (docsData.count ?? 0) > 0) {
     const totalDocs = docsData.count ?? 0;
     const readyDocs = (docsData.data ?? []).filter(
       (d: { status: string }) => d.status === "ready",
     ).length;
     context += `- Baza wiedzy: ${totalDocs} dokumentow (${readyDocs} gotowych do przeszukania)\n`;
-    context += `  → Gdy user pyta o COKOLWIEK co mogl wgrac w plikach, ZAWSZE uzyj "search_knowledge" ZANIM powiesz "nie wiem".\n`;
   }
+  context += `- ZAWSZE uzyj "search_knowledge" gdy user pyta o dokumenty, pliki, wiedze, lub cokolwiek co mogl wgrac.\n`;
+  context += `- Jesli search_knowledge zwraca 0 wynikow, poinformuj usera o statusie dokumentow i zasugeruj ponowne wgranie.\n`;
 
   // Memory system — daily summaries, highlights, conversation history
   const hasSummaries = summariesData.length > 0;

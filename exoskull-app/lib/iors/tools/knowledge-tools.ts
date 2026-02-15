@@ -50,7 +50,29 @@ export const knowledgeTools: ToolDefinition[] = [
         const results = await searchDocuments(tenantId, query, limit);
 
         if (results.length === 0) {
-          return "Nie znaleziono pasujących dokumentów. Użytkownik może nie mieć przesłanych plików na ten temat.";
+          // Diagnostic: why no results?
+          const supabase = getServiceSupabase();
+          const [docsResult, chunksResult] = await Promise.all([
+            supabase
+              .from("exo_user_documents")
+              .select("id, status", { count: "exact", head: true })
+              .eq("tenant_id", tenantId),
+            supabase
+              .from("exo_document_chunks")
+              .select("id, embedding", { count: "exact", head: true })
+              .eq("tenant_id", tenantId),
+          ]);
+
+          const totalDocs = docsResult.count ?? 0;
+          const totalChunks = chunksResult.count ?? 0;
+
+          const { count: readyDocs } = await supabase
+            .from("exo_user_documents")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
+            .eq("status", "ready");
+
+          return `Brak wynikow dla zapytania "${query}". Diagnostyka: tenant ma ${totalDocs} dokumentow (${readyDocs ?? 0} gotowych), ${totalChunks} chunkow w bazie. ${totalDocs === 0 ? "User nie wgral jeszcze zadnych plikow do bazy wiedzy." : totalChunks === 0 ? "Dokumenty istnieja ale chunki nie zostaly wygenerowane — prawdopodobnie blad przetwarzania. Zasugeruj ponowne przetworzenie." : "Chunki istnieja ale nie pasuja do zapytania. Sprobuj innego sformulowania lub zapytaj usera o dokladna nazwe dokumentu."}`;
         }
 
         let response = `Znaleziono ${results.length} fragmentów w dokumentach:\n\n`;

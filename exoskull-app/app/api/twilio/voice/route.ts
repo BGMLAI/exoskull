@@ -148,11 +148,14 @@ export async function POST(req: NextRequest) {
         tenantId = tenant?.id || "anonymous";
       }
 
-      // ── Gemini Live Media Streams mode (native audio, no separate STT/TTS) ──
-      const geminiLiveEnabled = process.env.GEMINI_LIVE_ENABLED === "true";
+      // ── Voice mode selection ──
+      // Gemini Live (Media Streams) is the DEFAULT when VOICE_WS_URL is set.
+      // Set USE_CONVERSATION_RELAY="true" to use legacy ConversationRelay instead.
+      const useConversationRelay =
+        process.env.USE_CONVERSATION_RELAY === "true";
       const voiceWsUrl = process.env.VOICE_WS_URL;
 
-      if (geminiLiveEnabled && voiceWsUrl) {
+      if (voiceWsUrl && !useConversationRelay) {
         // Media Streams sends raw audio — Gemini handles STT + LLM + TTS natively
         const mediaWsUrl = voiceWsUrl.replace(/\/?$/, "/media-streams");
 
@@ -165,7 +168,7 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        logger.info("[Twilio Voice] Media Streams TwiML generated:", {
+        logger.info("[Twilio Voice] Media Streams TwiML generated (default):", {
           tenantId,
           wsUrl: mediaWsUrl,
           mode: "gemini-live",
@@ -176,7 +179,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // ── ConversationRelay mode (Deepgram STT + ElevenLabs TTS, text WebSocket) ──
+      // ── ConversationRelay mode (explicit opt-in via USE_CONVERSATION_RELAY) ──
       if (voiceWsUrl) {
         // Generate personalized greeting (ConversationRelay speaks it via ElevenLabs)
         const greeting = await generateGreeting(tenantId);
