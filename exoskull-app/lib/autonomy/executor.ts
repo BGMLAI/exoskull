@@ -121,6 +121,7 @@ export async function executeIntervention(
       .eq("intervention_id", interventionId);
 
     // Emit outbound_ready event for Pętla loop
+    // Use action_type (snake_case) to match what outbound handler reads
     emitEvent({
       tenantId: intervention.tenant_id,
       eventType: "outbound_ready",
@@ -128,8 +129,10 @@ export async function executeIntervention(
       source: "executor",
       payload: {
         interventionId,
-        actionType: intervention.intervention_type,
-        result: result.message,
+        action_type:
+          (intervention.action_payload as Record<string, unknown>)?.action ||
+          "send_notification",
+        message: result.message,
       },
       dedupKey: `executor:${interventionId}`,
     }).catch((err) => console.error("[Executor] emitEvent failed:", err));
@@ -321,6 +324,9 @@ async function dispatchAction(
     case "task_creation":
       return await handleCreateTask(intervention);
     case "proactive_message":
+    case "send_notification":
+    case "trigger_checkin":
+    case "gap_detection":
       return await handleProactiveMessage(intervention);
     case "run_automation":
     case "automation_trigger":

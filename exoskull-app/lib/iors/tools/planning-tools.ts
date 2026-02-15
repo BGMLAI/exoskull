@@ -104,7 +104,7 @@ export const planningTools: ToolDefinition[] = [
         eventType: "outbound_ready",
         priority: 2,
         source: "plan_action",
-        payload: { actionType, title, priority, scheduledFor },
+        payload: { action_type: actionType, title, priority, scheduledFor },
         dedupKey: `plan:${tenantId}:${actionType}:${new Date().toISOString().slice(0, 13)}`,
       }).catch((err) =>
         console.error("[PlanningTools] emitEvent failed:", err),

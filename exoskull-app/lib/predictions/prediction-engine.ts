@@ -175,6 +175,7 @@ export async function createInterventionsFromPredictions(
           source: "prediction-engine",
           payload: {
             interventionId,
+            action_type: "send_notification",
             metric: p.metric,
             severity: p.severity,
           },

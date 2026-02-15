@@ -48,7 +48,10 @@ export async function checkPermission(
     .maybeSingle();
 
   if (!data) {
-    return { permitted: false, requires_confirmation: true };
+    // No permission record found — deny silently.
+    // requires_confirmation should only be true when an explicit permission
+    // record exists with that flag, not as a default for missing permissions.
+    return { permitted: false, requires_confirmation: false };
   }
 
   return {
