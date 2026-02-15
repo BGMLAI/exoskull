@@ -130,6 +130,39 @@ async function deliverResult(task: AsyncTask, text: string): Promise<void> {
 }
 
 // ============================================================================
+// SYSTEM TASK HANDLERS (non-AI pipeline tasks enqueued by other CRONs)
+// ============================================================================
+
+const MONTHLY_SUMMARY_PREFIX = "[SYSTEM:monthly_summary]";
+
+async function processSystemTask(task: AsyncTask): Promise<boolean> {
+  if (task.prompt === MONTHLY_SUMMARY_PREFIX) {
+    const { generateMonthlySummary } =
+      await import("@/lib/reports/summary-generator");
+    const { dispatchReport } = await import("@/lib/reports/report-dispatcher");
+
+    const summary = await generateMonthlySummary(task.tenant_id);
+    if (summary) {
+      await dispatchReport(task.tenant_id, summary, "monthly");
+      await completeTask(task.id, "Monthly summary dispatched", [
+        "monthly_summary",
+      ]);
+    } else {
+      await completeTask(task.id, "No data for monthly summary", []);
+    }
+
+    logger.info("[AsyncCRON] System task completed:", {
+      taskId: task.id,
+      type: "monthly_summary",
+      tenantId: task.tenant_id,
+    });
+    return true;
+  }
+
+  return false; // Not a system task
+}
+
+// ============================================================================
 // TASK PROCESSING
 // ============================================================================
 
@@ -144,6 +177,12 @@ async function processTask(task: AsyncTask): Promise<void> {
       promptLength: task.prompt.length,
       retryCount: task.retry_count,
     });
+
+    // Check for system tasks (monthly_summary, etc.) before AI pipeline
+    if (task.prompt.startsWith("[SYSTEM:")) {
+      const handled = await processSystemTask(task);
+      if (handled) return;
+    }
 
     // 1. Rebuild session
     const sessionId =

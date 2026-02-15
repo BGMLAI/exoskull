@@ -106,23 +106,47 @@ export function withCronGuard(
         (d: { satisfied: boolean }) => !d.satisfied,
       );
       if (unsatisfied.length > 0) {
-        const reasons = unsatisfied.map(
-          (d: {
-            dependency: string;
-            last_success: string | null;
-            required_within_hours: number;
-          }) =>
-            `${d.dependency}: last success ${d.last_success || "never"} (required within ${d.required_within_hours}h)`,
-        );
-        logger.warn(
-          `[CronGuard:${name}] Dependencies not met:`,
-          reasons.join(", "),
-        );
-        return NextResponse.json({
-          skipped: true,
-          reason: "dependency_not_met",
-          unsatisfied_dependencies: reasons,
-        });
+        // Staleness bypass: if this CRON hasn't succeeded in >24h, run anyway
+        // to prevent permanent cascade blockage (e.g. gold-etl blocked forever)
+        const { data: lastRun } = await db
+          .from("admin_cron_runs")
+          .select("completed_at")
+          .eq("cron_name", name)
+          .eq("status", "completed")
+          .order("completed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const lastSuccess = lastRun?.completed_at
+          ? new Date(lastRun.completed_at)
+          : null;
+        const hoursSinceSuccess = lastSuccess
+          ? (Date.now() - lastSuccess.getTime()) / (1000 * 60 * 60)
+          : Infinity;
+
+        if (hoursSinceSuccess > 24) {
+          logger.warn(
+            `[CronGuard:${name}] Dependencies not met but CRON stale (${Math.round(hoursSinceSuccess)}h since last success) — bypassing`,
+          );
+        } else {
+          const reasons = unsatisfied.map(
+            (d: {
+              dependency: string;
+              last_success: string | null;
+              required_within_hours: number;
+            }) =>
+              `${d.dependency}: last success ${d.last_success || "never"} (required within ${d.required_within_hours}h)`,
+          );
+          logger.warn(
+            `[CronGuard:${name}] Dependencies not met:`,
+            reasons.join(", "),
+          );
+          return NextResponse.json({
+            skipped: true,
+            reason: "dependency_not_met",
+            unsatisfied_dependencies: reasons,
+          });
+        }
       }
     }
 

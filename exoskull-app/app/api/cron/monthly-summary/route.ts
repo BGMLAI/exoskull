@@ -1,19 +1,26 @@
 /**
- * Monthly Summary CRON
+ * Monthly Summary CRON — Async Dispatcher
  *
  * Schedule: 1st of every month 09:00 UTC
- * Generates and dispatches a 30-day recap to every active tenant.
+ * Enqueues one async task per active tenant for monthly summary generation.
+ * Actual processing happens in /api/cron/async-tasks (1 per minute, ~15s each).
+ *
+ * Previous approach processed all tenants inline (55s for 4 tenants, near 60s limit).
+ * Async dispatch finishes in <2s regardless of tenant count.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { withCronGuard } from "@/lib/admin/cron-guard";
-import { generateMonthlySummary } from "@/lib/reports/summary-generator";
-import { dispatchReport } from "@/lib/reports/report-dispatcher";
+import { createTask } from "@/lib/async-tasks/queue";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+/** Prefix used to identify monthly summary tasks in async-tasks processor.
+ * Must match MONTHLY_SUMMARY_PREFIX in /api/cron/async-tasks/route.ts */
+const MONTHLY_SUMMARY_PREFIX = "[SYSTEM:monthly_summary]";
 
 async function handler(request: NextRequest): Promise<NextResponse> {
   const startTime = Date.now();
@@ -36,76 +43,57 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   }
 
   const activeTenants = tenants || [];
-  const results = {
-    processed: 0,
-    summaries_generated: 0,
-    dispatched: 0,
-    skipped_empty: 0,
-    errors: [] as string[],
-  };
 
-  // Process tenants in parallel batches of 5 (instead of sequential)
-  const BATCH_SIZE = 5;
-  for (let i = 0; i < activeTenants.length; i += BATCH_SIZE) {
-    const batch = activeTenants.slice(i, i + BATCH_SIZE);
-    const batchResults = await Promise.allSettled(
-      batch.map(async (tenant) => {
-        const summary = await generateMonthlySummary(tenant.id);
-        if (!summary) return { tenantId: tenant.id, status: "empty" as const };
+  if (activeTenants.length === 0) {
+    return NextResponse.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      duration_ms: Date.now() - startTime,
+      tenants_enqueued: 0,
+      message: "No active tenants",
+    });
+  }
 
-        const dispatchResult = await dispatchReport(
-          tenant.id,
-          summary,
-          "monthly",
-        );
-        return {
-          tenantId: tenant.id,
-          status: dispatchResult.success
-            ? ("dispatched" as const)
-            : ("dispatch_failed" as const),
-          error: dispatchResult.error,
-        };
-      }),
-    );
+  // Enqueue one async task per tenant (lightweight — just DB inserts)
+  const enqueued: string[] = [];
+  const errors: string[] = [];
 
-    for (const result of batchResults) {
-      results.processed++;
-      if (result.status === "rejected") {
-        const msg =
-          result.reason instanceof Error
-            ? result.reason.message
-            : String(result.reason);
-        results.errors.push(msg);
-      } else if (result.value.status === "empty") {
-        results.skipped_empty++;
-      } else if (result.value.status === "dispatched") {
-        results.summaries_generated++;
-        results.dispatched++;
-      } else {
-        results.summaries_generated++;
-        results.errors.push(
-          `${result.value.tenantId}: dispatch failed — ${result.value.error}`,
-        );
-      }
+  for (const tenant of activeTenants) {
+    try {
+      const taskId = await createTask({
+        tenantId: tenant.id,
+        channel: "web_chat",
+        channelMetadata: { source: "monthly_summary_cron" },
+        replyTo: "system",
+        prompt: MONTHLY_SUMMARY_PREFIX,
+      });
+      enqueued.push(taskId);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      errors.push(`${tenant.id}: ${msg}`);
+      console.error("[MonthlySummary] Failed to enqueue tenant:", {
+        tenantId: tenant.id,
+        error: msg,
+      });
     }
   }
 
   const durationMs = Date.now() - startTime;
 
-  logger.info("[MonthlySummary] Completed:", {
-    ...results,
+  logger.info("[MonthlySummary] Dispatched:", {
+    tenants: activeTenants.length,
+    enqueued: enqueued.length,
+    errors: errors.length,
     durationMs,
-    errorCount: results.errors.length,
   });
 
   return NextResponse.json({
     success: true,
     timestamp: new Date().toISOString(),
     duration_ms: durationMs,
-    results: {
-      ...results,
-      error_count: results.errors.length,
-    },
+    tenants_enqueued: enqueued.length,
+    task_ids: enqueued,
+    errors: errors.length > 0 ? errors : undefined,
   });
 }
 
