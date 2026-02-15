@@ -87,7 +87,8 @@ export async function updateSession(request: NextRequest) {
     pathname === "/api/knowledge/reprocess" || // Has own CRON_SECRET auth
     pathname === "/api/knowledge/reprocess-all" || // Has own CRON_SECRET auth
     pathname.startsWith("/api/mobile/") || // Mobile app — Bearer JWT auth verified in routes
-    pathname.startsWith("/api/agent/"); // Local agent — Bearer JWT auth verified in routes
+    pathname.startsWith("/api/agent/") || // Local agent — Bearer JWT auth verified in routes
+    pathname.startsWith("/api/debug/"); // Debug endpoints — own CRON_SECRET auth
 
   // ============================================================================
   // AUTH GUARD: Redirect unauthenticated users to login
