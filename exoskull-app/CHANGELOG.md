@@ -4,6 +4,36 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-16] Emergency Fallback Diagnosis + Tool Filtering
+
+### Bug Investigation
+
+**Root cause of persistent `emergency_fallback`** — ALL 3 AI providers were failing:
+
+1. **Gemini 3 Flash** (primary): FREE TIER quota exceeded (20 req/day limit). CRONs + user messages exhaust quota rapidly.
+2. **Anthropic Claude Haiku** (fallback): Credit balance too low — billing needs top-up at console.anthropic.com.
+3. **OpenAI GPT-4o** (fallback): Connection error — API key may be invalid.
+4. **Gemini 2.5 Flash** (emergency): Works fine — different model = separate quota bucket.
+
+**Resolution:** User must fix billing on all 3 provider accounts (Gemini pay-as-you-go, Anthropic credits, OpenAI key).
+
+### Performance
+
+**Tool filtering for web chat** — reduced from 100 to ~40 essential tools per API call:
+
+- Added `WEB_ESSENTIAL_TOOL_NAMES` set (matching existing `VOICE_ESSENTIAL_TOOL_NAMES` pattern)
+- `conversation-handler.ts`: filters `activeTools` per channel before sending to any AI provider
+- Reduces token usage, faster responses, lower API costs
+- Previously: ALL 100 IORS tools sent to every request regardless of channel
+
+### Diagnostics
+
+- New endpoint: `GET /api/debug/ai-providers?secret=CRON_SECRET` — tests each AI provider individually
+- Reports: model availability, API key validity, quota status, tool compatibility
+- Useful for rapid diagnosis of provider failures
+
+---
+
 ## [2026-02-14] Android Edge Client + Self-hosted AI (Phase 1-2)
 
 ### Architecture
