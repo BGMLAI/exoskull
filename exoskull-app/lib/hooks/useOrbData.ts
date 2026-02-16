@@ -183,6 +183,28 @@ function getApiEndpoint(type: OrbNodeType): string {
   return map[type];
 }
 
+/** Map OrbNodeType to the ID field name expected by each API route */
+function getIdFieldName(type: OrbNodeType): string {
+  const map: Record<OrbNodeType, string> = {
+    value: "valueId",
+    loop: "loopId",
+    quest: "questId",
+    mission: "id",
+    challenge: "id",
+    op: "opId",
+  };
+  return map[type];
+}
+
+/** Build full DELETE URL with correct query params per API route */
+function getDeleteUrl(type: OrbNodeType, nodeId: string): string {
+  const base = getApiEndpoint(type);
+  const idField = getIdFieldName(type);
+  // missions & challenges read { id } from body, no query params needed
+  if (type === "mission" || type === "challenge") return base;
+  return `${base}?${idField}=${encodeURIComponent(nodeId)}`;
+}
+
 function getParentFkField(
   type: OrbNodeType,
   parentId: string | null,
@@ -548,12 +570,15 @@ export function useOrbData() {
   const removeNode = useCallback(
     async (nodeId: string, type: OrbNodeType): Promise<boolean> => {
       try {
-        const endpoint = getApiEndpoint(type);
+        const endpoint = getDeleteUrl(type, nodeId);
 
         const res = await fetch(endpoint, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: nodeId }),
+          body:
+            type === "mission" || type === "challenge"
+              ? JSON.stringify({ id: nodeId })
+              : undefined,
         });
 
         if (!res.ok) {
@@ -594,8 +619,9 @@ export function useOrbData() {
       try {
         const endpoint = getApiEndpoint(type);
 
+        const idField = getIdFieldName(type);
         const body = {
-          id: nodeId,
+          [idField]: nodeId,
           name: data.label,
           title: data.label,
           ...data,

@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -211,16 +212,15 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
     const supabase = getServiceSupabase();
     const { searchParams } = new URL(request.url);
     const opId = searchParams.get("opId");
-    const tenantId = searchParams.get("tenantId");
 
-    if (!opId || !tenantId) {
-      return NextResponse.json(
-        { error: "opId and tenantId required" },
-        { status: 400 },
-      );
+    if (!opId) {
+      return NextResponse.json({ error: "opId required" }, { status: 400 });
     }
 
     const { error } = await supabase
