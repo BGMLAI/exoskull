@@ -10,6 +10,7 @@ ExoSkull's dashboard is a **hybrid 3D + 2D cockpit** built with React Three Fibe
 z-0   → R3F Canvas             (3D orbital scene, synthwave grid, particles, bloom)
 z-10  → CockpitHUDShell        (2D HTML/CSS cockpit: panels, chat, gauges, top/bottom bars)
 z-12  → ChannelOrbs            (floating channel indicators, top-right)
+z-20  → OrbContextMenuOverlay  (right-click context menu for orb CRUD)
 z-30  → ToolExecutionOverlay   (active tool indicator pill, top-center)
 z-50  → FloatingCallButton     (voice call, always accessible, bottom-right)
 ```
@@ -46,6 +47,14 @@ z-50  → FloatingCallButton     (voice call, always accessible, bottom-right)
 | `CenterViewport.tsx`   | Chat/Preview switcher — both layers always mounted, toggle via opacity                               |
 | `PreviewPane.tsx`      | Detail view: email, task, document, calendar, activity, value — with type badges                     |
 | `ChannelOrbs.tsx`      | Floating channel indicators (Email, Telegram, Discord, SMS) with hover glow                          |
+| `OrbFormDialog.tsx`    | Modal for creating/editing orbs: name, color picker, description, priority                           |
+| `OrbDeleteConfirm.tsx` | Red-accented delete confirmation dialog with safety warning                                          |
+
+### 3D Context Menu (`components/3d/`)
+
+| File                 | Purpose                                                                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `OrbContextMenu.tsx` | Right-click context menu on orbs: "Dodaj dziecko", "Edytuj", "Usuń". Also OrbContextMenuOverlay orchestrator with form/delete dialogs |
 
 ### Dashboard Overlays (`components/dashboard/`)
 
@@ -67,20 +76,21 @@ z-50  → FloatingCallButton     (voice call, always accessible, bottom-right)
 
 ### State Management
 
-| Store                 | Location                            | Purpose                                                                                                                       |
-| --------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `useCockpitStore`     | `lib/stores/useCockpitStore.ts`     | Cockpit layout: wing widths (persisted), centerMode (chat/preview), previewTarget, sections, collapsedPanels, selectedWorldId |
-| `useSceneStore`       | `lib/stores/useSceneStore.ts`       | Bridges SSE tool events → 3D visual effects. SceneEffect types: idle, thinking, building, searching, executing.               |
-| `useSpatialChatStore` | `lib/stores/useSpatialChatStore.ts` | @deprecated — was used by SpatialChat. CenterViewport uses UnifiedStream directly.                                            |
-| `useInterfaceStore`   | `lib/stores/useInterfaceStore.ts`   | General UI state (existing, preserved)                                                                                        |
-| `useStreamState`      | `lib/hooks/useStreamState.ts`       | Chat state reducer (existing, 14 action types)                                                                                |
+| Store                 | Location                            | Purpose                                                                                                                                       |
+| --------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useCockpitStore`     | `lib/stores/useCockpitStore.ts`     | Cockpit layout: wing widths (persisted), centerMode (chat/preview), previewTarget, sections, collapsedPanels, selectedWorldId, orbContextMenu |
+| `useSceneStore`       | `lib/stores/useSceneStore.ts`       | Bridges SSE tool events → 3D visual effects. SceneEffect types: idle, thinking, building, searching, executing.                               |
+| `useSpatialChatStore` | `lib/stores/useSpatialChatStore.ts` | @deprecated — was used by SpatialChat. CenterViewport uses UnifiedStream directly.                                                            |
+| `useInterfaceStore`   | `lib/stores/useInterfaceStore.ts`   | General UI state (existing, preserved)                                                                                                        |
+| `useStreamState`      | `lib/hooks/useStreamState.ts`       | Chat state reducer (existing, 14 action types)                                                                                                |
 
 ### Hooks
 
-| Hook              | Location                       | Purpose                                                                                       |
-| ----------------- | ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `useResizeHandle` | `lib/hooks/useResizeHandle.ts` | Custom drag-to-resize for cockpit columns (mousedown/move/up on document, RAF throttle)       |
-| `useCockpitKeys`  | `lib/hooks/useCockpitKeys.ts`  | Keyboard shortcuts: Escape (close preview), Ctrl+1-6 (toggle panels), Ctrl+[/] (resize wings) |
+| Hook              | Location                       | Purpose                                                                                              |
+| ----------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `useResizeHandle` | `lib/hooks/useResizeHandle.ts` | Custom drag-to-resize for cockpit columns (mousedown/move/up on document, RAF throttle)              |
+| `useCockpitKeys`  | `lib/hooks/useCockpitKeys.ts`  | Keyboard shortcuts: Escape (close preview), Ctrl+1-6 (toggle panels), Ctrl+[/] (resize wings)        |
+| `useOrbData`      | `lib/hooks/useOrbData.ts`      | Orb tree data (singleton). Mutations: addNode, removeNode, updateNode. Maps OrbNodeType→API endpoint |
 
 ### Shared Utilities
 
@@ -213,6 +223,20 @@ app/dashboard/page.tsx
     → ToolExecutionOverlay (z-30)
     → FloatingCallButton (z-50)
 ```
+
+## Knowledge API (Orb CRUD)
+
+| Type      | Endpoint                    | Methods               | ID Field    |
+| --------- | --------------------------- | --------------------- | ----------- |
+| Value     | `/api/knowledge/values`     | GET/POST/PATCH/DELETE | `valueId`   |
+| Loop      | `/api/knowledge/loops`      | GET/POST/PATCH/DELETE | `loopId`    |
+| Quest     | `/api/knowledge/quests`     | GET/POST/PATCH/DELETE | `questId`   |
+| Mission   | `/api/knowledge/missions`   | GET/POST/PATCH/DELETE | `id` (body) |
+| Challenge | `/api/knowledge/challenges` | GET/POST/PATCH/DELETE | `id` (body) |
+| Op        | `/api/knowledge/ops`        | GET/POST/PATCH/DELETE | `opId`      |
+
+DELETE: values/loops/quests/ops use query params; missions/challenges use request body.
+All routes use `verifyTenantAuth` for authentication.
 
 ## Future Work (Not Yet Implemented)
 

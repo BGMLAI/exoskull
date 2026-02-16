@@ -4,6 +4,54 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-16] Phase 9: Orb CRUD + Brighter Dashboard + Delete Fix
+
+### Brighter Dashboard
+
+- Brightened dark-ops CSS theme (background 4%→7%, card 10%→13%, muted 16%→20%, border 16%→22%)
+- Brightened cockpit HUD variables (bg, border, text-dim, text-muted)
+- 3D scene: ambientLight 0.8→1.2, scene background/fog #050510→#0a0a1c, toneMappingExposure 1.2→1.5
+- PostProcessing: vignette darkness 0.7→0.4, bloom intensity 1.4→1.6
+- SynthwaveGrid: cyan opacity 0.12→0.20, purple 0.04→0.08, horizon glow 0.06→0.12
+- WorldOrb: emissive 0.6→0.8, point light 0.6→1.0, halo 0.08→0.14
+
+### Orb CRUD (Full Hierarchy)
+
+- **New API routes**: `missions/route.ts`, `challenges/route.ts` (POST/PATCH/DELETE)
+- **useOrbData mutations**: `addNode()`, `removeNode()`, `updateNode()` with correct ID field mapping per API route
+- **OrbContextMenu**: Right-click on 3D orbs → "Dodaj dziecko", "Edytuj", "Usuń"
+- **OrbFormDialog**: Modal with name, color picker (8 colors), description, priority
+- **OrbDeleteConfirm**: Red-accented delete confirmation with safety warning
+- **Store**: `orbContextMenu` state in useCockpitStore
+
+### Bug Fixes
+
+- **DELETE/PATCH broken for values/loops/quests/ops**: `removeNode` was sending `{ id }` in request body but API routes expected query params (`valueId`, `loopId`, `questId`, `opId`). Added `getDeleteUrl()` + `getIdFieldName()` helpers.
+- **Ops DELETE missing auth**: Was requiring `tenantId` as query param instead of using `verifyTenantAuth`. Fixed to match other routes.
+- **Removed "Wartości" header** from LeftWing — values remain as orbs (bieguny) on 3D scene.
+
+### Architecture
+
+- New z-20 layer: `OrbContextMenuOverlay`
+- `useCockpitStore` extended with `orbContextMenu` + `setOrbContextMenu`
+- `useOrbData` hook extended with CRUD mutations + helper functions
+
+### Files Changed (25+)
+
+- `app/globals.css`, `styles/cockpit.css` — theme brightness
+- `components/3d/CyberpunkScene.tsx`, `CyberpunkSceneInner.tsx`, `ScenePostProcessing.tsx`, `SynthwaveGrid.tsx`, `WorldOrb.tsx` — 3D brightness
+- `components/3d/OrbContextMenu.tsx` — NEW context menu + overlay
+- `components/3d/OrbCluster.tsx`, `OrbitalScene.tsx` — context menu wiring
+- `components/cockpit/OrbFormDialog.tsx`, `OrbDeleteConfirm.tsx` — NEW dialogs
+- `components/cockpit/CockpitHUDShell.tsx`, `LeftWing.tsx` — layout updates
+- `components/dashboard/CyberpunkDashboard.tsx` — added OrbContextMenuOverlay
+- `app/api/knowledge/missions/route.ts`, `challenges/route.ts` — NEW API routes
+- `app/api/knowledge/ops/route.ts` — fixed DELETE auth
+- `lib/hooks/useOrbData.ts` — CRUD mutations + ID mapping
+- `lib/stores/useCockpitStore.ts` — orbContextMenu state
+
+---
+
 ## [2026-02-16] Phase 8: Cockpit HUD — 2D Overlay on 3D Scene
 
 ### Architecture Change
