@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { DualInterface } from "@/components/dual-interface/DualInterface";
+import { CyberpunkDashboard } from "@/components/dashboard/CyberpunkDashboard";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "ExoSkull" };
 
 /**
- * Dashboard Page — DualInterface (Chat River + Tree Graph)
+ * Dashboard Page — CyberpunkDashboard (3D Scene + Chat Overlay)
  *
- * No separate home, settings, or menu pages.
- * Everything flows from chat or the tree system.
+ * Layered architecture: 3D orbital scene at z-0, glass chat overlay at z-10.
+ * Everything flows from chat or clicking worlds in 3D space.
  */
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -41,5 +41,5 @@ export default async function DashboardPage() {
     console.error("[Dashboard] Failed to load tenant:", e);
   }
 
-  return <DualInterface tenantId={user.id} iorsName={iorsName} />;
+  return <CyberpunkDashboard tenantId={user.id} iorsName={iorsName} />;
 }

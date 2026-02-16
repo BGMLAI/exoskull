@@ -4,6 +4,188 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-16] Phase 8: Cockpit HUD — 2D Overlay on 3D Scene
+
+### Architecture Change
+
+Replaced 3D spatial panels (drei `<Html>`) with a pure HTML/CSS cockpit HUD overlay (z=10) on top of the 3D scene. FPV cockpit-style layout inspired by Star Citizen / Elite Dangerous.
+
+### New Components (17 files)
+
+- **`components/cockpit/`** — Complete cockpit HUD system:
+  - `CockpitHUDShell.tsx` — CSS Grid master layout (5-col × 3-row)
+  - `CockpitTopBar.tsx` — Clock, IORS status, active tool indicator
+  - `CockpitBottomBar.tsx` — Quick actions, input hint, HUD gauges
+  - `HUDPanel.tsx` — Reusable FUI panel frame with data fetch + normalize
+  - `HUDGauge.tsx` — SVG segmented arc gauge (12 segments, 0-100%)
+  - `LeftWing.tsx` — Tasks, IORS Activity, Email panels
+  - `RightWing.tsx` — Calendar, Values/Plan, Knowledge panels
+  - `CenterViewport.tsx` — Chat/Preview switcher (both always mounted, opacity toggle)
+  - `PreviewPane.tsx` — Detail view for emails, tasks, documents, calendar, activity, values
+  - `ChannelOrbs.tsx` — Floating channel indicators (Email, Telegram, Discord, SMS)
+  - `index.ts` — Barrel export
+
+### New Utilities
+
+- **`styles/cockpit.css`** — FUI design system (panel frames, corner brackets, scanlines, animations)
+- **`lib/cockpit/normalize-response.ts`** — Shared API response normalizer (extracted from SpatialPanel)
+- **`lib/cockpit/utils.ts`** — `stripMarkdown()`, `truncate()`, `relativeTime()` (extracted from SpatialChat)
+- **`lib/hooks/useResizeHandle.ts`** — Custom drag-to-resize hook (pointer events + RAF)
+- **`lib/hooks/useCockpitKeys.ts`** — Keyboard shortcuts (Escape, Ctrl+1-6, Ctrl+[/])
+
+### Modified Files
+
+- **`components/dashboard/CyberpunkDashboard.tsx`** — Replaced SpatialChat + UnifiedStream spatialMode → CockpitHUDShell
+- **`components/3d/CyberpunkSceneInner.tsx`** — Removed SpatialPanelLayout from 3D scene
+- **`lib/stores/useCockpitStore.ts`** — Extended with leftWingWidth, rightWingWidth, centerMode, previewTarget, collapsedPanels, openPreview, closePreview
+- **`app/globals.css`** — Added cockpit.css import
+
+### Features
+
+- Resizable left/right wings (200-400px, persisted in localStorage)
+- Click item in any wing panel → preview opens in center viewport
+- Escape/back button returns to chat from preview
+- Full UnifiedStream chat in center (not spatialMode — full message history + SSE streaming)
+- 4 HUD gauges: System health, Tasks done%, Unread emails, Goals
+- 6 quick action buttons (Build, Search, Email, Note, Report, VPS)
+- FUI panel frames with corner bracket accents and scanline overlay
+- Staggered panel load animations
+- Channel orbs with hover glow effects
+
+### Deprecated (not deleted)
+
+- `components/3d/SpatialPanel.tsx`
+- `components/3d/SpatialPanelLayout.tsx`
+- `components/3d/SpatialChat.tsx`
+
+---
+
+## [2026-02-16] Phase 7 Cockpit Fix — Panels Follow Camera + Chat Fix
+
+### Bug Fixes
+
+- **Cockpit paradigm**: Panels now follow camera (CockpitGroup copies camera position/quaternion every frame) instead of floating at fixed world positions
+- **Panel positioning**: Moved from x=±18 (invisible) to x=±7 camera-local space. Left wing: Zadania, IORS, Email. Right wing: Kalendarz, Wiedza
+- **distanceFactor**: Reduced from 25 → 10, width from 280 → 200px for compact cockpit cards
+- **All sections visible**: All 6 cockpit sections now `visible: true` by default in useCockpitStore
+- **API endpoint fixes**: Activity feed corrected from `/api/canvas/data/activity-feed` → `/api/canvas/activity-feed`. Knowledge corrected from `/api/canvas/data/knowledge` → `/api/knowledge`
+- **Response normalization**: SpatialPanel now handles varied API response shapes (flat arrays, `{ documents }`, `{ stats }`, `{ summary }`) via `normalizeResponse()`
+- **Polish labels**: Stats display in Polish (Oczekujace, W toku, Gotowe, Nieprzeczytane, Pilne, etc.) via LABEL_MAP
+- **Chat messages fixed**: Moved from drei `<Html>` in 3D (caused vertical text) to normal HTML overlay above input bar. Messages now display horizontally with proper bubble layout (user=cyan right, AI=purple left)
+
+### Files Changed
+
+- `components/3d/SpatialPanelLayout.tsx` — CockpitGroup (camera-following), camera-local panel positions, fixed API endpoints
+- `components/3d/SpatialPanel.tsx` — normalizeResponse(), LABEL_MAP, distanceFactor=10, width=200
+- `lib/stores/useCockpitStore.ts` — all sections visible by default
+- `components/3d/SpatialChat.tsx` — rewritten: removed drei Html, now pure DOM overlay with scrollable message list
+- `components/3d/CyberpunkSceneInner.tsx` — removed SpatialChat from 3D scene
+- `components/dashboard/CyberpunkDashboard.tsx` — added SpatialChat as HTML overlay above input bar
+
+---
+
+## [2026-02-16] Phase 7: Spatial UI Redesign — Everything IN the 3D Scene
+
+### Architecture
+
+**Paradigm shift** — moved ALL UI elements from HTML overlays INTO the 3D scene using drei `<Html>`. Data panels, chat messages, and world detail panels all exist at 3D coordinates.
+
+**New spatial architecture:**
+
+- Data panels (Zadania, IORS, Kalendarz, Wiedza, Email) → `<Html>` glass cards at 3D positions
+- Chat messages → floating bubbles in scene center (cyan=user, purple=AI)
+- World detail panels → appear near clicked orb with sub-sections
+- Camera fly-to on world orb click (OrbitControls target lerp)
+- Chat input bar → centered HTML overlay at bottom (only non-3D element)
+- Dashboard modifiable through chat (IORS `modify_dashboard` tool → SSE `cockpit_update`)
+
+**Removed HTML overlay paradigm:**
+
+- Deleted: CockpitHUD (bottom bar), WorldDetailPanel (right slide-in), ChatOverlay (left panel)
+- Deleted: FloatingWidget, WidgetOverlayManager (draggable widgets)
+- UnifiedStream now runs in `spatialMode` (hidden messages, only input bar visible)
+
+### New Components (Phase 7)
+
+**Spatial panels** (`components/3d/`):
+
+- `SpatialPanel.tsx` — generic glass card at 3D position (drei Html, lazy fetch, expand/collapse)
+- `SpatialPanelLayout.tsx` — positions panels at predefined 3D coords + world detail sub-panels
+- `SpatialChat.tsx` — floating message bubbles (last 8 msgs, rising y-positions, role-based colors)
+
+**Stores:**
+
+- `lib/stores/useSpatialChatStore.ts` — last 10 messages for 3D rendering (push/update/clear)
+- `lib/stores/useCockpitStore.ts` — panel visibility/expansion + selectedWorldId
+
+**IORS tool:**
+
+- `lib/iors/tools/dashboard-tools.ts` — `modify_dashboard` tool (show/hide/expand panels via SSE)
+
+### Phase 7 Sub-phases
+
+- **7A**: Spatial data panels (SpatialPanel + SpatialPanelLayout, removed CockpitHUD/WorldDetailPanel)
+- **7B**: Spatial chat bubbles (SpatialChat, UnifiedStream spatialMode, useSpatialChatStore)
+- **7C**: Camera fly-to (OrbitControls ref + useFrame lerp on world select)
+- **7D**: Chat-modifiable dashboard (modify_dashboard IORS tool → cockpit_update SSE → store)
+
+### Integration
+
+- UnifiedStream syncs messages to `useSpatialChatStore` for 3D rendering
+- Tool execution: `modify_dashboard` → `__SSE__` directive → agent-loop extracts → SSE stream → client
+- Camera animation: `useCockpitStore.selectedWorldId` → `useFrame` lerp → OrbitControls target
+- World click: OrbitalScene → useCockpitStore.selectWorld → camera fly-to + detail panels
+
+---
+
+## [2026-02-16] Phase 0-6: 3D Cyberpunk Dashboard Foundation
+
+### Architecture
+
+**Complete visual transformation** — replaced 2D split-pane DualInterface with a 3D cyberpunk/synthwave layered dashboard.
+
+### New Components (Phases 0-6)
+
+**3D Scene** (`components/3d/`):
+
+- `CyberpunkScene.tsx` — dynamic import wrapper with WebGL/mobile/reduced-motion detection
+- `CyberpunkSceneInner.tsx` — R3F Canvas, camera, fog, orbital worlds, camera fly-to
+- `SynthwaveGrid.tsx` — animated dual-layer neon grid floor (cyan/purple)
+- `Skybox.tsx` — 2500 stars, 3 nebulae, synthwave sun with scan lines
+- `Particles.tsx` — 150 upward-drifting cyan particles
+- `ScenePostProcessing.tsx` — Bloom (pulsing), Vignette, ChromaticAberration (auto-disables on low FPS)
+- `SceneEffects.tsx` — IORS activity visualization (bloom pulse, activity ring)
+- `WorldOrb.tsx` — glowing sphere with hover, Html label, halo, moons
+- `EphemeralThread.tsx` — pulsing connection lines between worlds (drei Line)
+- `GridRoad.tsx` — materializing tile path (progress metaphor)
+- `OrbitalScene.tsx` — composes all orbital elements
+
+**Dashboard** (`components/dashboard/`):
+
+- `CyberpunkDashboard.tsx` — top-level spatial dashboard
+- `ToolExecutionOverlay.tsx` — floating pill during tool execution
+
+**Stores:**
+
+- `lib/stores/useSceneStore.ts` — bridges SSE tool events → 3D scene effects
+
+### Performance
+
+- WebGL detection: no WebGL → CSS gradient fallback
+- Mobile (<768px): static background (no Three.js loaded)
+- `prefers-reduced-motion`: static background
+- FPS monitor: auto-disables ChromaticAberration below 25 FPS
+- Dynamic import with `ssr: false` for all Three.js code
+- Dashboard bundle: ~500kB first load (R3F chunk loaded separately)
+
+### Packages Added
+
+- `@react-three/fiber@^8.17.0`
+- `@react-three/drei@^9.117.0`
+- `@react-three/postprocessing@^2.16.0`
+
+---
+
 ## [2026-02-16] Emergency Fallback Diagnosis + Tool Filtering
 
 ### Bug Investigation
