@@ -161,9 +161,9 @@ export function CockpitHUDShell() {
                 pointerEvents: "auto",
                 display: "flex",
                 flexDirection: "column",
-                background: "rgba(5, 5, 16, 0.82)",
+                background: "rgba(10, 10, 28, 0.85)",
                 backdropFilter: "blur(14px)",
-                borderTop: "1px solid rgba(6, 182, 212, 0.15)",
+                borderTop: "1px solid rgba(6, 182, 212, 0.25)",
                 borderRadius: "8px 8px 0 0",
                 overflow: "hidden",
               }}

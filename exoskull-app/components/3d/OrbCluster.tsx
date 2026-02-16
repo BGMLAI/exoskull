@@ -16,6 +16,7 @@ interface OrbClusterProps {
   isBackground: boolean;
   onDrillIn: (node: OrbNode) => void;
   onLeafClick: (node: OrbNode) => void;
+  onContextMenu?: (node: OrbNode, event: ThreeEvent<MouseEvent>) => void;
   phaseOffset?: number;
 }
 
@@ -32,6 +33,7 @@ export function OrbCluster({
   isBackground,
   onDrillIn,
   onLeafClick,
+  onContextMenu,
   phaseOffset = 0,
 }: OrbClusterProps) {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -81,6 +83,12 @@ export function OrbCluster({
         position={position}
         scale={[scale, scale, scale]}
         onClick={handleClick}
+        onContextMenu={(e) => {
+          e.stopPropagation();
+          if (onContextMenu) {
+            onContextMenu(node, e);
+          }
+        }}
         onPointerOver={(e) => {
           e.stopPropagation();
           setHovered(true);
@@ -193,6 +201,7 @@ export function OrbCluster({
             isFocused={isFocused}
             onDrillIn={onDrillIn}
             onLeafClick={onLeafClick}
+            onContextMenu={onContextMenu}
           />
         ))}
 
@@ -238,6 +247,7 @@ interface MoonOrbProps {
   isFocused: boolean;
   onDrillIn: (node: OrbNode) => void;
   onLeafClick: (node: OrbNode) => void;
+  onContextMenu?: (node: OrbNode, event: ThreeEvent<MouseEvent>) => void;
 }
 
 function MoonOrb({
@@ -252,6 +262,7 @@ function MoonOrb({
   isFocused,
   onDrillIn,
   onLeafClick,
+  onContextMenu,
 }: MoonOrbProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const lineRef = useRef<any>(null);
@@ -371,6 +382,12 @@ function MoonOrb({
       <mesh
         ref={meshRef}
         onClick={handleClick}
+        onContextMenu={(e) => {
+          e.stopPropagation();
+          if (isFocused && onContextMenu) {
+            onContextMenu(child, e);
+          }
+        }}
         onPointerOver={(e) => {
           if (!isFocused) return;
           e.stopPropagation();

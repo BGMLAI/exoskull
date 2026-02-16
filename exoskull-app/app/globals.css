@@ -12,8 +12,42 @@
    * .dark fallback kept for system dark mode compatibility
    */
 
-  /* ===== Theme B: XO Minimal (default / light) ===== */
+  /* ===== Theme A: Dark Ops (default) ===== */
   :root,
+  .dark-ops,
+  .dark {
+    --background: 0 0% 7%;
+    --foreground: 240 5% 90%;
+    --card: 240 4% 13%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 4% 10%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 191 100% 50%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 215 25% 17%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 20%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 38 100% 50%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 354 100% 64%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 22%;
+    --input: 240 4% 22%;
+    --ring: 191 100% 50%;
+    --radius: 0.625rem;
+
+    /* Dark Ops specific */
+    --sidebar-bg: 0 0% 5%;
+    --sidebar-border: 240 4% 18%;
+    --sidebar-text: 240 5% 82%;
+    --sidebar-muted: 240 5% 45%;
+    --sidebar-active: 191 100% 50%;
+    --sidebar-active-text: 0 0% 0%;
+    --glow-color: 191 100% 50%;
+  }
+
+  /* ===== Theme B: XO Minimal (light) ===== */
   .xo-minimal {
     --background: 0 0% 100%;
     --foreground: 0 0% 3.5%;
@@ -43,40 +77,6 @@
     --sidebar-muted: 240 4% 46%;
     --sidebar-active: 0 0% 3.5%;
     --sidebar-active-text: 0 0% 98%;
-  }
-
-  /* ===== Theme A: Dark Ops ===== */
-  .dark-ops,
-  .dark {
-    --background: 0 0% 4%;
-    --foreground: 240 5% 90%;
-    --card: 240 4% 10%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 4% 10%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 191 100% 50%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 215 25% 17%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 38 100% 50%;
-    --accent-foreground: 0 0% 0%;
-    --destructive: 354 100% 64%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
-    --ring: 191 100% 50%;
-    --radius: 0.625rem;
-
-    /* Dark Ops specific */
-    --sidebar-bg: 0 0% 2%;
-    --sidebar-border: 240 4% 12%;
-    --sidebar-text: 240 5% 75%;
-    --sidebar-muted: 240 5% 45%;
-    --sidebar-active: 191 100% 50%;
-    --sidebar-active-text: 0 0% 0%;
-    --glow-color: 191 100% 50%;
   }
 
   /* ===== Theme C: Neural ===== */

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { NavStackEntry } from "@/lib/types/orb-types";
+import type { NavStackEntry, OrbNode } from "@/lib/types/orb-types";
 
 export interface CockpitSection {
   id: string;
@@ -34,6 +34,13 @@ interface CockpitState {
   collapsedPanels: Set<string>;
   /** Whether the HUD overlay is minimized (lets 3D scene through) */
   hudMinimized: boolean;
+  /** Context menu state for 3D orb right-click */
+  orbContextMenu: {
+    x: number;
+    y: number;
+    node: OrbNode | null;
+    depth: number;
+  } | null;
 
   // Actions
   selectWorld: (id: string | null) => void;
@@ -57,6 +64,9 @@ interface CockpitState {
   openPreview: (target: PreviewTarget) => void;
   closePreview: () => void;
   toggleHudMinimized: () => void;
+  setOrbContextMenu: (
+    menu: { x: number; y: number; node: OrbNode | null; depth: number } | null,
+  ) => void;
 }
 
 const DEFAULT_SECTIONS: CockpitSection[] = [
@@ -95,6 +105,7 @@ export const useCockpitStore = create<CockpitState>((set) => ({
   previewTarget: null,
   collapsedPanels: new Set<string>(),
   hudMinimized: false,
+  orbContextMenu: null,
 
   selectWorld: (id) => set({ selectedWorldId: id }),
 
@@ -184,4 +195,6 @@ export const useCockpitStore = create<CockpitState>((set) => ({
   closePreview: () => set({ centerMode: "chat", previewTarget: null }),
 
   toggleHudMinimized: () => set((s) => ({ hudMinimized: !s.hudMinimized })),
+
+  setOrbContextMenu: (menu) => set({ orbContextMenu: menu }),
 }));

@@ -4,6 +4,7 @@ import { CyberpunkScene } from "@/components/3d/CyberpunkScene";
 import { CockpitHUDShell } from "@/components/cockpit/CockpitHUDShell";
 import { ToolExecutionOverlay } from "./ToolExecutionOverlay";
 import { FloatingCallButton } from "@/components/voice/FloatingCallButton";
+import { OrbContextMenuOverlay } from "@/components/3d/OrbContextMenu";
 
 interface CyberpunkDashboardProps {
   tenantId: string;
@@ -27,6 +28,9 @@ export function CyberpunkDashboard({ tenantId }: CyberpunkDashboardProps) {
 
       {/* ── z-10: Cockpit HUD overlay (panels + chat + gauges) ── */}
       <CockpitHUDShell />
+
+      {/* ── z-20: Orb context menu overlay (right-click on 3D orbs) ── */}
+      <OrbContextMenuOverlay />
 
       {/* ── z-30: Tool execution indicator ── */}
       <ToolExecutionOverlay />

@@ -169,6 +169,44 @@ function transformApiToOrbTree(values: ApiValue[]): OrbNode[] {
   }));
 }
 
+// ─── API endpoint mapping ───
+
+function getApiEndpoint(type: OrbNodeType): string {
+  const map: Record<OrbNodeType, string> = {
+    value: "/api/knowledge/values",
+    loop: "/api/knowledge/loops",
+    quest: "/api/knowledge/quests",
+    mission: "/api/knowledge/missions",
+    challenge: "/api/knowledge/challenges",
+    op: "/api/knowledge/ops",
+  };
+  return map[type];
+}
+
+function getParentFkField(
+  type: OrbNodeType,
+  parentId: string | null,
+): Record<string, string> {
+  if (!parentId) return {};
+  const map: Record<OrbNodeType, Record<string, string>> = {
+    value: {},
+    loop: { valueId: parentId },
+    quest: { loopSlug: parentId, campaignId: parentId },
+    mission: { questId: parentId },
+    challenge: { missionId: parentId },
+    op: { challengeId: parentId, questId: parentId },
+  };
+  return map[type];
+}
+
+// ─── Force refresh (for use after mutations) ───
+
+async function forceRefreshOrbTree() {
+  _fetched = false;
+  _fetching = false;
+  await fetchOrbTree();
+}
+
 // ─── Fetch from API ───
 
 async function fetchOrbTree() {
@@ -453,11 +491,152 @@ export function useOrbData() {
     fetchOrbTree();
   }, []);
 
+  /** Add a new node under an optional parent */
+  const addNode = useCallback(
+    async (
+      parentId: string | null,
+      type: OrbNodeType,
+      data: {
+        label: string;
+        color?: string;
+        description?: string;
+        priority?: string;
+      },
+    ): Promise<boolean> => {
+      try {
+        const endpoint = getApiEndpoint(type);
+        const parentFields = getParentFkField(type, parentId);
+
+        const body = {
+          title: data.label,
+          name: data.label,
+          color: data.color,
+          description: data.description,
+          priority: data.priority,
+          ...parentFields,
+        };
+
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        if (!res.ok) {
+          console.error(
+            "[useOrbData.addNode] API returned non-OK:",
+            res.status,
+            await res.text(),
+          );
+          return false;
+        }
+
+        await forceRefreshOrbTree();
+        return true;
+      } catch (error) {
+        console.error("[useOrbData.addNode] Failed:", {
+          error: error instanceof Error ? error.message : error,
+          context: { parentId, type, data },
+        });
+        return false;
+      }
+    },
+    [],
+  );
+
+  /** Remove a node by ID and type */
+  const removeNode = useCallback(
+    async (nodeId: string, type: OrbNodeType): Promise<boolean> => {
+      try {
+        const endpoint = getApiEndpoint(type);
+
+        const res = await fetch(endpoint, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: nodeId }),
+        });
+
+        if (!res.ok) {
+          console.error(
+            "[useOrbData.removeNode] API returned non-OK:",
+            res.status,
+            await res.text(),
+          );
+          return false;
+        }
+
+        await forceRefreshOrbTree();
+        return true;
+      } catch (error) {
+        console.error("[useOrbData.removeNode] Failed:", {
+          error: error instanceof Error ? error.message : error,
+          context: { nodeId, type },
+        });
+        return false;
+      }
+    },
+    [],
+  );
+
+  /** Update an existing node's fields */
+  const updateNode = useCallback(
+    async (
+      nodeId: string,
+      type: OrbNodeType,
+      data: Partial<{
+        label: string;
+        color: string;
+        description: string;
+        priority: string;
+        status: string;
+      }>,
+    ): Promise<boolean> => {
+      try {
+        const endpoint = getApiEndpoint(type);
+
+        const body = {
+          id: nodeId,
+          name: data.label,
+          title: data.label,
+          ...data,
+        };
+
+        const res = await fetch(endpoint, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        if (!res.ok) {
+          console.error(
+            "[useOrbData.updateNode] API returned non-OK:",
+            res.status,
+            await res.text(),
+          );
+          return false;
+        }
+
+        await forceRefreshOrbTree();
+        return true;
+      } catch (error) {
+        console.error("[useOrbData.updateNode] Failed:", {
+          error: error instanceof Error ? error.message : error,
+          context: { nodeId, type, data },
+        });
+        return false;
+      }
+    },
+    [],
+  );
+
   return {
     rootNodes: tree,
     getNode,
     loadChildren,
     refresh,
+    addNode,
+    removeNode,
+    updateNode,
     isLive: _fetched,
   };
 }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { OrbCluster } from "./OrbCluster";
 import { EphemeralThread } from "./EphemeralThread";
 import { GridRoad } from "./GridRoad";
 import { useCockpitStore } from "@/lib/stores/useCockpitStore";
 import { useOrbData } from "@/lib/hooks/useOrbData";
 import type { OrbNode } from "@/lib/types/orb-types";
+import type { ThreeEvent } from "@react-three/fiber";
 
 interface OrbitalSceneProps {
   onPointerMissed?: () => void;
@@ -20,6 +21,7 @@ export function OrbitalScene({ onPointerMissed }: OrbitalSceneProps) {
   const navStack = useCockpitStore((s) => s.navStack);
   const drillInto = useCockpitStore((s) => s.drillInto);
   const openPreview = useCockpitStore((s) => s.openPreview);
+  const setOrbContextMenu = useCockpitStore((s) => s.setOrbContextMenu);
   const { rootNodes, getNode, loadChildren } = useOrbData();
 
   const depth = navStack.length;
@@ -115,11 +117,38 @@ export function OrbitalScene({ onPointerMissed }: OrbitalSceneProps) {
     });
   };
 
+  const handleOrbContextMenu = useCallback(
+    (node: OrbNode, event: ThreeEvent<MouseEvent>) => {
+      setOrbContextMenu({
+        x: event.nativeEvent.clientX,
+        y: event.nativeEvent.clientY,
+        node,
+        depth,
+      });
+    },
+    [setOrbContextMenu, depth],
+  );
+
+  const handleEmptyContextMenu = useCallback(
+    (event: ThreeEvent<MouseEvent>) => {
+      setOrbContextMenu({
+        x: event.nativeEvent.clientX,
+        y: event.nativeEvent.clientY,
+        node: null,
+        depth,
+      });
+    },
+    [setOrbContextMenu, depth],
+  );
+
   // Determine the orb radius based on depth
   const orbRadius = depth === 0 ? 1.5 : 1.2;
 
   return (
-    <group onPointerMissed={onPointerMissed}>
+    <group
+      onPointerMissed={onPointerMissed}
+      onContextMenu={handleEmptyContextMenu}
+    >
       {/* Visible orb clusters */}
       {visibleNodes.map((node, i) => (
         <OrbCluster
@@ -131,6 +160,7 @@ export function OrbitalScene({ onPointerMissed }: OrbitalSceneProps) {
           isBackground={false}
           onDrillIn={handleDrillIn}
           onLeafClick={handleLeafClick}
+          onContextMenu={handleOrbContextMenu}
           phaseOffset={i * 1.2}
         />
       ))}

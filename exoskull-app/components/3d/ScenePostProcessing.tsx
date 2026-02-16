@@ -28,7 +28,7 @@ export function ScenePostProcessing() {
     // Bloom pulse
     if (bloomRef.current) {
       bloomRef.current.intensity =
-        1.4 + Math.sin(clock.elapsedTime * 0.5) * 0.15;
+        1.6 + Math.sin(clock.elapsedTime * 0.5) * 0.15;
     }
 
     // FPS check every 2 seconds
@@ -48,14 +48,14 @@ export function ScenePostProcessing() {
     <EffectComposer>
       <Bloom
         ref={bloomRef}
-        intensity={1.4}
+        intensity={1.6}
         luminanceThreshold={0.15}
         luminanceSmoothing={0.5}
         mipmapBlur
       />
       <Vignette
         offset={0.3}
-        darkness={0.7}
+        darkness={0.4}
         blendFunction={BlendFunction.NORMAL}
       />
       <ChromaticAberration

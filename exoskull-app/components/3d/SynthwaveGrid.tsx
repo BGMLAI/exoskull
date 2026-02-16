@@ -22,13 +22,13 @@ export function SynthwaveGrid() {
       {/* Major grid (cyan) */}
       <gridHelper
         args={[200, 40, 0x00d4ff, 0x00d4ff]}
-        material-opacity={0.12}
+        material-opacity={0.2}
         material-transparent={true}
       />
       {/* Minor grid (purple) */}
       <gridHelper
         args={[200, 200, 0x8b5cf6, 0x8b5cf6]}
-        material-opacity={0.04}
+        material-opacity={0.08}
         material-transparent={true}
       />
       {/* Horizon glow */}
@@ -37,7 +37,7 @@ export function SynthwaveGrid() {
         <meshBasicMaterial
           color={0xa855f7}
           transparent
-          opacity={0.06}
+          opacity={0.12}
           side={THREE.DoubleSide}
         />
       </mesh>

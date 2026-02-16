@@ -1,9 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useCockpitStore } from "@/lib/stores/useCockpitStore";
 import { HUDPanel } from "./HUDPanel";
+import { OrbFormDialog } from "./OrbFormDialog";
+import { useOrbData } from "@/lib/hooks/useOrbData";
 import type { DataItem } from "@/lib/cockpit/normalize-response";
 import type { PreviewTarget } from "@/lib/stores/useCockpitStore";
+import type { OrbNodeType } from "@/lib/types/orb-types";
 import { relativeTime } from "@/lib/cockpit/utils";
 
 /**
@@ -15,8 +19,64 @@ export function LeftWing() {
   const isVisible = (id: string) =>
     sections.find((s) => s.id === id)?.visible !== false;
 
+  const { addNode } = useOrbData();
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [addNodeType, setAddNodeType] = useState<OrbNodeType>("value");
+
   return (
     <div className="hud-wing" style={{ height: "100%" }}>
+      {/* Section header with add button */}
+      <div
+        className="flex items-center justify-between px-3 py-2"
+        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <span
+          style={{
+            color: "rgba(255,255,255,0.5)",
+            fontSize: "10px",
+            fontWeight: 600,
+            letterSpacing: "0.1em",
+            fontFamily: "monospace",
+            textTransform: "uppercase",
+          }}
+        >
+          Wartości
+        </span>
+        <button
+          onClick={() => {
+            setAddNodeType("value");
+            setShowAddDialog(true);
+          }}
+          title="Dodaj nową wartość"
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: 4,
+            border: "1px solid rgba(6, 182, 212, 0.25)",
+            background: "rgba(6, 182, 212, 0.08)",
+            color: "rgba(6, 182, 212, 0.7)",
+            fontSize: "14px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(6, 182, 212, 0.15)";
+            e.currentTarget.style.borderColor = "rgba(6, 182, 212, 0.4)";
+            e.currentTarget.style.color = "rgba(6, 182, 212, 1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(6, 182, 212, 0.08)";
+            e.currentTarget.style.borderColor = "rgba(6, 182, 212, 0.25)";
+            e.currentTarget.style.color = "rgba(6, 182, 212, 0.7)";
+          }}
+        >
+          +
+        </button>
+      </div>
+
       {isVisible("tasks") && (
         <HUDPanel
           panelId="tasks"
@@ -49,6 +109,17 @@ export function LeftWing() {
           renderItem={renderEmailItem}
         />
       )}
+
+      <OrbFormDialog
+        open={showAddDialog}
+        onClose={() => setShowAddDialog(false)}
+        mode="create"
+        nodeType={addNodeType}
+        onSubmit={async (data) => {
+          const success = await addNode(null, addNodeType, data);
+          return success;
+        }}
+      />
     </div>
   );
 }

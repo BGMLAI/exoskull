@@ -7,3 +7,5 @@ export { LeftWing } from "./LeftWing";
 export { RightWing } from "./RightWing";
 export { CenterViewport } from "./CenterViewport";
 export { PreviewPane } from "./PreviewPane";
+export { OrbFormDialog } from "./OrbFormDialog";
+export { OrbDeleteConfirm } from "./OrbDeleteConfirm";

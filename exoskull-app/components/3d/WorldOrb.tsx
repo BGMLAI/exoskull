@@ -72,7 +72,7 @@ export function WorldOrb({ world, phaseOffset, onClick }: WorldOrbProps) {
         <meshStandardMaterial
           color={colorNum}
           emissive={colorNum}
-          emissiveIntensity={hovered ? 1.0 : 0.6}
+          emissiveIntensity={hovered ? 1.2 : 0.8}
           metalness={0.3}
           roughness={0.4}
         />
@@ -85,7 +85,7 @@ export function WorldOrb({ world, phaseOffset, onClick }: WorldOrbProps) {
           <meshBasicMaterial
             color={colorNum}
             transparent
-            opacity={hovered ? 0.18 : 0.08}
+            opacity={hovered ? 0.24 : 0.14}
             side={THREE.BackSide}
           />
         </mesh>
@@ -93,7 +93,7 @@ export function WorldOrb({ world, phaseOffset, onClick }: WorldOrbProps) {
         {/* Point light */}
         <pointLight
           color={colorNum}
-          intensity={hovered ? 1.2 : 0.6}
+          intensity={hovered ? 1.6 : 1.0}
           distance={15}
         />
 

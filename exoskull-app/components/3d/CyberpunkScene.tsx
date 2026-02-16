@@ -6,7 +6,7 @@ import { Suspense, useState, useEffect } from "react";
 const CyberpunkSceneInner = dynamic(() => import("./CyberpunkSceneInner"), {
   ssr: false,
   loading: () => (
-    <div className="fixed inset-0 z-0" style={{ background: "#050510" }} />
+    <div className="fixed inset-0 z-0" style={{ background: "#0a0a1c" }} />
   ),
 });
 
@@ -31,7 +31,7 @@ function StaticBackground() {
       className="fixed inset-0 z-0"
       style={{
         background:
-          "radial-gradient(ellipse at 50% 120%, #1a0a2e 0%, #050510 60%, #050510 100%)",
+          "radial-gradient(ellipse at 50% 120%, #1a0a2e 0%, #0a0a1c 60%, #0a0a1c 100%)",
       }}
     >
       {/* Simple CSS star field */}
@@ -82,7 +82,7 @@ export function CyberpunkScene({ className }: CyberpunkSceneProps) {
   // Still checking — show loading background
   if (canRender3D === null) {
     return (
-      <div className="fixed inset-0 z-0" style={{ background: "#050510" }} />
+      <div className="fixed inset-0 z-0" style={{ background: "#0a0a1c" }} />
     );
   }
 
@@ -94,7 +94,7 @@ export function CyberpunkScene({ className }: CyberpunkSceneProps) {
   return (
     <Suspense
       fallback={
-        <div className="fixed inset-0 z-0" style={{ background: "#050510" }} />
+        <div className="fixed inset-0 z-0" style={{ background: "#0a0a1c" }} />
       }
     >
       <CyberpunkSceneInner className={className} />

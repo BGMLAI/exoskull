@@ -7,13 +7,13 @@
 
 /* ── Cockpit CSS Variables ── */
 .cockpit-hud {
-  --hud-bg: rgba(5, 5, 16, 0.75);
+  --hud-bg: rgba(10, 10, 28, 0.8);
   --hud-bg-solid: rgba(5, 5, 16, 0.92);
-  --hud-border: rgba(255, 255, 255, 0.06);
+  --hud-border: rgba(255, 255, 255, 0.1);
   --hud-border-hover: rgba(255, 255, 255, 0.12);
   --hud-text: rgba(255, 255, 255, 0.85);
-  --hud-text-dim: rgba(255, 255, 255, 0.45);
-  --hud-text-muted: rgba(255, 255, 255, 0.25);
+  --hud-text-dim: rgba(255, 255, 255, 0.55);
+  --hud-text-muted: rgba(255, 255, 255, 0.35);
   --hud-cyan: #06b6d4;
   --hud-purple: #8b5cf6;
   --hud-amber: #f59e0b;
