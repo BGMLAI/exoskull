@@ -4,6 +4,31 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-16] Feature: Orb System — Live API, Animations, Performance
+
+### What
+Connected the recursive orb system to real database data. Orbs now show actual values, loops, quests, missions, and challenges from the Tyrolka hierarchy. Added smooth drill-in animations and performance caps.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **Real API data** | `useOrbData` fetches from `/api/canvas/data/values?deep=true` on mount, transforms full hierarchy into OrbNode tree |
+| **Lazy ops** | New `/api/canvas/data/ops` endpoint — ops loaded on-demand when drilling into challenges |
+| **Demo fallback** | DEMO_WORLDS renders instantly while API loads; persists if user is unauthenticated |
+| **Moon freeze** | Focused moons stop orbiting and position in a static circle (lerp transition) for easy clicking |
+| **Staggered fade-in** | Children appear one-by-one with 0.15s delay per moon |
+| **Performance cap** | Max 15 children per cluster with "+N more" indicator; LOD sphere segments (16 focused, 8 background) |
+| **Refresh** | `useOrbData().refresh()` for re-fetching after data mutations |
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `lib/hooks/useOrbData.ts` | Rewrote: API fetch, transform, lazy ops, demo fallback |
+| `components/3d/OrbCluster.tsx` | Moon freeze, staggered fade, 15-child cap, LOD |
+| `app/api/canvas/data/ops/route.ts` | NEW — ops by challengeId/questId |
+
+---
+
 ## [2026-02-16] Architecture: Claude Agent SDK — Sole AI Pipeline
 
 ### What
