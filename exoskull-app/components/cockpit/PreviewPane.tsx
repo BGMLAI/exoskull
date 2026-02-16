@@ -344,9 +344,34 @@ function ActivityPreview({ data }: { data?: Record<string, unknown> }) {
 function ValuePreview({ data }: { data?: Record<string, unknown> }) {
   if (!data) return <EmptyPreview />;
   const loops = Array.isArray(data.loops) ? data.loops : [];
+  const imageUrl = data.imageUrl as string | undefined;
+  const nodeType = data.nodeType as string | undefined;
+  const progress = data.progress as number | undefined;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      <FieldRow label="Wartość" value={String(data.name || "—")} />
+      {/* Image banner */}
+      {imageUrl && (
+        <div style={{ marginBottom: 8 }}>
+          <img
+            src={imageUrl}
+            alt=""
+            style={{
+              width: "100%",
+              height: 120,
+              objectFit: "cover",
+              borderRadius: 6,
+              border: "1px solid var(--hud-border)",
+            }}
+          />
+        </div>
+      )}
+
+      {nodeType && <FieldRow label="Typ" value={nodeType.toUpperCase()} />}
+      <FieldRow
+        label="Status"
+        value={data.status ? String(data.status) : undefined}
+      />
       <FieldRow
         label="Opis"
         value={data.description ? String(data.description) : undefined}
@@ -355,6 +380,52 @@ function ValuePreview({ data }: { data?: Record<string, unknown> }) {
         label="Priorytet"
         value={data.priority ? String(data.priority) : undefined}
       />
+      <FieldRow
+        label="Termin"
+        value={
+          data.dueDate
+            ? new Date(data.dueDate as string).toLocaleDateString("pl-PL")
+            : undefined
+        }
+      />
+
+      {/* Progress bar */}
+      {progress !== undefined && progress > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 10,
+              color: "var(--hud-text-muted)",
+              marginBottom: 4,
+            }}
+          >
+            <span>POSTĘP</span>
+            <span>{progress}%</span>
+          </div>
+          <div
+            style={{
+              width: "100%",
+              height: 6,
+              background: "rgba(255,255,255,0.06)",
+              borderRadius: 3,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${progress}%`,
+                height: "100%",
+                background: "var(--hud-cyan, #06b6d4)",
+                borderRadius: 3,
+                transition: "width 0.3s",
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {loops.length > 0 && (
         <div style={{ marginTop: 12 }}>
           <span
@@ -384,7 +455,49 @@ function ValuePreview({ data }: { data?: Record<string, unknown> }) {
           ))}
         </div>
       )}
+
+      {/* Action buttons */}
+      <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <ActionButton label="Czatuj o tym" color="#06b6d4" />
+        <ActionButton label="Dodaj zadanie" color="#3b82f6" />
+        <ActionButton label="Edytuj" color="#8b5cf6" />
+      </div>
     </div>
+  );
+}
+
+function ActionButton({ label, color }: { label: string; color: string }) {
+  return (
+    <button
+      onClick={() => {
+        const store = useCockpitStore.getState();
+        store.closePreview();
+        // Return to chat — user can type about the topic
+      }}
+      style={{
+        background: `${color}15`,
+        border: `1px solid ${color}40`,
+        borderRadius: 4,
+        color: color,
+        cursor: "pointer",
+        padding: "6px 12px",
+        fontSize: 11,
+        fontFamily: "monospace",
+        fontWeight: 600,
+        letterSpacing: "0.03em",
+        transition: "all 0.15s",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = `${color}25`;
+        e.currentTarget.style.borderColor = color;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = `${color}15`;
+        e.currentTarget.style.borderColor = `${color}40`;
+      }}
+    >
+      {label}
+    </button>
   );
 }
 

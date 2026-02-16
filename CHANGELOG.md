@@ -4,6 +4,77 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-16] Architecture: Claude Agent SDK — Sole AI Pipeline
+
+### What
+Migrated ALL 8 call sites from legacy `processUserMessage()` to `runExoSkullAgent()` (Claude Agent SDK). The Agent SDK is now the ONLY AI processing path for every channel — web, voice, SMS, Telegram, Slack, Discord, WhatsApp, Signal, iMessage, email, and async tasks.
+
+### Architecture
+- **Agent SDK** (`lib/agent-sdk/exoskull-agent.ts`): Single `runExoSkullAgent()` function handles all channels
+- **IORS MCP Server** (`lib/agent-sdk/iors-mcp-server.ts`): 101 IORS tools wrapped as in-process MCP server (zero network overhead)
+- **Channel-aware tool filtering** (`lib/iors/tools/channel-filters.ts`): Voice ~18 tools, Web ~37 tools, Async all tools
+- **3 configs**: WEB (10 turns, Sonnet), VOICE (6 turns, Haiku), ASYNC (15 turns, Sonnet)
+- **Emergency Gemini fallback**: If Claude SDK fails completely, falls back to Gemini Flash (no tools, conversation only)
+- **Gateway**: Always uses Agent SDK, no feature flag (`AGENT_SDK_ENABLED` removed)
+
+### Deprecated (kept for reference)
+- `processUserMessage()` in `conversation-handler.ts` — marked `@deprecated`
+- `agent-loop.ts` — entire file marked `@deprecated`
+- Legacy multi-model routing (Gemini → Anthropic → OpenAI fallback chain) — Agent SDK handles retries internally
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `lib/iors/tools/channel-filters.ts` | NEW — extracted tool filter sets |
+| `lib/agent-sdk/iors-mcp-server.ts` | Added `toolFilter` parameter |
+| `lib/agent-sdk/exoskull-agent.ts` | Extended all channels, async config, Gemini fallback |
+| `lib/agent-sdk/index.ts` | Export `AgentChannel` type |
+| `lib/gateway/gateway.ts` | Removed feature flag, Agent SDK is sole path |
+| `server/voice-ws.ts` | Uses `runExoSkullAgent` for ConversationRelay |
+| `app/api/cron/async-tasks/route.ts` | Uses `runExoSkullAgent` with `isAsync: true` |
+| `lib/conductor/workers/async-task-worker.ts` | Uses `runExoSkullAgent` with `isAsync: true` |
+| `lib/iors/birth-flow.ts` | Uses `runExoSkullAgent` with birth prompt prefix |
+| `app/api/onboarding/birth-chat/route.ts` | Uses `runExoSkullAgent` |
+| `app/api/twilio/voice/route.ts` | Uses `runExoSkullAgent` for legacy Gather |
+| `app/api/voice/chat/route.ts` | Uses `runExoSkullAgent` for web speech widget |
+| `lib/voice/index.ts` | Removed `processUserMessage` from exports |
+| `.env.example` | Removed `AGENT_SDK_ENABLED` |
+
+---
+
+## [2026-02-16] Feature: Recursive Orb System (Infinite Zoom)
+
+### What
+Recursive drill-in navigation for the 3D orbital scene. Click any orb to zoom in — its moons become full-sized orbs with their own moons. Works at any depth (value > loop > quest > mission > challenge > op). Click empty space or ESC to zoom back out.
+
+### Architecture
+- `navStack` state machine in Zustand (generic, not hardcoded levels)
+- Single `OrbCluster` component for all hierarchy levels
+- `useOrbData` hook with lazy-loading (demo children now, API-ready)
+- Camera controller with lerp-based zoom per depth
+- NavBreadcrumb in TopBar for navigation awareness
+- ChannelOrbs now clickable (open preview)
+
+### New Files
+| File | Purpose |
+|------|---------|
+| `lib/types/orb-types.ts` | OrbNode interface, NavStackEntry, hierarchy helpers |
+| `lib/3d/orb-positions.ts` | Child position generation (circle distribution) |
+| `lib/hooks/useOrbData.ts` | Recursive OrbNode data hook with lazy-loading |
+| `components/3d/OrbCluster.tsx` | Recursive orb + moons + connections |
+| `components/cockpit/NavBreadcrumb.tsx` | Drill-in breadcrumb |
+
+### Modified Files
+| File | Change |
+|------|--------|
+| `lib/stores/useCockpitStore.ts` | navStack + drillInto/navigateBack/navigateTo/resetNav |
+| `components/3d/CyberpunkSceneInner.tsx` | Camera zoom per depth, ESC handler, pointer miss → back |
+| `components/3d/OrbitalScene.tsx` | OrbCluster rendering, depth-aware composition |
+| `components/cockpit/ChannelOrbs.tsx` | onClick → openPreview |
+| `components/cockpit/CockpitTopBar.tsx` | NavBreadcrumb integration |
+
+---
+
 ## [2026-02-15] Fix: CRON Reliability — Gold-ETL Bypass + Monthly Summary Async
 
 ### Problems

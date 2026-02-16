@@ -442,4 +442,5 @@ export type SSEEventType =
   | "code_block"
   | "media_content"
   | "tool_execution"
-  | "ingestion_report";
+  | "ingestion_report"
+  | "cockpit_update";

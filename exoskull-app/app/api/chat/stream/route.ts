@@ -144,6 +144,12 @@ export async function POST(request: NextRequest) {
                 ),
               );
             },
+            // Custom SSE events from tools (e.g. cockpit_update)
+            onCustomEvent: (event) => {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
+              );
+            },
           };
 
           // Process through full pipeline (70+ tools, memory, emotion detection)

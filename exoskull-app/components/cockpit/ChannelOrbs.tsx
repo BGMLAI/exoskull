@@ -1,6 +1,7 @@
 "use client";
 
 import { Mail, MessageCircle, Hash, Phone } from "lucide-react";
+import { useCockpitStore } from "@/lib/stores/useCockpitStore";
 
 interface ChannelOrb {
   id: string;
@@ -31,6 +32,8 @@ const CHANNELS: ChannelOrb[] = [
  * Each orb represents a communication channel with a glow ring.
  */
 export function ChannelOrbs() {
+  const openPreview = useCockpitStore((s) => s.openPreview);
+
   return (
     <div
       style={{
@@ -60,6 +63,14 @@ export function ChannelOrbs() {
             cursor: "pointer",
             transition: "all 0.2s",
             animation: `hudPanelSlideIn 0.3s ease-out ${i * 50}ms both`,
+          }}
+          onClick={() => {
+            openPreview({
+              type: "activity",
+              id: ch.id,
+              title: ch.label,
+              data: { channel: ch.id },
+            });
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.boxShadow = `0 0 12px ${ch.color}40`;

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSceneStore } from "@/lib/stores/useSceneStore";
+import { NavBreadcrumb } from "./NavBreadcrumb";
 
 /**
  * CockpitTopBar — Status bar at the top of the cockpit HUD.
@@ -58,19 +59,22 @@ export function CockpitTopBar() {
         <span style={{ color: "var(--hud-text-muted)" }}>EXOSKULL</span>
       </div>
 
-      {/* Center: IORS Status */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span
-          className={`hud-indicator-pulse ${statusClass}`}
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: "50%",
-            background: "currentColor",
-            display: "inline-block",
-          }}
-        />
-        <span className={statusClass}>{statusLabel}</span>
+      {/* Center: Nav breadcrumb or IORS Status */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <NavBreadcrumb />
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            className={`hud-indicator-pulse ${statusClass}`}
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: "currentColor",
+              display: "inline-block",
+            }}
+          />
+          <span className={statusClass}>{statusLabel}</span>
+        </div>
       </div>
 
       {/* Right: Active tool */}

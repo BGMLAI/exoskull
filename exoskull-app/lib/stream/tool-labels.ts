@@ -45,8 +45,9 @@ const TOOL_LABELS: Record<string, string> = {
   install_mod: "Instaluję moduł...",
   create_mod: "Tworzę moduł...",
 
-  // Canvas
+  // Canvas & Dashboard
   manage_canvas: "Aktualizuję dashboard...",
+  modify_dashboard: "Modyfikuję dashboard...",
 
   // Integrations
   composio_connect: "Łączę integrację...",

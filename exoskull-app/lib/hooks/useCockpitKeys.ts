@@ -31,6 +31,16 @@ export function useCockpitKeys() {
         return;
       }
 
+      // Tab → toggle HUD minimize (only when not in input/textarea)
+      if (e.key === "Tab" && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag !== "INPUT" && tag !== "TEXTAREA") {
+          e.preventDefault();
+          store.toggleHudMinimized();
+          return;
+        }
+      }
+
       // Ctrl+1-6 → toggle panel visibility
       if (e.ctrlKey && !e.altKey && !e.shiftKey) {
         const num = parseInt(e.key, 10);

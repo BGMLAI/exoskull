@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { NavStackEntry } from "@/lib/types/orb-types";
 
 export interface CockpitSection {
   id: string;
@@ -17,6 +18,8 @@ export interface PreviewTarget {
 interface CockpitState {
   /** Currently selected world (clicked orb) */
   selectedWorldId: string | null;
+  /** Navigation stack for recursive orb drill-in */
+  navStack: NavStackEntry[];
   /** Cockpit sections visibility/expand state */
   sections: CockpitSection[];
   /** Left wing column width in px */
@@ -29,9 +32,19 @@ interface CockpitState {
   previewTarget: PreviewTarget | null;
   /** Set of collapsed panel IDs */
   collapsedPanels: Set<string>;
+  /** Whether the HUD overlay is minimized (lets 3D scene through) */
+  hudMinimized: boolean;
 
   // Actions
   selectWorld: (id: string | null) => void;
+  /** Push a node onto the nav stack (drill in) */
+  drillInto: (node: NavStackEntry) => void;
+  /** Pop one level from nav stack (zoom out) */
+  navigateBack: () => void;
+  /** Pop to specific depth (for breadcrumb clicks) */
+  navigateTo: (depth: number) => void;
+  /** Clear nav stack → overview */
+  resetNav: () => void;
   toggleSection: (id: string) => void;
   showSection: (id: string) => void;
   hideSection: (id: string) => void;
@@ -43,6 +56,7 @@ interface CockpitState {
   togglePanelCollapse: (panelId: string) => void;
   openPreview: (target: PreviewTarget) => void;
   closePreview: () => void;
+  toggleHudMinimized: () => void;
 }
 
 const DEFAULT_SECTIONS: CockpitSection[] = [
@@ -73,14 +87,43 @@ function getPersistedWidth(key: string, fallback: number): number {
 
 export const useCockpitStore = create<CockpitState>((set) => ({
   selectedWorldId: null,
+  navStack: [],
   sections: DEFAULT_SECTIONS,
   leftWingWidth: getPersistedWidth("cockpit-left-w", 260),
   rightWingWidth: getPersistedWidth("cockpit-right-w", 260),
   centerMode: "chat",
   previewTarget: null,
   collapsedPanels: new Set<string>(),
+  hudMinimized: false,
 
   selectWorld: (id) => set({ selectedWorldId: id }),
+
+  drillInto: (node) =>
+    set((s) => ({
+      navStack: [...s.navStack, node],
+      selectedWorldId: node.id,
+    })),
+
+  navigateBack: () =>
+    set((s) => {
+      if (s.navStack.length === 0) return s;
+      const next = s.navStack.slice(0, -1);
+      return {
+        navStack: next,
+        selectedWorldId: next.length > 0 ? next[next.length - 1].id : null,
+      };
+    }),
+
+  navigateTo: (depth) =>
+    set((s) => {
+      const next = s.navStack.slice(0, depth);
+      return {
+        navStack: next,
+        selectedWorldId: next.length > 0 ? next[next.length - 1].id : null,
+      };
+    }),
+
+  resetNav: () => set({ navStack: [], selectedWorldId: null }),
 
   toggleSection: (id) =>
     set((s) => ({
@@ -139,4 +182,6 @@ export const useCockpitStore = create<CockpitState>((set) => ({
     set({ centerMode: "preview", previewTarget: target }),
 
   closePreview: () => set({ centerMode: "chat", previewTarget: null }),
+
+  toggleHudMinimized: () => set((s) => ({ hudMinimized: !s.hudMinimized })),
 }));

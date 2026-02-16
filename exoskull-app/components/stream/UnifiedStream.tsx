@@ -9,6 +9,9 @@ import { ThreadBranch, ThreadSidebar } from "./ThreadBranch";
 import { Loader2, X, Reply, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useSceneStore } from "@/lib/stores/useSceneStore";
+import { useSpatialChatStore } from "@/lib/stores/useSpatialChatStore";
+import { useCockpitStore } from "@/lib/stores/useCockpitStore";
 import type {
   StreamEvent,
   AIMessageData,
@@ -49,6 +52,7 @@ const THIRD_PARTY_TOOL_MAP: Record<
 
 interface UnifiedStreamProps {
   className?: string;
+  spatialMode?: boolean;
   ttsEnabled?: boolean;
   onToggleTTS?: () => void;
 }
@@ -59,6 +63,7 @@ interface UnifiedStreamProps {
 
 export function UnifiedStream({
   className,
+  spatialMode,
   ttsEnabled: ttsEnabledProp,
   onToggleTTS: onToggleTTSProp,
 }: UnifiedStreamProps) {
@@ -79,6 +84,9 @@ export function UnifiedStream({
     setReplyTo,
     setActiveThread,
   } = useStreamState();
+
+  const pushSpatialMessage = useSpatialChatStore((s) => s.pushMessage);
+  const updateSpatialMessage = useSpatialChatStore((s) => s.updateMessage);
 
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
@@ -410,6 +418,14 @@ export function UnifiedStream({
       };
       addEvent(userEvent);
 
+      // Push to spatial chat store (3D bubbles)
+      pushSpatialMessage({
+        id: userEvent.id,
+        role: "user",
+        content: text.trim(),
+        timestamp: new Date(),
+      });
+
       // 2. Add empty AI message event
       const aiEventId = `ai-${Date.now()}`;
       const aiEvent: StreamEvent = {
@@ -422,7 +438,15 @@ export function UnifiedStream({
         } as AIMessageData,
       };
       addEvent(aiEvent);
+      pushSpatialMessage({
+        id: aiEventId,
+        role: "ai",
+        content: "",
+        timestamp: new Date(),
+        isStreaming: true,
+      });
       setLoading(true);
+      useSceneStore.getState().setEffect("thinking");
 
       try {
         const res = await fetch("/api/chat/stream", {
@@ -457,6 +481,7 @@ export function UnifiedStream({
         if (!reader) throw new Error("No response body");
 
         let buffer = "";
+        let spatialAccumulated = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -480,10 +505,14 @@ export function UnifiedStream({
 
                 case "delta":
                   updateAIMessage(aiEventId, data.text);
+                  spatialAccumulated += data.text;
+                  updateSpatialMessage(aiEventId, spatialAccumulated, true);
                   break;
 
                 case "done":
                   finalizeAIMessage(aiEventId, data.fullText, data.toolsUsed);
+                  updateSpatialMessage(aiEventId, data.fullText, false);
+                  useSceneStore.getState().setEffect("idle");
                   speakText(data.fullText);
                   break;
 
@@ -587,6 +616,9 @@ export function UnifiedStream({
                 }
 
                 case "tool_start": {
+                  // Notify 3D scene of tool execution
+                  useSceneStore.getState().startTool(data.tool);
+
                   // Fold tool into thinking event (grouped process view)
                   const tsThinkingId = `thinking-${aiEventId}`;
                   const tsExisting = state.events.find(
@@ -624,6 +656,9 @@ export function UnifiedStream({
                 }
 
                 case "tool_end": {
+                  // Notify 3D scene that tool finished
+                  useSceneStore.getState().endTool();
+
                   // Update tool in thinking event
                   const teThinkingId = `thinking-${aiEventId}`;
                   const teExisting = state.events.find(
@@ -746,6 +781,18 @@ export function UnifiedStream({
                   break;
                 }
 
+                case "cockpit_update": {
+                  const cmd = data as { action: string; panel_id: string };
+                  const cockpitStore = useCockpitStore.getState();
+                  if (cmd.action === "show_panel")
+                    cockpitStore.showSection(cmd.panel_id);
+                  if (cmd.action === "hide_panel")
+                    cockpitStore.hideSection(cmd.panel_id);
+                  if (cmd.action === "expand_panel")
+                    cockpitStore.toggleSection(cmd.panel_id);
+                  break;
+                }
+
                 case "error":
                   finalizeAIMessage(
                     aiEventId,
@@ -786,6 +833,8 @@ export function UnifiedStream({
       setConversationId,
       setReplyTo,
       speakText,
+      pushSpatialMessage,
+      updateSpatialMessage,
     ],
   );
 
@@ -971,134 +1020,139 @@ export function UnifiedStream({
         </div>
       )}
 
-      {/* Main content area (stream + optional thread sidebar) */}
-      <div className="flex flex-1 min-h-0">
-        {/* Stream area */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <div
-            ref={scrollRef}
-            onScroll={handleScroll}
-            className="flex-1 overflow-y-auto px-4 py-3 space-y-2"
-          >
-            {!historyLoaded && (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
-              </div>
-            )}
-
-            {historyLoaded && state.events.length === 0 && !state.isLoading && (
-              <EmptyState onQuickAction={(text) => sendMessage(text, "text")} />
-            )}
-
-            {state.events.map((event, idx) => {
-              // Skip events that are inline replies (they're shown via ThreadBranch)
-              // But still render them if thread sidebar is not active
-              const isReplyEvent = !!event.replyTo;
-
-              // Time separator: show when gap > 1 hour between events
-              let timeSeparator: React.ReactNode = null;
-              if (idx > 0 && !isReplyEvent) {
-                const prev = state.events[idx - 1];
-                const gap =
-                  event.timestamp.getTime() - prev.timestamp.getTime();
-                if (gap > 60 * 60 * 1000) {
-                  const now = new Date();
-                  const isToday =
-                    event.timestamp.toDateString() === now.toDateString();
-                  const isYesterday =
-                    event.timestamp.toDateString() ===
-                    new Date(now.getTime() - 86400000).toDateString();
-                  const label = isToday
-                    ? `Dzisiaj, ${event.timestamp.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}`
-                    : isYesterday
-                      ? `Wczoraj, ${event.timestamp.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}`
-                      : event.timestamp.toLocaleDateString("pl-PL", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        });
-                  timeSeparator = (
-                    <div className="flex items-center gap-3 py-2">
-                      <div className="flex-1 h-px bg-border" />
-                      <span className="text-[10px] text-muted-foreground/60">
-                        {label}
-                      </span>
-                      <div className="flex-1 h-px bg-border" />
-                    </div>
-                  );
-                }
-              }
-
-              // Get replies for this event
-              const replies = threadMap.get(event.id) || [];
-
-              return (
-                <div key={event.id}>
-                  {timeSeparator}
-                  <StreamEventRouter event={event} onReply={handleReply} />
-                  {/* Thread branch indicator (inline expandable) */}
-                  {replies.length > 0 && (
-                    <ThreadBranch
-                      parentEvent={event}
-                      replies={replies}
-                      onReply={handleReply}
-                    />
-                  )}
+      {!spatialMode && (
+        <div className="flex flex-1 min-h-0">
+          {/* Stream area */}
+          <div className="flex-1 flex flex-col min-w-0">
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              className="flex-1 overflow-y-auto px-4 py-3 space-y-2"
+            >
+              {!historyLoaded && (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
                 </div>
-              );
-            })}
+              )}
+
+              {historyLoaded &&
+                state.events.length === 0 &&
+                !state.isLoading && (
+                  <EmptyState
+                    onQuickAction={(text) => sendMessage(text, "text")}
+                  />
+                )}
+
+              {state.events.map((event, idx) => {
+                // Skip events that are inline replies (they're shown via ThreadBranch)
+                // But still render them if thread sidebar is not active
+                const isReplyEvent = !!event.replyTo;
+
+                // Time separator: show when gap > 1 hour between events
+                let timeSeparator: React.ReactNode = null;
+                if (idx > 0 && !isReplyEvent) {
+                  const prev = state.events[idx - 1];
+                  const gap =
+                    event.timestamp.getTime() - prev.timestamp.getTime();
+                  if (gap > 60 * 60 * 1000) {
+                    const now = new Date();
+                    const isToday =
+                      event.timestamp.toDateString() === now.toDateString();
+                    const isYesterday =
+                      event.timestamp.toDateString() ===
+                      new Date(now.getTime() - 86400000).toDateString();
+                    const label = isToday
+                      ? `Dzisiaj, ${event.timestamp.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}`
+                      : isYesterday
+                        ? `Wczoraj, ${event.timestamp.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}`
+                        : event.timestamp.toLocaleDateString("pl-PL", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          });
+                    timeSeparator = (
+                      <div className="flex items-center gap-3 py-2">
+                        <div className="flex-1 h-px bg-border" />
+                        <span className="text-[10px] text-muted-foreground/60">
+                          {label}
+                        </span>
+                        <div className="flex-1 h-px bg-border" />
+                      </div>
+                    );
+                  }
+                }
+
+                // Get replies for this event
+                const replies = threadMap.get(event.id) || [];
+
+                return (
+                  <div key={event.id}>
+                    {timeSeparator}
+                    <StreamEventRouter event={event} onReply={handleReply} />
+                    {/* Thread branch indicator (inline expandable) */}
+                    {replies.length > 0 && (
+                      <ThreadBranch
+                        parentEvent={event}
+                        replies={replies}
+                        onReply={handleReply}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Reply-to preview strip */}
-          {state.replyTo && (
-            <div className="flex items-center gap-2 px-4 py-2 border-t bg-muted/30">
-              <Reply className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <span className="text-[10px] font-medium text-primary">
-                  {state.replyTo.senderRole === "user"
-                    ? "Ty"
-                    : state.replyTo.senderRole === "ai"
-                      ? "ExoSkull"
-                      : "System"}
-                </span>
-                <p className="text-xs text-muted-foreground truncate">
-                  {state.replyTo.preview}
-                </p>
-              </div>
-              <button
-                onClick={() => setReplyTo(null)}
-                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
+          {/* Thread sidebar (Slack-like, slides in when active) */}
+          {activeThreadEvent && (
+            <ThreadSidebar
+              parentEvent={activeThreadEvent}
+              replies={activeThreadReplies}
+              onClose={() => setActiveThread(null)}
+              onReply={handleReply}
+            />
           )}
-
-          {/* Input bar */}
-          <VoiceInputBar
-            onSendText={(text) => sendMessage(text, "text")}
-            onSendVoice={(transcript) =>
-              sendMessage(transcript, "voice_transcript")
-            }
-            onFileUpload={handleFileUpload}
-            isLoading={state.isLoading}
-            ttsEnabled={ttsEnabled}
-            isSpeaking={isSpeaking}
-            onToggleTTS={toggleTTS}
-          />
         </div>
+      )}
 
-        {/* Thread sidebar (Slack-like, slides in when active) */}
-        {activeThreadEvent && (
-          <ThreadSidebar
-            parentEvent={activeThreadEvent}
-            replies={activeThreadReplies}
-            onClose={() => setActiveThread(null)}
-            onReply={handleReply}
-          />
-        )}
-      </div>
+      {/* Reply-to preview strip — always visible */}
+      {state.replyTo && (
+        <div className="flex items-center gap-2 px-4 py-2 border-t bg-muted/30">
+          <Reply className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="text-[10px] font-medium text-primary">
+              {state.replyTo.senderRole === "user"
+                ? "Ty"
+                : state.replyTo.senderRole === "ai"
+                  ? "ExoSkull"
+                  : "System"}
+            </span>
+            <p className="text-xs text-muted-foreground truncate">
+              {state.replyTo.preview}
+            </p>
+          </div>
+          <button
+            onClick={() => setReplyTo(null)}
+            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Input bar — always visible */}
+      <VoiceInputBar
+        onSendText={(text) => sendMessage(text, "text")}
+        onSendVoice={(transcript) =>
+          sendMessage(transcript, "voice_transcript")
+        }
+        onFileUpload={handleFileUpload}
+        isLoading={state.isLoading}
+        ttsEnabled={ttsEnabled}
+        isSpeaking={isSpeaking}
+        onToggleTTS={toggleTTS}
+      />
     </div>
   );
 }

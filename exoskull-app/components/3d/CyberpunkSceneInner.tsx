@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useMemo } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { useRef, useMemo, useEffect } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { SynthwaveGrid } from "./SynthwaveGrid";
@@ -11,13 +11,94 @@ import { ScenePostProcessing } from "./ScenePostProcessing";
 import { SceneEffects } from "./SceneEffects";
 import { OrbitalScene } from "./OrbitalScene";
 import { useCockpitStore } from "@/lib/stores/useCockpitStore";
-import { DEMO_WORLDS } from "@/lib/worlds/demo-worlds";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
 /** Default camera target (center of scene) */
 const DEFAULT_TARGET = new THREE.Vector3(0, 2, 0);
-/** Lerp speed for camera fly-to animation */
-const CAMERA_LERP_SPEED = 0.04;
+/** Lerp speed for camera target */
+const TARGET_LERP = 0.04;
+/** Lerp speed for camera distance */
+const DISTANCE_LERP = 0.03;
+
+/**
+ * ESC key handler — hooks into global keydown.
+ * Navigates back one level, or closes preview first.
+ */
+function useEscNavigation() {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const store = useCockpitStore.getState();
+      // Close preview first if open
+      if (store.centerMode === "preview") {
+        store.closePreview();
+        return;
+      }
+      // Then navigate back
+      if (store.navStack.length > 0) {
+        store.navigateBack();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+}
+
+/**
+ * Camera controller — adjusts target and distance based on navStack depth.
+ */
+function CameraController({
+  controlsRef,
+}: {
+  controlsRef: React.RefObject<OrbitControlsImpl | null>;
+}) {
+  const { camera } = useThree();
+  const navStack = useCockpitStore((s) => s.navStack);
+  const depth = navStack.length;
+
+  /** Target position based on depth */
+  const desiredTarget = useMemo(() => {
+    if (depth === 0) return DEFAULT_TARGET.clone();
+    // For deeper levels, target is always scene center (orbs re-center themselves)
+    return new THREE.Vector3(0, 2, 0);
+  }, [depth]);
+
+  /** Camera distance & limits based on depth */
+  const cameraConfig = useMemo(() => {
+    if (depth === 0) {
+      return { distance: 35, minDist: 10, maxDist: 70, fov: 75 };
+    }
+    // Zoomed in: closer camera
+    return { distance: 18, minDist: 4, maxDist: 30, fov: 65 };
+  }, [depth]);
+
+  useFrame(() => {
+    if (!controlsRef.current) return;
+    const controls = controlsRef.current;
+
+    // Lerp target
+    controls.target.lerp(desiredTarget, TARGET_LERP);
+
+    // Lerp distance
+    const currentDist = camera.position.distanceTo(controls.target);
+    if (Math.abs(currentDist - cameraConfig.distance) > 0.5) {
+      const dir = camera.position.clone().sub(controls.target).normalize();
+      const newDist = THREE.MathUtils.lerp(
+        currentDist,
+        cameraConfig.distance,
+        DISTANCE_LERP,
+      );
+      camera.position.copy(controls.target).addScaledVector(dir, newDist);
+    }
+
+    // Update distance limits
+    controls.minDistance = cameraConfig.minDist;
+    controls.maxDistance = cameraConfig.maxDist;
+    controls.update();
+  });
+
+  return null;
+}
 
 /**
  * Inner 3D scene content — rendered inside R3F Canvas.
@@ -25,30 +106,8 @@ const CAMERA_LERP_SPEED = 0.04;
  */
 function SceneContent() {
   const controlsRef = useRef<OrbitControlsImpl>(null);
-  const selectedWorldId = useCockpitStore((s) => s.selectedWorldId);
 
-  /** Compute the target position for the camera based on selected world */
-  const targetPos = useMemo(() => {
-    if (!selectedWorldId) return DEFAULT_TARGET;
-    const world = DEMO_WORLDS.find((w) => w.id === selectedWorldId);
-    if (!world) return DEFAULT_TARGET;
-    // Target slightly in front of the world orb (toward camera)
-    return new THREE.Vector3(
-      world.position[0],
-      world.position[1] + 1,
-      world.position[2] + 5,
-    );
-  }, [selectedWorldId]);
-
-  /** Smoothly animate OrbitControls target toward selected world */
-  useFrame(() => {
-    if (!controlsRef.current) return;
-    const controls = controlsRef.current;
-    const current = controls.target;
-    // Lerp toward target
-    current.lerp(targetPos, CAMERA_LERP_SPEED);
-    controls.update();
-  });
+  useEscNavigation();
 
   return (
     <>
@@ -67,6 +126,9 @@ function SceneContent() {
         enablePan={false}
       />
 
+      {/* Camera animation controller */}
+      <CameraController controlsRef={controlsRef} />
+
       {/* Environment */}
       <SynthwaveGrid />
       <Skybox />
@@ -74,11 +136,11 @@ function SceneContent() {
 
       {/* Orbital world system */}
       <OrbitalScene
-        worlds={DEMO_WORLDS}
-        onWorldClick={(id) => {
+        onPointerMissed={() => {
           const store = useCockpitStore.getState();
-          // Toggle: click same world = deselect
-          store.selectWorld(store.selectedWorldId === id ? null : id);
+          if (store.navStack.length > 0) {
+            store.navigateBack();
+          }
         }}
       />
 
