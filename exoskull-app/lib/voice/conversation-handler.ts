@@ -120,7 +120,7 @@ const IORS_TOOLS: Anthropic.Tool[] = IORS_TOOLS_RAW.map((tool, i, arr) =>
 );
 
 // ============================================================================
-// VOICE-SPECIFIC TOOL SUBSET (~15 tools vs 51 = faster prompt processing)
+// VOICE-SPECIFIC TOOL SUBSET (~15 tools vs 100 = faster prompt processing)
 // ============================================================================
 
 const VOICE_ESSENTIAL_TOOL_NAMES = new Set([
@@ -151,6 +151,67 @@ const VOICE_ESSENTIAL_TOOL_NAMES = new Set([
   // Email
   "search_emails",
   "email_summary",
+]);
+
+// ============================================================================
+// WEB CHAT TOOL SUBSET (~40 most-used tools — 100 tools overwhelms all providers)
+// ============================================================================
+
+const WEB_ESSENTIAL_TOOL_NAMES = new Set([
+  // Tasks & Planning
+  "add_task",
+  "complete_task",
+  "list_tasks",
+  "plan_action",
+  "schedule_action",
+  // Memory & Context
+  "search_memory",
+  "get_daily_summary",
+  "correct_daily_summary",
+  // Goals (Tyrolka)
+  "define_goal",
+  "log_goal_progress",
+  "check_goals",
+  "create_quest",
+  "list_quests",
+  // Knowledge
+  "search_knowledge",
+  "import_url",
+  "list_documents",
+  "get_document_content",
+  "analyze_knowledge",
+  // Communication
+  "send_sms",
+  "send_email",
+  // Apps / Mods
+  "build_app",
+  "list_apps",
+  "app_log_data",
+  "app_get_data",
+  "log_mod_data",
+  "get_mod_data",
+  // Email
+  "search_emails",
+  "email_summary",
+  "email_follow_ups",
+  "email_sender_info",
+  // Emotion & Personality
+  "tau_assess",
+  // Web
+  "search_web",
+  "fetch_webpage",
+  // Canvas
+  "update_canvas",
+  // Code Gen
+  "execute_code",
+  // Self-Config
+  "update_instructions",
+  "update_behavior",
+  // Autonomy
+  "request_autonomy",
+  "autonomous_action",
+  // Feedback
+  "submit_feedback",
 ]);
 
 const VOICE_TOOLS_RAW = IORS_TOOLS_RAW.filter((t) =>
@@ -423,13 +484,24 @@ export async function processUserMessage(
     ? VOICE_MODEL
     : CHAT_MODEL_MAP[chatModelPref] || CHAT_MODEL_MAP["auto"];
   const useGemini = isGeminiModel(resolvedModel);
-  // Tools already loaded in parallel above
+  // Tools already loaded in parallel above — FILTER to subset per channel
   const { definitions, dynamicCount } = toolsResult;
-  const activeTools: Anthropic.Tool[] = definitions.map((tool, i, arr) =>
+  const toolFilter = isVoiceChannel
+    ? VOICE_ESSENTIAL_TOOL_NAMES
+    : WEB_ESSENTIAL_TOOL_NAMES;
+  const filteredDefs = definitions.filter((t) => toolFilter.has(t.name));
+  const activeTools: Anthropic.Tool[] = filteredDefs.map((tool, i, arr) =>
     i === arr.length - 1
       ? { ...tool, cache_control: { type: "ephemeral" as const } }
       : tool,
   );
+  logger.info("[ConversationHandler] Tool filtering:", {
+    channel: options?.channel || "web_chat",
+    totalAvailable: definitions.length,
+    afterFilter: activeTools.length,
+    dynamicCount,
+    tenantId: session.tenantId,
+  });
   if (dynamicCount > 0) {
     logger.info("[ConversationHandler] Dynamic tools loaded:", {
       tenantId: session.tenantId,
