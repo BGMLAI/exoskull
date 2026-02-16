@@ -1,18 +1,19 @@
 /**
  * Agentic Execution Loop
  *
- * Replaces the fixed MAX_TOOL_ROUNDS=3 loop in conversation-handler.ts
- * with a configurable multi-step agent loop that:
- * - Supports up to 10 steps (web) or 3 steps (voice)
- * - Has a time budget (budgetMs) with safety margin
- * - Serializes to async queue when approaching timeout
- * - Fires ProcessingCallback on each step for SSE streaming
- * - Tracks all tool executions for telemetry
+ * @deprecated The entire file is superseded by the Claude Agent SDK
+ * (`@/lib/agent-sdk/exoskull-agent.ts`). The SDK handles multi-step
+ * tool execution, streaming, and timeout management natively.
+ * Kept for reference only. Will be removed in a future cleanup.
+ *
+ * Previously replaced the fixed MAX_TOOL_ROUNDS=3 loop in conversation-handler.ts
+ * with a configurable multi-step agent loop.
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
 import { logActivities } from "@/lib/activity-log";
 import { logger } from "@/lib/logger";
+import { extractSSEDirective } from "./tools/dashboard-tools";
 
 // ============================================================================
 // TYPES
@@ -50,6 +51,8 @@ export interface AgentLoopContext {
       durationMs: number,
       meta?: { success?: boolean; resultSummary?: string },
     ) => void;
+    /** Emit a custom SSE event (e.g. cockpit_update from dashboard tools) */
+    onCustomEvent?: (event: { type: string; [key: string]: unknown }) => void;
   };
 }
 
@@ -387,11 +390,20 @@ async function executeToolBlocks(
       ctx.callback?.onToolStart?.(toolUse.name);
       const toolStart = Date.now();
 
-      const result = await ctx.executeTool(
+      let result = await ctx.executeTool(
         toolUse.name,
         toolUse.input as Record<string, unknown>,
         ctx.tenantId,
       );
+
+      // Extract embedded SSE directives (e.g. cockpit_update from dashboard tools)
+      if (typeof result === "string" && result.startsWith("__SSE__")) {
+        const { sseEvent, cleanResult } = extractSSEDirective(result);
+        if (sseEvent) {
+          ctx.callback?.onCustomEvent?.(sseEvent);
+        }
+        result = cleanResult;
+      }
 
       toolsUsed.push(toolUse.name);
 

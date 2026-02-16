@@ -26,10 +26,10 @@ import {
   getOrCreateSession,
   updateSession,
   endSession,
-  processUserMessage,
   generateGreeting,
   findTenantByPhone,
 } from "@/lib/voice/conversation-handler";
+import { runExoSkullAgent } from "@/lib/agent-sdk";
 
 export const dynamic = "force-dynamic";
 
@@ -275,9 +275,12 @@ export async function POST(req: NextRequest) {
 
       logger.info("[Twilio Voice] User said:", userText);
 
-      // Process with Claude
-      const result = await processUserMessage(session, userText, {
-        recordingUrl: recordingUrl || undefined,
+      // Process with Agent SDK
+      const result = await runExoSkullAgent({
+        tenantId,
+        sessionId: session.id,
+        userMessage: userText,
+        channel: "voice",
       });
       const processingTime = Date.now() - startTime;
 

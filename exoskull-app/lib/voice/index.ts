@@ -42,16 +42,19 @@ export {
 } from "./elevenlabs-stt";
 export type { STTOptions, STTResult } from "./elevenlabs-stt";
 
-// Conversation Handler
+// Conversation Handler (session management — AI pipeline moved to Agent SDK)
 export {
   getOrCreateSession,
   updateSession,
   endSession,
-  processUserMessage,
   generateGreeting,
   findTenantByPhone,
 } from "./conversation-handler";
-export type { VoiceSession, ConversationResult } from "./conversation-handler";
+export type {
+  VoiceSession,
+  ConversationResult,
+  ProcessingCallback,
+} from "./conversation-handler";
 
 // System Prompt (re-export from existing)
 export {

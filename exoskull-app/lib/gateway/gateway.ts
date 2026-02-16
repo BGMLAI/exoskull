@@ -4,19 +4,19 @@
  * Central routing for ALL inbound messages.
  * Every channel adapter calls handleInboundMessage() which:
  * 1. Appends to unified thread (inbound)
- * 2. Runs full AI pipeline (processUserMessage + 28 tools)
+ * 2. Runs full AI pipeline (Claude Agent SDK + IORS MCP tools)
  * 3. Appends to unified thread (outbound)
  * 4. Returns response for adapter to send back
  */
 
 import {
   getOrCreateSession,
-  processUserMessage,
   updateSession,
   findTenantByPhone,
 } from "../voice/conversation-handler";
 import type { ProcessingCallback } from "../voice/conversation-handler";
 import { runExoSkullAgent } from "@/lib/agent-sdk";
+import type { AgentChannel } from "@/lib/agent-sdk";
 import { appendMessage } from "../unified-thread";
 import { isBirthPending, handleBirthMessage } from "@/lib/iors/birth-flow";
 import { findOrCreateLead, handleLeadMessage } from "@/lib/iors/lead-manager";
@@ -32,9 +32,6 @@ import { logger } from "@/lib/logger";
 import { logActivity } from "@/lib/activity-log";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-/** Feature flag: route web_chat through Claude Agent SDK instead of direct Anthropic API */
-const USE_AGENT_SDK = process.env.AGENT_SDK_ENABLED === "true";
 
 // Map GatewayChannel → UnifiedChannel for unified-thread.ts
 // Now that UnifiedChannel includes telegram/slack/discord, this is a direct pass-through
@@ -406,59 +403,27 @@ export async function handleInboundMessage(
     // 6. Sync path: process with timeout safety net
     const SYNC_TIMEOUT_MS = 40_000; // 40s — leaves 20s buffer before Vercel's 60s
 
-    let result: {
-      text: string;
-      toolsUsed: string[];
-      shouldEndCall?: boolean;
-    } | null = null;
-
-    // ── Agent SDK path (web_chat only, behind feature flag) ──
-    if (USE_AGENT_SDK && msg.channel !== "voice") {
-      logger.info("[Gateway] Using Agent SDK for:", {
-        channel: msg.channel,
+    // ── Agent SDK path (ALL channels) ──
+    const result = await Promise.race([
+      runExoSkullAgent({
         tenantId,
-      });
-
-      const sdkResult = await Promise.race([
-        runExoSkullAgent({
-          tenantId,
-          sessionId,
-          userMessage: msg.text,
-          channel: "web_chat", // Gateway never sees "voice" (handled by WebSocket)
-          skipThreadAppend: true,
-          onTextDelta: callback?.onTextDelta,
-          onThinkingStep: callback?.onThinkingStep,
-          onToolStart: callback?.onToolStart,
-          onToolEnd: callback?.onToolEnd,
-          systemPromptPrefix: WEB_CHAT_SYSTEM_OVERRIDE,
-          maxTokens: 1500,
-          timeoutMs: SYNC_TIMEOUT_MS - 2_000, // 2s buffer for gateway overhead
-        }),
-        new Promise<null>((resolve) =>
-          setTimeout(() => resolve(null), SYNC_TIMEOUT_MS),
-        ),
-      ]);
-
-      result = sdkResult;
-    }
-
-    // ── Legacy path (fallback when SDK disabled or SDK result was null) ──
-    if (!result) {
-      const session = await getOrCreateSession(sessionId, tenantId);
-      session.maxTokens = 1500;
-      session.systemPromptPrefix = WEB_CHAT_SYSTEM_OVERRIDE;
-      session.skipEndCallDetection = true;
-
-      result = await Promise.race([
-        processUserMessage(session, msg.text, {
-          skipThreadAppend: true,
-          callback,
-        }),
-        new Promise<null>((resolve) =>
-          setTimeout(() => resolve(null), SYNC_TIMEOUT_MS),
-        ),
-      ]);
-    }
+        sessionId,
+        userMessage: msg.text,
+        channel: msg.channel as AgentChannel,
+        skipThreadAppend: true,
+        onTextDelta: callback?.onTextDelta,
+        onThinkingStep: callback?.onThinkingStep,
+        onToolStart: callback?.onToolStart,
+        onToolEnd: callback?.onToolEnd,
+        onCustomEvent: callback?.onCustomEvent,
+        systemPromptPrefix: WEB_CHAT_SYSTEM_OVERRIDE,
+        maxTokens: 1500,
+        timeoutMs: SYNC_TIMEOUT_MS - 2_000, // 2s buffer for gateway overhead
+      }),
+      new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), SYNC_TIMEOUT_MS),
+      ),
+    ]);
 
     // Timeout — escalate to async queue
     if (result === null) {

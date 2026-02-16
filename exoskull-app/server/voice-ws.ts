@@ -30,11 +30,11 @@ import {
   getOrCreateSession,
   updateSession,
   endSession,
-  processUserMessage,
   generateGreeting,
   findTenantByPhone,
 } from "../lib/voice/conversation-handler";
 import type { VoiceSession } from "../lib/voice/conversation-handler";
+import { runExoSkullAgent } from "../lib/agent-sdk/exoskull-agent";
 import { logger } from "../lib/logger";
 
 // ============================================================================
@@ -292,24 +292,21 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
   logger.info("[VoiceWS] User:", userText);
 
   try {
-    // Refresh voice session from DB (may have been updated by previous turns)
-    const voiceSession = await getOrCreateSession(
-      wsSession.callSid,
-      wsSession.tenantId,
-    );
-
-    // Stream Claude response token-by-token via ConversationRelay.
+    // Stream response token-by-token via ConversationRelay.
     // Each token goes to Twilio → ElevenLabs TTS immediately.
     // User hears first words within ~0.5-1s instead of waiting 3-8s.
-    let streamedText = "";
     let tokenCount = 0;
 
-    const result = await processUserMessage(voiceSession, userText, {
+    const result = await runExoSkullAgent({
+      tenantId: wsSession.tenantId,
+      sessionId: wsSession.sessionId,
+      userMessage: userText,
       channel: "voice",
+      skipThreadAppend: true,
+      timeoutMs: 35_000,
       onTextDelta: (delta) => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: "text", token: delta, last: false }));
-          streamedText += delta;
           tokenCount++;
         }
       },
@@ -653,7 +650,7 @@ server.listen(PORT, () => {
 ║  Stack:                                          ║
 ║  ConvRelay: Deepgram STT + ElevenLabs TTS        ║
 ║  MediaStr:  Gemini 2.5 Flash Native Audio        ║
-║  LLM:      Gemini 3 Flash + 60+ IORS tools       ║
+║  LLM:      Claude Agent SDK + 100+ IORS tools    ║
 ╚══════════════════════════════════════════════════╝
 `);
 });

@@ -103,6 +103,8 @@ export interface ProcessingCallback {
   onThinkingToken?: (token: string) => void;
   /** Stream text response tokens */
   onTextDelta?: (delta: string) => void;
+  /** Emit a custom SSE event (e.g. cockpit_update from dashboard tools) */
+  onCustomEvent?: (event: { type: string; [key: string]: unknown }) => void;
 }
 
 // ============================================================================
@@ -422,7 +424,11 @@ function shouldEndCall(userText: string): boolean {
 // ============================================================================
 
 /**
- * Process user message and generate Claude response
+ * Process user message and generate Claude response.
+ *
+ * @deprecated Use `runExoSkullAgent()` from `@/lib/agent-sdk` instead.
+ * This function is kept for reference only. All call sites have been
+ * migrated to the Agent SDK path as of 2026-02-16.
  */
 export async function processUserMessage(
   session: VoiceSession,

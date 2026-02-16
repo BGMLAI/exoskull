@@ -19,6 +19,7 @@ import {
   IORS_EXTENSION_TOOLS,
   type ToolDefinition,
 } from "@/lib/iors/tools/index";
+import { extractSSEDirective } from "@/lib/iors/tools/dashboard-tools";
 import { logger } from "@/lib/logger";
 
 // ============================================================================
@@ -100,7 +101,11 @@ function buildZodShape(
 // Convert IORS ToolDefinition → SDK MCP tool
 // ============================================================================
 
-function convertIorsTool(toolDef: ToolDefinition, tenantId: string) {
+function convertIorsTool(
+  toolDef: ToolDefinition,
+  tenantId: string,
+  onCustomEvent?: (event: { type: string; [key: string]: unknown }) => void,
+) {
   const schema = toolDef.definition.input_schema as {
     type: string;
     properties?: Record<string, JsonSchemaProp>;
@@ -121,7 +126,7 @@ function convertIorsTool(toolDef: ToolDefinition, tenantId: string) {
 
       try {
         const timeout = toolDef.timeoutMs ?? 10_000;
-        const result = await Promise.race([
+        let result = await Promise.race([
           toolDef.execute(args as Record<string, unknown>, tenantId),
           new Promise<string>((_, reject) =>
             setTimeout(
@@ -133,6 +138,15 @@ function convertIorsTool(toolDef: ToolDefinition, tenantId: string) {
             ),
           ),
         ]);
+
+        // Extract embedded SSE directives (e.g. cockpit_update from dashboard tools)
+        if (result.startsWith("__SSE__")) {
+          const { sseEvent, cleanResult } = extractSSEDirective(result);
+          if (sseEvent && onCustomEvent) {
+            onCustomEvent(sseEvent);
+          }
+          result = cleanResult;
+        }
 
         logger.info(`[IORS-MCP] ${toolName} OK (${Date.now() - startMs}ms)`);
 
@@ -223,12 +237,21 @@ function isReadOnlyTool(name: string): boolean {
 export function createIorsMcpServer(
   tenantId: string,
   extraTools?: ToolDefinition[],
+  onCustomEvent?: (event: { type: string; [key: string]: unknown }) => void,
+  toolFilter?: Set<string> | null,
 ) {
-  const allToolDefs = extraTools
+  let allToolDefs = extraTools
     ? [...IORS_EXTENSION_TOOLS, ...extraTools]
     : IORS_EXTENSION_TOOLS;
 
-  const mcpTools = allToolDefs.map((t) => convertIorsTool(t, tenantId));
+  // Apply channel-based tool filter (voice ~18, web ~37, null = all)
+  if (toolFilter) {
+    allToolDefs = allToolDefs.filter((t) => toolFilter.has(t.definition.name));
+  }
+
+  const mcpTools = allToolDefs.map((t) =>
+    convertIorsTool(t, tenantId, onCustomEvent),
+  );
 
   logger.info(
     `[IORS-MCP] Server created: ${mcpTools.length} tools for tenant ${tenantId}`,
@@ -245,16 +268,25 @@ export function createIorsMcpServer(
  * Create IORS MCP server including dynamic tools from the database.
  * Slightly slower than createIorsMcpServer() due to DB query for dynamic tools.
  */
-export async function createIorsMcpServerWithDynamic(tenantId: string) {
+export async function createIorsMcpServerWithDynamic(
+  tenantId: string,
+  onCustomEvent?: (event: { type: string; [key: string]: unknown }) => void,
+  toolFilter?: Set<string> | null,
+) {
   try {
     const { getDynamicToolsForTenant } =
       await import("@/lib/iors/tools/dynamic-handler");
     const dynamicTools = await getDynamicToolsForTenant(tenantId);
-    return createIorsMcpServer(tenantId, dynamicTools);
+    return createIorsMcpServer(
+      tenantId,
+      dynamicTools,
+      onCustomEvent,
+      toolFilter,
+    );
   } catch (error) {
     logger.warn("[IORS-MCP] Failed to load dynamic tools, using static only:", {
       error: error instanceof Error ? error.message : error,
     });
-    return createIorsMcpServer(tenantId);
+    return createIorsMcpServer(tenantId, undefined, onCustomEvent, toolFilter);
   }
 }

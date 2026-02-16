@@ -12,8 +12,10 @@ export async function processOneAsyncTask(
   try {
     const { claimNextTask, releaseExpiredLocks, completeTask, failTask } =
       await import("@/lib/async-tasks/queue");
-    const { getOrCreateSession, processUserMessage, updateSession } =
+    const { getOrCreateSession, updateSession } =
       await import("@/lib/voice/conversation-handler");
+    const { runExoSkullAgent } = await import("@/lib/agent-sdk");
+    type AgentChannel = import("@/lib/agent-sdk").AgentChannel;
 
     // Release expired locks first
     await releaseExpiredLocks();
@@ -33,12 +35,19 @@ export async function processOneAsyncTask(
       const sessionId =
         task.session_id ||
         `async-${task.channel}-${task.tenant_id}-${new Date().toISOString().slice(0, 10)}`;
-      const session = await getOrCreateSession(sessionId, task.tenant_id);
 
-      // Process through full AI pipeline
-      const result = await processUserMessage(session, task.prompt);
+      // Process through Agent SDK (all tools, async config)
+      const result = await runExoSkullAgent({
+        tenantId: task.tenant_id,
+        sessionId,
+        userMessage: task.prompt,
+        channel: (task.channel || "web_chat") as AgentChannel,
+        isAsync: true,
+        skipThreadAppend: true,
+      });
 
       // Update session
+      const session = await getOrCreateSession(sessionId, task.tenant_id);
       const sessionChannel: "voice" | "web_chat" =
         task.channel === "voice" ? "voice" : "web_chat";
       await updateSession(session.id, task.prompt, result.text, {

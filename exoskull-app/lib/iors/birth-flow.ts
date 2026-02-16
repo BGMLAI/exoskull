@@ -16,9 +16,10 @@
 
 import {
   getOrCreateSession,
-  processUserMessage,
   updateSession,
 } from "../voice/conversation-handler";
+import { runExoSkullAgent } from "@/lib/agent-sdk";
+import type { AgentChannel } from "@/lib/agent-sdk";
 import type { GatewayChannel, GatewayResponse } from "../gateway/types";
 import {
   BIRTH_SYSTEM_PROMPT_PREFIX,
@@ -72,18 +73,17 @@ export async function handleBirthMessage(
       };
     }
 
-    // Get or create session with birth prompt prefix
+    // Get or create session for ID tracking
     const session = await getOrCreateSession(tenantId, channel);
 
-    // Inject birth prompt prefix into session context
-    // processUserMessage reads session.systemPromptPrefix if present
-    const birthSession = {
-      ...session,
+    // Run through Agent SDK with birth prompt prefix (all tools available)
+    const result = await runExoSkullAgent({
+      tenantId,
+      sessionId: session.id,
+      userMessage: text,
+      channel: (channel === "voice" ? "voice" : "web_chat") as AgentChannel,
       systemPromptPrefix: BIRTH_SYSTEM_PROMPT_PREFIX,
-    };
-
-    // Run through FULL pipeline (all 30+ tools available)
-    const result = await processUserMessage(birthSession, text);
+    });
 
     // Check for birth completion marker in response
     const birthMatch = result.text.match(

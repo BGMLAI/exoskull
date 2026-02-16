@@ -13,9 +13,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
   getOrCreateSession,
-  processUserMessage,
   updateSession,
 } from "@/lib/voice/conversation-handler";
+import { runExoSkullAgent } from "@/lib/agent-sdk";
 import {
   BIRTH_SYSTEM_PROMPT_PREFIX,
   BIRTH_FIRST_MESSAGE,
@@ -68,16 +68,15 @@ export async function POST(request: NextRequest) {
     const sessionKey = `birth-${user.id}`;
     const session = await getOrCreateSession(sessionKey, user.id);
 
-    // Inject birth flow configuration
-    const birthSession = {
-      ...session,
+    // Process through Agent SDK with birth prompt prefix (all tools available)
+    const result = await runExoSkullAgent({
+      tenantId: user.id,
+      sessionId: session.id,
+      userMessage: message,
+      channel: "web_chat",
       systemPromptPrefix: BIRTH_SYSTEM_PROMPT_PREFIX,
       maxTokens: 1024,
-      skipEndCallDetection: true,
-    };
-
-    // Process through Claude with ALL IORS tools
-    const result = await processUserMessage(birthSession, message);
+    });
 
     // Check for birth completion marker
     const birthMatch = result.text.match(

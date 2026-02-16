@@ -35,6 +35,7 @@ import { analyzeEmotion } from "@/lib/emotion";
 import { detectCrisis } from "@/lib/emotion/crisis-detector";
 import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
 import { logEmotion } from "@/lib/emotion/logger";
+import { getToolFilterForChannel } from "@/lib/iors/tools/channel-filters";
 import type { EmotionState } from "@/lib/emotion/types";
 import { logger } from "@/lib/logger";
 
@@ -42,11 +43,29 @@ import { logger } from "@/lib/logger";
 // TYPES
 // ============================================================================
 
+/** All supported channel types across ExoSkull */
+export type AgentChannel =
+  | "web_chat"
+  | "voice"
+  | "telegram"
+  | "slack"
+  | "discord"
+  | "sms"
+  | "whatsapp"
+  | "email"
+  | "signal"
+  | "imessage"
+  | "android_app"
+  | "messenger"
+  | "instagram";
+
 export interface AgentRequest {
   tenantId: string;
   sessionId: string;
   userMessage: string;
-  channel: "web_chat" | "voice";
+  channel: AgentChannel;
+  /** Mark as async task — uses higher maxTurns, all tools, no time pressure */
+  isAsync?: boolean;
   /** Gateway already wrote user message to thread */
   skipThreadAppend?: boolean;
   /** Token streaming callback (for SSE) */
@@ -61,6 +80,8 @@ export interface AgentRequest {
   ) => void;
   /** Thinking step callback */
   onThinkingStep?: (step: string, status: "running" | "done") => void;
+  /** Custom SSE event callback (e.g. cockpit_update from dashboard tools) */
+  onCustomEvent?: (event: { type: string; [key: string]: unknown }) => void;
   /** System prompt prefix (e.g., IORS birth flow) */
   systemPromptPrefix?: string;
   /** System prompt override from tenant settings */
@@ -99,6 +120,13 @@ const VOICE_CONFIG = {
   effort: "medium" as const,
 };
 
+const ASYNC_CONFIG = {
+  maxTurns: 15,
+  timeoutMs: 50_000,
+  model: "claude-sonnet-4-5-20250929" as const,
+  effort: "high" as const,
+};
+
 // ============================================================================
 // MAIN AGENT FUNCTION
 // ============================================================================
@@ -113,15 +141,21 @@ export async function runExoSkullAgent(
   req: AgentRequest,
 ): Promise<AgentResponse> {
   const startMs = Date.now();
-  const config = req.channel === "voice" ? VOICE_CONFIG : WEB_CONFIG;
+  const config = req.isAsync
+    ? ASYNC_CONFIG
+    : req.channel === "voice"
+      ? VOICE_CONFIG
+      : WEB_CONFIG;
 
   req.onThinkingStep?.("Ładuję kontekst", "running");
 
   // ── Phase 1: Load everything in parallel ──
+  const toolFilter = getToolFilterForChannel(req.channel, req.isAsync);
+
   const [dynamicCtxResult, emotionState, mcpServer] = await Promise.all([
     buildDynamicContext(req.tenantId),
     analyzeEmotion(req.userMessage),
-    createIorsMcpServerWithDynamic(req.tenantId),
+    createIorsMcpServerWithDynamic(req.tenantId, req.onCustomEvent, toolFilter),
   ]);
 
   const contextMs = Date.now() - startMs;
@@ -246,18 +280,29 @@ export async function runExoSkullAgent(
       });
     }
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
+    const errMsg = error instanceof Error ? error.message : String(error);
 
     if (abortController.signal.aborted) {
       logger.warn(`[ExoSkullAgent] Timed out after ${timeout}ms`);
-      // Return whatever we have so far
       if (!finalText) {
         finalText =
           "Przepraszam, odpowiedź zajęła zbyt długo. Spróbuj ponownie.";
       }
     } else {
-      logger.error("[ExoSkullAgent] SDK query failed:", { error: msg });
-      finalText = "Przepraszam, wystąpił błąd. Spróbuj ponownie.";
+      logger.error("[ExoSkullAgent] SDK query failed:", { error: errMsg });
+
+      // ── Emergency Gemini fallback (no tools, just conversation) ──
+      const geminiText = await emergencyGeminiFallback(
+        req,
+        systemPrompt,
+        emotionState,
+      );
+      if (geminiText) {
+        finalText = geminiText;
+        toolsUsed.push("emergency_fallback");
+      } else {
+        finalText = "Przepraszam, wystąpił błąd. Spróbuj ponownie.";
+      }
     }
   } finally {
     clearTimeout(timeoutHandle);
@@ -385,5 +430,62 @@ function handleSDKMessage(msg: SDKMessage, ctx: MessageHandlerContext): void {
     // Ignore other message types (system, auth_status, etc.)
     default:
       break;
+  }
+}
+
+// ============================================================================
+// EMERGENCY GEMINI FALLBACK
+// ============================================================================
+
+/**
+ * Last-resort fallback when Claude Agent SDK fails completely.
+ * Uses Gemini Flash for a no-tools conversational response.
+ */
+async function emergencyGeminiFallback(
+  req: AgentRequest,
+  systemPrompt: string,
+  emotionState: EmotionState,
+): Promise<string | null> {
+  try {
+    const geminiKey = process.env.GOOGLE_AI_API_KEY;
+    if (!geminiKey) return null;
+
+    logger.info(
+      "[ExoSkullAgent] All primary providers failed — emergency Gemini fallback (no tools)",
+      { tenantId: req.tenantId },
+    );
+    req.onThinkingStep?.("Tryb awaryjny", "running");
+
+    const { GoogleGenAI } = await import("@google/genai");
+    const emergencyAI = new GoogleGenAI({ apiKey: geminiKey });
+
+    const emergencyResponse = await emergencyAI.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: req.userMessage }],
+        },
+      ],
+      config: {
+        systemInstruction: systemPrompt.slice(0, 8000),
+        temperature: 0.7,
+        maxOutputTokens: 1024,
+      },
+    });
+
+    const text = emergencyResponse.text || "";
+    req.onThinkingStep?.("Tryb awaryjny", "done");
+
+    return text || null;
+  } catch (emergencyError) {
+    logger.error("[ExoSkullAgent] Emergency Gemini fallback also failed:", {
+      error:
+        emergencyError instanceof Error
+          ? emergencyError.message
+          : String(emergencyError),
+      tenantId: req.tenantId,
+    });
+    return null;
   }
 }

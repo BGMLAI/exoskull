@@ -9,10 +9,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
   getOrCreateSession,
-  processUserMessage,
   updateSession,
   endSession,
 } from "@/lib/voice/conversation-handler";
+import { runExoSkullAgent } from "@/lib/agent-sdk";
 import { textToSpeech } from "@/lib/voice/elevenlabs-tts";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 import { WEB_CHAT_SYSTEM_OVERRIDE } from "@/lib/voice/system-prompt";
@@ -61,11 +61,6 @@ export async function POST(request: NextRequest) {
     const callSid = sessionId || `web-chat-${user.id}`;
     const session = await getOrCreateSession(callSid, user.id);
 
-    // Web voice widget = web_chat context (not phone call)
-    session.maxTokens = 1500;
-    session.systemPromptPrefix = WEB_CHAT_SYSTEM_OVERRIDE;
-    session.skipEndCallDetection = true;
-
     // Append user message to unified thread (fire-and-forget, don't block)
     appendMessage(user.id, {
       role: "user",
@@ -81,17 +76,17 @@ export async function POST(request: NextRequest) {
       );
     });
 
-    // Process through Claude with tools (40s timeout like gateway)
-    const TIMEOUT_MS = 40_000;
-    const result = await Promise.race([
-      processUserMessage(session, message, { skipThreadAppend: true }),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error("Voice chat timeout after 40s")),
-          TIMEOUT_MS,
-        ),
-      ),
-    ]);
+    // Process through Agent SDK (40s timeout like gateway)
+    const result = await runExoSkullAgent({
+      tenantId: user.id,
+      sessionId: session.id,
+      userMessage: message,
+      channel: "web_chat",
+      skipThreadAppend: true,
+      systemPromptPrefix: WEB_CHAT_SYSTEM_OVERRIDE,
+      maxTokens: 1500,
+      timeoutMs: 38_000,
+    });
 
     // Track usage (fire-and-forget)
     incrementUsage(user.id, "voice_minutes").catch((err) => {

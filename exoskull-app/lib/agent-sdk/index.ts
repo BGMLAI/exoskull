@@ -22,6 +22,7 @@ export {
   runExoSkullAgent,
   type AgentRequest,
   type AgentResponse,
+  type AgentChannel,
 } from "./exoskull-agent";
 
 export {

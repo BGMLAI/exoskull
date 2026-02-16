@@ -23,9 +23,10 @@ import {
 import type { AsyncTask } from "@/lib/async-tasks/queue";
 import {
   getOrCreateSession,
-  processUserMessage,
   updateSession,
 } from "@/lib/voice/conversation-handler";
+import { runExoSkullAgent } from "@/lib/agent-sdk";
+import type { AgentChannel } from "@/lib/agent-sdk";
 import { appendMessage } from "@/lib/unified-thread";
 import type { GatewayChannel } from "@/lib/gateway/types";
 
@@ -188,18 +189,24 @@ async function processTask(task: AsyncTask): Promise<void> {
     const sessionId =
       task.session_id ||
       `async-${task.channel}-${task.tenant_id}-${new Date().toISOString().slice(0, 10)}`;
-    const session = await getOrCreateSession(sessionId, task.tenant_id);
 
-    // 2. Process through full AI pipeline (28 tools)
-    const result = await processUserMessage(session, task.prompt);
+    // 2. Process through Agent SDK (all tools, async config)
+    const result = await runExoSkullAgent({
+      tenantId: task.tenant_id,
+      sessionId,
+      userMessage: task.prompt,
+      channel: (task.channel || "web_chat") as AgentChannel,
+      isAsync: true,
+      skipThreadAppend: true,
+    });
 
     // 3. Update session (writes both user+assistant to unified thread)
+    const session = await getOrCreateSession(sessionId, task.tenant_id);
     const sessionChannel: "voice" | "web_chat" =
       task.channel === "voice" ? "voice" : "web_chat";
     await updateSession(session.id, task.prompt, result.text, {
       channel: sessionChannel,
     });
-    // Note: updateSession already appends assistant to unified thread — no duplicate appendMessage needed
 
     // 5. Mark complete in DB
     await completeTask(task.id, result.text, result.toolsUsed);
