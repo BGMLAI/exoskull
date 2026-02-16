@@ -21,7 +21,8 @@ interface OrbClusterProps {
 
 /**
  * Recursive orb component — renders a central orb with children as orbiting moons.
- * Same visual pattern at every hierarchy level.
+ * When focused, moons freeze in place (static circle) for easy clicking.
+ * Children fade in with staggered delay.
  */
 export function OrbCluster({
   node,
@@ -47,6 +48,11 @@ export function OrbCluster({
   // Moon orbit config
   const moonOrbitRadius = radius * 2.8;
   const moonSize = radius * 0.3;
+
+  // Performance: cap visible children at 15
+  const MAX_VISIBLE_CHILDREN = 15;
+  const visibleChildren = node.children.slice(0, MAX_VISIBLE_CHILDREN);
+  const hiddenCount = Math.max(0, node.children.length - MAX_VISIBLE_CHILDREN);
 
   // Animate floating
   useFrame(({ clock }) => {
@@ -171,9 +177,9 @@ export function OrbCluster({
         </mesh>
       </mesh>
 
-      {/* Children as orbiting moons */}
+      {/* Children as moons — orbiting (unfocused) or static circle (focused) */}
       {!isBackground &&
-        node.children.map((child, i) => (
+        visibleChildren.map((child, i) => (
           <MoonOrb
             key={child.id}
             child={child}
@@ -182,13 +188,38 @@ export function OrbCluster({
             orbitRadius={moonOrbitRadius}
             moonSize={moonSize}
             index={i}
-            total={node.children.length}
+            total={visibleChildren.length}
             phaseOffset={phaseOffset}
             isFocused={isFocused}
             onDrillIn={onDrillIn}
             onLeafClick={onLeafClick}
           />
         ))}
+
+      {/* "+N more" indicator when children are capped */}
+      {!isBackground && hiddenCount > 0 && isFocused && (
+        <Html
+          position={[position[0], position[1] - radius - 1.2, position[2]]}
+          center
+          distanceFactor={20}
+          style={{ pointerEvents: "none" }}
+        >
+          <div
+            style={{
+              color: node.color,
+              fontSize: "11px",
+              fontWeight: 600,
+              background: "rgba(0,0,0,0.6)",
+              padding: "2px 8px",
+              borderRadius: 4,
+              border: `1px solid ${node.color}40`,
+              whiteSpace: "nowrap",
+            }}
+          >
+            +{hiddenCount} more
+          </div>
+        </Html>
+      )}
     </group>
   );
 }
@@ -226,8 +257,21 @@ function MoonOrb({
   const lineRef = useRef<any>(null);
   const [hovered, setHovered] = useState(false);
 
+  // Stagger delay: each moon fades in 0.15s after the previous
+  const staggerDelay = index * 0.15;
+
   const phase = (Math.PI * 2 * index) / total;
   const speed = 0.2 + index * 0.05;
+
+  // Static position (when focused / frozen)
+  const staticPos = useMemo((): [number, number, number] => {
+    const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
+    return [
+      parentPosition[0] + Math.cos(angle) * orbitRadius,
+      parentPosition[1],
+      parentPosition[2] + Math.sin(angle) * orbitRadius,
+    ];
+  }, [index, total, parentPosition, orbitRadius]);
 
   const moonColor = useMemo(() => {
     return new THREE.Color(child.color || parentColor).lerp(
@@ -241,27 +285,60 @@ function MoonOrb({
   // Size: moons are bigger when parent is focused (clickable)
   const effectiveSize = isFocused ? moonSize * 1.8 : moonSize;
 
-  useFrame(({ clock }) => {
+  // Track fade-in and freeze transition
+  const fadeRef = useRef(0); // 0 = invisible, 1 = fully visible
+  const freezeRef = useRef(isFocused ? 1 : 0); // 0 = orbiting, 1 = frozen
+
+  useFrame(({ clock }, delta) => {
     const t = clock.elapsedTime;
     const mesh = meshRef.current;
     if (!mesh) return;
 
+    // Staggered fade-in: start after staggerDelay seconds
+    const targetFade = t > staggerDelay ? 1 : 0;
+    fadeRef.current = THREE.MathUtils.lerp(
+      fadeRef.current,
+      targetFade,
+      delta * 4,
+    );
+
+    // Freeze transition: lerp towards frozen (1) or orbiting (0)
+    const targetFreeze = isFocused ? 1 : 0;
+    freezeRef.current = THREE.MathUtils.lerp(
+      freezeRef.current,
+      targetFreeze,
+      delta * 5,
+    );
+    const freeze = freezeRef.current;
+
+    // Orbiting position
     const angle = t * speed + phase;
     const parentY = parentPosition[1] + Math.sin(t * 0.6 + phaseOffset) * 0.5;
+    const orbitX = parentPosition[0] + Math.cos(angle) * orbitRadius;
+    const orbitY = parentY + Math.sin(angle * 0.3) * 0.3;
+    const orbitZ = parentPosition[2] + Math.sin(angle) * orbitRadius;
 
+    // Blend between orbiting and static
     mesh.position.set(
-      parentPosition[0] + Math.cos(angle) * orbitRadius,
-      parentY + Math.sin(angle * 0.3) * 0.3,
-      parentPosition[2] + Math.sin(angle) * orbitRadius,
+      THREE.MathUtils.lerp(orbitX, staticPos[0], freeze),
+      THREE.MathUtils.lerp(orbitY, staticPos[1], freeze),
+      THREE.MathUtils.lerp(orbitZ, staticPos[2], freeze),
     );
+
+    // Apply fade via scale (0 → effectiveSize)
+    const s = fadeRef.current * effectiveSize;
+    mesh.scale.setScalar(s / effectiveSize || 0.001);
 
     // Update line endpoint
     if (lineRef.current && lineRef.current.geometry) {
       const positions = lineRef.current.geometry.attributes.position;
       if (positions) {
-        // Start point: parent center (animated Y)
-        positions.setXYZ(0, parentPosition[0], parentY, parentPosition[2]);
-        // End point: moon position
+        const lineParentY = THREE.MathUtils.lerp(
+          parentY,
+          parentPosition[1],
+          freeze,
+        );
+        positions.setXYZ(0, parentPosition[0], lineParentY, parentPosition[2]);
         positions.setXYZ(1, mesh.position.x, mesh.position.y, mesh.position.z);
         positions.needsUpdate = true;
       }
@@ -270,7 +347,7 @@ function MoonOrb({
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
-    if (!isFocused) return; // Only clickable when parent is focused
+    if (!isFocused) return;
     if (isLeafType(child.type)) {
       onLeafClick(child);
     } else {
@@ -305,7 +382,9 @@ function MoonOrb({
           document.body.style.cursor = "auto";
         }}
       >
-        <sphereGeometry args={[effectiveSize, 16, 16]} />
+        <sphereGeometry
+          args={[effectiveSize, isFocused ? 16 : 8, isFocused ? 16 : 8]}
+        />
         <meshStandardMaterial
           color={moonColorHex}
           emissive={moonColorHex}
@@ -315,7 +394,7 @@ function MoonOrb({
         />
 
         {/* Moon glow */}
-        {isFocused && (
+        {isFocused ? (
           <mesh>
             <sphereGeometry args={[effectiveSize * 1.3, 12, 12]} />
             <meshBasicMaterial
@@ -325,10 +404,10 @@ function MoonOrb({
               side={THREE.BackSide}
             />
           </mesh>
-        )}
+        ) : null}
 
         {/* Moon label (only when parent is focused) */}
-        {isFocused && (
+        {isFocused ? (
           <Html
             position={[0, effectiveSize + 0.6, 0]}
             center
@@ -349,7 +428,7 @@ function MoonOrb({
               {child.label}
             </div>
           </Html>
-        )}
+        ) : null}
       </mesh>
     </>
   );
