@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { ArwesProvider } from "@/components/providers/ArwesProvider";
 import { Toaster } from "sonner";
 import { validateEnv } from "@/lib/env-check";
 
@@ -37,8 +38,16 @@ export default function RootLayout({
         className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} ${inter.className} bg-background text-foreground`}
       >
         <ThemeProvider>
-          {children}
-          <Toaster richColors position="top-right" />
+          <ArwesProvider>
+            <a
+              href="#main"
+              className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:text-sm"
+            >
+              Przejdź do treści
+            </a>
+            {children}
+            <Toaster richColors position="top-right" />
+          </ArwesProvider>
         </ThemeProvider>
       </body>
     </html>

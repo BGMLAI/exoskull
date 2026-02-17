@@ -4,6 +4,50 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-17] Phase 13: Cockpit HUD Redesign
+
+- **BottomPanelGrid**: NEW — 2x2 glass panels replacing wings/drawer layout
+- **CockpitActionBar**: NEW — 5-cell bottom bar
+- **ReactionButtons**: NEW — quick action overlay
+- **CockpitHUDShell**: Simplified, full-viewport 3D + floating chat
+- **ChannelOrbs**: Repositioned for new layout
+- **Knowledge route**: Extended
+
+---
+
+## [2026-02-17] Phase 12: IORS Tools Expansion
+
+- **MCP bridge tools**: NEW — 512-line cross-tool orchestration (`mcp-bridge-tools.ts`)
+- **Code execution tools**: Added `web_search`, `web_fetch`, `deploy`, `list_skills`, `load_skill`, `load_agent`
+- **Channel filters**: Updated tool routing for new tools
+- **Tools index**: Registered new tool modules
+
+---
+
+## [2026-02-17] Phase 11: P0+P1 UX Audit
+
+- **Landing page**: Translated to Polish, nav anchors, pricing section, capability stats, colored avatars
+- **Login**: Split to server + client, tab toggle (Zaloguj/Stwórz konto), password visibility, length hint
+- **Reset password**: NEW page with Supabase `resetPasswordForEmail` flow
+- **Server actions**: NEW `actions.ts` (signIn, signUp, resetPassword)
+
+---
+
+## [2026-02-17] Phase 10: Unified Memory + Agent Improvements
+
+- **Unified memory search**: `unifiedSearch()` combines vector, keyword, notes, entity (473 lines)
+- **Note embeddings**: Fire-and-forget generation, HNSW index, `vector_search_notes()` RPC
+- **Dynamic context**: Enriched with highlights, knowledge graph, recent notes
+- **Voice context**: Top 5 highlights for personalization
+- **Conversation history**: Thread context loaded in parallel, deduplication
+- **Sign-out button**: "Wyloguj" in dashboard top-right
+- **Agent SDK fix**: Replaced `query()` with direct Anthropic Messages API (Vercel serverless compat)
+- **R2 upload**: Agent upload via presigned URLs (replaced Supabase Storage)
+- **VPS Code API**: 8 IORS tools + sandbox middleware
+- **Backfill script**: `scripts/backfill-note-embeddings.ts`
+
+---
+
 ## [2026-02-16] Phase 9: Orb CRUD + Brighter Dashboard + Delete Fix
 
 ### Brighter Dashboard

@@ -15,6 +15,9 @@ export interface PreviewTarget {
   data?: Record<string, unknown>;
 }
 
+/** Dashboard view mode */
+export type ViewMode = "classic" | "mindmap";
+
 interface CockpitState {
   /** Currently selected world (clicked orb) */
   selectedWorldId: string | null;
@@ -41,6 +44,8 @@ interface CockpitState {
     node: OrbNode | null;
     depth: number;
   } | null;
+  /** Dashboard view mode: classic 3D scene or mind map workspace */
+  viewMode: ViewMode;
 
   // Actions
   selectWorld: (id: string | null) => void;
@@ -67,6 +72,8 @@ interface CockpitState {
   setOrbContextMenu: (
     menu: { x: number; y: number; node: OrbNode | null; depth: number } | null,
   ) => void;
+  setViewMode: (mode: ViewMode) => void;
+  toggleViewMode: () => void;
 }
 
 const DEFAULT_SECTIONS: CockpitSection[] = [
@@ -106,6 +113,7 @@ export const useCockpitStore = create<CockpitState>((set) => ({
   collapsedPanels: new Set<string>(),
   hudMinimized: false,
   orbContextMenu: null,
+  viewMode: "mindmap",
 
   selectWorld: (id) => set({ selectedWorldId: id }),
 
@@ -197,4 +205,10 @@ export const useCockpitStore = create<CockpitState>((set) => ({
   toggleHudMinimized: () => set((s) => ({ hudMinimized: !s.hudMinimized })),
 
   setOrbContextMenu: (menu) => set({ orbContextMenu: menu }),
+
+  setViewMode: (mode) => set({ viewMode: mode }),
+  toggleViewMode: () =>
+    set((s) => ({
+      viewMode: s.viewMode === "classic" ? "mindmap" : "classic",
+    })),
 }));

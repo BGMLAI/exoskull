@@ -35,20 +35,23 @@ z-50  → FloatingCallButton     (voice call, always accessible, bottom-right)
 
 ### Cockpit HUD (`components/cockpit/`)
 
-| File                   | Purpose                                                                                              |
-| ---------------------- | ---------------------------------------------------------------------------------------------------- |
-| `CockpitHUDShell.tsx`  | Master CSS Grid layout (5-col × 3-row). Composes all cockpit pieces. Initializes keyboard shortcuts. |
-| `CockpitTopBar.tsx`    | Status bar: clock (left), IORS status indicator (center), active tool name (right)                   |
-| `CockpitBottomBar.tsx` | Quick actions (left), input hint (center), 4 HUD gauges (right)                                      |
-| `HUDPanel.tsx`         | Reusable FUI panel frame with data fetch, normalize, skeleton/error states, click-to-preview         |
-| `HUDGauge.tsx`         | SVG segmented arc gauge (12 segments, 0-100%, animated fill)                                         |
-| `LeftWing.tsx`         | Left column: Tasks (#3b82f6), IORS Activity (#8b5cf6), Email (#06b6d4)                               |
-| `RightWing.tsx`        | Right column: Calendar (#f59e0b), Values/Plan (#f59e0b), Knowledge (#10b981)                         |
-| `CenterViewport.tsx`   | Chat/Preview switcher — both layers always mounted, toggle via opacity                               |
-| `PreviewPane.tsx`      | Detail view: email, task, document, calendar, activity, value — with type badges                     |
-| `ChannelOrbs.tsx`      | Floating channel indicators (Email, Telegram, Discord, SMS) with hover glow                          |
-| `OrbFormDialog.tsx`    | Modal for creating/editing orbs: name, color picker, description, priority                           |
-| `OrbDeleteConfirm.tsx` | Red-accented delete confirmation dialog with safety warning                                          |
+| File                   | Purpose                                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------------------- |
+| `CockpitHUDShell.tsx`  | Simplified full-viewport layout. Floating chat + BottomPanelGrid + ActionBar.                |
+| `BottomPanelGrid.tsx`  | NEW — 2x2 glass panels replacing wings/drawer layout                                         |
+| `CockpitActionBar.tsx` | NEW — 5-cell bottom bar                                                                      |
+| `ReactionButtons.tsx`  | NEW — Quick action overlay for common operations                                             |
+| `CockpitTopBar.tsx`    | Status bar: clock (left), IORS status indicator (center), active tool name (right)           |
+| `CockpitBottomBar.tsx` | Quick actions (left), input hint (center), 4 HUD gauges (right)                              |
+| `HUDPanel.tsx`         | Reusable FUI panel frame with data fetch, normalize, skeleton/error states, click-to-preview |
+| `HUDGauge.tsx`         | SVG segmented arc gauge (12 segments, 0-100%, animated fill)                                 |
+| `LeftWing.tsx`         | @deprecated — replaced by BottomPanelGrid                                                    |
+| `RightWing.tsx`        | @deprecated — replaced by BottomPanelGrid                                                    |
+| `CenterViewport.tsx`   | Chat/Preview switcher — both layers always mounted, toggle via opacity                       |
+| `PreviewPane.tsx`      | Detail view: email, task, document, calendar, activity, value — with type badges             |
+| `ChannelOrbs.tsx`      | Floating channel indicators (Email, Telegram, Discord, SMS) — repositioned for new layout    |
+| `OrbFormDialog.tsx`    | Modal for creating/editing orbs: name, color picker, description, priority                   |
+| `OrbDeleteConfirm.tsx` | Red-accented delete confirmation dialog with safety warning                                  |
 
 ### 3D Context Menu (`components/3d/`)
 

@@ -3,6 +3,8 @@
 @tailwind utilities;
 
 @import "../styles/cockpit.css";
+@import "../styles/mindmap.css";
+@import "../styles/workspace.css";
 
 @layer base {
   /*

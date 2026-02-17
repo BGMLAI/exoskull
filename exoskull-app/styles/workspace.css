@@ -1,0 +1,161 @@
+/* ============================================================================
+ * WorkspaceLayout — Three-panel layout styles
+ * ============================================================================ */
+
+/* Panel sci-fi frame effect */
+.workspace-panel {
+  position: relative;
+}
+
+.workspace-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 212, 255, 0.15) 20%,
+    rgba(0, 212, 255, 0.3) 50%,
+    rgba(0, 212, 255, 0.15) 80%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* Panel resize handle */
+.workspace-resize-handle {
+  position: absolute;
+  top: 0;
+  width: 3px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 20;
+  transition: background 0.2s;
+}
+
+.workspace-resize-handle:hover {
+  background: rgba(0, 212, 255, 0.3);
+}
+
+.workspace-resize-handle:active {
+  background: rgba(0, 212, 255, 0.5);
+}
+
+/* Panel collapse/expand animation */
+.workspace-panel-content {
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+/* Sources list item hover */
+.source-item {
+  transition: all 0.15s ease;
+}
+
+.source-item:hover {
+  background: rgba(0, 212, 255, 0.05);
+  border-color: rgba(0, 212, 255, 0.15);
+}
+
+/* Studio panel tab active indicator */
+.studio-tab-active {
+  position: relative;
+}
+
+.studio-tab-active::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: #00d4ff;
+  border-radius: 1px;
+}
+
+/* Arwes-style animated border */
+@keyframes arwes-border-glow {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(0, 212, 255, 0.1);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 1px rgba(0, 212, 255, 0.2),
+      0 0 8px rgba(0, 212, 255, 0.05);
+  }
+}
+
+.arwes-frame {
+  animation: arwes-border-glow 4s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+/* Arwes corner accents */
+.arwes-corners {
+  position: relative;
+}
+
+.arwes-corners::before,
+.arwes-corners::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: rgba(0, 212, 255, 0.3);
+  border-style: solid;
+  pointer-events: none;
+}
+
+.arwes-corners::before {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+}
+
+.arwes-corners::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 2px 2px 0;
+}
+
+/* Mobile responsive: stack panels as tabs */
+@media (max-width: 768px) {
+  .workspace-layout {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .workspace-panel {
+    width: 100% !important;
+    max-height: 40vh;
+  }
+}
+
+/* Model picker grid responsive */
+@media (max-width: 640px) {
+  .model-picker-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Scrollbar for panels */
+.panel-scroll::-webkit-scrollbar {
+  width: 3px;
+}
+
+.panel-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.15);
+  border-radius: 2px;
+}
+
+.panel-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.3);
+}

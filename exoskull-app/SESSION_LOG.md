@@ -1,5 +1,32 @@
 # Session Log
 
+## [2026-02-17] Cockpit Redesign + UX Audit + Memory Unification + Agent Fixes
+
+### Tasks
+
+- VPS Code API (8 IORS tools + sandbox): **SUCCESS**
+- Agent upload → R2 presigned URLs: **SUCCESS**
+- Agent SDK → Direct Anthropic API: **SUCCESS**
+- Sign-out button: **SUCCESS**
+- Conversation history in agent: **SUCCESS**
+- Unified memory search (4 sources): **SUCCESS**
+- P0+P1 UX audit (landing PL, login tabs, pricing, reset): **SUCCESS**
+- Cockpit HUD redesign (BottomPanelGrid, ActionBar, Reactions): **SUCCESS**
+- MCP bridge tools (512 lines): **SUCCESS**
+
+### Commits
+
+`63d4e81` → `3a5de59` → `2ae668c` → `1fe3ae8` → `8d2907b` → `93036b7` → `87a2b9f` → `982a3e1` → `20a7fb8`
+
+### Key Decisions
+
+- Agent SDK `query()` broken on Vercel (spawns subprocess) → direct Anthropic Messages API
+- R2 over Supabase Storage: no size limit, presigned URLs
+- Unified memory: single entry point with score normalization > 4 separate searches
+- Cockpit: full-viewport 3D + bottom panels > wings/drawer
+
+---
+
 ## [2026-02-16] Orb CRUD + Brighter Dashboard + Delete Fix
 
 ### Tasks

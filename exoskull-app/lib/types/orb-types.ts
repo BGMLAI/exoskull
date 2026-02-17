@@ -10,6 +10,9 @@ export type OrbNodeType =
   | "challenge"
   | "op";
 
+/** Visual representation type for mind map nodes */
+export type NodeVisualType = "orb" | "image" | "model3d" | "card";
+
 export interface OrbNode {
   id: string;
   label: string;
@@ -26,6 +29,16 @@ export interface OrbNode {
   progress?: number; // 0-100
   /** Image URL for rich media display (thumbnail in tree, texture on orb) */
   imageUrl?: string;
+  /** Visual type for mind map rendering */
+  visualType?: NodeVisualType;
+  /** 3D model URL (glTF/GLB) */
+  modelUrl?: string;
+  /** Thumbnail URL for 2D preview */
+  thumbnailUrl?: string;
+  /** Reference source URLs */
+  sourceUrls?: string[];
+  /** Tags for filtering */
+  tags?: string[];
 }
 
 /** Human-readable labels per type */
