@@ -34,29 +34,29 @@ export function CodeSidebar() {
 
   return (
     <>
-      {/* Toggle button — always visible */}
+      {/* Toggle button — always visible, vertically centered on right edge */}
       <button
         onClick={toggleCodeSidebar}
         className={cn(
-          "fixed z-50 top-4 right-44 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-mono rounded",
-          "bg-black/50 backdrop-blur-sm border transition-all duration-200",
+          "fixed z-[60] top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 px-2 py-3 text-xs font-mono rounded-l-lg",
+          "backdrop-blur-sm border-l border-t border-b transition-all duration-200 shadow-lg",
           open
-            ? "text-cyan-400 border-cyan-600/50 hover:bg-cyan-900/30"
-            : "text-slate-400 border-slate-700/50 hover:text-white hover:border-slate-600/50",
+            ? "right-[480px] text-cyan-300 bg-cyan-950/90 border-cyan-500/70 shadow-cyan-500/20 hover:bg-cyan-900/90"
+            : "right-0 text-cyan-400 bg-black/80 border-cyan-700/60 shadow-cyan-500/10 hover:bg-cyan-950/90 hover:text-cyan-300 hover:border-cyan-500/70",
           modifiedFiles.size > 0 &&
             !open &&
-            "border-amber-500/50 text-amber-400",
+            "border-amber-500/70 text-amber-400 bg-amber-950/80 shadow-amber-500/20",
         )}
         title={open ? "Close code panel" : "Open code panel"}
       >
-        <Code2 className="w-3.5 h-3.5" />
+        <Code2 className="w-4 h-4" />
         {open ? (
-          <PanelRightClose className="w-3.5 h-3.5" />
+          <PanelRightClose className="w-4 h-4" />
         ) : (
-          <PanelRightOpen className="w-3.5 h-3.5" />
+          <PanelRightOpen className="w-4 h-4" />
         )}
         {modifiedFiles.size > 0 && !open && (
-          <span className="ml-0.5 px-1 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded">
+          <span className="px-1 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded leading-none">
             {modifiedFiles.size}
           </span>
         )}

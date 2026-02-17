@@ -70,21 +70,21 @@ export function NodeContextMenu({
 
       {/* Menu */}
       <div
-        className="fixed z-[61] min-w-[180px] bg-[#0a0a1a]/95 backdrop-blur-md border border-cyan-900/30 rounded-lg shadow-2xl shadow-black/50 py-1 font-mono text-xs"
+        className="fixed z-[61] min-w-[180px] bg-card/95 backdrop-blur-md border border-border rounded-lg shadow-2xl shadow-black/50 py-1 font-mono text-xs"
         style={{ left: x, top: y }}
       >
         {/* Node title */}
-        <div className="px-3 py-2 border-b border-cyan-900/20">
-          <div className="text-[10px] text-cyan-500 uppercase tracking-wider">
+        <div className="px-3 py-2 border-b border-border/50">
+          <div className="text-[10px] text-primary uppercase tracking-wider">
             {node.type}
           </div>
-          <div className="text-sm text-white truncate">{node.name}</div>
+          <div className="text-sm text-foreground truncate">{node.name}</div>
         </div>
 
         {/* Expand/Collapse */}
         <button
           onClick={() => handleAction(() => onToggleExpand(node.id))}
-          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-cyan-900/20 text-slate-300 hover:text-white transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-primary/10 text-muted-foreground hover:text-foreground transition-colors"
         >
           {isExpanded ? (
             <ChevronDown className="w-3.5 h-3.5" />
@@ -97,17 +97,17 @@ export function NodeContextMenu({
         {/* View details */}
         <button
           onClick={() => handleAction(() => onViewDetails(node))}
-          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-cyan-900/20 text-slate-300 hover:text-white transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-primary/10 text-muted-foreground hover:text-foreground transition-colors"
         >
           <Eye className="w-3.5 h-3.5" />
           Szczegoly
         </button>
 
         {/* Separator */}
-        <div className="border-t border-cyan-900/20 my-1" />
+        <div className="border-t border-border/50 my-1" />
 
         {/* Change visual type */}
-        <div className="px-3 py-1.5 text-[10px] text-slate-500 uppercase tracking-wider">
+        <div className="px-3 py-1.5 text-[10px] text-muted-foreground uppercase tracking-wider">
           Zmien wizualizacje
         </div>
         {visualTypes.map(({ type, label, icon: Icon }) => (
@@ -115,27 +115,27 @@ export function NodeContextMenu({
             key={type}
             onClick={() => handleAction(() => onChangeVisual(node.id, type))}
             className={cn(
-              "w-full flex items-center gap-2 px-3 py-1.5 hover:bg-cyan-900/20 transition-colors",
+              "w-full flex items-center gap-2 px-3 py-1.5 hover:bg-primary/10 transition-colors",
               node.visualType === type
-                ? "text-cyan-400"
-                : "text-slate-400 hover:text-white",
+                ? "text-primary"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             <Icon className="w-3.5 h-3.5" />
             {label}
             {node.visualType === type && (
-              <span className="ml-auto text-[9px] text-cyan-500">aktywne</span>
+              <span className="ml-auto text-[9px] text-primary">aktywne</span>
             )}
           </button>
         ))}
 
         {/* Separator */}
-        <div className="border-t border-cyan-900/20 my-1" />
+        <div className="border-t border-border/50 my-1" />
 
         {/* Attach 3D model */}
         <button
           onClick={() => handleAction(() => onOpenModelPicker(node.id))}
-          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-cyan-900/20 text-slate-300 hover:text-white transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-primary/10 text-muted-foreground hover:text-foreground transition-colors"
         >
           <Link2 className="w-3.5 h-3.5" />
           Dolacz model 3D

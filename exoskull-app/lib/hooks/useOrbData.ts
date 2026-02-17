@@ -64,6 +64,7 @@ interface ApiQuest {
   title: string;
   status: string;
   ops_count: number;
+  completed_ops?: number;
   notes_count: number;
   missions_count: number;
   missions: ApiMission[];
@@ -173,9 +174,7 @@ function transformApiToOrbTree(values: ApiValue[]): OrbNode[] {
         status: statusToOrb(q.status),
         progress:
           q.ops_count > 0
-            ? Math.round(
-                ((q.ops_count - (q.ops_count || 0)) / q.ops_count) * 100,
-              )
+            ? Math.round(((q.completed_ops || 0) / (q.ops_count || 1)) * 100)
             : undefined,
         visualType: toVisualType(q.visual_type),
         modelUrl: q.model_url || undefined,
@@ -238,7 +237,7 @@ function getApiEndpoint(type: OrbNodeType): string {
   return map[type];
 }
 
-/** Map OrbNodeType to the ID field name expected by each API route */
+/** Map OrbNodeType to the ID field name used in PATCH request body */
 function getIdFieldName(type: OrbNodeType): string {
   const map: Record<OrbNodeType, string> = {
     value: "valueId",
@@ -251,12 +250,23 @@ function getIdFieldName(type: OrbNodeType): string {
   return map[type];
 }
 
+/** Map OrbNodeType to the query param name used in DELETE requests */
+function getDeleteParamName(type: OrbNodeType): string {
+  const map: Record<OrbNodeType, string> = {
+    value: "valueId",
+    loop: "loopId",
+    quest: "questId",
+    mission: "missionId",
+    challenge: "challengeId",
+    op: "opId",
+  };
+  return map[type];
+}
+
 /** Build full DELETE URL with correct query params per API route */
 function getDeleteUrl(type: OrbNodeType, nodeId: string): string {
   const base = getApiEndpoint(type);
-  const idField = getIdFieldName(type);
-  // missions & challenges read { id } from body, no query params needed
-  if (type === "mission" || type === "challenge") return base;
+  const idField = getDeleteParamName(type);
   return `${base}?${idField}=${encodeURIComponent(nodeId)}`;
 }
 
@@ -643,11 +653,6 @@ export function useOrbData() {
 
         const res = await fetchWithRetry(endpoint, {
           method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body:
-            type === "mission" || type === "challenge"
-              ? JSON.stringify({ id: nodeId })
-              : undefined,
         });
 
         if (!res.ok) {

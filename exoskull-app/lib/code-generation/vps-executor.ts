@@ -59,6 +59,85 @@ export interface VPSHealthStatus {
 }
 
 // ============================================================================
+// CIRCUIT BREAKER
+// ============================================================================
+
+interface CircuitBreakerState {
+  failures: number;
+  lastFailure: number;
+  state: "closed" | "open" | "half-open";
+}
+
+const circuitBreaker: CircuitBreakerState = {
+  failures: 0,
+  lastFailure: 0,
+  state: "closed",
+};
+
+const CB_FAILURE_THRESHOLD = 3; // Open after 3 consecutive failures
+const CB_RESET_TIMEOUT_MS = 60_000; // Try again after 60 seconds
+
+function checkCircuitBreaker(): { allowed: boolean; reason?: string } {
+  if (circuitBreaker.state === "closed") return { allowed: true };
+
+  if (circuitBreaker.state === "open") {
+    const elapsed = Date.now() - circuitBreaker.lastFailure;
+    if (elapsed >= CB_RESET_TIMEOUT_MS) {
+      circuitBreaker.state = "half-open";
+      return { allowed: true };
+    }
+    return {
+      allowed: false,
+      reason: `Circuit open. ${Math.ceil((CB_RESET_TIMEOUT_MS - elapsed) / 1000)}s until retry.`,
+    };
+  }
+
+  // half-open: allow one request through
+  return { allowed: true };
+}
+
+function recordSuccess() {
+  circuitBreaker.failures = 0;
+  circuitBreaker.state = "closed";
+}
+
+function recordFailure() {
+  circuitBreaker.failures++;
+  circuitBreaker.lastFailure = Date.now();
+  if (circuitBreaker.failures >= CB_FAILURE_THRESHOLD) {
+    circuitBreaker.state = "open";
+  }
+}
+
+/**
+ * Get current circuit breaker status for health monitoring.
+ */
+export function getCircuitBreakerStatus(): {
+  state: CircuitBreakerState["state"];
+  failures: number;
+  lastFailure: number;
+  nextRetryIn?: number;
+} {
+  const result: {
+    state: CircuitBreakerState["state"];
+    failures: number;
+    lastFailure: number;
+    nextRetryIn?: number;
+  } = {
+    state: circuitBreaker.state,
+    failures: circuitBreaker.failures,
+    lastFailure: circuitBreaker.lastFailure,
+  };
+
+  if (circuitBreaker.state === "open") {
+    const elapsed = Date.now() - circuitBreaker.lastFailure;
+    result.nextRetryIn = Math.max(0, CB_RESET_TIMEOUT_MS - elapsed);
+  }
+
+  return result;
+}
+
+// ============================================================================
 // CLIENT
 // ============================================================================
 
@@ -75,6 +154,7 @@ function getConfig(): { url: string; secret: string } | null {
 
 /**
  * Check if VPS executor is configured and available.
+ * Updates circuit breaker state based on health check result.
  */
 export async function isVPSAvailable(): Promise<boolean> {
   const config = getConfig();
@@ -86,11 +166,38 @@ export async function isVPSAvailable(): Promise<boolean> {
       signal: AbortSignal.timeout(5000),
     });
 
-    if (!response.ok) return false;
+    if (!response.ok) {
+      recordFailure();
+      logger.warn("[VPSExecutor] Health check failed:", {
+        status: response.status,
+        cbState: circuitBreaker.state,
+        cbFailures: circuitBreaker.failures,
+      });
+      return false;
+    }
 
     const data = (await response.json()) as VPSHealthStatus;
-    return data.status === "ok" && data.docker === "connected";
-  } catch {
+    const healthy = data.status === "ok" && data.docker === "connected";
+
+    if (healthy) {
+      recordSuccess();
+    } else {
+      recordFailure();
+      logger.warn("[VPSExecutor] Health check unhealthy:", {
+        data,
+        cbState: circuitBreaker.state,
+        cbFailures: circuitBreaker.failures,
+      });
+    }
+
+    return healthy;
+  } catch (error) {
+    recordFailure();
+    logger.error("[VPSExecutor] Health check error:", {
+      error: error instanceof Error ? error.message : String(error),
+      cbState: circuitBreaker.state,
+      cbFailures: circuitBreaker.failures,
+    });
     return false;
   }
 }
@@ -105,6 +212,26 @@ export async function isVPSAvailable(): Promise<boolean> {
 export async function executeOnVPS(
   request: VPSExecuteRequest,
 ): Promise<VPSExecuteResult> {
+  // ── Circuit breaker check ──
+  const cbCheck = checkCircuitBreaker();
+  if (!cbCheck.allowed) {
+    logger.warn("[VPSExecutor] Circuit breaker OPEN, rejecting request:", {
+      reason: cbCheck.reason,
+      action: request.action,
+      workspaceId: request.workspace_id,
+    });
+    return {
+      success: false,
+      job_id: request.workspace_id || "unknown",
+      action: request.action,
+      duration_ms: 0,
+      exit_code: -1,
+      stdout: "",
+      stderr: `VPS unavailable: ${cbCheck.reason}`,
+      error: `VPS unavailable: ${cbCheck.reason}`,
+    };
+  }
+
   const config = getConfig();
   if (!config) {
     throw new Error(
@@ -134,12 +261,22 @@ export async function executeOnVPS(
 
     if (!response.ok) {
       const errorBody = await response.text();
-      throw new Error(
+      const err = new Error(
         `VPS executor returned ${response.status}: ${errorBody.slice(0, 500)}`,
       );
+      recordFailure();
+      logger.error("[VPSExecutor] HTTP error, circuit breaker updated:", {
+        error: err.message,
+        cbState: circuitBreaker.state,
+        cbFailures: circuitBreaker.failures,
+      });
+      throw err;
     }
 
     const result = (await response.json()) as VPSExecuteResult;
+
+    // Record success — resets circuit breaker
+    recordSuccess();
 
     logger.info("[VPSExecutor] Job complete:", {
       jobId: result.job_id,
@@ -151,7 +288,24 @@ export async function executeOnVPS(
     return result;
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
-    logger.error("[VPSExecutor] Job failed:", { error: errMsg });
+
+    // Record failure for circuit breaker (network/timeout errors)
+    // Note: HTTP errors already called recordFailure() above before re-throwing
+    const isNetworkOrTimeout =
+      errMsg.includes("timeout") ||
+      errMsg.includes("ECONNREFUSED") ||
+      errMsg.includes("ENOTFOUND") ||
+      errMsg.includes("fetch failed") ||
+      errMsg.includes("network");
+    if (isNetworkOrTimeout) {
+      recordFailure();
+    }
+
+    logger.error("[VPSExecutor] Job failed:", {
+      error: errMsg,
+      cbState: circuitBreaker.state,
+      cbFailures: circuitBreaker.failures,
+    });
 
     // Return structured error (don't throw — let caller handle)
     return {

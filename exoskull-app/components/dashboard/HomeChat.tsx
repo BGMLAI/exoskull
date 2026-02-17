@@ -39,6 +39,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTTS } from "@/lib/hooks/useTTS";
 import { MarkdownContent } from "@/components/ui/markdown-content";
+import { DiffViewer } from "@/components/chat/DiffViewer";
+import { TerminalOutput } from "@/components/chat/TerminalOutput";
+import { FileChange } from "@/components/chat/FileChange";
 
 interface HomeChatProps {
   tenantId: string;
@@ -57,10 +60,26 @@ interface TimelineItem {
   channel?: string;
 }
 
+type ChatBlock =
+  | { type: "text"; content: string }
+  | { type: "code_diff"; file: string; diff: string; language: string }
+  | {
+      type: "terminal_output";
+      command: string;
+      output: string;
+      exitCode: number;
+    }
+  | {
+      type: "file_change";
+      path: string;
+      action: "created" | "modified" | "deleted";
+    };
+
 interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  blocks: ChatBlock[];
   timestamp: Date;
 }
 
@@ -215,6 +234,7 @@ export function HomeChat({
         id: `user-${Date.now()}`,
         role: "user",
         content: messageText,
+        blocks: [{ type: "text", content: messageText }],
         timestamp: new Date(),
       };
 
@@ -228,6 +248,7 @@ export function HomeChat({
           id: assistantMsgId,
           role: "assistant",
           content: "",
+          blocks: [],
           timestamp: new Date(),
         },
       ]);
@@ -277,11 +298,25 @@ export function HomeChat({
               } else if (data.type === "delta") {
                 fullText += data.text;
                 setChatMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === assistantMsgId
-                      ? { ...msg, content: msg.content + data.text }
-                      : msg,
-                  ),
+                  prev.map((msg) => {
+                    if (msg.id !== assistantMsgId) return msg;
+                    // Accumulate text into the last text block, or create one
+                    const blocks = [...msg.blocks];
+                    const lastBlock = blocks[blocks.length - 1];
+                    if (lastBlock && lastBlock.type === "text") {
+                      blocks[blocks.length - 1] = {
+                        ...lastBlock,
+                        content: lastBlock.content + data.text,
+                      };
+                    } else {
+                      blocks.push({ type: "text", content: data.text });
+                    }
+                    return {
+                      ...msg,
+                      content: msg.content + data.text,
+                      blocks,
+                    };
+                  }),
                 );
               } else if (data.type === "done" && data.fullText) {
                 // Backup: use server's fullText if tracking missed some deltas
@@ -290,8 +325,66 @@ export function HomeChat({
                 setToolActivity(data.label || data.tool);
               } else if (data.type === "tool_end") {
                 setToolActivity(null);
+              } else if (data.type === "code_diff") {
+                // Rich block: inline diff viewer
+                setChatMessages((prev) =>
+                  prev.map((msg) => {
+                    if (msg.id !== assistantMsgId) return msg;
+                    return {
+                      ...msg,
+                      blocks: [
+                        ...msg.blocks,
+                        {
+                          type: "code_diff" as const,
+                          file: data.file,
+                          diff: data.diff,
+                          language: data.language || "",
+                        },
+                      ],
+                    };
+                  }),
+                );
+              } else if (data.type === "terminal_output") {
+                // Rich block: terminal output
+                setChatMessages((prev) =>
+                  prev.map((msg) => {
+                    if (msg.id !== assistantMsgId) return msg;
+                    return {
+                      ...msg,
+                      blocks: [
+                        ...msg.blocks,
+                        {
+                          type: "terminal_output" as const,
+                          command: data.command || "",
+                          output: data.output,
+                          exitCode: data.exitCode ?? 0,
+                        },
+                      ],
+                    };
+                  }),
+                );
               } else if (data.type === "file_change") {
-                onFileChange?.(data.filePath, data.operation);
+                // Rich block: file change card + notify parent
+                onFileChange?.(
+                  data.path || data.filePath,
+                  data.action || data.operation,
+                );
+                setChatMessages((prev) =>
+                  prev.map((msg) => {
+                    if (msg.id !== assistantMsgId) return msg;
+                    return {
+                      ...msg,
+                      blocks: [
+                        ...msg.blocks,
+                        {
+                          type: "file_change" as const,
+                          path: data.path || data.filePath,
+                          action: data.action || data.operation || "modified",
+                        },
+                      ],
+                    };
+                  }),
+                );
               } else if (data.type === "error") {
                 setChatMessages((prev) =>
                   prev.map((msg) =>
@@ -355,6 +448,9 @@ export function HomeChat({
           id: uploadMsgId,
           role: "assistant" as const,
           content: `Przesyłam plik: ${file.name}...`,
+          blocks: [
+            { type: "text", content: `Przesyłam plik: ${file.name}...` },
+          ],
           timestamp: new Date(),
         },
       ]);
@@ -707,34 +803,79 @@ export function HomeChat({
                 msg.role === "user" ? "text-right" : "",
               )}
             >
-              <div
-                className={cn(
-                  "inline-block rounded-2xl px-3 py-2 text-sm",
-                  msg.role === "user"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-foreground",
-                )}
-              >
-                {msg.content ? (
-                  msg.role === "assistant" ? (
-                    <MarkdownContent content={msg.content} />
+              {/* User messages: simple text bubble */}
+              {msg.role === "user" && (
+                <div className="inline-block rounded-2xl px-3 py-2 text-sm bg-primary text-primary-foreground">
+                  <span className="whitespace-pre-wrap">{msg.content}</span>
+                </div>
+              )}
+
+              {/* Assistant messages: render blocks if present, fallback to content */}
+              {msg.role === "assistant" && (
+                <>
+                  {msg.blocks.length > 0 ? (
+                    msg.blocks.map((block, blockIdx) => {
+                      switch (block.type) {
+                        case "text":
+                          return block.content ? (
+                            <div
+                              key={blockIdx}
+                              className="inline-block rounded-2xl px-3 py-2 text-sm bg-muted text-foreground"
+                            >
+                              <MarkdownContent content={block.content} />
+                            </div>
+                          ) : null;
+                        case "code_diff":
+                          return (
+                            <DiffViewer
+                              key={blockIdx}
+                              filename={block.file}
+                              diff={block.diff}
+                              language={block.language}
+                            />
+                          );
+                        case "terminal_output":
+                          return (
+                            <TerminalOutput
+                              key={blockIdx}
+                              command={block.command}
+                              output={block.output}
+                              exitCode={block.exitCode}
+                            />
+                          );
+                        case "file_change":
+                          return (
+                            <FileChange
+                              key={blockIdx}
+                              path={block.path}
+                              action={block.action}
+                            />
+                          );
+                        default:
+                          return null;
+                      }
+                    })
+                  ) : msg.content ? (
+                    <div className="inline-block rounded-2xl px-3 py-2 text-sm bg-muted text-foreground">
+                      <MarkdownContent content={msg.content} />
+                    </div>
                   ) : (
-                    <span className="whitespace-pre-wrap">{msg.content}</span>
-                  )
-                ) : (
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 bg-current rounded-full animate-bounce" />
-                    <span
-                      className="w-2 h-2 bg-current rounded-full animate-bounce"
-                      style={{ animationDelay: "0.1s" }}
-                    />
-                    <span
-                      className="w-2 h-2 bg-current rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    />
-                  </span>
-                )}
-              </div>
+                    <div className="inline-block rounded-2xl px-3 py-2 text-sm bg-muted text-foreground">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 bg-current rounded-full animate-bounce" />
+                        <span
+                          className="w-2 h-2 bg-current rounded-full animate-bounce"
+                          style={{ animationDelay: "0.1s" }}
+                        />
+                        <span
+                          className="w-2 h-2 bg-current rounded-full animate-bounce"
+                          style={{ animationDelay: "0.2s" }}
+                        />
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         ))}

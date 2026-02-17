@@ -113,6 +113,50 @@
     --sidebar-active-text: 0 0% 100%;
     --glow-color: 263 70% 66%;
   }
+
+  /* ===== Theme D: Gemini Hybrid (light, multi-color accents) ===== */
+  .gemini-hybrid {
+    --background: 220 14% 96%;
+    --foreground: 220 13% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 13%;
+    --primary: 213 94% 52%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 92%;
+    --secondary-foreground: 220 13% 18%;
+    --muted: 220 14% 92%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 38 92% 50%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 354 70% 54%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 87%;
+    --input: 220 13% 87%;
+    --ring: 213 94% 52%;
+    --radius: 0.625rem;
+
+    /* Gemini Hybrid specific */
+    --sidebar-bg: 0 0% 100%;
+    --sidebar-border: 220 13% 90%;
+    --sidebar-text: 220 13% 18%;
+    --sidebar-muted: 220 9% 46%;
+    --sidebar-active: 213 94% 52%;
+    --sidebar-active-text: 0 0% 100%;
+
+    /* Multi-color section accents */
+    --accent-tasks: 217 91% 60%;
+    --accent-calendar: 38 92% 50%;
+    --accent-knowledge: 160 84% 39%;
+    --accent-email: 191 91% 37%;
+    --accent-voice: 263 70% 50%;
+    --accent-health: 142 76% 36%;
+
+    /* 3D scene overrides */
+    --bg-void: 220 14% 94%;
+    --orb-glow-opacity: 0.3;
+  }
 }
 
 @layer base {
@@ -171,11 +215,38 @@
   border: 1px solid hsl(var(--border));
 }
 
+/* Gemini Hybrid: Soft shadow cards */
+.gemini-hybrid .card-glow:hover {
+  box-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.08),
+    0 0 0 1px hsl(var(--border));
+}
+
+/* Gemini Hybrid: Clean gradient background */
+.gemini-hybrid body,
+.gemini-hybrid {
+  background: linear-gradient(
+    180deg,
+    hsl(220 14% 96%) 0%,
+    hsl(220 14% 98%) 100%
+  );
+}
+
+/* Gemini Hybrid: Subtle dot pattern */
+.gemini-hybrid .neural-bg {
+  background-image: radial-gradient(
+    hsl(var(--primary) / 0.04) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
+}
+
 /* Smooth theme transitions */
 body,
 .dark-ops,
 .xo-minimal,
-.neural {
+.neural,
+.gemini-hybrid {
   transition:
     background-color 200ms ease,
     color 200ms ease;
@@ -376,6 +447,14 @@ body,
   box-shadow:
     0 0 6px 1px hsl(var(--glow-color) / 0.25),
     0 0 14px 3px hsl(var(--glow-color) / 0.1);
+}
+
+/* Gemini Hybrid: blue Gamma line */
+.gemini-hybrid .gamma-line-glow {
+  background: hsl(213 94% 52% / 0.5);
+  box-shadow:
+    0 0 4px 1px hsl(213 94% 52% / 0.15),
+    0 0 10px 2px hsl(213 94% 52% / 0.05);
 }
 
 /* Scrollbar styling for chat */

@@ -43,6 +43,15 @@ interface MindMap3DProps {
 export function MindMap3D({ width, height }: MindMap3DProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fgRef = useRef<any>(null);
+  const [bgColor, setBgColor] = useState<string>("#050510");
+
+  useEffect(() => {
+    const style = getComputedStyle(document.documentElement);
+    const hsl = style.getPropertyValue("--background").trim();
+    if (hsl) {
+      setBgColor(`hsl(${hsl})`);
+    }
+  }, []);
   const { rootNodes, loadChildren, updateNode } = useOrbData();
   const {
     expandedNodes,
@@ -209,7 +218,7 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
         graphData={graphData}
         width={width}
         height={height}
-        backgroundColor="#050510"
+        backgroundColor={bgColor}
         nodeThreeObject={nodeThreeObject}
         nodeThreeObjectExtend={false}
         onNodeClick={handleNodeClick}

@@ -158,15 +158,16 @@ export function OrbFormDialog({
         zIndex: 100,
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
-        background: "rgba(0, 0, 0, 0.5)",
+        background:
+          "rgba(0, 0, 0, 0.5)" /* bg-black/50 — acceptable on all themes */,
       }}
       onClick={handleBackdropClick}
     >
       <div
         className="w-full max-w-md flex flex-col gap-5"
         style={{
-          background: "rgba(10, 10, 28, 0.95)",
-          border: "1px solid rgba(6, 182, 212, 0.2)",
+          background: "hsl(var(--popover) / 0.95)",
+          border: "1px solid hsl(var(--primary) / 0.2)",
           borderRadius: 12,
           padding: 24,
           boxShadow:

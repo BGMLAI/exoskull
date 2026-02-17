@@ -26,20 +26,46 @@ import { useDictation } from "@/lib/hooks/useDictation";
 import { useTTS } from "@/lib/hooks/useTTS";
 import { BIRTH_FIRST_MESSAGE } from "@/lib/iors/birth-prompt";
 
+const ESTIMATED_STEPS = 15;
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
 }
 
+function MessageSkeleton() {
+  return (
+    <div className="flex justify-start animate-pulse">
+      <div className="max-w-[80%] space-y-2 rounded-2xl px-4 py-3 bg-muted">
+        <div className="h-3 w-48 bg-muted-foreground/20 rounded" />
+        <div className="h-3 w-36 bg-muted-foreground/20 rounded" />
+        <div className="h-3 w-24 bg-muted-foreground/20 rounded" />
+      </div>
+    </div>
+  );
+}
+
+function ProgressBar({ current, total }: { current: number; total: number }) {
+  const pct = Math.min((current / total) * 100, 100);
+  return (
+    <div className="flex items-center gap-3 px-4 py-2">
+      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+        <div
+          className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-xs text-muted-foreground whitespace-nowrap">
+        Krok {current} z ~{total}
+      </span>
+    </div>
+  );
+}
+
 export function BirthChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "greeting",
-      role: "assistant",
-      content: BIRTH_FIRST_MESSAGE,
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [dictationError, setDictationError] = useState<string | null>(null);
@@ -67,6 +93,24 @@ export function BirthChat() {
         setTimeout(() => setDictationError(null), 3000);
       },
     });
+
+  // Progress: count user messages
+  const userMessageCount = messages.filter((m) => m.role === "user").length;
+
+  // Show initial greeting after a brief skeleton
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMessages([
+        {
+          id: "greeting",
+          role: "assistant",
+          content: BIRTH_FIRST_MESSAGE,
+        },
+      ]);
+      setIsInitialized(true);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -110,7 +154,7 @@ export function BirthChat() {
       } catch {
         // Greeting audio failed — text greeting is still visible
       }
-    }, 100);
+    }, 700);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -203,7 +247,7 @@ export function BirthChat() {
             id: `error-${Date.now()}`,
             role: "assistant",
             content:
-              "Przepraszam, coś poszło nie tak. Napisz jeszcze raz — chcę Cię poznać!",
+              "Przepraszam, cos poszlo nie tak. Napisz jeszcze raz -- chce Cie poznac!",
           },
         ]);
       } finally {
@@ -280,7 +324,7 @@ export function BirthChat() {
 
         // Auto-send message so IORS knows about the file
         sendMessageDirect(
-          `Przesłałem plik "${file.name}" (typ: ${file.type}, kategoria: ${category}, id: ${documentId}). Skataloguj go.`,
+          `Przeslalem plik "${file.name}" (typ: ${file.type}, kategoria: ${category}, id: ${documentId}). Skataloguj go.`,
         );
       } catch (err) {
         console.error("[BirthChat] Upload error:", err);
@@ -289,7 +333,7 @@ export function BirthChat() {
           {
             id: `error-${Date.now()}`,
             role: "assistant",
-            content: `Błąd przesyłania pliku: ${err instanceof Error ? err.message : "Nieznany błąd"}`,
+            content: `Blad przesylania pliku: ${err instanceof Error ? err.message : "Nieznany blad"}`,
           },
         ]);
       } finally {
@@ -312,41 +356,53 @@ export function BirthChat() {
   // --------------------------------------------------------------------------
 
   return (
-    <Card className="w-full max-w-2xl bg-slate-800/50 border-slate-700">
-      <CardHeader className="pb-2 flex flex-row items-center justify-between border-b border-slate-700">
-        <CardTitle className="text-lg text-white flex items-center gap-2">
-          <MessageSquare className="h-5 w-5 text-blue-400" />
-          Rozmowa z IORS
-        </CardTitle>
+    <Card className="w-full max-w-2xl bg-card border-border">
+      <CardHeader className="pb-2 flex flex-col gap-0 border-b border-border">
+        <div className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg text-foreground flex items-center gap-2">
+            <MessageSquare className="h-5 w-5 text-primary" />
+            Rozmowa z IORS
+          </CardTitle>
 
-        {/* TTS toggle */}
-        <button
-          onClick={toggleTTS}
-          className={cn(
-            "p-2 rounded-full transition-colors",
-            isTTSEnabled
-              ? "bg-blue-600/20 text-blue-400 hover:bg-blue-600/30"
-              : "bg-slate-700 text-slate-500 hover:bg-slate-600",
-          )}
-          title={isTTSEnabled ? "Wycisz głos" : "Włącz głos"}
-          aria-label={isTTSEnabled ? "Wycisz głos" : "Włącz głos"}
-        >
-          {isTTSEnabled ? (
-            <Volume2 className={cn("h-5 w-5", isSpeaking && "animate-pulse")} />
-          ) : (
-            <VolumeX className="h-5 w-5" />
-          )}
-        </button>
+          {/* TTS toggle */}
+          <button
+            onClick={toggleTTS}
+            className={cn(
+              "p-2 rounded-full transition-colors",
+              isTTSEnabled
+                ? "bg-primary/20 text-primary hover:bg-primary/30"
+                : "bg-muted text-muted-foreground hover:bg-muted/80",
+            )}
+            title={isTTSEnabled ? "Wycisz glos" : "Wlacz glos"}
+            aria-label={isTTSEnabled ? "Wycisz glos" : "Wlacz glos"}
+          >
+            {isTTSEnabled ? (
+              <Volume2
+                className={cn("h-5 w-5", isSpeaking && "animate-pulse")}
+              />
+            ) : (
+              <VolumeX className="h-5 w-5" />
+            )}
+          </button>
+        </div>
+
+        {/* Progress bar */}
+        {isInitialized && (
+          <ProgressBar current={userMessageCount} total={ESTIMATED_STEPS} />
+        )}
       </CardHeader>
 
       <CardContent className="flex flex-col h-[500px] p-0">
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Skeleton before first message loads */}
+          {!isInitialized && <MessageSkeleton />}
+
           {messages.map((msg) => (
             <div
               key={msg.id}
               className={cn(
-                "flex",
+                "flex animate-in fade-in duration-300",
                 msg.role === "user" ? "justify-end" : "justify-start",
               )}
             >
@@ -354,8 +410,8 @@ export function BirthChat() {
                 className={cn(
                   "max-w-[80%] rounded-2xl px-4 py-2",
                   msg.role === "user"
-                    ? "bg-blue-600 text-white"
-                    : "bg-slate-700 text-slate-100",
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-foreground",
                 )}
               >
                 <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -364,9 +420,9 @@ export function BirthChat() {
           ))}
 
           {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-slate-700 rounded-2xl px-4 py-2">
-                <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+            <div className="flex justify-start animate-in fade-in duration-200">
+              <div className="bg-muted rounded-2xl px-4 py-2">
+                <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
               </div>
             </div>
           )}
@@ -376,33 +432,35 @@ export function BirthChat() {
 
         {/* Speaking indicator */}
         {isSpeaking && (
-          <div className="px-4 py-2 bg-blue-900/30 border-t border-slate-700">
+          <div className="px-4 py-2 bg-primary/10 border-t border-border">
             <button
               onClick={stopAudio}
-              className="flex items-center gap-2 text-sm text-blue-300 hover:text-blue-200"
+              className="flex items-center gap-2 text-sm text-primary hover:text-primary/80"
             >
               <Volume2 className="w-4 h-4 animate-pulse" />
-              IORS mówi... kliknij aby przerwać
+              IORS mowi... kliknij aby przerwac
             </button>
           </div>
         )}
 
         {/* Dictation interim transcript */}
         {interimTranscript && isListening && (
-          <div className="px-4 py-2 bg-slate-700/50 border-t border-slate-600">
-            <p className="text-sm text-slate-300 italic">{interimTranscript}</p>
+          <div className="px-4 py-2 bg-muted/50 border-t border-border">
+            <p className="text-sm text-foreground italic">
+              {interimTranscript}
+            </p>
           </div>
         )}
 
         {/* Dictation error */}
         {dictationError && (
-          <div className="px-4 py-2 bg-red-900/30 border-t border-slate-600">
-            <p className="text-sm text-red-300">{dictationError}</p>
+          <div className="px-4 py-2 bg-destructive/10 border-t border-border">
+            <p className="text-sm text-destructive">{dictationError}</p>
           </div>
         )}
 
         {/* Input bar */}
-        <div className="p-4 border-t border-slate-700">
+        <div className="p-4 border-t border-border">
           <div className="flex gap-2 items-center">
             <DictationButton
               isListening={isListening}
@@ -422,8 +480,8 @@ export function BirthChat() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading || isUploading}
-              className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white disabled:opacity-50 transition-colors"
-              title="Prześlij plik"
+              className="p-2 rounded-lg bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
+              title="Przeslij plik"
             >
               {isUploading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -435,14 +493,14 @@ export function BirthChat() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Napisz, dyktuj lub prześlij plik..."
+              placeholder="Napisz, dyktuj lub przeslij plik..."
               disabled={isLoading}
-              className="flex-1 bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+              className="flex-1 bg-muted border-border text-foreground placeholder:text-muted-foreground"
             />
             <Button
               onClick={sendMessage}
               disabled={!input.trim() || isLoading}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-primary hover:bg-primary/90"
             >
               <Send className="h-4 w-4" />
             </Button>

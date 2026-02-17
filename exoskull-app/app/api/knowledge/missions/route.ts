@@ -185,11 +185,14 @@ export const DELETE = withApiLog(async function DELETE(request: NextRequest) {
     const tenantId = auth.tenantId;
 
     const supabase = getServiceSupabase();
-    const body = await request.json();
-    const { id } = body;
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("missionId");
 
     if (!id) {
-      return NextResponse.json({ error: "id required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "missionId required" },
+        { status: 400 },
+      );
     }
 
     const { error } = await supabase
