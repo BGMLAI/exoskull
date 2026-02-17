@@ -9,13 +9,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
 // PUT — Update a single widget
 // ============================================================================
 
-export async function PUT(
+export const PUT = withApiLog(async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
@@ -109,13 +110,13 @@ export async function PUT(
       { status: 500 },
     );
   }
-}
+});
 
 // ============================================================================
 // DELETE — Remove a widget
 // ============================================================================
 
-export async function DELETE(
+export const DELETE = withApiLog(async function DELETE(
   _request: NextRequest,
   { params }: { params: { id: string } },
 ) {
@@ -169,4 +170,4 @@ export async function DELETE(
       { status: 500 },
     );
   }
-}
+});

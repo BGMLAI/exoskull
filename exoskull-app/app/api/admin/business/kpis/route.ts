@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, getAdminSupabase } from "@/lib/admin/auth";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     await requireAdmin();
     const db = getAdminSupabase();
@@ -79,4 +80,4 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

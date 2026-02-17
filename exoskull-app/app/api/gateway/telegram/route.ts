@@ -16,13 +16,14 @@ import {
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
 // POST - INCOMING TELEGRAM MESSAGES
 // =====================================================
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     // Verify secret token (mandatory)
     const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET;
@@ -73,13 +74,13 @@ export async function POST(req: NextRequest) {
     // Return 200 to prevent Telegram from retrying
     return NextResponse.json({ ok: true });
   }
-}
+});
 
 // =====================================================
 // GET - SETUP / HEALTH CHECK
 // =====================================================
 
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   const action = req.nextUrl.searchParams.get("action");
 
   if (action === "setup") {
@@ -101,4 +102,4 @@ export async function GET(req: NextRequest) {
     status: "active",
     hasToken: !!process.env.TELEGRAM_BOT_TOKEN,
   });
-}
+});

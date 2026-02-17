@@ -7,6 +7,7 @@ import {
 } from "@/lib/tasks/task-service";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // Tool Handlers (legacy VAPI format - using dual-write task service)
@@ -252,7 +253,7 @@ async function toggleCheckin(
   };
 }
 
-export async function POST(request: Request) {
+export const POST = withApiLog(async function POST(request: Request) {
   try {
     const body = await request.json();
 
@@ -457,7 +458,7 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
-}
+});
 
 // Handle OPTIONS for CORS
 export async function OPTIONS() {

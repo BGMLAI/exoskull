@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { executeTool } from "@/lib/tools";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 interface SearchRequest {
@@ -18,7 +19,7 @@ interface SearchRequest {
   exclude_domains?: string[];
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   try {
@@ -82,10 +83,10 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 // GET - Quick search with query params
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get("q") || searchParams.get("query");
   const tenantId = searchParams.get("tenant_id");
@@ -114,4 +115,4 @@ export async function GET(request: NextRequest) {
   );
 
   return NextResponse.json(result);
-}
+});

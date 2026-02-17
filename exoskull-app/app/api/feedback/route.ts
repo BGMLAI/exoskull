@@ -14,6 +14,7 @@ import {
   type FeedbackType,
 } from "@/lib/iors/feedback";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 const VALID_TYPES: FeedbackType[] = [
@@ -25,7 +26,7 @@ const VALID_TYPES: FeedbackType[] = [
   "general",
 ];
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -68,9 +69,9 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -89,4 +90,4 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

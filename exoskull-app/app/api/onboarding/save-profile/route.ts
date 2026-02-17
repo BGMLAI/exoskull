@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 interface LoopPayload {
@@ -17,7 +18,7 @@ interface LoopPayload {
 /**
  * POST /api/onboarding/save-profile - Save onboarding form data
  */
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) {
@@ -152,4 +153,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

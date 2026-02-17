@@ -7,9 +7,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
 
   if (!code) {
@@ -26,4 +27,4 @@ export async function GET(req: NextRequest) {
     message:
       "All user data associated with this Facebook account has been deleted.",
   });
-}
+});

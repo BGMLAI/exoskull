@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 interface LayoutItem {
@@ -19,7 +20,7 @@ interface LayoutItem {
   size_h: number;
 }
 
-export async function PUT(request: NextRequest) {
+export const PUT = withApiLog(async function PUT(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -65,4 +66,4 @@ export async function PUT(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

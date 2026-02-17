@@ -7,9 +7,10 @@
 
 import { NextResponse } from "next/server";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withApiLog(async function GET() {
   const html = `<!DOCTYPE html>
 <html lang="pl">
 <head>
@@ -46,4 +47,4 @@ export async function GET() {
   return new NextResponse(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
-}
+});

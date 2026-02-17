@@ -20,6 +20,7 @@ import {
   headObject,
 } from "@/lib/storage/r2-client";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // ---------------------------------------------------------------------------
@@ -427,7 +428,7 @@ async function handleBatchStatus(
 // Main handler
 // ---------------------------------------------------------------------------
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   const auth = await verifyTenantAuth(req);
   if (!auth.ok) return auth.response;
   const tenantId = auth.tenantId;
@@ -464,4 +465,4 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

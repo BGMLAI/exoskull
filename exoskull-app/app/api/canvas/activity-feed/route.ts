@@ -8,9 +8,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -59,4 +60,4 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
+import { withApiLog } from "@/lib/api/request-logger";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 // GET /api/voice/sessions
 // ============================================================================
 
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -48,4 +49,4 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

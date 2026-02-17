@@ -15,6 +15,7 @@ import { withCronGuard } from "@/lib/admin/cron-guard";
 import { verifyCronAuth } from "@/lib/cron/auth";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -82,7 +83,7 @@ export const GET = withCronGuard({ name: "post-conversation" }, getHandler);
 // POST HANDLER (for manual triggers)
 // ============================================================================
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   // Auth check
@@ -132,4 +133,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

@@ -10,6 +10,7 @@ import { cleanupSessionAudio } from "@/lib/voice/elevenlabs-tts";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -62,7 +63,7 @@ async function parseFormData(req: NextRequest): Promise<StatusUpdate> {
 // MAIN HANDLER
 // ============================================================================
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const data = await parseFormData(req);
 
@@ -151,12 +152,12 @@ export async function POST(req: NextRequest) {
     console.error("[Twilio Status] Error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
-}
+});
 
 // Allow GET for health check
-export async function GET() {
+export const GET = withApiLog(async function GET() {
   return NextResponse.json({
     status: "ok",
     endpoint: "Twilio Status Callback",
   });
-}
+});

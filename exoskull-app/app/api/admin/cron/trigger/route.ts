@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 const CRON_ROUTES: Record<string, string> = {
@@ -21,7 +22,7 @@ const CRON_ROUTES: Record<string, string> = {
   "admin-metrics": "/api/cron/admin-metrics",
 };
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     await requireAdmin();
 
@@ -67,4 +68,4 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

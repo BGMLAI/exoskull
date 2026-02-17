@@ -11,9 +11,10 @@ import { detectCrisis } from "@/lib/emotion/crisis-detector";
 import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -65,4 +66,4 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

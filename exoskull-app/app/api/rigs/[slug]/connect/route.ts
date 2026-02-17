@@ -5,10 +5,11 @@ import { getOAuthConfig, buildAuthUrl, supportsOAuth } from "@/lib/rigs/oauth";
 import { randomBytes } from "crypto";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/rigs/[slug]/connect - Start OAuth flow
-export async function GET(
+export const GET = withApiLog(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
@@ -103,4 +104,4 @@ export async function GET(
       { status: 500 },
     );
   }
-}
+});

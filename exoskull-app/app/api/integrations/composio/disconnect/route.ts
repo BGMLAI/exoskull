@@ -6,12 +6,13 @@ import {
 } from "@/lib/integrations/composio-adapter";
 import { logger } from "@/lib/logger";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/integrations/composio/disconnect — Disconnect a Composio toolkit
  */
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -67,4 +68,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

@@ -7,12 +7,13 @@ import {
 } from "@/lib/integrations/composio-adapter";
 import { logger } from "@/lib/logger";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/integrations/composio — List all Composio toolkits + connection status
  */
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -62,12 +63,12 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 /**
  * POST /api/integrations/composio — Initiate OAuth connection for a toolkit
  */
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -115,4 +116,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

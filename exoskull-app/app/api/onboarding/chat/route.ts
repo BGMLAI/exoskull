@@ -2,6 +2,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { NextRequest, NextResponse } from "next/server";
 import { DISCOVERY_SYSTEM_PROMPT } from "@/lib/onboarding/discovery-prompt";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 interface ChatMessage {
@@ -12,7 +13,7 @@ interface ChatMessage {
 /**
  * POST /api/onboarding/chat - Get AI response for text-based discovery
  */
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -128,4 +129,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

@@ -16,6 +16,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
 
+import { withApiLog } from "@/lib/api/request-logger";
 /** Constant-time comparison to prevent timing attacks on secrets */
 function safeTokenEquals(header: string | null, secret: string): boolean {
   const token = (header ?? "").replace(/^Bearer\s+/i, "");
@@ -49,7 +50,7 @@ interface PulseResult {
 // CRON HANDLER (GET)
 // ============================================================================
 
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
@@ -130,13 +131,13 @@ export async function GET(request: NextRequest) {
     console.error("[PULSE] CRON error:", error);
     return NextResponse.json({ error: "Pulse check failed" }, { status: 500 });
   }
-}
+});
 
 // ============================================================================
 // MANUAL TRIGGER (POST)
 // ============================================================================
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
@@ -187,7 +188,7 @@ export async function POST(request: NextRequest) {
     console.error("[PULSE] POST error:", error);
     return NextResponse.json({ error: "Pulse check failed" }, { status: 500 });
   }
-}
+});
 
 // ============================================================================
 // PULSE LOGIC

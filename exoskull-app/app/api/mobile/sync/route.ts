@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@supabase/supabase-js";
 
+import { withApiLog } from "@/lib/api/request-logger";
 // Tables allowed for mobile sync (whitelist)
 const SYNCABLE_TABLES: Record<
   string,
@@ -30,7 +31,7 @@ const SYNCABLE_TABLES: Record<
 
 const MAX_RECORDS = 500;
 
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   const auth = await verifyTenantAuth(req);
   if (!auth.ok) return auth.response;
   const tenantId = auth.tenantId;
@@ -130,4 +131,4 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

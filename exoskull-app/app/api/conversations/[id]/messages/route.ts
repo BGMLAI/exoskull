@@ -3,10 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/conversations/[id]/messages - Get messages for a conversation
-export async function GET(
+export const GET = withApiLog(async function GET(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
@@ -37,10 +38,10 @@ export async function GET(
       { status: 500 },
     );
   }
-}
+});
 
 // POST /api/conversations/[id]/messages - Add message to conversation
-export async function POST(
+export const POST = withApiLog(async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
@@ -106,4 +107,4 @@ export async function POST(
       { status: 500 },
     );
   }
-}
+});

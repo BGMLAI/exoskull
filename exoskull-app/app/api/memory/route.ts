@@ -12,9 +12,10 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getMemoryTimeline, keywordSearch } from "@/lib/memory/search";
 import { getUserHighlights } from "@/lib/memory/highlights";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -71,4 +72,4 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

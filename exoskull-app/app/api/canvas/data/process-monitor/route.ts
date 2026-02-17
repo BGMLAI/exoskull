@@ -11,6 +11,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { systemBus } from "@/lib/system/inter-system-bus";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 interface ProcessInfo {
@@ -30,7 +31,7 @@ interface ProcessInfo {
   details?: Record<string, unknown>;
 }
 
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -171,7 +172,7 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 // ============================================================================
 // HELPERS

@@ -10,9 +10,10 @@ import {
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function POST(
+export const POST = withApiLog(async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -101,7 +102,7 @@ export async function POST(
       { status: 500 },
     );
   }
-}
+});
 
 async function findApprovalRequest(
   skillId: string,

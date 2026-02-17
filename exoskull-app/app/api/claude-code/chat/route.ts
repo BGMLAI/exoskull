@@ -9,6 +9,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 import { createClient } from "@supabase/supabase-js";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
@@ -34,7 +35,7 @@ async function isAdminUser(tenantId: string): Promise<boolean> {
   return !!data;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     // 1. Auth
     const auth = await verifyTenantAuth(request);
@@ -121,4 +122,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

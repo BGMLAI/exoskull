@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // Valid metric types
@@ -49,7 +50,7 @@ interface SyncPayload {
 // POST /api/rigs/health-connect/sync - Receive health data
 // =====================================================
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
@@ -239,13 +240,13 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 // =====================================================
 // GET /api/rigs/health-connect/sync - Get sync status + recent metrics
 // =====================================================
 
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   const supabase = getServiceSupabase();
 
   const auth = await verifyTenantAuth(request);
@@ -320,7 +321,7 @@ export async function GET(request: NextRequest) {
     metrics_summary: metricsByType,
     recent_syncs: logs || [],
   });
-}
+});
 
 // =====================================================
 // HELPERS

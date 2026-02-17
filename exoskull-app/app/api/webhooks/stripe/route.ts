@@ -14,6 +14,7 @@ import {
 import type { BusinessEventType } from "@/lib/business/types";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 function getServiceClient() {
@@ -24,7 +25,7 @@ function getServiceClient() {
   );
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   const body = await req.text();
   const signature = req.headers.get("stripe-signature");
 
@@ -219,7 +220,7 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 async function getStripe() {
   const Stripe = (await import("stripe")).default;

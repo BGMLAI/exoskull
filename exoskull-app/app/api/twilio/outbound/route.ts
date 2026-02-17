@@ -13,6 +13,7 @@ import { makeOutboundCall } from "@/lib/voice/twilio-client";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -38,7 +39,7 @@ interface OutboundCallRequest {
 // MAIN HANDLER
 // ============================================================================
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const body: OutboundCallRequest = await req.json();
     const { phone, tenantId, purpose = "test" } = body;
@@ -121,10 +122,10 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 // Test endpoint
-export async function GET() {
+export const GET = withApiLog(async function GET() {
   return NextResponse.json({
     status: "ok",
     endpoint: "Twilio Outbound Call API",
@@ -137,4 +138,4 @@ export async function GET() {
       },
     },
   });
-}
+});

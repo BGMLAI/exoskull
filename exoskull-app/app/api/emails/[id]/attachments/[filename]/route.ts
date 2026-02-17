@@ -10,6 +10,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { ensureFreshToken } from "@/lib/rigs/oauth";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -21,7 +22,7 @@ interface AttachmentMeta {
   size: number;
 }
 
-export async function GET(
+export const GET = withApiLog(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; filename: string }> },
 ) {
@@ -132,4 +133,4 @@ export async function GET(
       { status: 500 },
     );
   }
-}
+});

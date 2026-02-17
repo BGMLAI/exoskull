@@ -3,12 +3,13 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 import { exchangeCodeForTokens, getOAuthConfig } from "@/lib/rigs/oauth";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 const RIG_SLUG = "oura";
 
 // GET /api/rigs/oura/callback - OAuth callback
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
@@ -151,4 +152,4 @@ export async function GET(request: NextRequest) {
       new URL(`/dashboard/mods/${RIG_SLUG}?error=internal_error`, request.url),
     );
   }
-}
+});

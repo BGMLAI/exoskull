@@ -27,6 +27,7 @@ import {
   MAX_MULTIPART_SIZE,
 } from "@/lib/storage/r2-client";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 const DEFAULT_PART_SIZE = 100 * 1024 * 1024; // 100MB per part
@@ -55,7 +56,7 @@ const ALLOWED_EXTENSIONS = [
   "gz",
 ];
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const authSupabase = await createAuthClient();
     const {
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 // ============================================================================
 // INITIATE — start multipart upload

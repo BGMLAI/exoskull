@@ -11,7 +11,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendPushToTenant } from "@/lib/push/fcm";
 
-export async function POST(req: NextRequest) {
+import { withApiLog } from "@/lib/api/request-logger";
+export const POST = withApiLog(async function POST(req: NextRequest) {
   // Internal auth via CRON_SECRET
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
@@ -45,4 +46,4 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ error: "Failed to send push" }, { status: 500 });
   }
-}
+});

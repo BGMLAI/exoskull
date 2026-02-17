@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/installations/[id] - Get single installation details
-export async function GET(
+export const GET = withApiLog(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -60,10 +61,10 @@ export async function GET(
       { status: 500 },
     );
   }
-}
+});
 
 // PATCH /api/installations/[id] - Update installation config
-export async function PATCH(
+export const PATCH = withApiLog(async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -118,10 +119,10 @@ export async function PATCH(
       { status: 500 },
     );
   }
-}
+});
 
 // DELETE /api/installations/[id] - Uninstall
-export async function DELETE(
+export const DELETE = withApiLog(async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -184,4 +185,4 @@ export async function DELETE(
       { status: 500 },
     );
   }
-}
+});

@@ -11,7 +11,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@supabase/supabase-js";
 
-export async function POST(req: NextRequest) {
+import { withApiLog } from "@/lib/api/request-logger";
+export const POST = withApiLog(async function POST(req: NextRequest) {
   const auth = await verifyTenantAuth(req);
   if (!auth.ok) return auth.response;
   const tenantId = auth.tenantId;
@@ -62,9 +63,9 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
-export async function DELETE(req: NextRequest) {
+export const DELETE = withApiLog(async function DELETE(req: NextRequest) {
   const auth = await verifyTenantAuth(req);
   if (!auth.ok) return auth.response;
   const tenantId = auth.tenantId;
@@ -98,4 +99,4 @@ export async function DELETE(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

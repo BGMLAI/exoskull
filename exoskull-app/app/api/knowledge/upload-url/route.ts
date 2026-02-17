@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 /** Canonical extension → MIME mapping (must match bucket allowed_mime_types exactly) */
@@ -41,7 +42,7 @@ const ALLOWED_EXTENSIONS = Object.keys(EXT_TO_MIME);
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB (Supabase storage limit for signed URLs)
 // For files >500MB, use /api/knowledge/multipart-upload (R2 direct, up to 10GB)
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const authSupabase = await createAuthClient();
     const {
@@ -141,4 +142,4 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

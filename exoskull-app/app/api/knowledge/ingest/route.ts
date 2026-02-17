@@ -22,13 +22,14 @@ import { chunkText, type ChunkOptions } from "@/lib/memory/chunking-pipeline";
 import { storeChunksWithEmbeddings } from "@/lib/memory/vector-store";
 import { processContentForGraph } from "@/lib/memory/knowledge-graph";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
 // GET — check ingestion job status
 // ============================================================================
 
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const authSupabase = await createAuthClient();
     const {
@@ -73,7 +74,7 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 // ============================================================================
 // POST — start ingestion
@@ -98,7 +99,7 @@ interface IngestRequest {
   extractGraph?: boolean;
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const authSupabase = await createAuthClient();
     const {
@@ -193,7 +194,7 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 // ============================================================================
 // INGESTION PIPELINE — runs asynchronously

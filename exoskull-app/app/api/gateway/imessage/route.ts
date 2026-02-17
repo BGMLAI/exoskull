@@ -13,13 +13,14 @@ import { imessageAdapter } from "@/lib/gateway/adapters/imessage";
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
 // POST - INCOMING IMESSAGE MESSAGES
 // =====================================================
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     // Verify BlueBubbles password (Bearer header only — query params leak to logs)
     const expectedPassword = process.env.BLUEBUBBLES_PASSWORD;
@@ -72,17 +73,17 @@ export async function POST(req: NextRequest) {
     // Return 200 to prevent BlueBubbles from retrying
     return NextResponse.json({ ok: true });
   }
-}
+});
 
 // =====================================================
 // GET - HEALTH CHECK
 // =====================================================
 
-export async function GET() {
+export const GET = withApiLog(async function GET() {
   return NextResponse.json({
     channel: "imessage",
     status: "active",
     hasUrl: !!process.env.BLUEBUBBLES_URL,
     hasPassword: !!process.env.BLUEBUBBLES_PASSWORD,
   });
-}
+});

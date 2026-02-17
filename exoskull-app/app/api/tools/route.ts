@@ -12,13 +12,14 @@ import {
   ToolExecutionRequest,
 } from "@/lib/tools";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
 // GET - List available tools
 // =====================================================
 
-export async function GET() {
+export const GET = withApiLog(async function GET() {
   try {
     const tools = getAllToolDefinitions();
     const manifest = getToolManifest();
@@ -36,13 +37,13 @@ export async function GET() {
       { status: 500 },
     );
   }
-}
+});
 
 // =====================================================
 // POST - Execute a tool
 // =====================================================
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   try {
@@ -92,4 +93,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

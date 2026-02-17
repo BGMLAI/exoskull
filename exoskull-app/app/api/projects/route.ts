@@ -9,9 +9,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export const GET = withApiLog(async function GET() {
   try {
     // Get authenticated user
     const serverSupabase = await createServerClient();
@@ -51,9 +52,9 @@ export async function GET() {
       { status: 500 },
     );
   }
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     // Get authenticated user
     const serverSupabase = await createServerClient();
@@ -110,4 +111,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

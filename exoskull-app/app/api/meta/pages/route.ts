@@ -12,6 +12,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 const GRAPH_API_VERSION = "v21.0";
@@ -21,7 +22,7 @@ const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 // GET - List connected pages for tenant
 // =====================================================
 
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
-}
+});
 
 // =====================================================
 // POST - Connect pages from Facebook user access token
@@ -66,7 +67,7 @@ interface ConnectRequest {
   page_ids?: string[]; // Optional: only connect specific pages
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -224,13 +225,13 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
-}
+});
 
 // =====================================================
 // DELETE - Disconnect a page
 // =====================================================
 
-export async function DELETE(req: NextRequest) {
+export const DELETE = withApiLog(async function DELETE(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -269,4 +270,4 @@ export async function DELETE(req: NextRequest) {
     });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
-}
+});

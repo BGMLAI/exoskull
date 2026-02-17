@@ -12,10 +12,11 @@ import { generateSkill } from "@/lib/skills/generator/skill-generator";
 import { initiateApproval } from "@/lib/skills/approval/approval-gateway";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -31,9 +32,9 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
-export async function PATCH(request: NextRequest) {
+export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -130,4 +131,4 @@ export async function PATCH(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

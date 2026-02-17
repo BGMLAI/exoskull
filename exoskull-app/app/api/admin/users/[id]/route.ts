@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, getAdminSupabase } from "@/lib/admin/auth";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function GET(
+export const GET = withApiLog(async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -110,4 +111,4 @@ export async function GET(
       { status: 500 },
     );
   }
-}
+});

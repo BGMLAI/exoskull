@@ -12,9 +12,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const authSupabase = await createAuthClient();
     const {
@@ -127,4 +128,4 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

@@ -3,6 +3,7 @@ import { CACHED_PHRASES } from "@/lib/voice/audio-cache";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // Cartesia Sonic 3 voice settings
@@ -22,7 +23,7 @@ const CARTESIA_API_VERSION = "2025-04-16";
  * - keys: string[] - specific keys to generate (default: all)
  * - force: boolean - regenerate even if exists (default: false)
  */
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const supabase = getServiceSupabase();
 
@@ -148,14 +149,14 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 /**
  * GET /api/audio/generate-cache
  *
  * Returns list of all cached phrases and their status
  */
-export async function GET() {
+export const GET = withApiLog(async function GET() {
   try {
     const supabase = getServiceSupabase();
     // List all files in audio-cache bucket
@@ -194,4 +195,4 @@ export async function GET() {
       { status: 500 },
     );
   }
-}
+});

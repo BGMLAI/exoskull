@@ -11,6 +11,7 @@ import crypto from "crypto";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 /**
@@ -54,7 +55,7 @@ function parseSignedRequest(
   }
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const signedRequest = formData.get("signed_request") as string;
@@ -120,4 +121,4 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
-}
+});

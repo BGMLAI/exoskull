@@ -21,13 +21,14 @@ import { verifyMetaSignature } from "@/lib/security/webhook-hmac";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
 // GET - WEBHOOK VERIFICATION
 // =====================================================
 
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
   const mode = searchParams.get("hub.mode");
   const token = searchParams.get("hub.verify_token");
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
     tokenMatch: token === verifyToken,
   });
   return NextResponse.json({ error: "Verification failed" }, { status: 403 });
-}
+});
 
 // =====================================================
 // RESOLVE CLIENT: DB page token → env var fallback
@@ -100,7 +101,7 @@ async function resolveMessengerClient(
 // POST - INCOMING MESSAGES
 // =====================================================
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     // Read raw body for HMAC verification before JSON parsing
     const rawBody = await req.text();
@@ -295,4 +296,4 @@ export async function POST(req: NextRequest) {
     // Always return 200 to Meta - they retry on errors which causes duplicates
     return NextResponse.json({ received: true });
   }
-}
+});

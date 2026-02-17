@@ -6,10 +6,11 @@ import { createMicrosoft365Client } from "@/lib/rigs/microsoft-365/client";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/rigs/[slug]/emails - Fetch recent emails
-export async function GET(
+export const GET = withApiLog(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
@@ -105,4 +106,4 @@ export async function GET(
       { status: 500 },
     );
   }
-}
+});

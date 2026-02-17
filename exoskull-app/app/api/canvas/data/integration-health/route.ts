@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 export interface IntegrationHealthItem {
@@ -22,7 +23,7 @@ export interface IntegrationHealthItem {
   last_error_message: string | null;
 }
 
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   const auth = await verifyTenantAuth(request);
   if (!auth.ok) return auth.response;
   const tenantId = auth.tenantId;
@@ -69,4 +70,4 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json({ integrations: [] });
   }
-}
+});

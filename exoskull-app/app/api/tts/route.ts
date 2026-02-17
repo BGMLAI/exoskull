@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 const MAX_CHARS = 4000;
@@ -154,7 +155,7 @@ async function openaiTTS(text: string): Promise<Buffer | null> {
   }
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -242,4 +243,4 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

@@ -11,7 +11,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
-export async function GET(req: NextRequest) {
+import { withApiLog } from "@/lib/api/request-logger";
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -110,4 +111,4 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

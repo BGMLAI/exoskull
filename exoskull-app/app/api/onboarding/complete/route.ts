@@ -4,12 +4,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { autoInstallMods } from "@/lib/builder/proactive-engine";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/onboarding/complete - Mark onboarding as completed
  */
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) {
@@ -116,4 +117,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

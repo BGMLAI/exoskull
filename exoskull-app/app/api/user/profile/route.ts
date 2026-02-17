@@ -4,6 +4,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { UserProfile } from "@/lib/types/user";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // Fields that can be updated via PATCH
@@ -23,7 +24,7 @@ const UPDATABLE_FIELDS = [
 ] as const;
 
 // GET /api/user/profile - Fetch current user's profile
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -53,10 +54,10 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 // PATCH /api/user/profile - Update current user's profile
-export async function PATCH(request: NextRequest) {
+export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -120,4 +121,4 @@ export async function PATCH(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

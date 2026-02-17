@@ -22,6 +22,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { appendMessage } from "@/lib/unified-thread";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -87,7 +88,7 @@ async function parseFormData(
 // MAIN HANDLER
 // ============================================================================
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const action = url.searchParams.get("action") || "start";
@@ -307,7 +308,7 @@ export async function POST(req: NextRequest) {
       headers: { "Content-Type": "application/xml" },
     });
   }
-}
+});
 
 // ============================================================================
 // HELPERS
@@ -398,10 +399,10 @@ async function notifyUserAboutDelegateResult(
 }
 
 // Also handle GET for testing
-export async function GET() {
+export const GET = withApiLog(async function GET() {
   return NextResponse.json({
     status: "ok",
     endpoint: "Twilio Delegate Voice Webhook",
     description: "Handles calls IORS makes to third parties on behalf of user",
   });
-}
+});

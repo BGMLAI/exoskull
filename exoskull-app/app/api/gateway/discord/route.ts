@@ -23,13 +23,14 @@ import {
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
 // POST - INCOMING DISCORD EVENTS
 // =====================================================
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
     const signature = req.headers.get("x-signature-ed25519");
@@ -88,17 +89,17 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ ok: true });
   }
-}
+});
 
 // =====================================================
 // GET - HEALTH CHECK
 // =====================================================
 
-export async function GET() {
+export const GET = withApiLog(async function GET() {
   return NextResponse.json({
     channel: "discord",
     status: "active",
     hasToken: !!process.env.DISCORD_BOT_TOKEN,
     hasPublicKey: !!process.env.DISCORD_PUBLIC_KEY,
   });
-}
+});

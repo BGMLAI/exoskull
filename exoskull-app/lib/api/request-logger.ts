@@ -16,10 +16,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 
-type RouteHandler = (
-  req: NextRequest,
-  ctx?: { params: Promise<Record<string, string>> },
-) => Promise<Response>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RouteHandler = (req: NextRequest, ctx?: any) => Promise<Response>;
 
 /**
  * Wrap a route handler with structured request logging.

@@ -16,6 +16,7 @@ import { slackAdapter } from "@/lib/gateway/adapters/slack";
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // Track processed events to prevent duplicates (Slack retries aggressively)
@@ -37,7 +38,7 @@ function cleanupDedupCache(): void {
 // POST - INCOMING SLACK EVENTS
 // =====================================================
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     // Verify Slack signature
     if (slackAdapter.verifyWebhook) {
@@ -118,17 +119,17 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ ok: true });
   }
-}
+});
 
 // =====================================================
 // GET - HEALTH CHECK
 // =====================================================
 
-export async function GET() {
+export const GET = withApiLog(async function GET() {
   return NextResponse.json({
     channel: "slack",
     status: "active",
     hasToken: !!process.env.SLACK_BOT_TOKEN,
     hasSigningSecret: !!process.env.SLACK_SIGNING_SECRET,
   });
-}
+});

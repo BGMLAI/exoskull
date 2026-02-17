@@ -8,10 +8,11 @@ import { initiateApproval } from "@/lib/skills/approval/approval-gateway";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Skill generation can take 10-30s
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     console.info("[Skills API] Generate request received");
 
@@ -105,4 +106,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

@@ -9,13 +9,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/knowledge
  * List user's documents with optional filtering
  */
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -100,13 +101,13 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 /**
  * DELETE /api/knowledge
  * Delete a document and its storage file
  */
-export async function DELETE(req: NextRequest) {
+export const DELETE = withApiLog(async function DELETE(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -175,4 +176,4 @@ export async function DELETE(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

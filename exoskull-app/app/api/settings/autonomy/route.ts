@@ -14,6 +14,7 @@ import {
 } from "@/lib/iors/autonomy";
 import type { AutonomyActionType, AutonomyDomain } from "@/lib/iors/types";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 const VALID_ACTIONS: AutonomyActionType[] = [
@@ -37,7 +38,7 @@ const VALID_DOMAINS: AutonomyDomain[] = [
   "*",
 ];
 
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -52,9 +53,9 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
-export async function PATCH(req: NextRequest) {
+export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -99,4 +100,4 @@ export async function PATCH(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

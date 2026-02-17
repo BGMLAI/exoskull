@@ -9,9 +9,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { searchDocuments } from "@/lib/knowledge/document-processor";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -32,4 +33,4 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ error: "Search failed" }, { status: 500 });
   }
-}
+});

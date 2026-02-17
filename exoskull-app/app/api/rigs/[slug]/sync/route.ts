@@ -24,6 +24,7 @@ import { ensureFreshToken } from "@/lib/rigs/oauth";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 interface HealthMetricInsert {
@@ -40,7 +41,7 @@ interface HealthMetricInsert {
 // POST /api/rigs/[slug]/sync - Trigger manual sync
 // =====================================================
 
-export async function POST(
+export const POST = withApiLog(async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
@@ -452,13 +453,13 @@ export async function POST(
       { status: 500 },
     );
   }
-}
+});
 
 // =====================================================
 // GET /api/rigs/[slug]/sync - Get sync status
 // =====================================================
 
-export async function GET(
+export const GET = withApiLog(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
@@ -498,7 +499,7 @@ export async function GET(
     metadata: connection.metadata,
     recent_syncs: logs || [],
   });
-}
+});
 
 // =====================================================
 // HELPERS

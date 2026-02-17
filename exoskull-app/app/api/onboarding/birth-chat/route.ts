@@ -23,9 +23,10 @@ import {
 import { completeBirth } from "@/lib/iors/birth-flow";
 import { textToSpeech } from "@/lib/voice/elevenlabs-tts";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -134,4 +135,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

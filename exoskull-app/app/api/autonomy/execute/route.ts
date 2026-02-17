@@ -20,13 +20,14 @@ import { detectGaps, optimizeSystem, checkAndSpawnAgents } from "@/lib/agents";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
 // POST - Execute autonomy operations
 // ============================================================================
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     // Auth: verify caller is the user or a CRON service
     const authHeader = request.headers.get("authorization");
@@ -116,13 +117,13 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 // ============================================================================
 // GET - Get autonomy status and pending interventions
 // ============================================================================
 
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   try {
     // Auth: verify caller is the user or a CRON service
     const authHeader = request.headers.get("authorization");
@@ -182,7 +183,7 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 // ============================================================================
 // OPERATION HANDLERS

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@supabase/supabase-js";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 const VPS_EXECUTOR_URL =
@@ -34,7 +35,7 @@ async function isAdminUser(tenantId: string): Promise<boolean> {
 }
 
 // GET /api/claude-code/workspace?path=src/
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -68,10 +69,10 @@ export async function GET(request: NextRequest) {
     console.error("[ClaudeCode] Workspace GET error:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
-}
+});
 
 // POST /api/claude-code/workspace — Initialize workspace
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -97,4 +98,4 @@ export async function POST(request: NextRequest) {
     console.error("[ClaudeCode] Workspace POST error:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
-}
+});

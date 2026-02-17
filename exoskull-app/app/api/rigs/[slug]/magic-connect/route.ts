@@ -3,6 +3,7 @@ import { getOAuthConfig, buildAuthUrl } from "@/lib/rigs/oauth";
 import { validateMagicToken } from "@/lib/rigs/in-chat-connector";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 /**
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
  * User receives this link in chat (WhatsApp, Telegram, etc.) and opens it.
  * Validates magic token, then redirects to provider OAuth.
  */
-export async function GET(
+export const GET = withApiLog(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
@@ -79,4 +80,4 @@ export async function GET(
       { status: 500 },
     );
   }
-}
+});

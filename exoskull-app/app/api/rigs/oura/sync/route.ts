@@ -11,6 +11,7 @@ import type {
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 const DEFAULT_DAYS = 7;
@@ -29,7 +30,7 @@ interface HealthMetricInsert {
 // POST /api/rigs/oura/sync - Trigger Oura sync
 // =====================================================
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
@@ -157,13 +158,13 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 // =====================================================
 // GET /api/rigs/oura/sync - Sync status
 // =====================================================
 
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   const supabase = getServiceSupabase();
 
   const auth = await verifyTenantAuth(request);
@@ -200,7 +201,7 @@ export async function GET(request: NextRequest) {
     metadata: connection.metadata,
     recent_syncs: logs || [],
   });
-}
+});
 
 // =====================================================
 // HELPERS

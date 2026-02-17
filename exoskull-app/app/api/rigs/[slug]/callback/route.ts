@@ -8,6 +8,7 @@ import {
   clearMagicToken,
 } from "@/lib/rigs/in-chat-connector";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 function getServiceSupabase() {
@@ -18,7 +19,7 @@ function getServiceSupabase() {
 }
 
 // GET /api/rigs/[slug]/callback - OAuth callback (dashboard + magic-link)
-export async function GET(
+export const GET = withApiLog(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
@@ -205,7 +206,7 @@ export async function GET(
       ),
     );
   }
-}
+});
 
 /**
  * Handle magic-link OAuth callback (no auth session needed).

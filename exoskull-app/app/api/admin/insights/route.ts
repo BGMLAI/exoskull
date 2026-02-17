@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin, getAdminSupabase } from "@/lib/admin/auth";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // DB row shapes for query results
@@ -32,7 +33,7 @@ interface ModRegistryRow {
  * Analyzes patterns across all metrics to generate actionable recommendations.
  * Mirrors the MAPE-K loop at system level (not per-user).
  */
-export async function GET() {
+export const GET = withApiLog(async function GET() {
   try {
     await requireAdmin();
     const db = getAdminSupabase();
@@ -511,4 +512,4 @@ export async function GET() {
       { status: 500 },
     );
   }
-}
+});

@@ -9,13 +9,14 @@ import { ModSlug } from "@/lib/mods/types";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
 // GET /api/mods/[slug] - Get mod data & insights
 // =====================================================
 
-export async function GET(
+export const GET = withApiLog(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
@@ -78,13 +79,13 @@ export async function GET(
       { status: 500 },
     );
   }
-}
+});
 
 // =====================================================
 // POST /api/mods/[slug] - Execute mod action
 // =====================================================
 
-export async function POST(
+export const POST = withApiLog(async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
@@ -168,4 +169,4 @@ export async function POST(
       { status: 500 },
     );
   }
-}
+});

@@ -19,6 +19,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { callUser } from "@/lib/communication/outbound-caller";
 import type { OutboundCallRequest } from "@/lib/communication/outbound-caller";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 const VALID_REASONS: OutboundCallRequest["reason"][] = [
@@ -30,7 +31,7 @@ const VALID_REASONS: OutboundCallRequest["reason"][] = [
   "custom",
 ];
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -77,4 +78,4 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

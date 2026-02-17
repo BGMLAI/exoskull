@@ -9,13 +9,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/schedule
  * Get all scheduled jobs with user's preferences
  */
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -93,13 +94,13 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 /**
  * PUT /api/schedule
  * Update user's job preference or global settings
  */
-export async function PUT(req: NextRequest) {
+export const PUT = withApiLog(async function PUT(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -172,13 +173,13 @@ export async function PUT(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 /**
  * POST /api/schedule
  * Manually trigger a specific job (for testing)
  */
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -265,4 +266,4 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

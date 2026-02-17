@@ -4,12 +4,13 @@ import { createClient } from "@/lib/supabase/server";
 import { buildAuthUrl, getOAuthConfig } from "@/lib/rigs/oauth";
 import { randomBytes } from "crypto";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 const RIG_SLUG = "oura";
 
 // GET /api/rigs/oura/connect - Start OAuth flow
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) {
@@ -78,4 +79,4 @@ export async function GET(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

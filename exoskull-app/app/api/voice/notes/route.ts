@@ -11,13 +11,14 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/voice/notes
  * Upload a new voice note
  */
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -112,13 +113,13 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 /**
  * GET /api/voice/notes
  * List voice notes for a tenant
  */
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -171,13 +172,13 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 /**
  * DELETE /api/voice/notes
  * Delete a voice note
  */
-export async function DELETE(req: NextRequest) {
+export const DELETE = withApiLog(async function DELETE(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -239,7 +240,7 @@ export async function DELETE(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 /**
  * Queue voice note for transcription.

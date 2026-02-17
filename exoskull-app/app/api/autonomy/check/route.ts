@@ -12,6 +12,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
 
+import { withApiLog } from "@/lib/api/request-logger";
 /** Constant-time comparison to prevent timing attacks on secrets */
 function safeTokenEquals(header: string | null, secret: string): boolean {
   const token = (header ?? "").replace(/^Bearer\s+/i, "");
@@ -27,7 +28,7 @@ export const dynamic = "force-dynamic";
 // POST - Check if action is granted
 // ============================================================================
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     // Auth: verify caller is the user or a service (CRON)
     const authHeader = request.headers.get("authorization");
@@ -111,13 +112,13 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
 
 // ============================================================================
 // PATCH - Record error for circuit breaker
 // ============================================================================
 
-export async function PATCH(request: NextRequest) {
+export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
   try {
     // Auth: verify caller
     const authHeader = request.headers.get("authorization");
@@ -171,4 +172,4 @@ export async function PATCH(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

@@ -9,9 +9,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   const auth = await verifyTenantAuth(req);
   if (!auth.ok) return auth.response;
   const tenantId = auth.tenantId;
@@ -97,9 +98,9 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
-}
+});
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   const auth = await verifyTenantAuth(req);
   if (!auth.ok) return auth.response;
   const tenantId = auth.tenantId;
@@ -177,4 +178,4 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
-}
+});

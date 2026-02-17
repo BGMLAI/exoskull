@@ -19,10 +19,11 @@ import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { processDocument } from "@/lib/knowledge/document-processor";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes for bulk processing
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const cronSecret = req.headers.get("x-cron-secret");
     const body = await req.json().catch(() => ({}));
@@ -139,4 +140,4 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ error: "Failed to reprocess" }, { status: 500 });
   }
-}
+});

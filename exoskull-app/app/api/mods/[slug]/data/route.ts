@@ -5,10 +5,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // GET - Fetch recent data entries for a Mod
-export async function GET(
+export const GET = withApiLog(async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
@@ -46,10 +47,10 @@ export async function GET(
       { status: 500 },
     );
   }
-}
+});
 
 // POST - Add a new data entry for a Mod
-export async function POST(
+export const POST = withApiLog(async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
@@ -88,4 +89,4 @@ export async function POST(
       { status: 500 },
     );
   }
-}
+});

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 /** Get app config from registry */
@@ -25,7 +26,7 @@ async function getAppConfig(tenantId: string, slug: string) {
   return data;
 }
 
-export async function GET(
+export const GET = withApiLog(async function GET(
   _request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
@@ -61,9 +62,9 @@ export async function GET(
     entries: entries || [],
     total: entries?.length || 0,
   });
-}
+});
 
-export async function POST(
+export const POST = withApiLog(async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
@@ -115,4 +116,4 @@ export async function POST(
     .then(() => {});
 
   return NextResponse.json({ entry }, { status: 201 });
-}
+});

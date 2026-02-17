@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { queryDatabase } from "@/lib/db-direct";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET() {
+export const GET = withApiLog(async function GET() {
   try {
     const agents = await queryDatabase("exo_agents", {
       filter: { is_global: true },
@@ -22,4 +23,4 @@ export async function GET() {
       { status: 500 },
     );
   }
-}
+});

@@ -8,12 +8,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 let cachedStats: { data: any; timestamp: number } | null = null;
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour (extended for DoS protection)
 
-export async function GET() {
+export const GET = withApiLog(async function GET() {
   // Check cache
   if (cachedStats && Date.now() - cachedStats.timestamp < CACHE_TTL) {
     return NextResponse.json(cachedStats.data, {
@@ -60,4 +61,4 @@ export async function GET() {
       { status: 200 },
     );
   }
-}
+});

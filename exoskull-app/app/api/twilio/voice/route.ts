@@ -31,6 +31,7 @@ import {
 } from "@/lib/voice/conversation-handler";
 import { runExoSkullAgent } from "@/lib/agent-sdk";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -66,7 +67,7 @@ async function parseFormData(
 // MAIN HANDLER
 // ============================================================================
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   const startTime = Date.now();
 
   try {
@@ -391,14 +392,14 @@ export async function POST(req: NextRequest) {
       headers: { "Content-Type": "application/xml" },
     });
   }
-}
+});
 
 // Also handle GET for testing
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   return NextResponse.json({
     status: "ok",
     endpoint: "Twilio Voice Webhook",
     actions: ["start", "process", "end"],
     usage: "POST /api/twilio/voice?action=start",
   });
-}
+});

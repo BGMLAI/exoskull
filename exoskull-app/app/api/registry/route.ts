@@ -1,32 +1,30 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
-export const dynamic = 'force-dynamic';
+import { withApiLog } from "@/lib/api/request-logger";
+export const dynamic = "force-dynamic";
 
 // GET /api/registry - List all available Mods, Rigs, and Quests
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
 
     // Query params
-    const type = searchParams.get('type'); // 'mod', 'rig', 'quest', or null for all
-    const category = searchParams.get('category'); // 'health', 'productivity', etc.
-    const search = searchParams.get('search'); // search term
+    const type = searchParams.get("type"); // 'mod', 'rig', 'quest', or null for all
+    const category = searchParams.get("category"); // 'health', 'productivity', etc.
+    const search = searchParams.get("search"); // search term
 
     // Build query
-    let query = supabase
-      .from('exo_registry')
-      .select('*')
-      .order('name');
+    let query = supabase.from("exo_registry").select("*").order("name");
 
     // Apply filters
     if (type) {
-      query = query.eq('type', type);
+      query = query.eq("type", type);
     }
 
     if (category) {
-      query = query.eq('category', category);
+      query = query.eq("category", category);
     }
 
     if (search) {
@@ -36,18 +34,18 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('[Registry] Error fetching registry:', error);
+      console.error("[Registry] Error fetching registry:", error);
       return NextResponse.json(
-        { error: 'Failed to fetch registry' },
-        { status: 500 }
+        { error: "Failed to fetch registry" },
+        { status: 500 },
       );
     }
 
     // Group by type for easier frontend consumption
     const grouped = {
-      mods: data?.filter((item) => item.type === 'mod') || [],
-      rigs: data?.filter((item) => item.type === 'rig') || [],
-      quests: data?.filter((item) => item.type === 'quest') || [],
+      mods: data?.filter((item) => item.type === "mod") || [],
+      rigs: data?.filter((item) => item.type === "rig") || [],
+      quests: data?.filter((item) => item.type === "quest") || [],
     };
 
     // Get counts
@@ -68,10 +66,10 @@ export async function GET(request: NextRequest) {
       categories,
     });
   } catch (error) {
-    console.error('[Registry] Unexpected error:', error);
+    console.error("[Registry] Unexpected error:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
-}
+});

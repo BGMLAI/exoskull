@@ -16,9 +16,10 @@ import {
   getPeriodComparison,
 } from "@/lib/analytics/queries";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
+export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -69,4 +70,4 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

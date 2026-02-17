@@ -10,10 +10,11 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { processDocument } from "@/lib/knowledge/document-processor";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 min for Pro plan
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     let tenantId: string;
 
@@ -114,4 +115,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

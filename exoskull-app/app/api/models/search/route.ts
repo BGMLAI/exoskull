@@ -6,11 +6,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 const SKETCHFAB_API = "https://api.sketchfab.com/v3";
 
-export async function GET(request: NextRequest) {
+export const GET = withApiLog(async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q");
@@ -94,4 +95,4 @@ export async function GET(request: NextRequest) {
     console.error("[SketchfabProxy] Error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
-}
+});

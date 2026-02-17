@@ -7,10 +7,11 @@ import { invalidateSkillCache } from "@/lib/skills/registry/dynamic-registry";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/skills/[id]
-export async function GET(
+export const GET = withApiLog(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -60,10 +61,10 @@ export async function GET(
       { status: 500 },
     );
   }
-}
+});
 
 // PATCH /api/skills/[id] - Update skill metadata
-export async function PATCH(
+export const PATCH = withApiLog(async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -114,10 +115,10 @@ export async function PATCH(
       { status: 500 },
     );
   }
-}
+});
 
 // DELETE /api/skills/[id] - Archive a skill (soft delete)
-export async function DELETE(
+export const DELETE = withApiLog(async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -153,4 +154,4 @@ export async function DELETE(
       { status: 500 },
     );
   }
-}
+});

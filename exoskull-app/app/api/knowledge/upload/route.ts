@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { withApiLog } from "@/lib/api/request-logger";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ const ALLOWED_TYPES = [
 ];
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
 
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     // Auth: verify caller
     const authSupabase = await createAuthClient();
@@ -164,4 +165,4 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-}
+});
