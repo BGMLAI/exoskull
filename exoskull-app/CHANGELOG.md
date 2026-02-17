@@ -4,6 +4,27 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-18] P1 Bug Fixes: Mod Slug, CSP, Messenger Gateway
+
+### P1.1 — Mod Installation Check
+
+- Added missing `.eq("mod_slug", slug)` filter — previously returned first active mod regardless of slug
+- Changed `.single()` to `.maybeSingle()` for graceful no-installation handling
+
+### P1.2 — CSP connect-src
+
+- Added `https://*.daily.co` (WebRTC signaling) and `https://*.googleapis.com` (Google Maps, AI)
+- Previously blocked by Content Security Policy in browser
+
+### P1.3 — Messenger Gateway Upgrade
+
+- Replaced `aiChat()` (0 tools, simple completion) with `handleInboundMessage()` (full 28-tool pipeline)
+- Messenger users now get: birth flow, async task classification, IORS tools, session tracking, unified thread, activity logging
+- Same AI capabilities as WhatsApp and Telegram channels
+- Added `messenger_psid` to gateway's `resolveTenant()` channel map
+
+---
+
 ## [2026-02-18] Audit Final Cleanup: Circular Deps, Dead Code, Dep Hygiene
 
 - **Fixed InboxSidebar ↔ MessageListItem circular dependency** — extracted `UnifiedMessage` to `components/inbox/types.ts`
