@@ -45,19 +45,51 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Get stats
-    const { data: stats } = await supabase.rpc("get_document_stats", {
-      p_tenant_id: tenantId,
-    });
+    // Get stats — graceful fallback if RPC doesn't exist or fails
+    let stats = {
+      total_documents: documents?.length || 0,
+      total_chunks: 0,
+      by_category: {} as Record<string, number>,
+      by_status: {} as Record<string, number>,
+    };
+
+    try {
+      const { data: rpcStats, error: rpcError } = await supabase.rpc(
+        "get_document_stats",
+        { p_tenant_id: tenantId },
+      );
+      if (!rpcError && rpcStats?.[0]) {
+        stats = rpcStats[0];
+      } else if (rpcError) {
+        console.warn(
+          "[GET /api/knowledge] RPC get_document_stats failed:",
+          rpcError.message,
+        );
+        // Build stats from documents array as fallback
+        if (documents) {
+          const byCategory: Record<string, number> = {};
+          const byStatus: Record<string, number> = {};
+          for (const doc of documents) {
+            if (doc.category)
+              byCategory[doc.category] = (byCategory[doc.category] || 0) + 1;
+            if (doc.status)
+              byStatus[doc.status] = (byStatus[doc.status] || 0) + 1;
+          }
+          stats = {
+            total_documents: documents.length,
+            total_chunks: 0,
+            by_category: byCategory,
+            by_status: byStatus,
+          };
+        }
+      }
+    } catch (rpcErr) {
+      console.warn("[GET /api/knowledge] RPC call threw:", rpcErr);
+    }
 
     return NextResponse.json({
       documents: documents || [],
-      stats: stats?.[0] || {
-        total_documents: 0,
-        total_chunks: 0,
-        by_category: {},
-        by_status: {},
-      },
+      stats,
     });
   } catch (error) {
     console.error("GET /api/knowledge error:", error);

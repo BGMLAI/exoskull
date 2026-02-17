@@ -64,6 +64,7 @@ import { contentTools } from "./content-tools";
 import { strategyTools } from "./strategy-tools";
 import { outboundTools } from "./outbound-tools";
 import { codeExecutionTools } from "./code-execution-tools";
+import { mcpBridgeTools } from "./mcp-bridge-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -102,8 +103,10 @@ export const IORS_EXTENSION_TOOLS: ToolDefinition[] = [
   ...contentTools,
   ...strategyTools,
   ...outboundTools,
-  // Code execution tools (VPS file ops, bash, git)
+  // Code execution tools (VPS file ops, bash, git, web search, skills)
   ...codeExecutionTools,
+  // MCP bridge tools (GitHub, Slack, Notion — direct API calls)
+  ...mcpBridgeTools,
 ];
 
 /**

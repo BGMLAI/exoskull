@@ -2,81 +2,79 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useCockpitStore } from "@/lib/stores/useCockpitStore";
-import { useResizeHandle } from "@/lib/hooks/useResizeHandle";
 import { useCockpitKeys } from "@/lib/hooks/useCockpitKeys";
 import { CockpitTopBar } from "./CockpitTopBar";
-import { CockpitBottomBar } from "./CockpitBottomBar";
-import { LeftWing } from "./LeftWing";
-import { RightWing } from "./RightWing";
+import { CockpitActionBar } from "./CockpitActionBar";
+import { BottomPanelGrid } from "./BottomPanelGrid";
 import { CenterViewport } from "./CenterViewport";
 import { ChannelOrbs } from "./ChannelOrbs";
+import { ReactionButtons } from "./ReactionButtons";
 
 /**
- * CockpitHUDShell — Master CSS Grid layout for the cockpit HUD overlay.
+ * CockpitHUDShell — Master overlay layout for the cockpit HUD.
  *
- * Center column = fully transparent (3D scene clickable).
- * Chat/Tree/Preview lives in a resizable bottom drawer (full width between wings).
- * Drawer can be collapsed to input-only bar (~48px) or expanded.
+ * NEW LAYOUT (per user mockup):
+ * ┌──────────────────────────────────────────────────────┐
+ * │ [reactions]    3D SCENE (full bg)        [channels]  │
+ * │  ❌ ✅ 😆     orbs, grid, skybox        📷🟢📞@    │
+ * │                                                      │
+ * │         ┌── message from iors ──┐                    │
+ * │                    ┌── my message ──┐                │
+ * │         ┌── message from iors ──┐                    │
+ * │                                                      │
+ * │ ┌──────────┬──────────┐  ┌──────────┬──────────┐    │
+ * │ │ iors     │kalendarz │  │ plan     │ moje     │    │
+ * │ │ activity │ /teraz   │  │          │ taski    │    │
+ * │ └──────────┴──────────┘  └──────────┴──────────┘    │
+ * │ ┌──────┬──────────┬───────────┬──────────┬──────┐   │
+ * │ │delete│ proces   │  [input]  │ wiedza/  │zacho-│   │
+ * │ │      │ iors     │           │ kontekst │ waj  │   │
+ * │ └──────┴──────────┴───────────┴──────────┴──────┘   │
+ * └──────────────────────────────────────────────────────┘
  *
- * Tab toggles hudMinimized: hides wings + drawer, full 3D mode.
+ * - 3D scene = full viewport background (no wings)
+ * - Chat = floating bubbles over center
+ * - Bottom panels = 2x2 glass panels
+ * - Action bar = 5-cell bar at very bottom
+ * - Top-right: channel icons
+ * - Top-left: reaction/action buttons
+ * - Tab toggles HUD minimize (full 3D mode)
  */
 
-const DRAWER_MIN = 48; // collapsed: just input bar
-const DRAWER_DEFAULT = 280; // comfortable chat height
-const DRAWER_MAX = 600;
+const CHAT_MIN_H = 120;
+const CHAT_DEFAULT_H = 260;
+const CHAT_MAX_H = 500;
 
 export function CockpitHUDShell() {
   useCockpitKeys();
-  const leftW = useCockpitStore((s) => s.leftWingWidth);
-  const rightW = useCockpitStore((s) => s.rightWingWidth);
-  const setLeftW = useCockpitStore((s) => s.setLeftWingWidth);
-  const setRightW = useCockpitStore((s) => s.setRightWingWidth);
   const hudMinimized = useCockpitStore((s) => s.hudMinimized);
   const toggleHud = useCockpitStore((s) => s.toggleHudMinimized);
 
-  const [drawerH, setDrawerH] = useState(DRAWER_DEFAULT);
+  // Chat area height (draggable)
+  const [chatH, setChatH] = useState(CHAT_DEFAULT_H);
   const dragging = useRef(false);
   const startY = useRef(0);
   const startH = useRef(0);
 
-  const { handleProps: leftHandleProps, isResizing: isLeftResizing } =
-    useResizeHandle({
-      initialWidth: leftW,
-      min: 200,
-      max: 400,
-      onResize: setLeftW,
-      side: "left",
-    });
-
-  const { handleProps: rightHandleProps, isResizing: isRightResizing } =
-    useResizeHandle({
-      initialWidth: rightW,
-      min: 200,
-      max: 400,
-      onResize: setRightW,
-      side: "right",
-    });
-
-  // Drawer vertical resize (drag handle at top of drawer)
-  const onDrawerDragStart = useCallback(
+  const onChatDragStart = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       dragging.current = true;
       startY.current = e.clientY;
-      startH.current = drawerH;
+      startH.current = chatH;
     },
-    [drawerH],
+    [chatH],
   );
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!dragging.current) return;
-      const delta = startY.current - e.clientY; // drag up = bigger
+      const delta = startY.current - e.clientY;
       const newH = Math.max(
-        DRAWER_MIN,
-        Math.min(DRAWER_MAX, startH.current + delta),
+        CHAT_MIN_H,
+        Math.min(CHAT_MAX_H, startH.current + delta),
       );
-      setDrawerH(newH);
+      setChatH(newH);
     };
     const onUp = () => {
       dragging.current = false;
@@ -89,121 +87,62 @@ export function CockpitHUDShell() {
     };
   }, []);
 
-  const isCollapsed = drawerH <= DRAWER_MIN + 10;
-
   return (
     <div
-      className="cockpit-hud"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 10,
-        display: "grid",
-        gridTemplateColumns: hudMinimized
-          ? "1fr"
-          : `${leftW}px 6px 1fr 6px ${rightW}px`,
-        gridTemplateRows: hudMinimized
-          ? "36px 1fr"
-          : `36px 1fr ${drawerH}px 72px`,
-        pointerEvents: "none",
-      }}
+      className="cockpit-hud cockpit-hud-v2"
+      style={{ pointerEvents: "none" }}
     >
-      {/* ── Row 1: Top Bar (spans all columns) ── */}
-      <div style={{ gridColumn: "1 / -1", pointerEvents: "auto" }}>
+      {/* ── Top Bar (minimal, transparent) ── */}
+      <div
+        className="cockpit-zone cockpit-zone--top"
+        style={{ pointerEvents: "auto" }}
+      >
         <CockpitTopBar />
       </div>
 
+      {/* ── Top-Left: Reaction buttons ── */}
+      <ReactionButtons />
+
+      {/* ── Top-Right: Channel orbs ── */}
+      <ChannelOrbs />
+
       {!hudMinimized && (
         <>
-          {/* ── Row 2: Left Wing ── */}
-          <div style={{ pointerEvents: "auto", overflow: "hidden" }}>
-            <LeftWing />
-          </div>
-
-          {/* ── Row 2: Left Resize Handle ── */}
+          {/* ── Center: Floating chat area ── */}
           <div
-            className={`hud-resize-handle ${isLeftResizing ? "resizing" : ""}`}
-            style={{ pointerEvents: "auto", cursor: "col-resize" }}
-            onMouseDown={leftHandleProps.onMouseDown}
-          />
-
-          {/* ── Row 2: Center — Fully transparent, 3D scene pass-through ── */}
-          <div style={{ pointerEvents: "none", minWidth: 0 }} />
-
-          {/* ── Row 2: Right Resize Handle ── */}
-          <div
-            className={`hud-resize-handle ${isRightResizing ? "resizing" : ""}`}
-            style={{ pointerEvents: "auto", cursor: "col-resize" }}
-            onMouseDown={rightHandleProps.onMouseDown}
-          />
-
-          {/* ── Row 2: Right Wing ── */}
-          <div style={{ pointerEvents: "auto", overflow: "hidden" }}>
-            <RightWing />
-          </div>
-
-          {/* ── Row 3: Chat Drawer (spans center 3 columns) ── */}
-          <div
+            className="cockpit-zone cockpit-zone--chat"
             style={{
-              gridColumn: "1 / -1",
-              pointerEvents: "none",
-              position: "relative",
+              height: chatH,
+              pointerEvents: "auto",
             }}
           >
-            {/* Drawer container - inset from wings */}
+            {/* Drag handle at top of chat */}
             <div
-              style={{
-                position: "absolute",
-                left: leftW + 6,
-                right: rightW + 6,
-                top: 0,
-                bottom: 0,
-                pointerEvents: "auto",
-                display: "flex",
-                flexDirection: "column",
-                background: "rgba(10, 10, 28, 0.85)",
-                backdropFilter: "blur(14px)",
-                borderTop: "1px solid rgba(6, 182, 212, 0.25)",
-                borderRadius: "8px 8px 0 0",
-                overflow: "hidden",
-              }}
+              onMouseDown={onChatDragStart}
+              className="cockpit-chat-drag-handle"
             >
-              {/* Drag handle to resize drawer */}
-              <div
-                onMouseDown={onDrawerDragStart}
-                onDoubleClick={() =>
-                  setDrawerH(isCollapsed ? DRAWER_DEFAULT : DRAWER_MIN)
-                }
-                style={{
-                  height: 20,
-                  cursor: "row-resize",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  userSelect: "none",
-                }}
-              >
-                <div
-                  style={{
-                    width: 40,
-                    height: 3,
-                    borderRadius: 2,
-                    background: "rgba(6, 182, 212, 0.35)",
-                  }}
-                />
-              </div>
+              <div className="cockpit-chat-drag-pill" />
+            </div>
 
-              {/* Chat/Tree/Preview content */}
-              <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
-                <CenterViewport />
-              </div>
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
+              <CenterViewport />
             </div>
           </div>
 
-          {/* ── Row 4: Bottom Bar (spans all columns) ── */}
-          <div style={{ gridColumn: "1 / -1", pointerEvents: "auto" }}>
-            <CockpitBottomBar />
+          {/* ── Bottom: Panel grid (2x2) ── */}
+          <div
+            className="cockpit-zone cockpit-zone--panels"
+            style={{ pointerEvents: "auto" }}
+          >
+            <BottomPanelGrid />
+          </div>
+
+          {/* ── Bottom: Action bar (5 cells) ── */}
+          <div
+            className="cockpit-zone cockpit-zone--actions"
+            style={{ pointerEvents: "auto" }}
+          >
+            <CockpitActionBar />
           </div>
         </>
       )}
@@ -212,35 +151,14 @@ export function CockpitHUDShell() {
       <div
         onClick={toggleHud}
         title={hudMinimized ? "Show HUD (Tab)" : "Full 3D (Tab)"}
+        className="cockpit-hud-toggle"
         style={{
-          position: "fixed",
-          bottom: hudMinimized ? 16 : 80,
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 20,
           pointerEvents: "auto",
-          cursor: "pointer",
-          padding: "6px 16px",
-          borderRadius: 20,
-          background: hudMinimized
-            ? "rgba(16, 185, 129, 0.2)"
-            : "rgba(255, 255, 255, 0.06)",
-          border: hudMinimized
-            ? "1px solid rgba(16, 185, 129, 0.5)"
-            : "1px solid rgba(255, 255, 255, 0.15)",
-          color: hudMinimized ? "#10b981" : "rgba(255, 255, 255, 0.5)",
-          fontSize: "11px",
-          fontFamily: "monospace",
-          fontWeight: 600,
-          letterSpacing: "0.05em",
-          transition: "all 0.2s",
+          bottom: hudMinimized ? 16 : 8,
         }}
       >
         {hudMinimized ? "SHOW HUD [Tab]" : "FULL 3D [Tab]"}
       </div>
-
-      {/* ── Channel Orbs (floating, top-right) ── */}
-      <ChannelOrbs />
     </div>
   );
 }

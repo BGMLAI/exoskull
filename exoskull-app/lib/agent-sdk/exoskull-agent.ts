@@ -117,6 +117,12 @@ const ASYNC_CONFIG = {
   model: "claude-sonnet-4-5-20250929" as const,
 };
 
+const CODING_CONFIG = {
+  maxTurns: 25,
+  timeoutMs: 120_000,
+  model: "claude-sonnet-4-5-20250929" as const,
+};
+
 /** Max tool result size (50KB) to prevent hitting API limits */
 const MAX_TOOL_RESULT_LENGTH = 50_000;
 
@@ -228,11 +234,19 @@ export async function runExoSkullAgent(
   req: AgentRequest,
 ): Promise<AgentResponse> {
   const startMs = Date.now();
+  const isCodingIntent =
+    req.channel === "web_chat" &&
+    /\b(code|kod|napisz|implementuj|napraw|debug|refactor|deploy|git |commit|push|pull request|PR|npm|build|test|function|class|import|export|error|bug|feature)\b/i.test(
+      req.userMessage,
+    );
+
   const config = req.isAsync
     ? ASYNC_CONFIG
     : req.channel === "voice"
       ? VOICE_CONFIG
-      : WEB_CONFIG;
+      : isCodingIntent
+        ? CODING_CONFIG
+        : WEB_CONFIG;
 
   req.onThinkingStep?.("Ładuję kontekst", "running");
 

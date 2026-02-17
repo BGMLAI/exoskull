@@ -13,6 +13,7 @@
  *   POST /api/code/grep   — Search content in files
  *   POST /api/code/git    — Git operations
  *   POST /api/code/tree   — Directory structure
+ *   POST /api/code/fetch  — Fetch URL content
  */
 
 import { Router } from "express";
@@ -25,6 +26,7 @@ import {
   grepFiles,
   gitOperation,
   getTree,
+  fetchUrl,
 } from "../services/code-executor";
 
 const router = Router();
@@ -259,6 +261,32 @@ router.post("/tree", async (req, res) => {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[CodeAPI] tree failed:", msg);
+    res.status(400).json({ success: false, error: msg });
+  }
+});
+
+// ============================================================================
+// FETCH URL
+// ============================================================================
+
+router.post("/fetch", async (req, res) => {
+  if (!checkRateLimit(req)) {
+    res.status(429).json({ error: "Rate limit exceeded" });
+    return;
+  }
+
+  const { url } = req.body;
+  if (!url) {
+    res.status(400).json({ error: "url is required" });
+    return;
+  }
+
+  try {
+    const content = await fetchUrl(url);
+    res.json({ success: true, content, length: content.length });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("[CodeAPI] fetch failed:", msg);
     res.status(400).json({ success: false, error: msg });
   }
 });

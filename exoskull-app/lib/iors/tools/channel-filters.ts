@@ -112,6 +112,20 @@ export const WEB_TOOL_NAMES = new Set([
   "code_grep",
   "code_git",
   "code_tree",
+  "code_web_search",
+  "code_web_fetch",
+  "code_deploy",
+  "code_list_skills",
+  "code_load_skill",
+  "code_load_agent",
+  // MCP Bridge (GitHub, Slack, Notion)
+  "github_list_prs",
+  "github_create_issue",
+  "github_create_pr",
+  "slack_send_message",
+  "slack_read_channel",
+  "notion_search",
+  "notion_create_page",
 ]);
 
 // ============================================================================

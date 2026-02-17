@@ -159,6 +159,14 @@ export function startWatching(): FSWatcher {
       /\.pytest_cache/,
       /\.parcel-cache/,
       /\.turbo/,
+      /Program Files/,
+      /WindowsApps/,
+      /WpSystem/,
+      /WUDownloadCache/,
+      /Windows[\/\\]/,
+      /\bsteam\b/i,
+      /\bNintendo\b/i,
+      /\bInstallers\b/i,
     ],
   });
 

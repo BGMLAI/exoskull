@@ -296,6 +296,37 @@ export async function gitOperation(
 }
 
 // ============================================================================
+// FETCH URL
+// ============================================================================
+
+export async function fetchUrl(url: string): Promise<string> {
+  const res = await fetch(url, {
+    headers: { "User-Agent": "ExoSkull-Agent/1.0" },
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} ${res.statusText} for ${url}`);
+  }
+
+  const contentType = res.headers.get("content-type") || "";
+  const text = await res.text();
+
+  if (contentType.includes("text/html")) {
+    // Strip scripts, styles, and HTML tags — keep text content
+    return text
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 30_000);
+  }
+
+  return text.slice(0, 50_000);
+}
+
+// ============================================================================
 // TREE (directory structure)
 // ============================================================================
 

@@ -5,14 +5,20 @@
  * file operations, bash commands, and git operations on the VPS.
  *
  * Tools:
- * - code_read_file   — Read a file from VPS
- * - code_write_file  — Write/create a file on VPS
- * - code_edit_file   — Edit a file (old_string → new_string)
- * - code_bash        — Execute bash command on VPS
- * - code_glob        — Search files by pattern
- * - code_grep        — Search content in files
- * - code_git         — Git operations (status, commit, push, etc.)
- * - code_tree        — Directory structure
+ * - code_read_file    — Read a file from VPS
+ * - code_write_file   — Write/create a file on VPS
+ * - code_edit_file    — Edit a file (old_string → new_string)
+ * - code_bash         — Execute bash command on VPS
+ * - code_glob         — Search files by pattern
+ * - code_grep         — Search content in files
+ * - code_git          — Git operations (status, commit, push, etc.)
+ * - code_tree         — Directory structure
+ * - code_web_search   — Brave Search API for docs/code/solutions
+ * - code_web_fetch    — Fetch URL content via VPS
+ * - code_deploy       — Deploy to Vercel via git push
+ * - code_list_skills  — List available skills from ~/.claude/skills/
+ * - code_load_skill   — Load a skill's SKILL.md instructions
+ * - code_load_agent   — Load an agent definition from ~/.claude/agents/
  */
 
 import type { ToolDefinition } from "./index";
@@ -477,6 +483,212 @@ Useful for understanding project layout.`,
       } catch {
         return result;
       }
+    },
+  },
+
+  // ---- code_web_search ----
+  {
+    timeoutMs: 10_000,
+    definition: {
+      name: "code_web_search",
+      description: `Search the web for documentation, APIs, code examples, solutions.
+Uses Brave Search API. Returns top 10 results with titles, URLs, and descriptions.`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          query: {
+            type: "string",
+            description: "Search query",
+          },
+        },
+        required: ["query"],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const query = input.query as string;
+      logger.info("[CodeExecTools] code_web_search:", { query });
+
+      const key = process.env.BRAVE_API_KEY;
+      if (!key) return "Brave Search API key not configured (BRAVE_API_KEY).";
+
+      try {
+        const res = await fetch(
+          `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`,
+          {
+            headers: {
+              "X-Subscription-Token": key,
+              Accept: "application/json",
+            },
+            signal: AbortSignal.timeout(8_000),
+          },
+        );
+
+        if (!res.ok) {
+          return `Brave Search error: ${res.status} ${res.statusText}`;
+        }
+
+        const data = await res.json();
+        const results = data.web?.results;
+        if (!results || results.length === 0) return "Brak wynikow.";
+
+        return results
+          .map(
+            (r: { title: string; url: string; description: string }) =>
+              `**${r.title}**\n${r.url}\n${r.description}`,
+          )
+          .join("\n\n");
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error("[CodeExecTools] code_web_search failed:", { error: msg });
+        return `Web search error: ${msg}`;
+      }
+    },
+  },
+
+  // ---- code_web_fetch ----
+  {
+    timeoutMs: 15_000,
+    definition: {
+      name: "code_web_fetch",
+      description: `Fetch a URL and return content as text. Use for docs, APIs, web pages.
+HTML is stripped to plain text. Max 30KB for HTML, 50KB for other content.`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          url: {
+            type: "string",
+            description: "URL to fetch",
+          },
+        },
+        required: ["url"],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const url = input.url as string;
+      logger.info("[CodeExecTools] code_web_fetch:", { url });
+
+      return callVPSCodeAPI("/api/code/fetch", { url });
+    },
+  },
+
+  // ---- code_deploy ----
+  {
+    timeoutMs: 30_000,
+    definition: {
+      name: "code_deploy",
+      description: `Deploy exoskull to Vercel production by pushing to main.
+Triggers Vercel auto-deploy. Use after making and committing code changes.`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          message: {
+            type: "string",
+            description: "Deploy description (for logging)",
+          },
+        },
+        required: ["message"],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const message = input.message as string;
+      logger.info("[CodeExecTools] code_deploy:", { message });
+
+      return callVPSCodeAPI("/api/code/bash", {
+        command: "cd /root/projects/exoskull && git push origin main",
+        timeout_ms: 25000,
+      });
+    },
+  },
+
+  // ---- code_list_skills ----
+  {
+    timeoutMs: 5_000,
+    definition: {
+      name: "code_list_skills",
+      description: `List available skills from ~/.claude/skills/. Returns skill directory names.
+Skills contain SKILL.md with specialized methodologies (TDD, security audit, etc.).`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          filter: {
+            type: "string",
+            description:
+              "Optional filter pattern (e.g., 'security', 'tdd', 'debug')",
+          },
+        },
+        required: [],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const filter = input.filter as string | undefined;
+      logger.info("[CodeExecTools] code_list_skills:", { filter });
+
+      const command = filter
+        ? `ls /root/.claude/skills/ | grep -i '${filter.replace(/'/g, "")}'`
+        : "ls /root/.claude/skills/";
+
+      return callVPSCodeAPI("/api/code/bash", {
+        command,
+        cwd: "/root",
+      });
+    },
+  },
+
+  // ---- code_load_skill ----
+  {
+    timeoutMs: 5_000,
+    definition: {
+      name: "code_load_skill",
+      description: `Load a skill's SKILL.md instructions. Use to learn specialized methodologies.
+First use code_list_skills to find available skills, then load the one you need.`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          skill_name: {
+            type: "string",
+            description:
+              "Skill directory name (e.g., 'tdd-guide', 'security-audit')",
+          },
+        },
+        required: ["skill_name"],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const skillName = input.skill_name as string;
+      logger.info("[CodeExecTools] code_load_skill:", { skillName });
+
+      return callVPSCodeAPI("/api/code/read", {
+        file_path: `/root/.claude/skills/${skillName}/SKILL.md`,
+      });
+    },
+  },
+
+  // ---- code_load_agent ----
+  {
+    timeoutMs: 5_000,
+    definition: {
+      name: "code_load_agent",
+      description: `Load an agent definition from ~/.claude/agents/. Agents have specialized roles (architect, debugger, tester, etc.).
+Use to adopt an agent's persona and methodology for the current task.`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          agent_name: {
+            type: "string",
+            description:
+              "Agent filename without .md (e.g., 'architect', 'debugger', 'tester-qa')",
+          },
+        },
+        required: ["agent_name"],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const agentName = input.agent_name as string;
+      logger.info("[CodeExecTools] code_load_agent:", { agentName });
+
+      return callVPSCodeAPI("/api/code/read", {
+        file_path: `/root/.claude/agents/${agentName}.md`,
+      });
     },
   },
 ];

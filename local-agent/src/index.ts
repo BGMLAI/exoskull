@@ -489,6 +489,11 @@ function scanFolder(folder: {
           ".cache", ".vscode", ".idea", "AppData", "$RECYCLE.BIN",
           "System Volume Information", ".Trash", "__MACOSX",
           ".tox", ".mypy_cache", ".pytest_cache", ".parcel-cache", ".turbo",
+          // Windows system dirs
+          "Program Files", "Program Files (x86)", "WindowsApps",
+          "WpSystem", "WUDownloadCache", "Windows",
+          // Large binary/cache dirs
+          "steam", "Nintendo", "Installers",
         ]);
         if (entry.name.startsWith(".") || SKIP_DIRS.has(entry.name)) continue;
         if (folder.recursive) walk(fullPath);
