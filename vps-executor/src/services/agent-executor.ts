@@ -19,8 +19,14 @@ import {
   grepFiles,
   gitOperation,
   getTree,
-  fetchUrl,
 } from "./code-executor";
+
+// Local fetchUrl — VPS code-executor.ts doesn't export one
+async function fetchUrl(url: string): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  return res.text();
+}
 import * as fs from "fs";
 import * as path from "path";
 

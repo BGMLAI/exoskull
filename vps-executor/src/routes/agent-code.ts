@@ -37,6 +37,7 @@ router.post("/chat", async (req: Request, res: Response) => {
     Connection: "keep-alive",
     "X-Accel-Buffering": "no",
   });
+  res.flushHeaders();
 
   // SSE emit function
   const emit = (event: Record<string, unknown>) => {
@@ -47,9 +48,11 @@ router.post("/chat", async (req: Request, res: Response) => {
     }
   };
 
-  // Handle client disconnect
+  // Handle client disconnect — use res.on("close"), NOT req.on("close")
+  // req "close" fires when the POST body is fully read (immediately),
+  // res "close" fires when the actual socket/connection closes.
   let disconnected = false;
-  req.on("close", () => {
+  res.on("close", () => {
     disconnected = true;
   });
 
