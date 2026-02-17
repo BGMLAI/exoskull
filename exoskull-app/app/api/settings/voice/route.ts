@@ -2,23 +2,20 @@
  * Voice Settings API — Get/Set ElevenLabs voice ID
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const svc = getServiceSupabase();
     const { data: tenant } = await svc
       .from("exo_tenants")
       .select("voice_config")
-      .eq("id", user.id)
+      .eq("id", tenantId)
       .maybeSingle();
 
     const voiceConfig = (tenant?.voice_config || {}) as Record<string, string>;
@@ -33,12 +30,9 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { voiceId } = await req.json();
 
@@ -48,7 +42,7 @@ export async function PUT(req: NextRequest) {
     const { data: tenant } = await svc
       .from("exo_tenants")
       .select("voice_config")
-      .eq("id", user.id)
+      .eq("id", tenantId)
       .maybeSingle();
 
     const voiceConfig = {
@@ -59,7 +53,7 @@ export async function PUT(req: NextRequest) {
     const { error } = await svc
       .from("exo_tenants")
       .update({ voice_config: voiceConfig })
-      .eq("id", user.id);
+      .eq("id", tenantId);
 
     if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });

@@ -27,6 +27,36 @@ const VPS_AGENT_URL = process.env.VPS_AGENT_URL; // e.g. https://agent.exoskull.
 const VPS_AGENT_SECRET = process.env.VPS_AGENT_SECRET;
 const VPS_TIMEOUT_MS = 5000; // 5s to establish connection, then stream
 
+// ---------------------------------------------------------------------------
+// VPS Circuit Breaker (prevents 5s latency spike when VPS is down)
+// ---------------------------------------------------------------------------
+const VPS_CB_THRESHOLD = 3; // failures before opening
+const VPS_CB_RESET_MS = 30_000; // 30s before half-open retry
+let vpsFailures = 0;
+let vpsCircuitOpenAt = 0;
+
+function isVpsCircuitOpen(): boolean {
+  if (vpsFailures < VPS_CB_THRESHOLD) return false;
+  // Check if reset period has passed (half-open)
+  if (Date.now() - vpsCircuitOpenAt >= VPS_CB_RESET_MS) {
+    return false; // Allow one probe request
+  }
+  return true;
+}
+
+function recordVpsSuccess(): void {
+  vpsFailures = 0;
+  vpsCircuitOpenAt = 0;
+}
+
+function recordVpsFailure(): void {
+  vpsFailures++;
+  if (vpsFailures >= VPS_CB_THRESHOLD) {
+    vpsCircuitOpenAt = Date.now();
+    logger.warn("[ChatStream] VPS circuit breaker OPEN — skipping VPS for 30s");
+  }
+}
+
 /**
  * Try to proxy the request to the VPS agent backend.
  * Returns a Response with SSE stream, or null if VPS is unavailable.
@@ -37,6 +67,7 @@ async function tryVpsProxy(
   conversationId?: string,
 ): Promise<Response | null> {
   if (!VPS_AGENT_URL || !VPS_AGENT_SECRET) return null;
+  if (isVpsCircuitOpen()) return null;
 
   try {
     const controller = new AbortController();
@@ -62,13 +93,17 @@ async function tryVpsProxy(
       logger.warn("[ChatStream] VPS returned error:", {
         status: vpsResponse.status,
       });
+      recordVpsFailure();
       return null;
     }
 
     if (!vpsResponse.body) {
       logger.warn("[ChatStream] VPS returned no body");
+      recordVpsFailure();
       return null;
     }
+
+    recordVpsSuccess();
 
     // Relay SSE stream from VPS → client (pass-through)
     return new Response(vpsResponse.body, {
@@ -80,6 +115,7 @@ async function tryVpsProxy(
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
+    recordVpsFailure();
     // AbortError = timeout, that's expected
     if (msg.includes("abort")) {
       logger.warn("[ChatStream] VPS connection timed out");

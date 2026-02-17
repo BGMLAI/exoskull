@@ -16,6 +16,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { emitEvent } from "@/lib/iors/loop";
 import { createTask } from "@/lib/tasks/task-service";
 
+import { getAlignmentGuardian } from "./guardian";
 import { logger } from "@/lib/logger";
 function getTwilioConfig() {
   return {
@@ -101,6 +102,52 @@ export async function executeIntervention(
     .eq("id", interventionId);
 
   try {
+    // Guardian re-check before execution (rules may have changed since approval)
+    try {
+      const guardian = getAlignmentGuardian();
+      const verdict = await guardian.verifyBenefit(intervention.tenant_id, {
+        id: intervention.id,
+        type: intervention.intervention_type as any,
+        title: intervention.title,
+        description: intervention.description || "",
+        actionPayload: intervention.action_payload as any,
+        priority: intervention.priority as any,
+        requiresApproval: false,
+        reasoning: "pre-execution re-check",
+      });
+      if (verdict.action === "blocked") {
+        logger.warn("[Executor] Guardian blocked intervention:", {
+          interventionId,
+          reason: verdict.reasoning,
+        });
+        await supabase
+          .from("exo_interventions")
+          .update({
+            status: "blocked",
+            execution_error: `Guardian blocked: ${verdict.reasoning}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", interventionId);
+        await supabase
+          .from("exo_intervention_queue")
+          .delete()
+          .eq("intervention_id", interventionId);
+        return {
+          success: false,
+          message: `Guardian blocked: ${verdict.reasoning}`,
+        };
+      }
+    } catch (guardianError) {
+      // Guardian failure should not block execution — log and continue
+      logger.warn("[Executor] Guardian check failed, proceeding:", {
+        interventionId,
+        error:
+          guardianError instanceof Error
+            ? guardianError.message
+            : String(guardianError),
+      });
+    }
+
     const result = await dispatchAction(intervention as Intervention);
 
     // Mark as completed
