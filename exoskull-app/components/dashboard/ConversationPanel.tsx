@@ -382,13 +382,21 @@ export function ConversationPanel({
           {isSpeechSupported && (
             <button
               onClick={isListening ? stopListening : startListening}
+              disabled={isSpeaking && !isListening}
               className={cn(
                 "p-2.5 rounded-full transition-colors shrink-0",
                 isListening
                   ? "bg-destructive text-destructive-foreground animate-pulse"
                   : "bg-muted text-muted-foreground hover:bg-accent",
+                isSpeaking && !isListening && "opacity-50 cursor-not-allowed",
               )}
-              title={isListening ? "Zatrzymaj" : "Mow"}
+              title={
+                isSpeaking && !isListening
+                  ? "Poczekaj az AI skonczy mowic"
+                  : isListening
+                    ? "Zatrzymaj"
+                    : "Mow"
+              }
             >
               {isListening ? (
                 <MicOff className="w-4 h-4" />

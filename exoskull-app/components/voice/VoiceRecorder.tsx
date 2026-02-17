@@ -12,6 +12,7 @@ interface VoiceRecorderProps {
   className?: string;
   size?: "sm" | "md" | "lg";
   variant?: "icon" | "button";
+  disabled?: boolean;
 }
 
 export function VoiceRecorder({
@@ -20,6 +21,7 @@ export function VoiceRecorder({
   className,
   size = "md",
   variant = "icon",
+  disabled = false,
 }: VoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -105,6 +107,7 @@ export function VoiceRecorder({
   }, [isRecording]);
 
   const toggleRecording = () => {
+    if (disabled && !isRecording) return;
     if (isRecording) {
       stopRecording();
     } else {
@@ -146,12 +149,15 @@ export function VoiceRecorder({
         className={cn(
           sizeClasses[size],
           isRecording && "animate-pulse",
+          disabled && !isRecording && "opacity-50 cursor-not-allowed",
           className,
         )}
         title={
-          isRecording
-            ? `Nagrywanie ${duration}s - kliknij by zatrzymac`
-            : "Nagraj glosowo"
+          disabled && !isRecording
+            ? "Poczekaj az AI skonczy mowic"
+            : isRecording
+              ? `Nagrywanie ${duration}s - kliknij by zatrzymac`
+              : "Nagraj glosowo"
         }
       >
         {isRecording ? (
@@ -167,7 +173,11 @@ export function VoiceRecorder({
     <Button
       variant={isRecording ? "destructive" : "outline"}
       onClick={toggleRecording}
-      className={cn(isRecording && "animate-pulse", className)}
+      className={cn(
+        isRecording && "animate-pulse",
+        disabled && !isRecording && "opacity-50 cursor-not-allowed",
+        className,
+      )}
     >
       {isRecording ? (
         <>

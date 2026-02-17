@@ -408,7 +408,7 @@ export function BirthChat() {
               isListening={isListening}
               isSupported={isSupported}
               onClick={toggleListening}
-              disabled={isLoading}
+              disabled={isLoading || isSpeaking}
               size="sm"
             />
             {/* Hidden file input */}

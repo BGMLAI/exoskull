@@ -6,8 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
 import { logger } from "@/lib/logger";
@@ -15,16 +15,10 @@ export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(request: NextRequest) {
   try {
-    // Get authenticated user
-    const serverSupabase = await createServerClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await serverSupabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Verify tenant authentication
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { searchParams } = new URL(request.url);
     const channel = searchParams.get("channel"); // email, sms, voice, web_chat, etc.
@@ -42,7 +36,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     let query = supabase
       .from("exo_unified_messages")
       .select("*", { count: "exact" })
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -74,7 +68,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     const { data: channelCounts } = await supabase
       .from("exo_unified_messages")
       .select("channel")
-      .eq("tenant_id", user.id);
+      .eq("tenant_id", tenantId);
 
     const counts: Record<string, number> = {};
     let unreadCount = 0;
@@ -89,7 +83,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     const { count: unread } = await supabase
       .from("exo_unified_messages")
       .select("*", { count: "exact", head: true })
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .eq("metadata->>isUnread", "true");
 
     unreadCount = unread || 0;

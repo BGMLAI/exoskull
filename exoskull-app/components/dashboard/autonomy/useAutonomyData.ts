@@ -27,6 +27,7 @@ export interface AutonomyData {
   cycles: MAPEKCycleUI[];
   loading: boolean;
   error: string | null;
+  lastRefreshed: Date | null;
 
   // Mutations — Grants
   createGrant: (
@@ -84,6 +85,7 @@ export function useAutonomyData(): AutonomyData {
   const [cycles, setCycles] = useState<MAPEKCycleUI[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   // --------------------------------------------------------------------------
   // Fetch all data
@@ -167,6 +169,7 @@ export function useAutonomyData(): AutonomyData {
         const data = await cyclesRes.json();
         setCycles(data.cycles || []);
       }
+      setLastRefreshed(new Date());
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[useAutonomyData] Fetch error:", { error: msg });
@@ -178,6 +181,17 @@ export function useAutonomyData(): AutonomyData {
 
   useEffect(() => {
     fetchData();
+  }, [fetchData]);
+
+  // Auto-refresh every 30 minutes
+  useEffect(() => {
+    const interval = setInterval(
+      () => {
+        fetchData();
+      },
+      30 * 60 * 1000,
+    );
+    return () => clearInterval(interval);
   }, [fetchData]);
 
   // --------------------------------------------------------------------------
@@ -440,6 +454,7 @@ export function useAutonomyData(): AutonomyData {
     cycles,
     loading,
     error,
+    lastRefreshed,
     createGrant,
     toggleGrant,
     updateGrant,

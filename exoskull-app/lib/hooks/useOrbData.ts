@@ -8,6 +8,7 @@ let _tree: OrbNode[] = buildDemoTree();
 let _listeners: Set<() => void> = new Set();
 let _fetched = false;
 let _fetching = false;
+let _lastRefreshed: Date | null = null;
 
 function emitChange() {
   _listeners.forEach((fn) => fn());
@@ -297,6 +298,7 @@ async function fetchOrbTree() {
     const tree = transformApiToOrbTree(values);
     _tree = tree;
     _fetched = true;
+    _lastRefreshed = new Date();
     emitChange();
   } catch (err) {
     console.error("[useOrbData] Failed to fetch hierarchy:", err);
@@ -479,6 +481,19 @@ export function useOrbData() {
   // Trigger API fetch on first mount
   useEffect(() => {
     fetchOrbTree();
+  }, []);
+
+  // Auto-refresh every 30 minutes
+  useEffect(() => {
+    const interval = setInterval(
+      () => {
+        _fetched = false;
+        _fetching = false;
+        fetchOrbTree();
+      },
+      30 * 60 * 1000,
+    );
+    return () => clearInterval(interval);
   }, []);
 
   const nodeMap = useMemo(() => buildNodeMap(tree), [tree]);
@@ -720,5 +735,6 @@ export function useOrbData() {
     removeNode,
     updateNode,
     isLive: _fetched,
+    lastRefreshed: _lastRefreshed,
   };
 }
