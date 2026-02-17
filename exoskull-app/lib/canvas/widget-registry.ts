@@ -180,6 +180,14 @@ export const WIDGET_REGISTRY: Record<string, WidgetMeta> = {
     minSize: { w: 2, h: 2 },
     category: "iors",
   },
+  claude_code: {
+    type: "claude_code",
+    label: "Claude Code",
+    icon: "Code2",
+    defaultSize: { w: 2, h: 2 },
+    minSize: { w: 2, h: 2 },
+    category: "core",
+  },
 };
 
 /** Get metadata for a widget type. Falls back to a generic entry for dynamic_mod types. */

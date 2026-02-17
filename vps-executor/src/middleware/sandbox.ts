@@ -9,6 +9,7 @@ import * as path from "path";
 
 const ALLOWED_ROOTS = [
   "/root/projects",
+  "/root/projects/users",
   "/root/.claude",
   "/root/goals",
   "/root/tools",

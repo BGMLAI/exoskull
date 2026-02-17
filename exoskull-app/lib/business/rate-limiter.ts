@@ -18,18 +18,24 @@ function getServiceClient() {
   );
 }
 
-type UsageField = "conversations_count" | "ai_requests_count" | "voice_minutes";
+type UsageField =
+  | "conversations_count"
+  | "ai_requests_count"
+  | "voice_minutes"
+  | "coding_sessions_count";
 
 const RESOURCE_TO_FIELD: Record<string, UsageField> = {
   conversations: "conversations_count",
   ai_requests: "ai_requests_count",
   voice_minutes: "voice_minutes",
+  coding_sessions: "coding_sessions_count",
 };
 
 const RESOURCE_TO_LIMIT: Record<string, keyof (typeof TIER_LIMITS)["free"]> = {
   conversations: "conversations_daily",
   ai_requests: "ai_requests_daily",
   voice_minutes: "voice_minutes_daily",
+  coding_sessions: "coding_sessions_daily",
 };
 
 // Admin bypass - set ADMIN_TENANT_IDS in .env (comma-separated)

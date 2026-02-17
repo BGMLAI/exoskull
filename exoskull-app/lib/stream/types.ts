@@ -58,7 +58,11 @@ export type StreamEventData =
   | CodeBlockData
   | MediaContentData
   | ToolExecutionData
-  | IngestionReportData;
+  | IngestionReportData
+  | SearchResultsData
+  | RichContentEventData
+  | FileChangeData
+  | DiffViewData;
 
 // ---------------------------------------------------------------------------
 // Message events
@@ -342,6 +346,74 @@ export interface IngestionReportData {
 }
 
 // ---------------------------------------------------------------------------
+// Search Results events — Perplexity-style web search results
+// ---------------------------------------------------------------------------
+
+export interface SearchResultsData {
+  type: "search_results";
+  query?: string;
+  results: Array<{
+    title: string;
+    url: string;
+    snippet: string;
+    thumbnailUrl?: string;
+    favicon?: string;
+    siteName?: string;
+  }>;
+  followUpSuggestions?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Rich Content events — inline rich cards (articles, images, code, 3D models)
+// ---------------------------------------------------------------------------
+
+export interface RichContentEventData {
+  type: "rich_content";
+  contentType: "image" | "article" | "code" | "model3d";
+  title?: string;
+  // Image fields
+  imageUrl?: string;
+  caption?: string;
+  alt?: string;
+  // Article fields
+  url?: string;
+  favicon?: string;
+  snippet?: string;
+  siteName?: string;
+  thumbnailUrl?: string;
+  // Code fields
+  code?: string;
+  language?: string;
+  // Model3D fields
+  modelUrl?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Claude Code events — file changes and diff views
+// ---------------------------------------------------------------------------
+
+export interface FileChangeData {
+  type: "file_change";
+  filePath: string;
+  language: string;
+  operation: "write" | "edit" | "create";
+}
+
+export interface DiffHunk {
+  oldStart: number;
+  newStart: number;
+  lines: Array<{ type: "context" | "add" | "remove"; content: string }>;
+}
+
+export interface DiffViewData {
+  type: "diff_view";
+  filePath: string;
+  before: string;
+  after: string;
+  hunks: DiffHunk[];
+}
+
+// ---------------------------------------------------------------------------
 // Notification category resolver — maps event type to category
 // ---------------------------------------------------------------------------
 
@@ -369,6 +441,9 @@ export function getNotificationCategory(
       return "evolution";
     case "ingestion_report":
       return data.status === "failed" ? "alert" : "task";
+    case "search_results":
+    case "rich_content":
+      return "ai_insight";
     default:
       return "system";
   }
@@ -445,6 +520,8 @@ export type SSEEventType =
   | "media_content"
   | "tool_execution"
   | "ingestion_report"
+  | "search_results"
+  | "rich_content"
   | "cockpit_update"
   // Multi-agent events (from VPS agent backend)
   | "delegation"
@@ -453,4 +530,7 @@ export type SSEEventType =
   | "agent_end"
   | "agent_handoff"
   | "mcp_tool_start"
-  | "mcp_tool_end";
+  | "mcp_tool_end"
+  // Claude Code events (from /api/claude-code/chat)
+  | "file_change"
+  | "diff_view";

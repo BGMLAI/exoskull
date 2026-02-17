@@ -95,6 +95,7 @@ export interface TierLimits {
   conversations_daily: number; // -1 = unlimited
   ai_requests_daily: number;
   voice_minutes_daily: number;
+  coding_sessions_daily: number;
   mods_max: number;
 }
 
@@ -103,30 +104,35 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
     conversations_daily: 5,
     ai_requests_daily: 20,
     voice_minutes_daily: 10,
+    coding_sessions_daily: 5,
     mods_max: 2,
   },
   basic: {
     conversations_daily: 50,
     ai_requests_daily: 200,
     voice_minutes_daily: 60,
+    coding_sessions_daily: 20,
     mods_max: 10,
   },
   pro: {
     conversations_daily: -1,
     ai_requests_daily: -1,
     voice_minutes_daily: 120,
+    coding_sessions_daily: 50,
     mods_max: 25,
   },
   business: {
     conversations_daily: -1,
     ai_requests_daily: -1,
     voice_minutes_daily: 500,
+    coding_sessions_daily: -1,
     mods_max: -1,
   },
   enterprise: {
     conversations_daily: -1,
     ai_requests_daily: -1,
     voice_minutes_daily: -1,
+    coding_sessions_daily: -1,
     mods_max: -1,
   },
 };
