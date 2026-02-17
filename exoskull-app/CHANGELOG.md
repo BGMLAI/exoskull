@@ -44,6 +44,60 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-18] Claude Code Merge: Full Coding Capabilities in Main Chat
+
+### Always-On Coding Mode
+
+- Web chat now always uses `CODING_CONFIG` (25 turns, 120s timeout) — removed keyword-based `isCodingIntent` detection
+- Added coding workspace instructions to system prompt for non-voice channels (VPS paths, tool usage hints)
+- 14 code tools (read, write, edit, bash, git, glob, grep, tree, deploy, web_search) always available in web chat
+
+### File Change SSE Events
+
+- `code_write_file` and `code_edit_file` now emit `__SSE__{"type":"file_change"}__SSE__` directives
+- Existing `extractSSEDirective()` in agent loop picks them up automatically — no agent loop changes needed
+- `UnifiedStream` handles `file_change` events → pushes to `useCockpitStore.notifyFileChange()`
+
+### Code Sidebar (New Component)
+
+- `CodeSidebar.tsx` — toggleable 480px right panel with file browser + code viewer
+- Reuses existing `WorkspaceFileBrowser` and `CodePanel` from `components/claude-code/`
+- Toggle button at `top-4 right-44 z-50` (above channel orbs and other overlays)
+- Auto-opens when `file_change` SSE events arrive; shows modified file count badge when closed
+- State managed via Zustand (`useCockpitStore`: `codeSidebarOpen`, `lastChangedFile`, `toggleCodeSidebar`, `notifyFileChange`)
+
+### Tool Activity Indicator
+
+- `HomeChat.tsx` shows animated wrench badge during tool execution (reads `tool_start`/`tool_end` SSE events)
+- `onFileChange` prop wired to parent for file change propagation
+
+### Files Changed
+
+| File                                          | Action                                          |
+| --------------------------------------------- | ----------------------------------------------- |
+| `lib/agent-sdk/exoskull-agent.ts`             | Modified — always CODING_CONFIG + coding prompt |
+| `lib/iors/tools/code-execution-tools.ts`      | Modified — `__SSE__` file_change directives     |
+| `components/dashboard/HomeChat.tsx`           | Modified — file_change + tool activity handlers |
+| `components/stream/UnifiedStream.tsx`         | Modified — file_change → store bridge           |
+| `lib/stores/useCockpitStore.ts`               | Modified — codeSidebar state + actions          |
+| `components/dashboard/CodeSidebar.tsx`        | Created — toggleable file browser + code panel  |
+| `components/dashboard/CyberpunkDashboard.tsx` | Modified — CodeSidebar in both view modes       |
+
+### Commits
+
+- `8c9ef7c` — feat: merge Claude Code into main dashboard chat
+- `73353a9` — fix: move code sidebar toggle to visible top-row position
+
+### Verified
+
+- TypeScript: 0 errors
+- E2E: `code_read_file`, `code_tree`, `code_write_file` all work via SSE
+- `file_change` SSE events fire correctly on file write
+- Puppeteer screenshot confirms button visible at `top:16px right:176px`
+- Production deploy: both Vercel deployments succeeded
+
+---
+
 ## [2026-02-18] P2 Mind Map Persistence: Visual Type, Model, Thumbnail
 
 ### DB Migration

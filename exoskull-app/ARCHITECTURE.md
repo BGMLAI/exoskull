@@ -8,7 +8,9 @@ ExoSkull's dashboard has **two view modes** selectable via toggle:
 
 2. **Classic Cockpit** — Hybrid 3D + 2D cockpit built with React Three Fiber (R3F). The 3D scene (world orbs, synthwave grid, particles, bloom) serves as background. HTML/CSS cockpit HUD overlay at z=10 provides FPV game-style panels (Star Citizen / Elite Dangerous).
 
-The backend (Agent SDK, Gateway, 63+ IORS tools) is shared between both views.
+The backend (Agent SDK, Gateway, 63+ IORS tools) is shared between both views. Both views include a **CodeSidebar** (toggleable right panel with file browser + code viewer) that auto-opens when code tools modify files.
+
+**Agent Config**: Web chat always uses `CODING_CONFIG` (25 turns, 120s timeout) with full VPS coding tools. Voice uses `VOICE_CONFIG` (6 turns, 40s). Async uses `ASYNC_CONFIG` (15 turns, 50s).
 
 ## Mind Map Workspace (`viewMode: "mindmap"`)
 
@@ -96,6 +98,7 @@ z-10  → CockpitHUDShell        (2D HTML/CSS cockpit: panels, chat, gauges, top
 z-12  → ChannelOrbs            (floating channel indicators, top-right)
 z-20  → OrbContextMenuOverlay  (right-click context menu for orb CRUD)
 z-30  → ToolExecutionOverlay   (active tool indicator pill, top-center)
+z-50  → CodeSidebar toggle     (code panel toggle button, top-right row)
 z-50  → FloatingCallButton     (voice call, always accessible, bottom-right)
 ```
 
@@ -145,10 +148,11 @@ z-50  → FloatingCallButton     (voice call, always accessible, bottom-right)
 
 ### Dashboard Overlays (`components/dashboard/`)
 
-| File                       | Purpose                                                                                                                                |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `CyberpunkDashboard.tsx`   | Top-level layout — routes to WorkspaceLayout (mindmap) or CyberpunkScene+CockpitHUDShell (classic) based on `useCockpitStore.viewMode` |
-| `ToolExecutionOverlay.tsx` | Shows active tool name + elapsed time. Reads from `useSceneStore`.                                                                     |
+| File                       | Purpose                                                                                                                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CyberpunkDashboard.tsx`   | Top-level layout — routes to WorkspaceLayout (mindmap) or CyberpunkScene+CockpitHUDShell (classic) based on `useCockpitStore.viewMode`                                               |
+| `ToolExecutionOverlay.tsx` | Shows active tool name + elapsed time. Reads from `useSceneStore`.                                                                                                                   |
+| `CodeSidebar.tsx`          | Toggleable 480px right panel: WorkspaceFileBrowser (top 35%) + CodePanel (bottom 65%). Auto-opens on file_change SSE. Toggle at z-50 `top-4 right-44`. State from `useCockpitStore`. |
 
 ### Deprecated (kept for reference)
 
@@ -163,14 +167,14 @@ z-50  → FloatingCallButton     (voice call, always accessible, bottom-right)
 
 ### State Management
 
-| Store                 | Location                            | Purpose                                                                                                                          |
-| --------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `useCockpitStore`     | `lib/stores/useCockpitStore.ts`     | Layout: viewMode (`"mindmap"` \| `"classic"`), wing widths, centerMode, previewTarget, sections, collapsedPanels, orbContextMenu |
-| `useMindMapStore`     | `lib/stores/useMindMapStore.ts`     | Mind map: expandedNodes, focusedNodeId, hoveredNodeId, viewMode (3d/2d), filterQuery, selectedSources                            |
-| `useSceneStore`       | `lib/stores/useSceneStore.ts`       | Bridges SSE tool events → 3D visual effects. SceneEffect types: idle, thinking, building, searching, executing.                  |
-| `useSpatialChatStore` | `lib/stores/useSpatialChatStore.ts` | @deprecated — was used by SpatialChat. CenterViewport uses UnifiedStream directly.                                               |
-| `useInterfaceStore`   | `lib/stores/useInterfaceStore.ts`   | General UI state (existing, preserved)                                                                                           |
-| `useStreamState`      | `lib/hooks/useStreamState.ts`       | Chat state reducer (existing, 14 action types)                                                                                   |
+| Store                 | Location                            | Purpose                                                                                                                                                                                                  |
+| --------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useCockpitStore`     | `lib/stores/useCockpitStore.ts`     | Layout: viewMode, wing widths, centerMode, previewTarget, sections, collapsedPanels, orbContextMenu. Code sidebar: `codeSidebarOpen`, `lastChangedFile`, `toggleCodeSidebar()`, `notifyFileChange(path)` |
+| `useMindMapStore`     | `lib/stores/useMindMapStore.ts`     | Mind map: expandedNodes, focusedNodeId, hoveredNodeId, viewMode (3d/2d), filterQuery, selectedSources                                                                                                    |
+| `useSceneStore`       | `lib/stores/useSceneStore.ts`       | Bridges SSE tool events → 3D visual effects. SceneEffect types: idle, thinking, building, searching, executing.                                                                                          |
+| `useSpatialChatStore` | `lib/stores/useSpatialChatStore.ts` | @deprecated — was used by SpatialChat. CenterViewport uses UnifiedStream directly.                                                                                                                       |
+| `useInterfaceStore`   | `lib/stores/useInterfaceStore.ts`   | General UI state (existing, preserved)                                                                                                                                                                   |
+| `useStreamState`      | `lib/hooks/useStreamState.ts`       | Chat state reducer (existing, 14 action types)                                                                                                                                                           |
 
 ### Hooks
 
@@ -200,12 +204,19 @@ z-50  → FloatingCallButton     (voice call, always accessible, bottom-right)
 ```
 User sends message
   → POST /api/chat/stream (Agent SDK + 63 IORS tools)
-  → SSE stream events: tool_start, tool_end, text, done
+  → SSE stream events: tool_start, tool_end, text, file_change, done
   → UnifiedStream reads SSE events
   → useSceneStore.startTool(toolName) / endTool()
   → SceneEffects.tsx reads store via useFrame → animates light color, ring opacity, bloom pulse
   → ToolExecutionOverlay.tsx shows/hides active tool pill
   → CockpitTopBar shows active tool name + IORS status
+
+  File change path (code_write_file / code_edit_file):
+  → Tool returns __SSE__{"type":"file_change","filePath":"...","operation":"write|edit"}__SSE__result
+  → extractSSEDirective() splits SSE event from clean result
+  → Agent loop emits file_change SSE event to client
+  → UnifiedStream case "file_change" → useCockpitStore.notifyFileChange(filePath)
+  → CodeSidebar auto-opens, selects + highlights modified file
 ```
 
 ### Cockpit Data Loading
@@ -307,6 +318,7 @@ app/dashboard/page.tsx
           → ModelPicker (3D model dialog)
         → UnifiedStream (floating bottom, resizable 120-600px)
         → StudioPanel (right, collapsible 320px)
+      → CodeSidebar (z-30 panel, z-50 toggle button)
       → View toggle button ("Classic")
       → FloatingCallButton (z-50)
 
@@ -316,6 +328,7 @@ app/dashboard/page.tsx
           → SynthwaveGrid, Skybox, Particles, OrbitalScene, SceneEffects, ScenePostProcessing
       → CockpitHUDShell (z-10)
         → CockpitTopBar, LeftWing, CenterViewport (UnifiedStream + PreviewPane), RightWing, CockpitBottomBar, ChannelOrbs
+      → CodeSidebar (z-30 panel, z-50 toggle button)
       → ToolExecutionOverlay (z-30)
       → View toggle button ("Mind Map")
       → FloatingCallButton (z-50)
@@ -345,7 +358,7 @@ All routes use `verifyTenantAuth` for authentication.
 - **Inline image generation**: NanoBanana / AI Studio Gemini integration in chat
 - **Quick action dispatch**: Bottom bar buttons dispatch commands to UnifiedStream input
 - **Real-time panel refresh**: WebSocket or polling for live data updates in wing panels
-- **Mind map persistence**: Save node visual types, model URLs, expanded state to DB (`exo_values` columns added but API not yet updated)
+- **Mind map persistence**: ~~Save node visual types, model URLs~~ — DONE (visual_type, model_url, thumbnail_url columns + API + UI wired). Expanded state not yet persisted.
 - **Sketchfab download + R2 cache**: Download glTF from Sketchfab, cache on Cloudflare R2 (API route placeholder exists)
 - **LOD for mind map**: Distant nodes → simple sphere, close → full detail. Max 200 visible nodes
 - **Web Worker for force simulation**: Offload physics to worker for better frame rate

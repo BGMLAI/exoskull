@@ -1,5 +1,52 @@
 # Session Log
 
+## [2026-02-17] Claude Code Merge into Main Dashboard Chat
+
+### Tasks
+
+- Always-on CODING_CONFIG for web chat: **SUCCESS**
+- Coding workspace prompt in system message: **SUCCESS**
+- `__SSE__` file_change directives in code_write_file/code_edit_file: **SUCCESS**
+- file_change handler in UnifiedStream → Zustand store: **SUCCESS**
+- CodeSidebar component (file browser + code panel): **SUCCESS**
+- Zustand store extension (codeSidebarOpen, lastChangedFile, actions): **SUCCESS**
+- CyberpunkDashboard integration (both view modes): **SUCCESS**
+- Tool activity badge in HomeChat: **SUCCESS**
+- TypeScript build: **SUCCESS** (0 errors)
+- E2E test — code_read_file via SSE: **SUCCESS** (44 events, 23.6s)
+- E2E test — code_write_file + file_change event: **SUCCESS** (13.8s)
+- Puppeteer screenshot — mindmap view: **SUCCESS**
+- Puppeteer screenshot — classic view with WebGL: **SUCCESS** (2 retries — SwiftShader flags)
+- Button position fix (hidden behind ChannelOrbs): **SUCCESS**
+- Vercel production deploy: **SUCCESS** (commits `8c9ef7c`, `73353a9`)
+
+### Retries
+
+- Headless Chrome WebGL: 2 retries — 3D scene stuck on "Ładowanie..." → fixed with `--enable-webgl --use-gl=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist`
+- Button visibility: 1 retry — `top-14 right-4 z-40` hidden behind ChannelOrbs (`top:44px right:16px z-12`) → moved to `top-4 right-44 z-50`
+- CDN propagation: 1 retry — screenshot showed old position → re-verified after propagation
+
+### Commits
+
+- `8c9ef7c` — feat: merge Claude Code into main dashboard chat (7 files)
+- `73353a9` — fix: move code sidebar toggle to visible top-row position
+
+### Key Decisions
+
+- Zustand store over prop drilling: file_change events flow via `useCockpitStore` (UnifiedStream → CodeSidebar) instead of prop chains through CockpitHUDShell
+- Adapted plan: UnifiedStream handles file_change events (not CockpitHUDShell as originally planned) because CenterViewport uses UnifiedStream for chat
+- Reused existing claude-code components: WorkspaceFileBrowser + CodePanel — zero new API routes needed
+- Always CODING_CONFIG: removed isCodingIntent regex — all web messages get 25 turns / 120s (was 10/55s)
+
+### Issues Found & Fixed
+
+- Plan said CockpitHUDShell at `components/dashboard/` — actually at `components/cockpit/`
+- Plan said modify CockpitHUDShell for file events — actual data flow is UnifiedStream → Zustand → CodeSidebar
+- Bearer token auth rejected by production middleware for /api/chat/stream — used local dev server with cookie auth for testing
+- Code sidebar button overlapped by ChannelOrbs in Classic view — repositioned
+
+---
+
 ## [2026-02-17] 3D Mind Map Workspace Implementation
 
 ### Tasks
