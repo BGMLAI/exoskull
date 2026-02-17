@@ -1,6 +1,7 @@
 import { useMemo, useCallback, useEffect, useSyncExternalStore } from "react";
 import { DEMO_WORLDS } from "@/lib/worlds/demo-worlds";
 import type { OrbNode, OrbNodeType } from "@/lib/types/orb-types";
+import { fetchWithRetry } from "@/lib/utils/fetch-retry";
 
 // ─── Singleton store for OrbNode tree ───
 
@@ -606,7 +607,7 @@ export function useOrbData() {
           ...parentFields,
         };
 
-        const res = await fetch(endpoint, {
+        const res = await fetchWithRetry(endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -640,7 +641,7 @@ export function useOrbData() {
       try {
         const endpoint = getDeleteUrl(type, nodeId);
 
-        const res = await fetch(endpoint, {
+        const res = await fetchWithRetry(endpoint, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body:
@@ -698,7 +699,7 @@ export function useOrbData() {
           ...data,
         };
 
-        const res = await fetch(endpoint, {
+        const res = await fetchWithRetry(endpoint, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),

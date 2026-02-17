@@ -148,6 +148,33 @@ export async function executeIntervention(
       });
     }
 
+    // Validate action type against whitelist before dispatching
+    const actionType =
+      ((intervention.action_payload as Record<string, unknown>)
+        ?.action as string) || intervention.intervention_type;
+    if (!ALLOWED_ACTION_TYPES.has(actionType)) {
+      logger.warn("[Executor] Rejected unknown action type:", {
+        interventionId,
+        actionType,
+      });
+      await supabase
+        .from("exo_interventions")
+        .update({
+          status: "failed",
+          execution_error: `Rejected: action type "${actionType}" is not in the allowed whitelist`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", interventionId);
+      await supabase
+        .from("exo_intervention_queue")
+        .delete()
+        .eq("intervention_id", interventionId);
+      return {
+        success: false,
+        message: `Rejected: action type "${actionType}" is not whitelisted`,
+      };
+    }
+
     const result = await dispatchAction(intervention as Intervention);
 
     // Mark as completed
@@ -350,6 +377,27 @@ export async function processTimeouts(): Promise<number> {
 // ============================================================================
 // ACTION DISPATCH
 // ============================================================================
+
+/**
+ * Whitelist of allowed action types that dispatchAction can execute.
+ * Any action_type not in this set will be rejected before dispatch.
+ */
+const ALLOWED_ACTION_TYPES = new Set([
+  "send_sms",
+  "send_email",
+  "send_whatsapp",
+  "make_call",
+  "create_task",
+  "task_creation",
+  "proactive_message",
+  "send_notification",
+  "trigger_checkin",
+  "gap_detection",
+  "run_automation",
+  "automation_trigger",
+  "notify_emergency_contact",
+  "custom",
+]);
 
 async function dispatchAction(
   intervention: Intervention,

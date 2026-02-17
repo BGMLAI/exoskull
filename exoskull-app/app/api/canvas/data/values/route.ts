@@ -149,6 +149,29 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       });
     }
 
+    // --- Batch notes count helper ---
+    // Fetches all notes for a given FK column where the FK is in the provided IDs,
+    // returns a Map<entityId, count>. Single query replaces N individual count queries.
+    const batchNotesCount = async (
+      fkColumn: string,
+      entityIds: string[],
+    ): Promise<Map<string, number>> => {
+      const counts = new Map<string, number>();
+      if (entityIds.length === 0) return counts;
+      const { data } = await supabase
+        .from("user_notes")
+        .select(fkColumn)
+        .eq("tenant_id", tenantId)
+        .in(fkColumn, entityIds);
+      if (data) {
+        for (const row of data) {
+          const id = (row as unknown as Record<string, string>)[fkColumn];
+          if (id) counts.set(id, (counts.get(id) || 0) + 1);
+        }
+      }
+      return counts;
+    };
+
     // Fetch loops + quest counts per value
     const valuesWithLoops = await Promise.all(
       values.map(async (value) => {
@@ -160,17 +183,6 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
           .eq("tenant_id", tenantId)
           .eq("value_id", value.id)
           .eq("is_active", true);
-
-        // Count notes at the value level
-        let valueNotesCount = 0;
-        if (deep) {
-          const { count } = await supabase
-            .from("user_notes")
-            .select("id", { count: "exact", head: true })
-            .eq("tenant_id", tenantId)
-            .eq("value_id", value.id);
-          valueNotesCount = count || 0;
-        }
 
         const loopsWithQuests = await Promise.all(
           (loops || []).map(async (loop) => {
@@ -188,17 +200,6 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
               .in("status", ["active", "draft"]);
 
             const { data: quests, count } = await questQuery;
-
-            // Count notes at loop level
-            let loopNotesCount = 0;
-            if (deep) {
-              const { count: nc } = await supabase
-                .from("user_notes")
-                .select("id", { count: "exact", head: true })
-                .eq("tenant_id", tenantId)
-                .eq("loop_id", loop.id);
-              loopNotesCount = nc || 0;
-            }
 
             // For deep mode, get ops/missions/challenges count per quest
             let questDetails: Array<{
@@ -233,26 +234,20 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
               questDetails = await Promise.all(
                 typedQuests.map(async (q) => {
                   const questId = q.id as string;
-                  const [opsResult, missionsResult, questNotesResult] =
-                    await Promise.all([
-                      supabase
-                        .from("user_ops")
-                        .select("id", { count: "exact", head: true })
-                        .eq("quest_id", questId)
-                        .in("status", ["pending", "active"]),
-                      supabase
-                        .from("user_missions")
-                        .select(
-                          "id, title, status, total_ops, completed_ops, visual_type, model_url, thumbnail_url, source_urls, tags",
-                        )
-                        .eq("quest_id", questId)
-                        .in("status", ["active", "draft", "paused"]),
-                      supabase
-                        .from("user_notes")
-                        .select("id", { count: "exact", head: true })
-                        .eq("tenant_id", tenantId)
-                        .eq("quest_id", questId),
-                    ]);
+                  const [opsResult, missionsResult] = await Promise.all([
+                    supabase
+                      .from("user_ops")
+                      .select("id", { count: "exact", head: true })
+                      .eq("quest_id", questId)
+                      .in("status", ["pending", "active"]),
+                    supabase
+                      .from("user_missions")
+                      .select(
+                        "id, title, status, total_ops, completed_ops, visual_type, model_url, thumbnail_url, source_urls, tags",
+                      )
+                      .eq("quest_id", questId)
+                      .in("status", ["active", "draft", "paused"]),
+                  ]);
 
                   // Fetch challenges for each mission
                   const missions = await Promise.all(
@@ -281,28 +276,19 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
                           .in("status", ["active", "draft", "paused"]);
 
                         if (challengeData && challengeData.length > 0) {
-                          challenges = await Promise.all(
-                            challengeData.map(async (c) => {
-                              const { count: cNotes } = await supabase
-                                .from("user_notes")
-                                .select("id", { count: "exact", head: true })
-                                .eq("tenant_id", tenantId)
-                                .eq("challenge_id", c.id);
-
-                              return {
-                                id: c.id,
-                                title: c.title,
-                                status: c.status,
-                                difficulty: c.difficulty || 1,
-                                due_date: c.due_date,
-                                notes_count: cNotes || 0,
-                                visual_type: c.visual_type || "orb",
-                                model_url: c.model_url || null,
-                                thumbnail_url: c.thumbnail_url || null,
-                                tags: c.tags || [],
-                              };
-                            }),
-                          );
+                          // notes_count will be injected later via batch query
+                          challenges = challengeData.map((c) => ({
+                            id: c.id,
+                            title: c.title,
+                            status: c.status,
+                            difficulty: c.difficulty || 1,
+                            due_date: c.due_date,
+                            notes_count: 0, // placeholder — filled by batch
+                            visual_type: c.visual_type || "orb",
+                            model_url: c.model_url || null,
+                            thumbnail_url: c.thumbnail_url || null,
+                            tags: c.tags || [],
+                          }));
                         }
                       } catch {
                         // user_challenges table might not exist yet
@@ -330,7 +316,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
                     title: q.title as string,
                     status: q.status as string,
                     ops_count: opsResult.count || 0,
-                    notes_count: questNotesResult.count || 0,
+                    notes_count: 0, // placeholder — filled by batch
                     visual_type: (q.visual_type as string) || "orb",
                     model_url: (q.model_url as string) || null,
                     thumbnail_url: (q.thumbnail_url as string) || null,
@@ -345,7 +331,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
 
             return {
               ...loop,
-              notes_count: loopNotesCount,
+              notes_count: 0, // placeholder — filled by batch
               visual_type: loop.visual_type || "orb",
               model_url: loop.model_url || null,
               thumbnail_url: loop.thumbnail_url || null,
@@ -365,7 +351,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
           color: value.color,
           priority: value.priority,
           is_default: value.is_default,
-          notes_count: valueNotesCount,
+          notes_count: 0, // placeholder — filled by batch
           visual_type: value.visual_type || "orb",
           model_url: value.model_url || null,
           thumbnail_url: value.thumbnail_url || null,
@@ -375,6 +361,59 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
         };
       }),
     );
+
+    // --- Batch-fill notes counts (replaces N+1 individual queries with 4 queries) ---
+    if (deep) {
+      // Collect all entity IDs from the built tree
+      const valueIds: string[] = [];
+      const loopIds: string[] = [];
+      const questIds: string[] = [];
+      const challengeIds: string[] = [];
+
+      for (const v of valuesWithLoops) {
+        valueIds.push(v.id);
+        for (const l of v.loops) {
+          loopIds.push(l.id);
+          if (l.quests) {
+            for (const q of l.quests) {
+              questIds.push(q.id);
+              for (const m of q.missions) {
+                for (const c of m.challenges) {
+                  challengeIds.push(c.id);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Run all 4 batch counts in parallel
+      const [valueNotes, loopNotes, questNotes, challengeNotes] =
+        await Promise.all([
+          batchNotesCount("value_id", valueIds),
+          batchNotesCount("loop_id", loopIds),
+          batchNotesCount("quest_id", questIds),
+          batchNotesCount("challenge_id", challengeIds),
+        ]);
+
+      // Inject counts back into the tree
+      for (const v of valuesWithLoops) {
+        v.notes_count = valueNotes.get(v.id) || 0;
+        for (const l of v.loops) {
+          l.notes_count = loopNotes.get(l.id) || 0;
+          if (l.quests) {
+            for (const q of l.quests) {
+              q.notes_count = questNotes.get(q.id) || 0;
+              for (const m of q.missions) {
+                for (const c of m.challenges) {
+                  c.notes_count = challengeNotes.get(c.id) || 0;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
 
     return NextResponse.json({
       values: valuesWithLoops,
