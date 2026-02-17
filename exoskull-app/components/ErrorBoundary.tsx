@@ -40,15 +40,19 @@ export class ErrorBoundary extends React.Component<
       }
 
       return (
-        <div className="flex items-center justify-center min-h-[200px] p-6">
+        <div
+          role="alert"
+          className="flex items-center justify-center min-h-[200px] p-6"
+        >
           <div className="text-center space-y-3">
-            <p className="text-lg font-medium text-destructive">
+            <h1 className="text-lg font-medium text-destructive">
               Coś poszło nie tak
-            </p>
+            </h1>
             <p className="text-sm text-muted-foreground">
               {this.state.error?.message || "Nieoczekiwany błąd"}
             </p>
             <button
+              type="button"
               onClick={() => this.setState({ hasError: false, error: null })}
               className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
             >

@@ -77,11 +77,16 @@ function PasswordInput({
           name={name}
           type={visible ? "text" : "password"}
           required={required}
+          aria-required={required || undefined}
           minLength={minLength}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className="w-full px-4 py-2 pr-10 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent"
           placeholder={placeholder}
+          aria-describedby={showHint ? `${id}-hint` : undefined}
+          autoComplete={
+            name === "password" ? "current-password" : "new-password"
+          }
         />
         <button
           type="button"
@@ -94,12 +99,14 @@ function PasswordInput({
       </div>
       {showHint && (
         <p
+          id={`${id}-hint`}
           className={cn(
             "text-xs mt-1",
             value.length > 0 && value.length < 6
               ? "text-amber-400"
               : "text-muted-foreground",
           )}
+          aria-live="polite"
         >
           Minimum 6 znakow{" "}
           {value.length > 0 && value.length < 6 && `(${value.length}/6)`}
@@ -135,6 +142,9 @@ function EmailInput({
         name={name}
         type="email"
         required={required}
+        aria-required={required || undefined}
+        aria-invalid={isInvalid || undefined}
+        aria-describedby={isInvalid ? `${id}-error` : undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onBlur={() => setTouched(true)}
@@ -143,9 +153,14 @@ function EmailInput({
           isInvalid ? "border-destructive" : "border-border",
         )}
         placeholder={placeholder}
+        autoComplete="email"
       />
       {isInvalid && (
-        <p className="text-xs mt-1 text-destructive">
+        <p
+          id={`${id}-error`}
+          className="text-xs mt-1 text-destructive"
+          role="alert"
+        >
           Nieprawidlowy format email
         </p>
       )}
@@ -230,13 +245,19 @@ export function LoginForm() {
         </div>
 
         {message && (
-          <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg text-sm text-foreground">
+          <div
+            role="status"
+            className="p-4 bg-primary/10 border border-primary/30 rounded-lg text-sm text-foreground"
+          >
             {message}
           </div>
         )}
 
         {error && (
-          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
+          <div
+            role="alert"
+            className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive"
+          >
             {error}
           </div>
         )}
@@ -255,9 +276,17 @@ export function LoginForm() {
         </div>
 
         {/* Tabs */}
-        <div className="flex bg-background rounded-lg p-1">
+        <div
+          role="tablist"
+          aria-label="Logowanie lub rejestracja"
+          className="flex bg-background rounded-lg p-1"
+        >
           <button
             type="button"
+            role="tab"
+            id="tab-login"
+            aria-selected={activeTab === "login"}
+            aria-controls="panel-login"
             onClick={() => setActiveTab("login")}
             className={cn(
               "flex-1 py-2.5 text-sm font-medium rounded-md transition-colors",
@@ -270,6 +299,10 @@ export function LoginForm() {
           </button>
           <button
             type="button"
+            role="tab"
+            id="tab-signup"
+            aria-selected={activeTab === "signup"}
+            aria-controls="panel-signup"
             onClick={() => setActiveTab("signup")}
             className={cn(
               "flex-1 py-2.5 text-sm font-medium rounded-md transition-colors",
@@ -284,7 +317,13 @@ export function LoginForm() {
 
         {/* Login Form */}
         {activeTab === "login" && (
-          <form action={handleLoginSubmit} className="space-y-4">
+          <form
+            action={handleLoginSubmit}
+            className="space-y-4"
+            id="panel-login"
+            role="tabpanel"
+            aria-labelledby="tab-login"
+          >
             <div>
               <label
                 htmlFor="email"
@@ -329,6 +368,7 @@ export function LoginForm() {
             <button
               type="submit"
               disabled={loginDisabled}
+              aria-disabled={loginDisabled || undefined}
               className={cn(
                 "w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3 px-4 rounded-lg transition-colors",
                 loginDisabled && "opacity-50 cursor-not-allowed",
@@ -341,7 +381,13 @@ export function LoginForm() {
 
         {/* Signup Form */}
         {activeTab === "signup" && (
-          <form action={handleSignupSubmit} className="space-y-4">
+          <form
+            action={handleSignupSubmit}
+            className="space-y-4"
+            id="panel-signup"
+            role="tabpanel"
+            aria-labelledby="tab-signup"
+          >
             <div>
               <label
                 htmlFor="signup-name"
@@ -354,10 +400,12 @@ export function LoginForm() {
                 name="name"
                 type="text"
                 required
+                aria-required="true"
                 value={signupName}
                 onChange={(e) => setSignupName(e.target.value)}
                 className="w-full px-4 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="Jan Kowalski"
+                autoComplete="name"
               />
             </div>
 
@@ -407,8 +455,18 @@ export function LoginForm() {
                   id="signup-confirm-password"
                   type="password"
                   required
+                  aria-required="true"
+                  aria-invalid={
+                    confirmPasswordStatus === "mismatch" || undefined
+                  }
+                  aria-describedby={
+                    confirmPasswordStatus === "mismatch"
+                      ? "confirm-pw-error"
+                      : undefined
+                  }
                   value={signupConfirmPassword}
                   onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
                   className={cn(
                     "w-full px-4 py-2 pr-10 bg-background border rounded-lg text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent",
                     confirmPasswordStatus === "mismatch"
@@ -456,7 +514,11 @@ export function LoginForm() {
                 )}
               </div>
               {confirmPasswordStatus === "mismatch" && (
-                <p className="text-xs mt-1 text-destructive">
+                <p
+                  id="confirm-pw-error"
+                  className="text-xs mt-1 text-destructive"
+                  role="alert"
+                >
                   Hasla nie sa identyczne
                 </p>
               )}
@@ -465,6 +527,7 @@ export function LoginForm() {
             <button
               type="submit"
               disabled={signupDisabled}
+              aria-disabled={signupDisabled || undefined}
               className={cn(
                 "w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3 px-4 rounded-lg transition-colors",
                 signupDisabled && "opacity-50 cursor-not-allowed",

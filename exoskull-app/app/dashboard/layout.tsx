@@ -33,5 +33,9 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  return <ErrorBoundary>{children}</ErrorBoundary>;
+  return (
+    <main id="main-content" role="main" aria-label="Dashboard">
+      <ErrorBoundary>{children}</ErrorBoundary>
+    </main>
+  );
 }

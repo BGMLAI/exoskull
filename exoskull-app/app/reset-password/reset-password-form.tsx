@@ -9,7 +9,10 @@ export function ResetPasswordForm() {
   const message = searchParams.get("message");
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4">
+    <main
+      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4"
+      id="main-content"
+    >
       <div className="max-w-md w-full space-y-6 p-8 bg-slate-800/50 border border-slate-700 rounded-xl">
         <div>
           <Link href="/" className="block text-center">
@@ -19,7 +22,10 @@ export function ResetPasswordForm() {
         </div>
 
         {message && (
-          <div className="p-4 bg-blue-900/30 border border-blue-700/50 rounded-lg text-sm text-blue-300">
+          <div
+            role="status"
+            className="p-4 bg-blue-900/30 border border-blue-700/50 rounded-lg text-sm text-blue-300"
+          >
             {message}
           </div>
         )}
@@ -37,6 +43,8 @@ export function ResetPasswordForm() {
               name="email"
               type="email"
               required
+              aria-required="true"
+              autoComplete="email"
               className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="twoj@email.pl"
             />
@@ -59,6 +67,6 @@ export function ResetPasswordForm() {
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

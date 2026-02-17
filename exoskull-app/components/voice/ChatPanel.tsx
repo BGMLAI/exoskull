@@ -40,13 +40,17 @@ export function ChatPanel({
     <Card className={cn("flex flex-col h-full", className)}>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
-          <MessageSquare className="h-5 w-5" />
+          <MessageSquare className="h-5 w-5" aria-hidden="true" />
           Transkrypcja
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden p-0">
         <div
           ref={scrollRef}
+          role="log"
+          aria-label="Historia wiadomości"
+          aria-live="polite"
+          aria-relevant="additions"
           className="h-full overflow-y-auto px-6 pb-4 space-y-3"
         >
           {messages.length === 0 && !isUserSpeaking && !isAgentSpeaking && (
@@ -61,18 +65,28 @@ export function ChatPanel({
 
           {/* Typing indicators */}
           {isUserSpeaking && (
-            <div className="flex justify-end">
+            <div className="flex justify-end" role="status" aria-live="polite">
               <div className="flex items-center gap-2 text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950 px-3 py-2 rounded-lg">
-                <Mic className="h-4 w-4 animate-pulse text-blue-500" />
+                <Mic
+                  className="h-4 w-4 animate-pulse text-blue-500"
+                  aria-hidden="true"
+                />
                 <span>Mowisz...</span>
               </div>
             </div>
           )}
 
           {isAgentSpeaking && (
-            <div className="flex justify-start">
+            <div
+              className="flex justify-start"
+              role="status"
+              aria-live="polite"
+            >
               <div className="flex items-center gap-2 text-sm text-muted-foreground bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-lg">
-                <Volume2 className="h-4 w-4 animate-pulse text-green-500" />
+                <Volume2
+                  className="h-4 w-4 animate-pulse text-green-500"
+                  aria-hidden="true"
+                />
                 <span>Agent mowi...</span>
               </div>
             </div>
@@ -86,10 +100,11 @@ export function ChatPanel({
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
+  const senderLabel = isUser ? "Ty" : isSystem ? "System" : "IORS";
 
   if (isSystem) {
     return (
-      <div className="text-center">
+      <div className="text-center" role="status">
         <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
           {message.content}
         </span>
@@ -98,7 +113,10 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   }
 
   return (
-    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+    <div
+      className={cn("flex", isUser ? "justify-end" : "justify-start")}
+      aria-label={`${senderLabel}, ${formatTime(message.timestamp)}`}
+    >
       <div
         className={cn(
           "max-w-[80%] px-4 py-2 rounded-2xl",
@@ -118,6 +136,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             "text-xs mt-1",
             isUser ? "text-blue-100" : "text-muted-foreground",
           )}
+          aria-hidden="true"
         >
           {formatTime(message.timestamp)}
         </p>

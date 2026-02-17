@@ -32,6 +32,8 @@ function StaticBackground() {
   return (
     <div
       className="fixed inset-0 z-0"
+      role="img"
+      aria-label="ExoSkull — tło cyberpunkowe"
       style={{
         background:
           "radial-gradient(ellipse at 50% 120%, hsl(var(--bg-void, 263 60% 11%)) 0%, hsl(var(--background)) 60%, hsl(var(--background)) 100%)",
@@ -40,6 +42,7 @@ function StaticBackground() {
       {/* Simple CSS star field */}
       <div
         className="absolute inset-0 opacity-30"
+        aria-hidden="true"
         style={{
           backgroundImage:
             "radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.5) 0%, transparent 100%), " +
@@ -52,6 +55,7 @@ function StaticBackground() {
       {/* Horizon glow */}
       <div
         className="absolute bottom-0 left-0 right-0 h-1/3 opacity-20"
+        aria-hidden="true"
         style={{
           background:
             "linear-gradient(to top, rgba(139,92,246,0.3) 0%, transparent 100%)",
@@ -98,15 +102,27 @@ export function CyberpunkScene({ className }: CyberpunkSceneProps) {
   }
 
   return (
-    <Suspense
-      fallback={
-        <div
-          className="fixed inset-0 z-0"
-          style={{ background: "hsl(var(--background))" }}
-        />
-      }
+    <div
+      id="3d-scene"
+      role="img"
+      aria-label="Interaktywna scena 3D ExoSkull — wizualizacja orbitalnych światów i danych"
     >
-      <CyberpunkSceneInner className={className} />
-    </Suspense>
+      {/* Screen reader description */}
+      <div className="sr-only">
+        Scena 3D przedstawia orbitalne światy reprezentujące różne obszary
+        życia: zadania, wspomnienia, cele i integracje. Interakcja odbywa się
+        głównie przez panel czatu i przyciski w dolnej części ekranu.
+      </div>
+      <Suspense
+        fallback={
+          <div
+            className="fixed inset-0 z-0"
+            style={{ background: "hsl(var(--background))" }}
+          />
+        }
+      >
+        <CyberpunkSceneInner className={className} />
+      </Suspense>
+    </div>
   );
 }

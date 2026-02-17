@@ -107,9 +107,12 @@ export default async function LandingPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
       />
 
-      <div id="main" className="container mx-auto px-4 py-20 max-w-5xl">
+      <div className="container mx-auto px-4 py-20 max-w-5xl">
         {/* Nav with anchor links */}
-        <nav className="flex justify-between items-center mb-20">
+        <nav
+          aria-label="Nawigacja główna"
+          className="flex justify-between items-center mb-20"
+        >
           <h1 className="text-2xl font-bold">ExoSkull</h1>
           <div className="hidden md:flex items-center gap-6">
             <a
@@ -145,225 +148,237 @@ export default async function LandingPage() {
           </Link>
         </nav>
 
-        {/* Hero */}
-        <div className="text-center mb-12">
-          <h2 className="text-2xl sm:text-4xl md:text-5xl lg:text-7xl font-bold mb-6 leading-tight">
-            Twoj Drugi Mozg.
-            <br />
-            <span className="text-blue-400">
-              Zbudowany Dla Ciebie. Przez AI.
-            </span>
-          </h2>
-          <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-            ExoSkull to adaptacyjny system operacyjny dla Twojego życia. IORS -
-            Twój osobisty AI - uczy się, buduje narzędzia i działa za Ciebie.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/login?tab=signup"
-              className="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-xl text-lg font-semibold transition-colors"
+        <main id="main-content" role="main">
+          {/* Hero */}
+          <section aria-label="Wprowadzenie" className="text-center mb-12">
+            <h2
+              className="text-2xl sm:text-4xl md:text-5xl lg:text-7xl font-bold mb-6 leading-tight"
+              id="hero-heading"
             >
-              Zacznij za darmo
-            </Link>
-            <a
-              href="#jak-to-dziala"
-              className="px-8 py-4 border border-slate-600 hover:border-slate-500 rounded-xl text-lg font-medium transition-colors text-slate-300"
-            >
-              Jak to dziala?
-            </a>
-          </div>
-        </div>
-
-        {/* Social Proof Counter */}
-        <SocialProof />
-
-        {/* Features */}
-        <div
-          id="funkcje"
-          className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20 mt-12 scroll-mt-24"
-        >
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-8">
-            <div className="w-12 h-12 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center mb-4 text-2xl">
-              🎙️
-            </div>
-            <h3 className="text-xl font-semibold mb-3">Voice-First</h3>
-            <p className="text-slate-400">
-              Rozmawiaj głosowo z IORSem. Dodawaj zadania, sprawdzaj sen, planuj
-              dzień - po prostu powiedz.
+              Twoj Drugi Mozg.
+              <br />
+              <span className="text-blue-400">
+                Zbudowany Dla Ciebie. Przez AI.
+              </span>
+            </h2>
+            <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10">
+              ExoSkull to adaptacyjny system operacyjny dla Twojego życia. IORS
+              - Twój osobisty AI - uczy się, buduje narzędzia i działa za
+              Ciebie.
             </p>
-          </div>
-
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-8">
-            <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center mb-4 text-2xl">
-              🧠
-            </div>
-            <h3 className="text-xl font-semibold mb-3">Adaptive</h3>
-            <p className="text-slate-400">
-              IORS uczy się Twoich nawyków, wykrywa emocje, dostosowuje styl i
-              kolory UI do Twojego stanu.
-            </p>
-          </div>
-
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-8">
-            <div className="w-12 h-12 bg-violet-500/10 border border-violet-500/20 rounded-xl flex items-center justify-center mb-4 text-2xl">
-              🔧
-            </div>
-            <h3 className="text-xl font-semibold mb-3">Proactive Mods</h3>
-            <p className="text-slate-400">
-              IORS automatycznie buduje mikro-aplikacje dopasowane do Twoich
-              celów. Sen, nastrój, finanse, nawyki.
-            </p>
-          </div>
-        </div>
-
-        {/* How it works */}
-        <div id="jak-to-dziala" className="text-center mb-20 scroll-mt-24">
-          <h3 className="text-3xl font-bold mb-8">Jak to działa?</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {[
-              { step: "1", title: "Rejestracja", desc: "15 pytań, 2 minuty" },
-              {
-                step: "2",
-                title: "IORS się konfiguruje",
-                desc: "Auto-instaluje Mody na podstawie Twoich celów",
-              },
-              {
-                step: "3",
-                title: "Rozmawiaj",
-                desc: "Głos lub tekst - IORS zawsze słucha",
-              },
-              {
-                step: "4",
-                title: "Żyj lepiej",
-                desc: "IORS działa w tle, Ty żyjesz",
-              },
-            ].map((item) => (
-              <div key={item.step} className="text-center">
-                <div className="w-12 h-12 bg-blue-600/20 border border-blue-500/30 rounded-full flex items-center justify-center mx-auto mb-3 text-blue-400 font-bold">
-                  {item.step}
-                </div>
-                <h4 className="font-semibold mb-1">{item.title}</h4>
-                <p className="text-sm text-slate-500">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Pricing */}
-        <div id="cennik" className="mb-20 scroll-mt-24">
-          <h3 className="text-3xl font-bold text-center mb-10">Cennik</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            <div className="bg-slate-800/50 border-2 border-blue-500/50 rounded-xl p-8 relative">
-              <div className="absolute -top-3 left-6 px-3 py-1 bg-blue-600 rounded-full text-xs font-medium">
-                Aktualnie
-              </div>
-              <h4 className="text-2xl font-bold mb-2">Beta</h4>
-              <div className="flex items-baseline gap-1 mb-4">
-                <span className="text-4xl font-bold">0 zl</span>
-                <span className="text-slate-500">/miesiac</span>
-              </div>
-              <ul className="space-y-3 text-slate-300 text-sm mb-8">
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 mt-0.5">&#10003;</span>
-                  Pelny dostep do IORS (glos + tekst)
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 mt-0.5">&#10003;</span>
-                  Wszystkie Mody (sen, nastroj, nawyki, finanse)
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 mt-0.5">&#10003;</span>
-                  Integracje (Google, Oura, Todoist)
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 mt-0.5">&#10003;</span>
-                  Pamiec bez limitu
-                </li>
-              </ul>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/login?tab=signup"
-                className="block text-center w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
+                className="px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-xl text-lg font-semibold transition-colors"
               >
                 Zacznij za darmo
               </Link>
+              <a
+                href="#jak-to-dziala"
+                className="px-8 py-4 border border-slate-600 hover:border-slate-500 rounded-xl text-lg font-medium transition-colors text-slate-300"
+              >
+                Jak to dziala?
+              </a>
+            </div>
+          </section>
+
+          {/* Social Proof Counter */}
+          <SocialProof />
+
+          {/* Features */}
+          <div
+            id="funkcje"
+            className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20 mt-12 scroll-mt-24"
+          >
+            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-8">
+              <div className="w-12 h-12 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-center mb-4 text-2xl">
+                🎙️
+              </div>
+              <h3 className="text-xl font-semibold mb-3">Voice-First</h3>
+              <p className="text-slate-400">
+                Rozmawiaj głosowo z IORSem. Dodawaj zadania, sprawdzaj sen,
+                planuj dzień - po prostu powiedz.
+              </p>
             </div>
 
-            <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-8">
-              <h4 className="text-2xl font-bold mb-2">Pro</h4>
-              <div className="flex items-baseline gap-1 mb-4">
-                <span className="text-4xl font-bold text-slate-400">TBD</span>
+            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-8">
+              <div className="w-12 h-12 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center mb-4 text-2xl">
+                🧠
               </div>
-              <ul className="space-y-3 text-slate-400 text-sm mb-8">
-                <li className="flex items-start gap-2">
-                  <span className="text-slate-500 mt-0.5">&#10003;</span>
-                  Wszystko z Beta +
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-slate-500 mt-0.5">&#10003;</span>
-                  Autonomiczne akcje (planowanie, rezerwacje)
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-slate-500 mt-0.5">&#10003;</span>
-                  Zaawansowane AI (Opus tier)
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-slate-500 mt-0.5">&#10003;</span>
-                  Priority support
-                </li>
-              </ul>
-              <div className="block text-center w-full py-3 border border-slate-600 rounded-lg font-medium text-slate-400">
-                Wkrotce
+              <h3 className="text-xl font-semibold mb-3">Adaptive</h3>
+              <p className="text-slate-400">
+                IORS uczy się Twoich nawyków, wykrywa emocje, dostosowuje styl i
+                kolory UI do Twojego stanu.
+              </p>
+            </div>
+
+            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-8">
+              <div className="w-12 h-12 bg-violet-500/10 border border-violet-500/20 rounded-xl flex items-center justify-center mb-4 text-2xl">
+                🔧
               </div>
+              <h3 className="text-xl font-semibold mb-3">Proactive Mods</h3>
+              <p className="text-slate-400">
+                IORS automatycznie buduje mikro-aplikacje dopasowane do Twoich
+                celów. Sen, nastrój, finanse, nawyki.
+              </p>
             </div>
           </div>
-        </div>
 
-        {/* Testimonials */}
-        <div id="opinie" className="mb-20 scroll-mt-24">
-          <h3 className="text-3xl font-bold text-center mb-10">
-            Co mówią użytkownicy?
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map((t) => (
-              <div
-                key={t.name}
-                className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6"
-              >
-                <p className="text-slate-300 mb-4 italic">
-                  &ldquo;{t.quote}&rdquo;
-                </p>
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-10 h-10 ${t.color} rounded-full flex items-center justify-center text-sm font-bold text-white`}
-                  >
-                    {t.initials}
+          {/* How it works */}
+          <div id="jak-to-dziala" className="text-center mb-20 scroll-mt-24">
+            <h2 className="text-3xl font-bold mb-8">Jak to działa?</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {[
+                { step: "1", title: "Rejestracja", desc: "15 pytań, 2 minuty" },
+                {
+                  step: "2",
+                  title: "IORS się konfiguruje",
+                  desc: "Auto-instaluje Mody na podstawie Twoich celów",
+                },
+                {
+                  step: "3",
+                  title: "Rozmawiaj",
+                  desc: "Głos lub tekst - IORS zawsze słucha",
+                },
+                {
+                  step: "4",
+                  title: "Żyj lepiej",
+                  desc: "IORS działa w tle, Ty żyjesz",
+                },
+              ].map((item) => (
+                <div key={item.step} className="text-center">
+                  <div className="w-12 h-12 bg-blue-600/20 border border-blue-500/30 rounded-full flex items-center justify-center mx-auto mb-3 text-blue-400 font-bold">
+                    {item.step}
                   </div>
-                  <div>
-                    <div className="font-semibold text-sm">{t.name}</div>
-                    <div className="text-xs text-slate-500">{t.role}</div>
-                  </div>
+                  <h3 className="font-semibold mb-1">{item.title}</h3>
+                  <p className="text-sm text-slate-500">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Pricing */}
+          <div id="cennik" className="mb-20 scroll-mt-24">
+            <h2 className="text-3xl font-bold text-center mb-10">Cennik</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+              <div className="bg-slate-800/50 border-2 border-blue-500/50 rounded-xl p-8 relative">
+                <div className="absolute -top-3 left-6 px-3 py-1 bg-blue-600 rounded-full text-xs font-medium">
+                  Aktualnie
+                </div>
+                <h3 className="text-2xl font-bold mb-2">Beta</h3>
+                <div className="flex items-baseline gap-1 mb-4">
+                  <span className="text-4xl font-bold">0 zl</span>
+                  <span className="text-slate-500">/miesiac</span>
+                </div>
+                <ul className="space-y-3 text-slate-300 text-sm mb-8">
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-400 mt-0.5">&#10003;</span>
+                    Pelny dostep do IORS (glos + tekst)
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-400 mt-0.5">&#10003;</span>
+                    Wszystkie Mody (sen, nastroj, nawyki, finanse)
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-400 mt-0.5">&#10003;</span>
+                    Integracje (Google, Oura, Todoist)
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-400 mt-0.5">&#10003;</span>
+                    Pamiec bez limitu
+                  </li>
+                </ul>
+                <Link
+                  href="/login?tab=signup"
+                  className="block text-center w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
+                >
+                  Zacznij za darmo
+                </Link>
+              </div>
+
+              <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-8">
+                <h3 className="text-2xl font-bold mb-2">Pro</h3>
+                <div className="flex items-baseline gap-1 mb-4">
+                  <span className="text-4xl font-bold text-slate-400">TBD</span>
+                </div>
+                <ul className="space-y-3 text-slate-400 text-sm mb-8">
+                  <li className="flex items-start gap-2">
+                    <span className="text-slate-500 mt-0.5">&#10003;</span>
+                    Wszystko z Beta +
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-slate-500 mt-0.5">&#10003;</span>
+                    Autonomiczne akcje (planowanie, rezerwacje)
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-slate-500 mt-0.5">&#10003;</span>
+                    Zaawansowane AI (Opus tier)
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-slate-500 mt-0.5">&#10003;</span>
+                    Priority support
+                  </li>
+                </ul>
+                <div className="block text-center w-full py-3 border border-slate-600 rounded-lg font-medium text-slate-400">
+                  Wkrotce
                 </div>
               </div>
-            ))}
+            </div>
           </div>
-        </div>
 
-        {/* CTA */}
-        <div className="text-center py-12 bg-slate-800/30 rounded-2xl border border-slate-700">
-          <h3 className="text-3xl font-bold mb-4">Gotowy?</h3>
-          <p className="text-slate-400 mb-6">
-            Twój IORS czeka. Bez karty kredytowej.
-          </p>
-          <Link
-            href="/login?tab=signup"
-            className="inline-block px-10 py-4 bg-blue-600 hover:bg-blue-700 rounded-xl text-lg font-semibold transition-colors"
+          {/* Testimonials */}
+          <div id="opinie" className="mb-20 scroll-mt-24">
+            <h2 className="text-3xl font-bold text-center mb-10">
+              Co mówią użytkownicy?
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {TESTIMONIALS.map((t) => (
+                <div
+                  key={t.name}
+                  className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6"
+                >
+                  <p className="text-slate-300 mb-4 italic">
+                    &ldquo;{t.quote}&rdquo;
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 ${t.color} rounded-full flex items-center justify-center text-sm font-bold text-white`}
+                    >
+                      {t.initials}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm">{t.name}</div>
+                      <div className="text-xs text-slate-500">{t.role}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* CTA */}
+          <section
+            aria-label="Zacznij teraz"
+            className="text-center py-12 bg-slate-800/30 rounded-2xl border border-slate-700"
           >
-            Zacznij za darmo
-          </Link>
-        </div>
+            <h2 className="text-3xl font-bold mb-4">Gotowy?</h2>
+            <p className="text-slate-400 mb-6">
+              Twój IORS czeka. Bez karty kredytowej.
+            </p>
+            <Link
+              href="/login?tab=signup"
+              className="inline-block px-10 py-4 bg-blue-600 hover:bg-blue-700 rounded-xl text-lg font-semibold transition-colors"
+            >
+              Zacznij za darmo
+            </Link>
+          </section>
+        </main>
 
         {/* Footer */}
-        <footer className="text-slate-600 text-sm py-12 mt-12 border-t border-slate-800">
+        <footer
+          aria-label="Stopka"
+          className="text-slate-600 text-sm py-12 mt-12 border-t border-slate-800"
+        >
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             {/* Left: Brand */}
             <div className="text-center md:text-left">

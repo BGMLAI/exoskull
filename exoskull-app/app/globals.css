@@ -711,3 +711,138 @@ body,
 .iors-focus-researching {
   --iors-focus-color: rgba(59, 130, 246, 0.06);
 }
+
+/* ============================================================================
+ * Accessibility — Focus, contrast, reduced motion, screen reader utilities
+ * ============================================================================ */
+
+/* Enhanced focus-visible indicator for all interactive elements */
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Remove default focus for mouse users */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Respect prefers-reduced-motion globally */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-pulse,
+  .animate-wave-bar,
+  .fractal-slow-rotate,
+  .gamma-pulse,
+  .world-glow,
+  .world-bg-glow,
+  .crystal-steady-shimmer,
+  .crystal-sparkle,
+  .iors-focus-active {
+    animation: none !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border: 0 0% 0%;
+    --ring: 0 0% 0%;
+  }
+
+  .dark-ops,
+  .dark,
+  .neural {
+    --border: 0 0% 100%;
+    --ring: 0 0% 100%;
+  }
+
+  a {
+    text-decoration: underline !important;
+    text-decoration-thickness: 2px !important;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    border-width: 2px !important;
+  }
+
+  *:focus-visible {
+    outline-width: 3px;
+    outline-offset: 3px;
+  }
+}
+
+/* Forced colors mode (Windows high contrast) */
+@media (forced-colors: active) {
+  .hud-action-cell,
+  .cockpit-hud-toggle {
+    border: 1px solid ButtonText;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+
+/* Screen reader only — enhanced from Tailwind's sr-only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Skip link visible on focus */
+.skip-link:focus,
+.sr-only:focus:not(.sr-only-focusable) {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 9999;
+  width: auto;
+  height: auto;
+  padding: 0.5rem 1rem;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border-radius: 0.5rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Ensure minimum touch target size on interactive elements */
+@media (pointer: coarse) {
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

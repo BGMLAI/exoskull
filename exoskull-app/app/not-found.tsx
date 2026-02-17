@@ -2,10 +2,19 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6">
+    <main
+      className="min-h-screen flex items-center justify-center bg-background text-foreground p-6"
+      id="main-content"
+      role="main"
+    >
       <div className="max-w-md text-center space-y-4">
-        <h1 className="text-6xl font-bold text-muted-foreground">404</h1>
-        <h2 className="text-xl font-semibold">Strona nie znaleziona</h2>
+        <p
+          className="text-6xl font-bold text-muted-foreground"
+          aria-hidden="true"
+        >
+          404
+        </p>
+        <h1 className="text-xl font-semibold">Strona nie znaleziona</h1>
         <p className="text-muted-foreground">
           Tej strony nie ma lub zostala przeniesiona.
         </p>
@@ -16,6 +25,6 @@ export default function NotFound() {
           Wroc do dashboard
         </Link>
       </div>
-    </div>
+    </main>
   );
 }

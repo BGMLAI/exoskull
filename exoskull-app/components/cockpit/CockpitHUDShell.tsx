@@ -109,7 +109,8 @@ export function CockpitHUDShell() {
       {!hudMinimized && (
         <>
           {/* ── Center: Floating chat area ── */}
-          <div
+          <section
+            aria-label="Czat z IORS"
             className="cockpit-zone cockpit-zone--chat"
             style={{
               height: chatH,
@@ -118,7 +119,23 @@ export function CockpitHUDShell() {
           >
             {/* Drag handle at top of chat */}
             <div
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Zmień rozmiar panelu czatu"
+              aria-valuenow={chatH}
+              aria-valuemin={CHAT_MIN_H}
+              aria-valuemax={CHAT_MAX_H}
+              tabIndex={0}
               onMouseDown={onChatDragStart}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setChatH((h) => Math.min(CHAT_MAX_H, h + 20));
+                } else if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setChatH((h) => Math.max(CHAT_MIN_H, h - 20));
+                }
+              }}
               className="cockpit-chat-drag-handle"
             >
               <div className="cockpit-chat-drag-pill" />
@@ -127,7 +144,7 @@ export function CockpitHUDShell() {
             <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
               <CenterViewport />
             </div>
-          </div>
+          </section>
 
           {/* ── Bottom: Panel grid (2x2) ── */}
           <div
@@ -148,9 +165,11 @@ export function CockpitHUDShell() {
       )}
 
       {/* ── Toggle HUD button (always visible) ── */}
-      <div
+      <button
+        type="button"
         onClick={toggleHud}
-        title={hudMinimized ? "Show HUD (Tab)" : "Full 3D (Tab)"}
+        aria-label={hudMinimized ? "Pokaż panel HUD" : "Tryb pełnego 3D"}
+        aria-pressed={!hudMinimized}
         className="cockpit-hud-toggle"
         style={{
           pointerEvents: "auto",
@@ -158,7 +177,7 @@ export function CockpitHUDShell() {
         }}
       >
         {hudMinimized ? "SHOW HUD [Tab]" : "FULL 3D [Tab]"}
-      </div>
+      </button>
     </div>
   );
 }

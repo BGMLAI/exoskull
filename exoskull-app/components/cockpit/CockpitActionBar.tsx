@@ -98,8 +98,9 @@ export function CockpitActionBar() {
       <button
         className="hud-action-cell hud-action-cell--danger"
         title="Usuń / Czarna dziura"
+        aria-label="Usuń wybrany element"
       >
-        <Trash2 size={16} />
+        <Trash2 size={16} aria-hidden="true" />
         <span className="hud-action-label">USUŃ</span>
       </button>
 
@@ -130,8 +131,12 @@ export function CockpitActionBar() {
 
       {/* Cell 3: Input (center, largest) */}
       <div className="hud-action-cell hud-action-cell--input">
+        <label htmlFor="cockpit-command-input" className="sr-only">
+          Polecenie dla IORS
+        </label>
         <input
           ref={inputRef}
+          id="cockpit-command-input"
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
@@ -140,13 +145,18 @@ export function CockpitActionBar() {
           }}
           placeholder="Wpisz polecenie..."
           className="hud-action-input"
+          aria-describedby="cockpit-input-hint"
         />
+        <span id="cockpit-input-hint" className="sr-only">
+          Wpisz polecenie i naciśnij Enter aby wysłać
+        </span>
       </div>
 
       {/* Cell 4: Knowledge / Context */}
       <button
         className="hud-action-cell hud-action-cell--knowledge"
         title="Wiedza / Kontekst"
+        aria-label="Otwórz bazę wiedzy"
         onClick={() =>
           openPreview({
             type: "document",
@@ -169,6 +179,7 @@ export function CockpitActionBar() {
       <button
         className="hud-action-cell hud-action-cell--save"
         title="Zachowaj"
+        aria-label="Zachowaj bieżący element"
       >
         <Bookmark size={16} style={{ color: "var(--hud-amber)" }} />
         <span

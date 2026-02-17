@@ -41,5 +41,10 @@ export default async function DashboardPage() {
     console.error("[Dashboard] Failed to load tenant:", e);
   }
 
-  return <CyberpunkDashboard tenantId={user.id} iorsName={iorsName} />;
+  return (
+    <>
+      <h1 className="sr-only">ExoSkull Dashboard</h1>
+      <CyberpunkDashboard tenantId={user.id} iorsName={iorsName} />
+    </>
+  );
 }

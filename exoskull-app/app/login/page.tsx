@@ -25,8 +25,10 @@ export default async function LoginPage() {
   }
 
   return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
+    <main id="main-content">
+      <Suspense>
+        <LoginForm />
+      </Suspense>
+    </main>
   );
 }

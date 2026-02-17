@@ -53,7 +53,10 @@ export default async function AdminLayout({
       />
 
       {/* Sidebar — hidden on mobile */}
-      <aside className="hidden md:flex w-60 bg-sidebar-bg text-sidebar-text flex-col border-r border-sidebar-border">
+      <aside
+        aria-label="Admin navigation"
+        className="hidden md:flex w-60 bg-sidebar-bg text-sidebar-text flex-col border-r border-sidebar-border"
+      >
         {/* Logo */}
         <div className="p-4 border-b border-sidebar-border">
           <Link href="/admin" className="flex items-center gap-2.5">
@@ -68,7 +71,7 @@ export default async function AdminLayout({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1">
+        <nav aria-label="Admin menu" className="flex-1 p-3 space-y-1">
           {ADMIN_NAV.map((item) => (
             <Link
               key={item.href}
