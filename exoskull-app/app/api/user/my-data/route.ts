@@ -8,22 +8,19 @@
  * - Engagement stats
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     // 4 parallel queries
     const [mitsResult, patternsResult, learningResult, engagementResult] =
@@ -32,7 +29,7 @@ export async function GET() {
         supabase
           .from("exo_highlights")
           .select("id, content, category, weight, updated_at")
-          .eq("tenant_id", user.id)
+          .eq("tenant_id", tenantId)
           .order("weight", { ascending: false })
           .limit(20),
 
@@ -42,7 +39,7 @@ export async function GET() {
           .select(
             "id, pattern_type, description, confidence, occurrences, last_seen",
           )
-          .eq("tenant_id", user.id)
+          .eq("tenant_id", tenantId)
           .order("confidence", { ascending: false })
           .limit(20),
 
@@ -50,7 +47,7 @@ export async function GET() {
         supabase
           .from("learning_events")
           .select("id, event_type, description, created_at, metadata")
-          .eq("tenant_id", user.id)
+          .eq("tenant_id", tenantId)
           .order("created_at", { ascending: false })
           .limit(30),
 
@@ -58,7 +55,7 @@ export async function GET() {
         supabase
           .from("exo_unified_messages")
           .select("*", { count: "exact", head: true })
-          .eq("tenant_id", user.id)
+          .eq("tenant_id", tenantId)
           .gte(
             "created_at",
             new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),

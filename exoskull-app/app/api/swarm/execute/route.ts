@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import {
   executeSwarm,
@@ -28,16 +28,9 @@ const RATE_LIMIT_MS = 15 * 60 * 1000; // 15 minutes
 export async function POST(req: NextRequest) {
   try {
     // Auth
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const tenantId = user.id;
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     // Parse body
     const body = await req.json();

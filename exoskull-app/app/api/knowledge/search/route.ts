@@ -6,21 +6,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { searchDocuments } from "@/lib/knowledge/document-processor";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { query, limit = 5 } = await request.json();
 
@@ -28,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
 
-    const results = await searchDocuments(user.id, query, limit);
+    const results = await searchDocuments(tenantId, query, limit);
 
     return NextResponse.json({ results });
   } catch (error) {

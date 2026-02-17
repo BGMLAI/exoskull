@@ -5,22 +5,20 @@
  * Queries learning_events, exo_interventions, exo_feedback, exo_mapek_cycles.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 import type { OptimizationStats } from "@/lib/dashboard/types";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -41,14 +39,14 @@ export async function GET() {
       supabase
         .from("learning_events")
         .select("event_type")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .gte("created_at", weekAgo.toISOString()),
 
       // Successful interventions (last 30 days)
       supabase
         .from("exo_interventions")
         .select("id", { count: "exact", head: true })
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .eq("status", "completed")
         .gte("created_at", monthAgo.toISOString()),
 
@@ -56,7 +54,7 @@ export async function GET() {
       supabase
         .from("exo_interventions")
         .select("id", { count: "exact", head: true })
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .in("status", ["failed", "cancelled"])
         .gte("created_at", monthAgo.toISOString()),
 
@@ -64,7 +62,7 @@ export async function GET() {
       supabase
         .from("exo_interventions")
         .select("id", { count: "exact", head: true })
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .eq("guardian_verdict", "blocked")
         .gte("created_at", monthAgo.toISOString()),
 
@@ -72,7 +70,7 @@ export async function GET() {
       supabase
         .from("exo_feedback")
         .select("rating")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .not("rating", "is", null)
         .gte("created_at", monthAgo.toISOString()),
 
@@ -80,7 +78,7 @@ export async function GET() {
       supabase
         .from("exo_interventions")
         .select("id", { count: "exact", head: true })
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .eq("status", "completed")
         .gte("created_at", weekAgo.toISOString()),
 
@@ -88,7 +86,7 @@ export async function GET() {
       supabase
         .from("exo_interventions")
         .select("id", { count: "exact", head: true })
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .eq("status", "completed")
         .gte("created_at", twoWeeksAgo.toISOString())
         .lt("created_at", weekAgo.toISOString()),
@@ -97,7 +95,7 @@ export async function GET() {
       supabase
         .from("exo_mapek_cycles")
         .select("started_at, analyze_result, interventions_proposed")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .order("started_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
@@ -118,7 +116,7 @@ export async function GET() {
     const { count: skillsCreated } = await supabase
       .from("exo_generated_skills")
       .select("id", { count: "exact", head: true })
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .gte("created_at", weekAgo.toISOString());
 
     // Intervention success

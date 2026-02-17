@@ -5,8 +5,8 @@
  * GET  /api/feedback — get feedback summary + recent items
  */
 
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import {
   submitFeedback,
   getFeedbackSummary,
@@ -25,17 +25,11 @@ const VALID_TYPES: FeedbackType[] = [
   "general",
 ];
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const body = await request.json();
     const { feedback_type, rating, message, context } = body;
@@ -54,7 +48,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await submitFeedback(user.id, {
+    const result = await submitFeedback(tenantId, {
       type: feedback_type,
       rating,
       message,
@@ -76,21 +70,15 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const [summary, recent] = await Promise.all([
-      getFeedbackSummary(user.id, 30),
-      getRecentFeedback(user.id, 20),
+      getFeedbackSummary(tenantId, 30),
+      getRecentFeedback(tenantId, 20),
     ]);
 
     return NextResponse.json({ summary, recent });

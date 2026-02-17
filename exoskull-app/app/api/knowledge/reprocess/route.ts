@@ -6,7 +6,7 @@
  * Supports ?limit=N for batching (default: 10, max: 20).
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { processDocument } from "@/lib/knowledge/document-processor";
 
@@ -27,15 +27,9 @@ export async function POST(request: NextRequest) {
     ) {
       tenantId = searchParams.get("tenant_id")!;
     } else {
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      tenantId = user.id;
+      const auth = await verifyTenantAuth(request);
+      if (!auth.ok) return auth.response;
+      tenantId = auth.tenantId;
     }
 
     const limit = Math.min(Number(searchParams.get("limit") || 10), 20);

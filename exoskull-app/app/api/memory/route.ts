@@ -8,6 +8,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getMemoryTimeline, keywordSearch } from "@/lib/memory/search";
 import { getUserHighlights } from "@/lib/memory/highlights";
 
@@ -15,14 +16,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const url = new URL(request.url);
     const type = url.searchParams.get("type") || "timeline";
@@ -31,7 +27,7 @@ export async function GET(request: NextRequest) {
       case "timeline": {
         const page = parseInt(url.searchParams.get("page") || "1");
         const pageSize = parseInt(url.searchParams.get("pageSize") || "10");
-        const result = await getMemoryTimeline(user.id, page, pageSize);
+        const result = await getMemoryTimeline(tenantId, page, pageSize);
         return NextResponse.json(result);
       }
 
@@ -45,7 +41,7 @@ export async function GET(request: NextRequest) {
         }
         const limit = parseInt(url.searchParams.get("limit") || "20");
         const results = await keywordSearch({
-          tenantId: user.id,
+          tenantId,
           query: q,
           limit,
         });
@@ -53,8 +49,9 @@ export async function GET(request: NextRequest) {
       }
 
       case "highlights": {
+        const supabase = await createClient();
         const limit = parseInt(url.searchParams.get("limit") || "20");
-        const highlights = await getUserHighlights(supabase, user.id, limit);
+        const highlights = await getUserHighlights(supabase, tenantId, limit);
         return NextResponse.json({ highlights });
       }
 

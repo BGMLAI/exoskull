@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import {
   listConnections,
   disconnectAccount,
@@ -13,14 +13,9 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const body = await request.json();
     const { toolkit } = body;
@@ -34,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     const toolkitUpper = toolkit.toUpperCase();
 
-    const connections = await listConnections(user.id);
+    const connections = await listConnections(tenantId);
     const match = connections.find(
       (c) => c.toolkit.toUpperCase() === toolkitUpper,
     );
@@ -56,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     logger.info("[ComposioAPI] Disconnected:", {
-      tenantId: user.id,
+      tenantId: tenantId,
       toolkit: toolkitUpper,
       connectionId: match.id,
     });

@@ -5,23 +5,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
-
-/** Resolve tenant from auth */
-async function getTenantId(): Promise<string | null> {
-  try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    return user?.id ?? null;
-  } catch {
-    return null;
-  }
-}
 
 /** Get app config from registry */
 async function getAppConfig(tenantId: string, slug: string) {
@@ -42,10 +29,9 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const tenantId = await getTenantId();
-  if (!tenantId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(_request);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   const app = await getAppConfig(tenantId, params.slug);
   if (!app) {
@@ -81,10 +67,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const tenantId = await getTenantId();
-  if (!tenantId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(request);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   const app = await getAppConfig(tenantId, params.slug);
   if (!app) {

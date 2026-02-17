@@ -2,6 +2,7 @@
  * GET/POST /api/mods/[slug]/data - CRUD for Mod data
  */
 import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -12,23 +13,19 @@ export async function GET(
   { params }: { params: { slug: string } },
 ) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { slug } = params;
     const url = new URL(request.url);
     const limit = parseInt(url.searchParams.get("limit") || "20");
 
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from("exo_mod_data")
       .select("*")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .eq("mod_slug", slug)
       .order("created_at", { ascending: false })
       .limit(limit);
@@ -57,22 +54,18 @@ export async function POST(
   { params }: { params: { slug: string } },
 ) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { slug } = params;
     const body = await request.json();
 
+    const supabase = await createClient();
     const { data, error } = await supabase
       .from("exo_mod_data")
       .insert({
-        tenant_id: user.id,
+        tenant_id: tenantId,
         mod_slug: slug,
         data: body,
       })

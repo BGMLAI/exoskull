@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { NextRequest, NextResponse } from "next/server";
 import { DISCOVERY_SYSTEM_PROMPT } from "@/lib/onboarding/discovery-prompt";
 
@@ -14,14 +14,9 @@ interface ChatMessage {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { conversationId, message, history } = await request.json();
 

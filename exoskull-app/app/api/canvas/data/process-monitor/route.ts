@@ -6,8 +6,8 @@
  * for the ProcessMonitorWidget.
  */
 
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { systemBus } from "@/lib/system/inter-system-bus";
 
@@ -30,19 +30,13 @@ interface ProcessInfo {
   details?: Record<string, unknown>;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const serviceDb = getServiceSupabase();
-    const tenantId = user.id;
     const now = new Date();
     const h24ago = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
     const h2ago = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();

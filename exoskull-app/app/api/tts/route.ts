@@ -11,7 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -156,14 +156,8 @@ async function openaiTTS(text: string): Promise<Buffer | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
 
     const body = await req.json();
     const { text, provider } = body;

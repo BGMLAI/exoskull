@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@supabase/supabase-js";
 
 // Tables allowed for mobile sync (whitelist)
@@ -29,36 +30,10 @@ const SYNCABLE_TABLES: Record<
 
 const MAX_RECORDS = 500;
 
-async function authenticateRequest(
-  req: NextRequest,
-): Promise<{ userId: string } | null> {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  const token = authHeader.slice(7);
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    },
-  );
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return null;
-
-  return { userId: user.id };
-}
-
 export async function GET(req: NextRequest) {
-  const auth = await authenticateRequest(req);
-  if (!auth) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(req);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   const { searchParams } = new URL(req.url);
   const tablesParam = searchParams.get("tables");
@@ -106,7 +81,7 @@ export async function GET(req: NextRequest) {
       let query = supabase
         .from(table)
         .select("*", { count: "exact" })
-        .eq(config.tenantCol, auth.userId)
+        .eq(config.tenantCol, tenantId)
         .order(config.timestampCol, { ascending: true })
         .limit(limit);
 
@@ -148,7 +123,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("[MobileSync] Sync failed:", {
       error: error instanceof Error ? error.message : error,
-      userId: auth.userId,
+      userId: tenantId,
     });
     return NextResponse.json(
       { error: "Internal server error" },

@@ -1,3 +1,4 @@
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { autoInstallMods } from "@/lib/builder/proactive-engine";
@@ -10,23 +11,21 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) {
       console.error("[Complete API] No user session");
       return NextResponse.json(
         { error: "Sesja wygasla. Zaloguj sie ponownie." },
         { status: 401 },
       );
     }
+    const tenantId = auth.tenantId;
 
+    const supabase = await createClient();
     const body = await request.json().catch(() => ({}));
     const method = body.method || "form";
 
-    logger.info("[Complete API] Starting for user:", user.id, { method });
+    logger.info("[Complete API] Starting for user:", tenantId, { method });
 
     // Update tenant status - THIS IS THE CRITICAL STEP
     const { error: updateError } = await supabase
@@ -35,14 +34,14 @@ export async function POST(request: NextRequest) {
         onboarding_status: "completed",
         onboarding_completed_at: new Date().toISOString(),
       })
-      .eq("id", user.id);
+      .eq("id", tenantId);
 
     if (updateError) {
       console.error("[Complete API] Error updating status:", {
         code: updateError.code,
         message: updateError.message,
         details: updateError.details,
-        userId: user.id,
+        userId: tenantId,
       });
       return NextResponse.json(
         { error: `Blad zapisu statusu: ${updateError.message}` },
@@ -53,7 +52,7 @@ export async function POST(request: NextRequest) {
     // Non-critical operations below - don't let them break the flow
     try {
       await supabase.from("exo_onboarding_sessions").insert({
-        tenant_id: user.id,
+        tenant_id: tenantId,
         step: 1,
         step_name: "onboarding",
         completed_at: new Date().toISOString(),
@@ -72,7 +71,7 @@ export async function POST(request: NextRequest) {
       const { data: tenant } = await supabase
         .from("exo_tenants")
         .select("morning_checkin_time, preferred_name, checkin_enabled")
-        .eq("id", user.id)
+        .eq("id", tenantId)
         .single();
 
       if (tenant?.checkin_enabled && tenant?.morning_checkin_time) {
@@ -84,7 +83,7 @@ export async function POST(request: NextRequest) {
 
         if (morningJob) {
           await supabase.from("exo_user_job_preferences").upsert({
-            tenant_id: user.id,
+            tenant_id: tenantId,
             job_id: morningJob.id,
             enabled: true,
             preferred_time: tenant.morning_checkin_time,
@@ -99,10 +98,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    logger.info("[Complete API] Onboarding completed for user:", user.id);
+    logger.info("[Complete API] Onboarding completed for user:", tenantId);
 
     // Auto-install Mods based on user goals (fire-and-forget)
-    autoInstallMods(user.id).catch((err) =>
+    autoInstallMods(tenantId).catch((err) =>
       console.error("[Complete API] Auto-install mods error:", err),
     );
 

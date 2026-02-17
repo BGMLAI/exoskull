@@ -5,27 +5,25 @@
  * Joins with source tables to get insight content.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     // Get recent insight deliveries
     const { data: deliveries } = await supabase
       .from("exo_insight_deliveries")
       .select("id, source_table, source_id, delivered_at, channel, batch_id")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .order("delivered_at", { ascending: false })
       .limit(10);
 

@@ -1,68 +1,70 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { buildAuthUrl, getOAuthConfig } from '@/lib/rigs/oauth';
-import { randomBytes } from 'crypto';
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { createClient } from "@/lib/supabase/server";
+import { buildAuthUrl, getOAuthConfig } from "@/lib/rigs/oauth";
+import { randomBytes } from "crypto";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
-const RIG_SLUG = 'oura';
+const RIG_SLUG = "oura";
 
 // GET /api/rigs/oura/connect - Start OAuth flow
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check auth
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) {
       const returnUrl = `/api/rigs/${RIG_SLUG}/connect`;
       return NextResponse.redirect(
-        new URL(`/login?returnUrl=${encodeURIComponent(returnUrl)}`, request.url)
+        new URL(
+          `/login?returnUrl=${encodeURIComponent(returnUrl)}`,
+          request.url,
+        ),
       );
     }
+    const tenantId = auth.tenantId;
 
     const config = getOAuthConfig(RIG_SLUG);
     if (!config) {
       return NextResponse.json(
-        { error: 'OAuth config not found for Oura' },
-        { status: 500 }
+        { error: "OAuth config not found for Oura" },
+        { status: 500 },
       );
     }
 
     if (!config.clientId) {
-      console.error('[Oura OAuth] Missing client ID');
+      console.error("[Oura OAuth] Missing client ID");
       return NextResponse.json(
-        { error: 'Oura integration is not configured. Please add API credentials.' },
-        { status: 500 }
+        {
+          error:
+            "Oura integration is not configured. Please add API credentials.",
+        },
+        { status: 500 },
       );
     }
 
-    const state = randomBytes(32).toString('hex');
+    const state = randomBytes(32).toString("hex");
 
+    const supabase = await createClient();
     const { error: stateError } = await supabase
-      .from('exo_rig_connections')
+      .from("exo_rig_connections")
       .upsert(
         {
-          tenant_id: user.id,
+          tenant_id: tenantId,
           rig_slug: RIG_SLUG,
           metadata: {
             oauth_state: state,
             oauth_initiated_at: new Date().toISOString(),
           },
-          sync_status: 'pending',
+          sync_status: "pending",
         },
-        { onConflict: 'tenant_id,rig_slug' }
+        { onConflict: "tenant_id,rig_slug" },
       );
 
     if (stateError) {
-      console.error('[Oura OAuth] Failed to store state:', stateError);
+      console.error("[Oura OAuth] Failed to store state:", stateError);
       return NextResponse.json(
-        { error: 'Failed to initiate OAuth flow' },
-        { status: 500 }
+        { error: "Failed to initiate OAuth flow" },
+        { status: 500 },
       );
     }
 
@@ -70,10 +72,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(authUrl);
   } catch (error) {
-    console.error('[Oura OAuth] Connect error:', error);
+    console.error("[Oura OAuth] Connect error:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }

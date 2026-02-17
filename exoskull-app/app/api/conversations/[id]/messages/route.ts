@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
@@ -10,14 +11,11 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const conversationId = params.id;
 
@@ -26,7 +24,7 @@ export async function GET(
       .from("exo_messages")
       .select("*")
       .eq("conversation_id", conversationId)
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .order("timestamp", { ascending: true });
 
     if (error) throw error;
@@ -47,14 +45,11 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const conversationId = params.id;
     const { role, content, context } = await req.json();
@@ -64,7 +59,7 @@ export async function POST(
       .from("exo_messages")
       .insert({
         conversation_id: conversationId,
-        tenant_id: user.id,
+        tenant_id: tenantId,
         role,
         content,
         context: context || {},

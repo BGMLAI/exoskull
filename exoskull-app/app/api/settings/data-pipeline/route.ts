@@ -4,29 +4,26 @@
  * GET: Returns sync status from exo_bronze_sync_log + ETL timestamps per user
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     // Parallel: bronze sync log + silver ETL status + gold ETL status
     const [syncResult, silverResult, goldResult] = await Promise.allSettled([
       supabase
         .from("exo_bronze_sync_log")
         .select("data_type, synced_at, record_count, status")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .order("synced_at", { ascending: false })
         .limit(20),
       supabase

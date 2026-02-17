@@ -4,7 +4,8 @@
  * Fetches voice session history for the current user.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -13,24 +14,19 @@ export const dynamic = "force-dynamic";
 // GET /api/voice/sessions
 // ============================================================================
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    // Get authenticated user
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     // Fetch user's voice sessions
     const { data: sessions, error } = await supabase
       .from("exo_voice_sessions")
       .select("*")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .order("started_at", { ascending: false })
       .limit(20);
 

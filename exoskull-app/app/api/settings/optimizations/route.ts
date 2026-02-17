@@ -8,37 +8,34 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     // Parallel: optimizations history + permissions from iors_ai_config
     const [optResult, tenantResult] = await Promise.allSettled([
       supabase
         .from("system_optimizations")
         .select("*")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false })
         .limit(50),
-      supabase.from("exo_tenants").select("*").eq("id", user.id).single(),
+      supabase.from("exo_tenants").select("*").eq("id", tenantId).single(),
     ]);
 
     const optimizations =
       optResult.status === "fulfilled" ? (optResult.value.data ?? []) : [];
     if (optResult.status === "fulfilled" && optResult.value.error) {
       console.error("[OptimizationsAPI] GET optimizations failed:", {
-        userId: user.id,
+        tenantId,
         error: optResult.value.error.message,
       });
     }
@@ -67,15 +64,11 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const body = await req.json();
 
@@ -90,7 +83,7 @@ export async function PATCH(req: NextRequest) {
     const { data: tenant } = await supabase
       .from("exo_tenants")
       .select("*")
-      .eq("id", user.id)
+      .eq("id", tenantId)
       .single();
 
     const t = tenant as Record<string, unknown> | null;
@@ -103,11 +96,11 @@ export async function PATCH(req: NextRequest) {
         iors_ai_config: updatedConfig,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", user.id);
+      .eq("id", tenantId);
 
     if (error) {
       console.error("[OptimizationsAPI] PATCH permissions failed:", {
-        userId: user.id,
+        tenantId,
         error: error.message,
       });
       return NextResponse.json(
@@ -130,15 +123,11 @@ export async function PATCH(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const body = await req.json();
     const { action, id } = body;
@@ -155,7 +144,7 @@ export async function POST(req: NextRequest) {
       .from("system_optimizations")
       .select("*")
       .eq("id", id)
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .single();
 
     if (loadError || !opt) {
@@ -178,7 +167,7 @@ export async function POST(req: NextRequest) {
         const paramName = opt.parameter_name as string;
         const afterState = opt.after_state;
 
-        await applyOptimization(supabase, user.id, paramName, afterState);
+        await applyOptimization(supabase, tenantId, paramName, afterState);
 
         await supabase
           .from("system_optimizations")
@@ -216,7 +205,7 @@ export async function POST(req: NextRequest) {
         const paramName = opt.parameter_name as string;
         const beforeState = opt.before_state;
 
-        await applyOptimization(supabase, user.id, paramName, beforeState);
+        await applyOptimization(supabase, tenantId, paramName, beforeState);
 
         await supabase
           .from("system_optimizations")

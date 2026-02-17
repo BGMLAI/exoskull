@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import type { StreamEvent } from "@/lib/stream/types";
 
 export const dynamic = "force-dynamic";
@@ -25,14 +26,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const { searchParams } = new URL(request.url);
     const since =
@@ -53,7 +51,7 @@ export async function GET(request: NextRequest) {
               .select(
                 "id, action_type, action_name, description, status, source, metadata, created_at",
               )
-              .eq("tenant_id", user.id)
+              .eq("tenant_id", tenantId)
               .gte("created_at", since)
               .order("created_at", { ascending: false })
               .limit(limit),
@@ -69,7 +67,7 @@ export async function GET(request: NextRequest) {
               .select(
                 "id, quadrant, label, valence, arousal, subcriticality, confidence, created_at",
               )
-              .eq("tenant_id", user.id)
+              .eq("tenant_id", tenantId)
               .gte("created_at", since)
               .order("created_at", { ascending: false })
               .limit(10),
@@ -85,7 +83,7 @@ export async function GET(request: NextRequest) {
               .select(
                 "id, source_table, source_id, channel, delivered_at, batch_id",
               )
-              .eq("tenant_id", user.id)
+              .eq("tenant_id", tenantId)
               .gte("delivered_at", since)
               .order("delivered_at", { ascending: false })
               .limit(10),

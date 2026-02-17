@@ -4,28 +4,26 @@
  * GET /api/canvas/data/knowledge-insights — Returns recent KAE analyses.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const { data: analyses, error } = await supabase
       .from("exo_knowledge_analyses")
       .select(
         "id, analysis_type, insights, actions_proposed, actions_executed, cost_cents, created_at",
       )
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .limit(5);
 

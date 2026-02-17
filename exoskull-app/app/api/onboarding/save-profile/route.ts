@@ -1,3 +1,4 @@
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -18,25 +19,21 @@ interface LoopPayload {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      console.error("[SaveProfile] No user session:", {
-        authError: authError?.message,
-      });
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) {
+      console.error("[SaveProfile] No user session");
       return NextResponse.json(
         { error: "Sesja wygasla. Zaloguj sie ponownie." },
         { status: 401 },
       );
     }
+    const tenantId = auth.tenantId;
+
+    const supabase = await createClient();
 
     const body = await request.json();
 
-    logger.info("[SaveProfile] Saving for tenant:", user.id, {
+    logger.info("[SaveProfile] Saving for tenant:", tenantId, {
       preferred_name: body.preferred_name,
       primary_goal: body.primary_goal,
       loops_count: body.selected_loops?.length || 0,
@@ -90,7 +87,7 @@ export async function POST(request: NextRequest) {
     const { error: updateError } = await supabase
       .from("exo_tenants")
       .update(updateData)
-      .eq("id", user.id);
+      .eq("id", tenantId);
 
     if (updateError) {
       console.error("[SaveProfile] Error updating tenant:", {
@@ -98,7 +95,7 @@ export async function POST(request: NextRequest) {
         message: updateError.message,
         details: updateError.details,
         hint: updateError.hint,
-        userId: user.id,
+        userId: tenantId,
       });
       return NextResponse.json(
         { error: `Blad zapisu: ${updateError.message}` },
@@ -109,7 +106,7 @@ export async function POST(request: NextRequest) {
     // Create user_loops with aspects
     if (selectedLoops.length > 0) {
       const loopRows = selectedLoops.map((loop, index) => ({
-        tenant_id: user.id,
+        tenant_id: tenantId,
         slug: loop.slug,
         name: loop.name,
         icon: loop.icon,
@@ -129,7 +126,7 @@ export async function POST(request: NextRequest) {
           code: loopsError.code,
           message: loopsError.message,
           details: loopsError.details,
-          userId: user.id,
+          userId: tenantId,
           loopCount: loopRows.length,
         });
         // Non-fatal: profile was saved, loops creation failed
@@ -140,12 +137,12 @@ export async function POST(request: NextRequest) {
           "[SaveProfile] Created",
           loopRows.length,
           "loops for tenant:",
-          user.id,
+          tenantId,
         );
       }
     }
 
-    logger.info("[SaveProfile] Profile saved for tenant:", user.id);
+    logger.info("[SaveProfile] Profile saved for tenant:", tenantId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

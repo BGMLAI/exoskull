@@ -7,20 +7,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     // Parallel: loop config + today's cycle count + today's intervention count
     const today = new Date().toISOString().slice(0, 10);
@@ -29,7 +26,7 @@ export async function GET() {
         supabase
           .from("exo_tenant_loop_config")
           .select("*")
-          .eq("tenant_id", user.id)
+          .eq("tenant_id", tenantId)
           .single(),
         supabase
           .from("admin_cron_runs")
@@ -39,7 +36,7 @@ export async function GET() {
         supabase
           .from("exo_interventions")
           .select("*", { count: "exact", head: true })
-          .eq("tenant_id", user.id)
+          .eq("tenant_id", tenantId)
           .gte("created_at", `${today}T00:00:00Z`),
       ]);
 
@@ -72,15 +69,11 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const body = await req.json();
     const updatePayload: Record<string, unknown> = {};
@@ -117,11 +110,11 @@ export async function PATCH(req: NextRequest) {
     const { error } = await supabase
       .from("exo_tenant_loop_config")
       .update(updatePayload)
-      .eq("tenant_id", user.id);
+      .eq("tenant_id", tenantId);
 
     if (error) {
       console.error("[LoopConfigAPI] PATCH failed:", {
-        userId: user.id,
+        userId: tenantId,
         error: error.message,
       });
       return NextResponse.json(

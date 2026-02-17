@@ -7,39 +7,37 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function GET(req: NextRequest) {
+  const auth = await verifyTenantAuth(req);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   try {
+    const supabase = await createClient();
+
     // Get user values
     const { data: values } = await supabase
       .from("exo_user_values")
       .select("*")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .order("importance", { ascending: false });
 
     // Get guardian config
     const { data: config } = await supabase
       .from("exo_guardian_config")
       .select("*")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .single();
 
     // Get recent effectiveness stats
     const { data: effectiveness } = await supabase
       .from("exo_intervention_effectiveness")
       .select("effectiveness_score, intervention_type, created_at")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .not("effectiveness_score", "is", null)
       .order("created_at", { ascending: false })
       .limit(20);
@@ -49,7 +47,7 @@ export async function GET() {
     const { data: todayInterventions } = await supabase
       .from("exo_interventions")
       .select("guardian_verdict, benefit_score")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .gte("created_at", `${today}T00:00:00Z`)
       .not("guardian_verdict", "is", null);
 
@@ -64,7 +62,7 @@ export async function GET() {
     const { data: conflicts } = await supabase
       .from("exo_value_conflicts")
       .select("*")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .eq("resolved", false);
 
     // Average effectiveness
@@ -102,16 +100,13 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(req);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   try {
+    const supabase = await createClient();
+
     const body = await req.json();
     const { action, data } = body;
 
@@ -120,7 +115,7 @@ export async function POST(req: NextRequest) {
         const { value_area, importance, description } = data;
         await supabase.from("exo_user_values").upsert(
           {
-            tenant_id: user.id,
+            tenant_id: tenantId,
             value_area,
             importance,
             description,
@@ -146,7 +141,7 @@ export async function POST(req: NextRequest) {
             suggested_resolution: resolution,
           })
           .eq("id", conflict_id)
-          .eq("tenant_id", user.id);
+          .eq("tenant_id", tenantId);
 
         return NextResponse.json({ success: true });
       }
@@ -159,7 +154,7 @@ export async function POST(req: NextRequest) {
         } = data;
         await supabase.from("exo_guardian_config").upsert(
           {
-            tenant_id: user.id,
+            tenant_id: tenantId,
             ...(max_interventions_per_day !== undefined && {
               max_interventions_per_day,
             }),

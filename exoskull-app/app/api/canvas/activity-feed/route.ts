@@ -5,20 +5,18 @@
  * Powers the Activity Feed widget on the canvas.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const url = new URL(request.url);
     const limit = Math.min(
@@ -32,7 +30,7 @@ export async function GET(request: NextRequest) {
       .select(
         "id, action_type, action_name, description, status, source, metadata, created_at",
       )
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .limit(limit);
 
@@ -45,7 +43,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error("[ActivityFeed] Query failed:", {
         error: error.message,
-        userId: user.id,
+        tenantId,
       });
       return NextResponse.json(
         { error: "Failed to fetch activity" },

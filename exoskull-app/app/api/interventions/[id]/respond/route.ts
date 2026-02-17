@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
@@ -21,14 +21,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { id } = await params;
     const body: RespondBody = await request.json();
@@ -50,7 +45,7 @@ export async function POST(
       .from("exo_interventions")
       .select("id, status, tenant_id, title, intervention_type, action_payload")
       .eq("id", id)
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .maybeSingle();
 
     if (fetchErr || !intervention) {
@@ -95,7 +90,7 @@ export async function POST(
       // Insert into feedback table
       if (body.rating || body.feedback) {
         await serviceSupabase.from("exo_feedback").insert({
-          tenant_id: user.id,
+          tenant_id: tenantId,
           feedback_type: "action",
           rating: body.rating || null,
           message: body.feedback || null,

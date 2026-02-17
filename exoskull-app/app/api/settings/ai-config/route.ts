@@ -7,28 +7,25 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     // Parallel: AI config (select * for migration resilience) + usage summary
     const [configResult, usageResult] = await Promise.allSettled([
-      supabase.from("exo_tenants").select("*").eq("id", user.id).single(),
+      supabase.from("exo_tenants").select("*").eq("id", tenantId).single(),
       supabase
         .from("exo_ai_usage")
         .select("model, tier, estimated_cost, created_at")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .gte(
           "created_at",
           new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -85,15 +82,11 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const body = await req.json();
 
@@ -101,7 +94,7 @@ export async function PATCH(req: NextRequest) {
     const { data: tenant } = await supabase
       .from("exo_tenants")
       .select("*")
-      .eq("id", user.id)
+      .eq("id", tenantId)
       .single();
 
     const t = tenant as Record<string, unknown> | null;
@@ -172,11 +165,11 @@ export async function PATCH(req: NextRequest) {
         iors_ai_config: updated,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", user.id);
+      .eq("id", tenantId);
 
     if (error) {
       console.error("[AIConfigAPI] PATCH failed:", {
-        userId: user.id,
+        userId: tenantId,
         error: error.message,
       });
       return NextResponse.json(

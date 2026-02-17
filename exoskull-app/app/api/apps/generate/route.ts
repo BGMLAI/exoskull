@@ -3,21 +3,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServerClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { generateApp } from "@/lib/apps/generator/app-generator";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { description } = await request.json();
 
@@ -33,7 +28,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await generateApp({
-      tenant_id: user.id,
+      tenant_id: tenantId,
       description: description.trim(),
       source: "user_request",
     });

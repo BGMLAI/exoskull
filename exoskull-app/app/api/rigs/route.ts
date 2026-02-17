@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 import { RIG_DEFINITIONS } from "@/lib/rigs";
 
@@ -7,22 +8,19 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/rigs — List all available rigs + user connection status
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     // Fetch user's rig connections
     const { data: connections, error } = await supabase
       .from("exo_rig_connections")
       .select("rig_slug, sync_status, last_sync_at, created_at, metadata")
-      .eq("tenant_id", user.id);
+      .eq("tenant_id", tenantId);
 
     if (error) {
       console.error("[RigsAPI] Connections fetch error:", error);

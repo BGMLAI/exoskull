@@ -12,7 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import {
   generateDocumentPath,
@@ -21,35 +21,6 @@ import {
 } from "@/lib/storage/r2-client";
 
 export const dynamic = "force-dynamic";
-
-// ---------------------------------------------------------------------------
-// Auth (reuses mobile/sync pattern)
-// ---------------------------------------------------------------------------
-
-async function authenticateRequest(
-  req: NextRequest,
-): Promise<{ userId: string } | null> {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  const token = authHeader.slice(7);
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    },
-  );
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return null;
-
-  return { userId: user.id };
-}
 
 // ---------------------------------------------------------------------------
 // MIME mapping (expanded — blacklist approach, fallback to octet-stream)
@@ -457,10 +428,9 @@ async function handleBatchStatus(
 // ---------------------------------------------------------------------------
 
 export async function POST(req: NextRequest) {
-  const auth = await authenticateRequest(req);
-  if (!auth) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(req);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   try {
     const body = await req.json();
@@ -468,13 +438,13 @@ export async function POST(req: NextRequest) {
 
     switch (action) {
       case "get-url":
-        return handleGetUrl(body, auth.userId);
+        return handleGetUrl(body, tenantId);
       case "confirm":
-        return handleConfirm(body, auth.userId);
+        return handleConfirm(body, tenantId);
       case "status":
-        return handleStatus(body, auth.userId);
+        return handleStatus(body, tenantId);
       case "batch-status":
-        return handleBatchStatus(body, auth.userId);
+        return handleBatchStatus(body, tenantId);
       default:
         return NextResponse.json(
           {
@@ -487,7 +457,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[AgentUpload] Error:", {
       error: error instanceof Error ? error.message : error,
-      userId: auth.userId,
+      userId: tenantId,
     });
     return NextResponse.json(
       { error: "Internal server error" },

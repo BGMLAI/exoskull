@@ -4,21 +4,19 @@
  * GET /api/canvas/data/interventions — Returns pending + needs-feedback interventions.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
@@ -29,7 +27,7 @@ export async function GET() {
         .select(
           "id, title, description, intervention_type, priority, created_at",
         )
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .eq("status", "proposed")
         .eq("requires_approval", true)
         .order("created_at", { ascending: false })
@@ -39,7 +37,7 @@ export async function GET() {
       supabase
         .from("exo_interventions")
         .select("id, title, intervention_type, completed_at")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .eq("status", "completed")
         .is("user_feedback", null)
         .gte("completed_at", twoDaysAgo)

@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { logProgress } from "@/lib/goals/engine";
 
 export const dynamic = "force-dynamic";
@@ -17,14 +17,9 @@ export async function POST(
 ) {
   try {
     const { id: goalId } = await params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const body = await request.json();
     const { value, notes } = body as { value: number; notes?: string };
@@ -37,7 +32,7 @@ export async function POST(
     }
 
     const checkpoint = await logProgress(
-      user.id,
+      tenantId,
       goalId,
       value,
       "manual_dashboard",

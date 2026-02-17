@@ -5,7 +5,7 @@
  * for consistent tool access, unified thread, and Petla event emission.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 import type { GatewayMessage } from "@/lib/gateway/types";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
@@ -15,14 +15,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { message, conversationId } = await request.json();
 
@@ -34,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limit check
-    const rateCheck = await checkRateLimit(user.id, "conversations");
+    const rateCheck = await checkRateLimit(tenantId, "conversations");
     if (!rateCheck.allowed) {
       return NextResponse.json(
         { error: rateCheck.upgradeMessage || "Limit rozmow osiagniety" },
@@ -45,17 +40,17 @@ export async function POST(request: NextRequest) {
     // Route through Unified Message Gateway (full AI pipeline with 31 tools)
     const gatewayMsg: GatewayMessage = {
       channel: "web_chat",
-      from: user.id,
+      from: tenantId,
       text: message.trim(),
-      tenantId: user.id,
-      senderName: user.user_metadata?.first_name || "User",
+      tenantId,
+      senderName: "User",
       metadata: { conversationId },
     };
 
     const result = await handleInboundMessage(gatewayMsg);
 
     // Track usage
-    await incrementUsage(user.id, "conversations").catch((err) => {
+    await incrementUsage(tenantId, "conversations").catch((err) => {
       logger.warn(
         "[ChatSend] Usage tracking failed:",
         err instanceof Error ? err.message : String(err),
@@ -67,7 +62,7 @@ export async function POST(request: NextRequest) {
       toolsUsed: result.toolsUsed,
       conversationId:
         conversationId ||
-        `chat-${user.id}-${new Date().toISOString().slice(0, 10)}`,
+        `chat-${tenantId}-${new Date().toISOString().slice(0, 10)}`,
     });
   } catch (error) {
     console.error("[Chat Send] Error:", error);

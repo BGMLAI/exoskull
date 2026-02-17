@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import {
   COMPOSIO_TOOLKITS,
   listConnections,
@@ -12,16 +12,11 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/integrations/composio — List all Composio toolkits + connection status
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     let connections: Array<{
       id: string;
@@ -30,10 +25,10 @@ export async function GET() {
       createdAt: string;
     }> = [];
     try {
-      connections = await listConnections(user.id);
+      connections = await listConnections(tenantId);
     } catch (err) {
       logger.error("[ComposioAPI] listConnections failed:", {
-        tenantId: user.id,
+        tenantId: tenantId,
         error: err instanceof Error ? err.message : err,
       });
     }
@@ -74,14 +69,9 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const body = await request.json();
     const { toolkit } = body;
@@ -104,12 +94,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { redirectUrl, connectionId } = await initiateConnection(
-      user.id,
+      tenantId,
       toolkit.toUpperCase(),
     );
 
     logger.info("[ComposioAPI] Connection initiated:", {
-      tenantId: user.id,
+      tenantId: tenantId,
       toolkit: toolkit.toUpperCase(),
       connectionId,
     });

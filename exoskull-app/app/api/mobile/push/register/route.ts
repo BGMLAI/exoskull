@@ -8,38 +8,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@supabase/supabase-js";
 
-async function authenticateRequest(
-  req: NextRequest,
-): Promise<{ userId: string } | null> {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  const token = authHeader.slice(7);
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    },
-  );
-
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return null;
-
-  return { userId: user.id };
-}
-
 export async function POST(req: NextRequest) {
-  const auth = await authenticateRequest(req);
-  if (!auth) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(req);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   const body = await req.json();
   const { token, deviceName, platform } = body;
@@ -59,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     const { error } = await supabase.from("exo_device_tokens").upsert(
       {
-        tenant_id: auth.userId,
+        tenant_id: tenantId,
         token,
         platform: platform || "android",
         device_name: deviceName || null,
@@ -80,7 +55,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[PushRegister] Error:", {
       error: error instanceof Error ? error.message : error,
-      userId: auth.userId,
+      userId: tenantId,
     });
     return NextResponse.json(
       { error: "Internal server error" },
@@ -90,10 +65,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const auth = await authenticateRequest(req);
-  if (!auth) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await verifyTenantAuth(req);
+  if (!auth.ok) return auth.response;
+  const tenantId = auth.tenantId;
 
   const body = await req.json();
   const { token } = body;
@@ -111,7 +85,7 @@ export async function DELETE(req: NextRequest) {
     await supabase
       .from("exo_device_tokens")
       .delete()
-      .eq("tenant_id", auth.userId)
+      .eq("tenant_id", tenantId)
       .eq("token", token);
 
     return NextResponse.json({ success: true });

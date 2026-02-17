@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { UserProfile } from "@/lib/types/user";
 
 import { logger } from "@/lib/logger";
@@ -22,29 +23,24 @@ const UPDATABLE_FIELDS = [
 ] as const;
 
 // GET /api/user/profile - Fetch current user's profile
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      console.error("[API:user/profile] Auth error:", authError);
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const { data: profile, error: profileError } = await supabase
       .from("exo_tenants")
       .select("*")
-      .eq("id", user.id)
+      .eq("id", tenantId)
       .single();
 
     if (profileError) {
       console.error("[API:user/profile] Profile fetch error:", {
         error: profileError.message,
-        userId: user.id,
+        userId: tenantId,
       });
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
@@ -60,18 +56,13 @@ export async function GET() {
 }
 
 // PATCH /api/user/profile - Update current user's profile
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      console.error("[API:user/profile] Auth error:", authError);
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const body = await request.json();
 
@@ -100,14 +91,14 @@ export async function PATCH(request: Request) {
     const { data: profile, error: updateError } = await supabase
       .from("exo_tenants")
       .update(updateData)
-      .eq("id", user.id)
+      .eq("id", tenantId)
       .select()
       .single();
 
     if (updateError) {
       console.error("[API:user/profile] Update error:", {
         error: updateError.message,
-        userId: user.id,
+        userId: tenantId,
         updates: Object.keys(updates),
       });
       return NextResponse.json(
@@ -117,7 +108,7 @@ export async function PATCH(request: Request) {
     }
 
     logger.info("[API:user/profile] Profile updated:", {
-      userId: user.id,
+      userId: tenantId,
       fields: Object.keys(updates),
     });
 

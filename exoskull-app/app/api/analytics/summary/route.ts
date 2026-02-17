@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAuthClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import {
   getDailySummary,
   getWeeklySummary,
@@ -20,16 +20,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createAuthClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const tenantId = user.id;
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
     const { searchParams } = new URL(req.url);
     const period = searchParams.get("period") || "daily";
     const days = parseInt(searchParams.get("days") || "30", 10);

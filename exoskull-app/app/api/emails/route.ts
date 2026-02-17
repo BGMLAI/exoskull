@@ -2,20 +2,16 @@
  * Email API — list/search emails with full body for the Email page
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
 
     const { searchParams } = new URL(req.url);
-    const tenantId = searchParams.get("tenantId") || user.id;
+    const tenantId = searchParams.get("tenantId") || auth.tenantId;
     const query = searchParams.get("query");
     const category = searchParams.get("category");
     const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);

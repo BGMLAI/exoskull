@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -15,14 +16,11 @@ const VALID_DAYS = [7, 14, 30] as const;
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const daysParam = request.nextUrl.searchParams.get("days");
     const days = daysParam ? parseInt(daysParam, 10) : 7;
@@ -35,14 +33,14 @@ export async function GET(request: NextRequest) {
     }
 
     const { data, error } = await supabase.rpc("get_emotion_trends", {
-      p_tenant_id: user.id,
+      p_tenant_id: tenantId,
       p_days: days,
     });
 
     if (error) {
       console.error("[EmotionTrends] RPC error:", {
         error: error.message,
-        userId: user.id,
+        tenantId,
       });
       return NextResponse.json(
         { error: "Failed to fetch emotion trends" },

@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/conversations - Get user's conversation history
 export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get("limit") || "10");
@@ -22,7 +20,7 @@ export async function GET(req: NextRequest) {
     const { data: conversations, error } = await supabase
       .from("exo_conversations")
       .select("*")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .order("started_at", { ascending: false })
       .limit(limit);
 
@@ -41,14 +39,11 @@ export async function GET(req: NextRequest) {
 // POST /api/conversations - Create new conversation
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const { context } = await req.json();
 
@@ -56,7 +51,7 @@ export async function POST(req: NextRequest) {
     const { data: conversation, error } = await supabase
       .from("exo_conversations")
       .insert({
-        tenant_id: user.id,
+        tenant_id: tenantId,
         context: context || {},
       })
       .select()
@@ -67,7 +62,7 @@ export async function POST(req: NextRequest) {
     // Return conversation AND tenant_id for VAPI tools
     return NextResponse.json({
       conversation,
-      tenant_id: user.id,
+      tenant_id: tenantId,
     });
   } catch (error) {
     console.error("[Conversations] POST error:", error);

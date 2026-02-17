@@ -9,7 +9,7 @@
  * Vercel acts as auth proxy + SSE relay.
  */
 import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { handleInboundMessage } from "@/lib/gateway/gateway";
 import type { GatewayMessage } from "@/lib/gateway/types";
 import type { ProcessingCallback } from "@/lib/voice/conversation-handler";
@@ -132,7 +132,7 @@ async function tryVpsProxy(
 
 function createLocalStream(
   message: string,
-  user: { id: string; email?: string },
+  tenantId: string,
   conversationId?: string,
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -143,7 +143,7 @@ function createLocalStream(
         // Send session ID immediately
         const sessionId =
           conversationId ||
-          `chat-${user.id}-${new Date().toISOString().slice(0, 10)}`;
+          `chat-${tenantId}-${new Date().toISOString().slice(0, 10)}`;
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({ type: "session", conversationId: sessionId })}\n\n`,
@@ -157,20 +157,16 @@ function createLocalStream(
           ),
         );
 
-        // Get user email for sender name
-        const senderName = user.email || "Dashboard User";
-
         // Build gateway message
         const gatewayMsg: GatewayMessage = {
           channel: "web_chat",
-          tenantId: user.id,
-          from: user.id,
-          senderName,
+          tenantId,
+          from: tenantId,
+          senderName: "Dashboard User",
           text: message,
           metadata: {
             conversationId,
             source: "dashboard",
-            user_email: user.email,
           },
         };
 
@@ -270,7 +266,7 @@ function createLocalStream(
           ),
         );
 
-        incrementUsage(user.id, "conversations").catch((err) => {
+        incrementUsage(tenantId, "conversations").catch((err) => {
           logger.warn(
             "[ChatStream] Usage tracking failed:",
             err instanceof Error ? err.message : String(err),
@@ -281,7 +277,7 @@ function createLocalStream(
       } catch (error) {
         console.error("[Chat Stream] Gateway processing error:", {
           error: error instanceof Error ? error.message : "Unknown error",
-          userId: user.id,
+          tenantId,
           stack: error instanceof Error ? error.stack : undefined,
         });
         controller.enqueue(
@@ -301,17 +297,9 @@ function createLocalStream(
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { message, conversationId } = await request.json();
 
@@ -323,7 +311,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limit check
-    const rateCheck = await checkRateLimit(user.id, "conversations");
+    const rateCheck = await checkRateLimit(tenantId, "conversations");
     if (!rateCheck.allowed) {
       return new Response(
         JSON.stringify({
@@ -334,11 +322,11 @@ export async function POST(request: NextRequest) {
     }
 
     // --- Try VPS Agent Backend first ---
-    const vpsResponse = await tryVpsProxy(message, user.id, conversationId);
+    const vpsResponse = await tryVpsProxy(message, tenantId, conversationId);
 
     if (vpsResponse) {
       // VPS handled it — relay SSE stream + track usage
-      incrementUsage(user.id, "conversations").catch((err) => {
+      incrementUsage(tenantId, "conversations").catch((err) => {
         logger.warn(
           "[ChatStream] Usage tracking failed:",
           err instanceof Error ? err.message : String(err),
@@ -349,7 +337,7 @@ export async function POST(request: NextRequest) {
 
     // --- Fallback to local gateway pipeline ---
     logger.info("[ChatStream] VPS unavailable — using local fallback");
-    const stream = createLocalStream(message, user, conversationId);
+    const stream = createLocalStream(message, tenantId, conversationId);
 
     return new Response(stream, {
       headers: {

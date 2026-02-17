@@ -5,25 +5,20 @@
  * for the SystemHealthWidget.
  */
 
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getSystemHealthSnapshot } from "@/lib/system/events";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     // Get health snapshot scoped to this tenant
-    const snapshot = await getSystemHealthSnapshot(user.id);
+    const snapshot = await getSystemHealthSnapshot(tenantId);
 
     return NextResponse.json({
       overall_status: snapshot.overall_status,

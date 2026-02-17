@@ -1,22 +1,19 @@
 /**
  * GET /api/mods - List installed Mods for the current user
  */
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { data, error } = await supabase
       .from("exo_tenant_mods")
       .select(
@@ -29,7 +26,7 @@ export async function GET() {
         )
       `,
       )
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .eq("active", true);
 
     if (error) {

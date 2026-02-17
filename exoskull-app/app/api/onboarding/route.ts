@@ -1,22 +1,19 @@
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/onboarding - Get current onboarding status
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { data: tenant, error } = await supabase
       .from("exo_tenants")
       .select(
@@ -34,7 +31,7 @@ export async function GET() {
         discovery_data
       `,
       )
-      .eq("id", user.id)
+      .eq("id", tenantId)
       .single();
 
     if (error) {

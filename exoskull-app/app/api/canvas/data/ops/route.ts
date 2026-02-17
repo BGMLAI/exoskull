@@ -9,20 +9,18 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const { searchParams } = new URL(request.url);
     const challengeId = searchParams.get("challengeId");
@@ -38,7 +36,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from("user_ops")
       .select("id, title, status, priority, due_date, description")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .in("status", ["pending", "active", "blocked"])
       .order("priority", { ascending: false })
       .limit(20);

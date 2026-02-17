@@ -1,3 +1,4 @@
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { EXTRACTION_PROMPT } from "@/lib/onboarding/discovery-prompt";
@@ -10,14 +11,11 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const { conversationId } = await request.json();
 
@@ -133,7 +131,7 @@ export async function POST(request: NextRequest) {
     const { error: updateError } = await supabase
       .from("exo_tenants")
       .update(updateData)
-      .eq("id", user.id);
+      .eq("id", tenantId);
 
     if (updateError) {
       console.error("[Extract API] Error saving profile:", updateError);
@@ -147,7 +145,7 @@ export async function POST(request: NextRequest) {
     if (profileData.insights && Array.isArray(profileData.insights)) {
       for (const insight of profileData.insights) {
         await supabase.from("exo_discovery_extractions").insert({
-          tenant_id: user.id,
+          tenant_id: tenantId,
           conversation_id: conversationId,
           extraction_type: "insight",
           value: insight,
@@ -159,7 +157,7 @@ export async function POST(request: NextRequest) {
     if (profileData.quotes && Array.isArray(profileData.quotes)) {
       for (const quote of profileData.quotes) {
         await supabase.from("exo_discovery_extractions").insert({
-          tenant_id: user.id,
+          tenant_id: tenantId,
           conversation_id: conversationId,
           extraction_type: "insight",
           value: `Quote: "${quote}"`,
@@ -170,7 +168,7 @@ export async function POST(request: NextRequest) {
 
     logger.info(
       "[Extract API] Profile extracted successfully for user:",
-      user.id,
+      tenantId,
     );
 
     return NextResponse.json({

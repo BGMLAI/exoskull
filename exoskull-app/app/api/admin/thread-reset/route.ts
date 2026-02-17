@@ -6,22 +6,17 @@
  *
  * Auth: requires authenticated user (resets own thread only).
  */
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const service = getServiceSupabase();
 
@@ -47,7 +42,7 @@ export async function POST() {
     const { data: messages, error: fetchError } = await service
       .from("exo_unified_messages")
       .select("id, content, role")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .eq("role", "assistant")
       .order("created_at", { ascending: false })
       .limit(100);
@@ -89,7 +84,7 @@ export async function POST() {
     }
 
     console.log(
-      `[ThreadReset] Removed ${poisonedIds.length} poisoned messages for tenant ${user.id}`,
+      `[ThreadReset] Removed ${poisonedIds.length} poisoned messages for tenant ${tenantId}`,
     );
 
     return NextResponse.json({

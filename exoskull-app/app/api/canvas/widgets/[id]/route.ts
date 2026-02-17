@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -19,14 +20,11 @@ export async function PUT(
   { params }: { params: { id: string } },
 ) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const widgetId = params.id;
     const body = await request.json();
@@ -36,7 +34,7 @@ export async function PUT(
       .from("exo_canvas_widgets")
       .select("id, pinned")
       .eq("id", widgetId)
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .single();
 
     if (!existing) {
@@ -56,7 +54,7 @@ export async function PUT(
         .from("exo_canvas_widgets")
         .update(updates)
         .eq("id", widgetId)
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .select()
         .single();
 
@@ -91,7 +89,7 @@ export async function PUT(
       .from("exo_canvas_widgets")
       .update(updates)
       .eq("id", widgetId)
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .select()
       .single();
 
@@ -122,14 +120,11 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(_request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const widgetId = params.id;
 
@@ -138,7 +133,7 @@ export async function DELETE(
       .from("exo_canvas_widgets")
       .select("id, pinned")
       .eq("id", widgetId)
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .single();
 
     if (!existing) {
@@ -156,7 +151,7 @@ export async function DELETE(
       .from("exo_canvas_widgets")
       .delete()
       .eq("id", widgetId)
-      .eq("tenant_id", user.id);
+      .eq("tenant_id", tenantId);
 
     if (error) {
       console.error("[Canvas] DELETE widget failed:", error.message);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 import { exchangeCodeForTokens, getOAuthConfig } from "@/lib/rigs/oauth";
 
@@ -37,23 +38,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) {
       return NextResponse.redirect(
         new URL(`/login?error=session_expired`, request.url),
       );
     }
+    const tenantId = auth.tenantId;
+
+    const supabase = await createClient();
 
     const { data: connection, error: connError } = await supabase
       .from("exo_rig_connections")
       .select("*")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .eq("rig_slug", RIG_SLUG)
       .single();
 
@@ -135,7 +133,7 @@ export async function GET(request: NextRequest) {
     if (registry) {
       await supabase.from("exo_user_installations").upsert(
         {
-          tenant_id: user.id,
+          tenant_id: tenantId,
           registry_id: registry.id,
           enabled: true,
           config: {},

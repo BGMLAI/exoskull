@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getOAuthConfig, exchangeCodeForTokens } from "@/lib/rigs/oauth";
 import { logger } from "@/lib/logger";
@@ -58,24 +58,22 @@ export async function GET(
     }
 
     // Standard dashboard OAuth callback
-    const supabase = await createClient();
-
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) {
       return NextResponse.redirect(
         new URL(`/login?error=session_expired`, request.url),
       );
     }
+    const tenantId = auth.tenantId;
+
+    // Use service client for DB operations
+    const supabase = getServiceSupabase();
 
     // Verify state token
     const { data: connection, error: connError } = await supabase
       .from("exo_rig_connections")
       .select("*")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .eq("rig_slug", slug)
       .single();
 
@@ -169,7 +167,7 @@ export async function GET(
     if (registry) {
       await supabase.from("exo_user_installations").upsert(
         {
-          tenant_id: user.id,
+          tenant_id: tenantId,
           registry_id: registry.id,
           enabled: true,
           config: {},
@@ -180,12 +178,12 @@ export async function GET(
       );
     }
 
-    logger.info(`[OAuth] ${slug} connected successfully for user ${user.id}`);
+    logger.info(`[OAuth] ${slug} connected successfully for user ${tenantId}`);
 
     // Facebook-specific: auto-fetch page tokens and store in exo_meta_pages
     if (slug === "facebook" && tokens.access_token) {
       try {
-        await syncFacebookPages(user.id, tokens.access_token);
+        await syncFacebookPages(tenantId, tokens.access_token);
       } catch (fbError) {
         console.error("[OAuth] Facebook page sync failed (non-blocking):", {
           error: fbError instanceof Error ? fbError.message : "Unknown",

@@ -2,21 +2,16 @@
  * POST /api/mods/install - Install a Mod for the current user
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { installMod } from "@/lib/builder/proactive-engine";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { slug } = await request.json();
 
@@ -27,7 +22,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await installMod(user.id, slug);
+    const result = await installMod(tenantId, slug);
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });

@@ -9,20 +9,18 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const { searchParams } = new URL(request.url);
     const deep = searchParams.get("deep") === "true";
@@ -32,7 +30,7 @@ export async function GET(request: NextRequest) {
       try {
         const { data: hierarchy, error: rpcErr } = await supabase.rpc(
           "get_value_hierarchy_full",
-          { p_tenant_id: user.id },
+          { p_tenant_id: tenantId },
         );
 
         if (
@@ -51,6 +49,11 @@ export async function GET(request: NextRequest) {
             priority: v.priority,
             is_default: v.is_default,
             notes_count: v.notes_count || 0,
+            visual_type: v.visual_type || "orb",
+            model_url: v.model_url || null,
+            thumbnail_url: v.thumbnail_url || null,
+            source_urls: v.source_urls || [],
+            tags: v.tags || [],
             loops: ((v.loops as Array<Record<string, unknown>>) || []).map(
               (l) => ({
                 id: l.id,
@@ -59,6 +62,11 @@ export async function GET(request: NextRequest) {
                 icon: l.icon,
                 color: l.color,
                 notes_count: l.notes_count || 0,
+                visual_type: l.visual_type || "orb",
+                model_url: l.model_url || null,
+                thumbnail_url: l.thumbnail_url || null,
+                source_urls: l.source_urls || [],
+                tags: l.tags || [],
                 questCount: ((l.quests as unknown[]) || []).length,
                 quests: (
                   (l.quests as Array<Record<string, unknown>>) || []
@@ -68,6 +76,11 @@ export async function GET(request: NextRequest) {
                   status: q.status,
                   ops_count: q.ops_count || 0,
                   notes_count: q.notes_count || 0,
+                  visual_type: q.visual_type || "orb",
+                  model_url: q.model_url || null,
+                  thumbnail_url: q.thumbnail_url || null,
+                  source_urls: q.source_urls || [],
+                  tags: q.tags || [],
                   missions_count: ((q.missions as unknown[]) || []).length,
                   missions: (
                     (q.missions as Array<Record<string, unknown>>) || []
@@ -77,6 +90,11 @@ export async function GET(request: NextRequest) {
                     status: m.status,
                     total_ops: m.total_ops || 0,
                     completed_ops: m.completed_ops || 0,
+                    visual_type: m.visual_type || "orb",
+                    model_url: m.model_url || null,
+                    thumbnail_url: m.thumbnail_url || null,
+                    source_urls: m.source_urls || [],
+                    tags: m.tags || [],
                     challenges_count: ((m.challenges as unknown[]) || [])
                       .length,
                     challenges: (
@@ -88,6 +106,10 @@ export async function GET(request: NextRequest) {
                       difficulty: c.difficulty || 1,
                       due_date: c.due_date,
                       notes_count: c.notes_count || 0,
+                      visual_type: c.visual_type || "orb",
+                      model_url: c.model_url || null,
+                      thumbnail_url: c.thumbnail_url || null,
+                      tags: c.tags || [],
                     })),
                   })),
                 })),
@@ -106,7 +128,7 @@ export async function GET(request: NextRequest) {
     const { data: values, error } = await supabase
       .from("exo_values")
       .select("*")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .eq("is_active", true)
       .order("priority", { ascending: false });
 
@@ -124,8 +146,10 @@ export async function GET(request: NextRequest) {
       values.map(async (value) => {
         const { data: loops } = await supabase
           .from("user_loops")
-          .select("id, name, slug, icon")
-          .eq("tenant_id", user.id)
+          .select(
+            "id, name, slug, icon, color, visual_type, model_url, thumbnail_url, source_urls, tags",
+          )
+          .eq("tenant_id", tenantId)
           .eq("value_id", value.id)
           .eq("is_active", true);
 
@@ -135,7 +159,7 @@ export async function GET(request: NextRequest) {
           const { count } = await supabase
             .from("user_notes")
             .select("id", { count: "exact", head: true })
-            .eq("tenant_id", user.id)
+            .eq("tenant_id", tenantId)
             .eq("value_id", value.id);
           valueNotesCount = count || 0;
         }
@@ -146,10 +170,12 @@ export async function GET(request: NextRequest) {
             const questQuery = supabase
               .from("user_quests")
               .select(
-                deep ? "id, title, status, completed_ops, target_ops" : "id",
+                deep
+                  ? "id, title, status, completed_ops, target_ops, visual_type, model_url, thumbnail_url, source_urls, tags"
+                  : "id",
                 { count: "exact", head: !deep },
               )
-              .eq("tenant_id", user.id)
+              .eq("tenant_id", tenantId)
               .or(`loop_id.eq.${loop.id},loop_slug.eq.${loop.slug}`)
               .in("status", ["active", "draft"]);
 
@@ -161,7 +187,7 @@ export async function GET(request: NextRequest) {
               const { count: nc } = await supabase
                 .from("user_notes")
                 .select("id", { count: "exact", head: true })
-                .eq("tenant_id", user.id)
+                .eq("tenant_id", tenantId)
                 .eq("loop_id", loop.id);
               loopNotesCount = nc || 0;
             }
@@ -208,13 +234,15 @@ export async function GET(request: NextRequest) {
                         .in("status", ["pending", "active"]),
                       supabase
                         .from("user_missions")
-                        .select("id, title, status, total_ops, completed_ops")
+                        .select(
+                          "id, title, status, total_ops, completed_ops, visual_type, model_url, thumbnail_url, source_urls, tags",
+                        )
                         .eq("quest_id", questId)
                         .in("status", ["active", "draft", "paused"]),
                       supabase
                         .from("user_notes")
                         .select("id", { count: "exact", head: true })
-                        .eq("tenant_id", user.id)
+                        .eq("tenant_id", tenantId)
                         .eq("quest_id", questId),
                     ]);
 
@@ -237,9 +265,11 @@ export async function GET(request: NextRequest) {
                       try {
                         const { data: challengeData } = await supabase
                           .from("user_challenges")
-                          .select("id, title, status, difficulty, due_date")
+                          .select(
+                            "id, title, status, difficulty, due_date, visual_type, model_url, thumbnail_url, tags",
+                          )
                           .eq("mission_id", missionId)
-                          .eq("tenant_id", user.id)
+                          .eq("tenant_id", tenantId)
                           .in("status", ["active", "draft", "paused"]);
 
                         if (challengeData && challengeData.length > 0) {
@@ -248,7 +278,7 @@ export async function GET(request: NextRequest) {
                               const { count: cNotes } = await supabase
                                 .from("user_notes")
                                 .select("id", { count: "exact", head: true })
-                                .eq("tenant_id", user.id)
+                                .eq("tenant_id", tenantId)
                                 .eq("challenge_id", c.id);
 
                               return {
@@ -258,6 +288,10 @@ export async function GET(request: NextRequest) {
                                 difficulty: c.difficulty || 1,
                                 due_date: c.due_date,
                                 notes_count: cNotes || 0,
+                                visual_type: c.visual_type || "orb",
+                                model_url: c.model_url || null,
+                                thumbnail_url: c.thumbnail_url || null,
+                                tags: c.tags || [],
                               };
                             }),
                           );
@@ -272,6 +306,11 @@ export async function GET(request: NextRequest) {
                         status: m.status as string,
                         total_ops: (m.total_ops as number) || 0,
                         completed_ops: (m.completed_ops as number) || 0,
+                        visual_type: (m.visual_type as string) || "orb",
+                        model_url: (m.model_url as string) || null,
+                        thumbnail_url: (m.thumbnail_url as string) || null,
+                        source_urls: (m.source_urls as string[]) || [],
+                        tags: (m.tags as string[]) || [],
                         challenges_count: challenges.length,
                         challenges,
                       };
@@ -284,6 +323,11 @@ export async function GET(request: NextRequest) {
                     status: q.status as string,
                     ops_count: opsResult.count || 0,
                     notes_count: questNotesResult.count || 0,
+                    visual_type: (q.visual_type as string) || "orb",
+                    model_url: (q.model_url as string) || null,
+                    thumbnail_url: (q.thumbnail_url as string) || null,
+                    source_urls: (q.source_urls as string[]) || [],
+                    tags: (q.tags as string[]) || [],
                     missions_count: missions.length,
                     missions,
                   };
@@ -294,6 +338,11 @@ export async function GET(request: NextRequest) {
             return {
               ...loop,
               notes_count: loopNotesCount,
+              visual_type: loop.visual_type || "orb",
+              model_url: loop.model_url || null,
+              thumbnail_url: loop.thumbnail_url || null,
+              source_urls: loop.source_urls || [],
+              tags: loop.tags || [],
               questCount: deep ? (quests?.length ?? 0) : count || 0,
               ...(deep ? { quests: questDetails } : {}),
             };
@@ -309,6 +358,11 @@ export async function GET(request: NextRequest) {
           priority: value.priority,
           is_default: value.is_default,
           notes_count: valueNotesCount,
+          visual_type: value.visual_type || "orb",
+          model_url: value.model_url || null,
+          thumbnail_url: value.thumbnail_url || null,
+          source_urls: value.source_urls || [],
+          tags: value.tags || [],
           loops: loopsWithQuests,
         };
       }),

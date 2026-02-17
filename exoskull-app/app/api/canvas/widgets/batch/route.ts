@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -20,14 +21,11 @@ interface LayoutItem {
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const { layouts } = (await request.json()) as { layouts: LayoutItem[] };
 
@@ -53,7 +51,7 @@ export async function PUT(request: NextRequest) {
           updated_at: now,
         })
         .eq("id", item.id)
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .eq("pinned", false);
 
       if (!error) updated++;

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 import { getOAuthConfig, buildAuthUrl, supportsOAuth } from "@/lib/rigs/oauth";
 import { randomBytes } from "crypto";
@@ -13,14 +14,8 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
-    const supabase = await createClient();
-
-    // Check auth
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) {
       // Redirect to login with return URL
       const returnUrl = `/api/rigs/${slug}/connect`;
       return NextResponse.redirect(
@@ -30,6 +25,7 @@ export async function GET(
         ),
       );
     }
+    const tenantId = auth.tenantId;
 
     // Check if rig supports OAuth
     if (!supportsOAuth(slug)) {
@@ -63,11 +59,12 @@ export async function GET(
     const state = randomBytes(32).toString("hex");
 
     // Store state in database for verification
+    const supabase = await createClient();
     const { error: stateError } = await supabase
       .from("exo_rig_connections")
       .upsert(
         {
-          tenant_id: user.id,
+          tenant_id: tenantId,
           rig_slug: slug,
           metadata: {
             oauth_state: state,
@@ -92,7 +89,7 @@ export async function GET(
     const authUrl = buildAuthUrl(config, state);
 
     logger.info(`[OAuth] Redirecting to ${slug} auth`, {
-      userId: user.id,
+      userId: tenantId,
       redirectUri: config.redirectUri,
       scopeCount: config.scopes.length,
       authUrlLength: authUrl.length,

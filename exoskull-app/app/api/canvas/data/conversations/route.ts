@@ -5,22 +5,20 @@
  * Queries exo_unified_messages + exo_voice_sessions for real counts.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 import type { DataPoint } from "@/lib/dashboard/types";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const now = new Date();
     const todayStart = new Date(now);
@@ -33,7 +31,7 @@ export async function GET() {
         supabase
           .from("exo_unified_messages")
           .select("id", { count: "exact", head: true })
-          .eq("tenant_id", user.id)
+          .eq("tenant_id", tenantId)
           .eq("role", "user")
           .gte("created_at", todayStart.toISOString()),
 
@@ -41,7 +39,7 @@ export async function GET() {
         supabase
           .from("exo_unified_messages")
           .select("id", { count: "exact", head: true })
-          .eq("tenant_id", user.id)
+          .eq("tenant_id", tenantId)
           .eq("role", "user")
           .gte("created_at", weekAgo.toISOString()),
 
@@ -49,7 +47,7 @@ export async function GET() {
         supabase
           .from("exo_voice_sessions")
           .select("started_at, ended_at")
-          .eq("tenant_id", user.id)
+          .eq("tenant_id", tenantId)
           .eq("status", "ended")
           .gte("started_at", weekAgo.toISOString())
           .not("ended_at", "is", null),
@@ -58,7 +56,7 @@ export async function GET() {
         supabase
           .from("exo_unified_messages")
           .select("created_at")
-          .eq("tenant_id", user.id)
+          .eq("tenant_id", tenantId)
           .eq("role", "user")
           .gte("created_at", weekAgo.toISOString())
           .order("created_at", { ascending: true }),

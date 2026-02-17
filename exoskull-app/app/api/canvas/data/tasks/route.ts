@@ -4,25 +4,20 @@
  * GET /api/canvas/data/tasks — Returns TaskStats for the TasksWidget.
  */
 
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getTaskStats } from "@/lib/tasks/task-service";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     // Count tasks by status via dual-read service
-    const stats = await getTaskStats(user.id);
+    const stats = await getTaskStats(tenantId);
 
     return NextResponse.json({ stats, series: [] });
   } catch (error) {

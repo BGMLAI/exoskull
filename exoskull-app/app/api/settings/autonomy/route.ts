@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import {
   listPermissions,
   grantPermission,
@@ -37,19 +37,13 @@ const VALID_DOMAINS: AutonomyDomain[] = [
   "*",
 ];
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const permissions = await listPermissions(user.id);
+    const permissions = await listPermissions(tenantId);
     return NextResponse.json({ permissions });
   } catch (error) {
     console.error("[AutonomyAPI] GET error:", error);
@@ -62,15 +56,9 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const body = await req.json();
     const {
@@ -93,16 +81,16 @@ export async function PATCH(req: NextRequest) {
       : "*";
 
     if (granted === false) {
-      await revokePermission(user.id, action_type, permDomain);
+      await revokePermission(tenantId, action_type, permDomain);
     } else {
-      await grantPermission(user.id, action_type, permDomain, {
+      await grantPermission(tenantId, action_type, permDomain, {
         requires_confirmation: requires_confirmation ?? false,
         threshold_amount: threshold_amount ?? null,
         granted_via: "settings",
       });
     }
 
-    const permissions = await listPermissions(user.id);
+    const permissions = await listPermissions(tenantId);
     return NextResponse.json({ permissions });
   } catch (error) {
     console.error("[AutonomyAPI] PATCH error:", error);

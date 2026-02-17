@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -36,14 +37,11 @@ interface MetricDataPoint {
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     // Parse query params
     const searchParams = request.nextUrl.searchParams;
@@ -85,7 +83,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from("exo_health_metrics")
       .select("value, unit, recorded_at")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .eq("metric_type", metricType)
       .gte("recorded_at", startDate.toISOString())
       .lte("recorded_at", endDate.toISOString())
@@ -95,7 +93,7 @@ export async function GET(request: NextRequest) {
       console.error("[HealthMetrics] Query error:", {
         error: error.message,
         metricType,
-        userId: user.id,
+        tenantId,
       });
       return NextResponse.json(
         { error: "Failed to fetch metrics" },

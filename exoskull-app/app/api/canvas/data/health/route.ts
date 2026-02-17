@@ -5,7 +5,8 @@
  * Thin wrapper reusing the same queries as the dashboard health page.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 import type {
   HealthSummary,
@@ -15,16 +16,13 @@ import type {
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const today = new Date().toISOString().split("T")[0];
 
@@ -32,7 +30,7 @@ export async function GET() {
     const { data: healthData } = await supabase
       .from("exo_daily_health")
       .select("steps, sleep_minutes, hrv_avg")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .eq("date", today)
       .maybeSingle();
 
@@ -43,7 +41,7 @@ export async function GET() {
     const { data: sleepRows } = await supabase
       .from("exo_daily_health")
       .select("date, sleep_minutes")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .gte("date", sevenDaysAgo.toISOString().split("T")[0])
       .order("date", { ascending: true });
 
@@ -58,7 +56,7 @@ export async function GET() {
       .select(
         "metric, probability, confidence, severity, message_pl, message_en",
       )
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
       .order("created_at", { ascending: false })
       .limit(4);

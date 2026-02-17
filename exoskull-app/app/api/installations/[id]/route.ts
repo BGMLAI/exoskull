@@ -1,51 +1,49 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { createClient } from "@/lib/supabase/server";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 // GET /api/installations/[id] - Get single installation details
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = await createClient();
 
-    // Check auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const { data: installation, error } = await supabase
-      .from('exo_user_installations')
-      .select(`
+      .from("exo_user_installations")
+      .select(
+        `
         *,
         registry:exo_registry(*)
-      `)
-      .eq('id', id)
-      .eq('tenant_id', user.id)
+      `,
+      )
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
       .single();
 
     if (error || !installation) {
       return NextResponse.json(
-        { error: 'Installation not found' },
-        { status: 404 }
+        { error: "Installation not found" },
+        { status: 404 },
       );
     }
 
     // Get connection if it's a rig
     let connection = null;
-    if (installation.registry?.type === 'rig') {
+    if (installation.registry?.type === "rig") {
       const { data: conn } = await supabase
-        .from('exo_rig_connections')
-        .select('*')
-        .eq('tenant_id', user.id)
-        .eq('rig_slug', installation.registry.slug)
+        .from("exo_rig_connections")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("rig_slug", installation.registry.slug)
         .single();
 
       connection = conn;
@@ -56,10 +54,10 @@ export async function GET(
       connection,
     });
   } catch (error) {
-    console.error('[Installations] Unexpected error:', error);
+    console.error("[Installations] Unexpected error:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }
@@ -67,20 +65,15 @@ export async function GET(
 // PATCH /api/installations/[id] - Update installation config
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    // Check auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const supabase = await createClient();
 
     const body = await request.json();
     const { config, enabled } = body;
@@ -99,18 +92,18 @@ export async function PATCH(
     }
 
     const { data: installation, error } = await supabase
-      .from('exo_user_installations')
+      .from("exo_user_installations")
       .update(updates)
-      .eq('id', id)
-      .eq('tenant_id', user.id)
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
       .select()
       .single();
 
     if (error) {
-      console.error('[Installations] Update error:', error);
+      console.error("[Installations] Update error:", error);
       return NextResponse.json(
-        { error: 'Failed to update installation' },
-        { status: 500 }
+        { error: "Failed to update installation" },
+        { status: 500 },
       );
     }
 
@@ -119,10 +112,10 @@ export async function PATCH(
       installation,
     });
   } catch (error) {
-    console.error('[Installations] Unexpected error:', error);
+    console.error("[Installations] Unexpected error:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }
@@ -130,48 +123,43 @@ export async function PATCH(
 // DELETE /api/installations/[id] - Uninstall
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    // Check auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const supabase = await createClient();
 
     // Get installation to check type
     const { data: installation } = await supabase
-      .from('exo_user_installations')
-      .select('*, registry:exo_registry(slug, type, name)')
-      .eq('id', id)
-      .eq('tenant_id', user.id)
+      .from("exo_user_installations")
+      .select("*, registry:exo_registry(slug, type, name)")
+      .eq("id", id)
+      .eq("tenant_id", tenantId)
       .single();
 
     if (!installation) {
       return NextResponse.json(
-        { error: 'Installation not found' },
-        { status: 404 }
+        { error: "Installation not found" },
+        { status: 404 },
       );
     }
 
     // Delete installation
     const { error } = await supabase
-      .from('exo_user_installations')
+      .from("exo_user_installations")
       .delete()
-      .eq('id', id)
-      .eq('tenant_id', user.id);
+      .eq("id", id)
+      .eq("tenant_id", tenantId);
 
     if (error) {
-      console.error('[Installations] Delete error:', error);
+      console.error("[Installations] Delete error:", error);
       return NextResponse.json(
-        { error: 'Failed to uninstall' },
-        { status: 500 }
+        { error: "Failed to uninstall" },
+        { status: 500 },
       );
     }
 
@@ -190,10 +178,10 @@ export async function DELETE(
       message: `${installation.registry?.name} uninstalled`,
     });
   } catch (error) {
-    console.error('[Installations] Unexpected error:', error);
+    console.error("[Installations] Unexpected error:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
 }

@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import {
   getOrCreateSession,
   updateSession,
@@ -27,14 +27,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const { message, generateAudio = false } = await request.json();
 
@@ -65,12 +60,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Stable session key per user (survives page refresh)
-    const sessionKey = `birth-${user.id}`;
-    const session = await getOrCreateSession(sessionKey, user.id);
+    const sessionKey = `birth-${tenantId}`;
+    const session = await getOrCreateSession(sessionKey, tenantId);
 
     // Process through Agent SDK with birth prompt prefix (all tools available)
     const result = await runExoSkullAgent({
-      tenantId: user.id,
+      tenantId: tenantId,
       sessionId: session.id,
       userMessage: message,
       channel: "web_chat",
@@ -95,10 +90,10 @@ export async function POST(request: NextRequest) {
 
       // Complete birth synchronously (await — we need confirmation before redirect)
       try {
-        await completeBirth(user.id, birthMatch[1]);
+        await completeBirth(tenantId, birthMatch[1]);
       } catch (err) {
         console.error("[BirthChat] completeBirth failed:", {
-          userId: user.id,
+          userId: tenantId,
           error: err instanceof Error ? err.message : err,
         });
         // Still mark as complete on client — next middleware check will redirect properly
@@ -107,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     // Persist to session + unified thread
     await updateSession(session.id, message, responseText, {
-      tenantId: user.id,
+      tenantId: tenantId,
       channel: "web_chat",
     });
 

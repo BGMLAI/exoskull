@@ -5,22 +5,20 @@
  * Aggregates scheduled jobs, task deadlines, and scheduled interventions.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 import type { CalendarItem } from "@/lib/dashboard/types";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const now = new Date().toISOString();
 
@@ -29,7 +27,7 @@ export async function GET() {
       supabase
         .from("exo_custom_scheduled_jobs")
         .select("id, display_name, next_execution_at, job_type, recurrence")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .eq("is_enabled", true)
         .gt("next_execution_at", now)
         .order("next_execution_at", { ascending: true })
@@ -39,7 +37,7 @@ export async function GET() {
       supabase
         .from("exo_tasks")
         .select("id, title, due_date, status, priority")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .neq("status", "done")
         .not("due_date", "is", null)
         .gt("due_date", now)
@@ -50,7 +48,7 @@ export async function GET() {
       supabase
         .from("exo_interventions")
         .select("id, title, scheduled_for, intervention_type")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .in("status", ["scheduled", "approved"])
         .not("scheduled_for", "is", null)
         .gt("scheduled_for", now)

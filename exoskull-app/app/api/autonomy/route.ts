@@ -6,19 +6,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
-
-async function getAuthUser() {
-  const supabase = await createAuthClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user;
-}
 
 // ============================================================================
 // GET - List user's autonomy grants
@@ -26,11 +18,9 @@ async function getAuthUser() {
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getAuthUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const userId = user.id;
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const userId = auth.tenantId;
 
     const supabase = getServiceSupabase();
 
@@ -73,17 +63,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getAuthUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const userId = auth.tenantId;
 
     const supabase = getServiceSupabase();
     const body = await request.json();
     const { actionPattern, category, expiresAt, spendingLimit, dailyLimit } =
       body;
-
-    const userId = user.id;
 
     if (!actionPattern) {
       return NextResponse.json(
@@ -152,11 +139,9 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const user = await getAuthUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const userId = user.id;
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const userId = auth.tenantId;
 
     const supabase = getServiceSupabase();
     const body = await request.json();
@@ -211,11 +196,9 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await getAuthUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const userId = user.id;
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const userId = auth.tenantId;
 
     const supabase = getServiceSupabase();
     const { searchParams } = new URL(request.url);

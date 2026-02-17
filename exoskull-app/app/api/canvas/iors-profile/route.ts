@@ -5,21 +5,19 @@
  * active permissions count, and latest emotion signal.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     // Fetch IORS data from tenant
     const { data: tenant } = await supabase
@@ -27,14 +25,14 @@ export async function GET() {
       .select(
         "iors_name, iors_personality, iors_birth_date, iors_birth_completed, iors_birth_enabled",
       )
-      .eq("id", user.id)
+      .eq("id", tenantId)
       .single();
 
     // Count active permissions
     const { count: activePermissions } = await supabase
       .from("exo_autonomy_permissions")
       .select("id", { count: "exact", head: true })
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .eq("granted", true)
       .is("revoked_at", null);
 
@@ -42,7 +40,7 @@ export async function GET() {
     const { data: lastEmotion } = await supabase
       .from("exo_emotion_signals")
       .select("quadrant, label, valence, arousal, created_at")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();

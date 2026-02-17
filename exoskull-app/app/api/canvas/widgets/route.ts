@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import {
   seedDefaultWidgets,
   ensureEssentialWidgets,
@@ -19,22 +20,19 @@ export const dynamic = "force-dynamic";
 // GET — List widgets for current user
 // ============================================================================
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     // Fetch visible widgets
     const { data: widgets, error } = await supabase
       .from("exo_canvas_widgets")
       .select("*")
-      .eq("tenant_id", user.id)
+      .eq("tenant_id", tenantId)
       .eq("visible", true)
       .order("sort_order")
       .order("position_y")
@@ -50,13 +48,13 @@ export async function GET() {
 
     // Auto-seed defaults if no widgets exist
     if (!widgets || widgets.length === 0) {
-      await seedDefaultWidgets(user.id);
+      await seedDefaultWidgets(tenantId);
 
       // Re-fetch after seeding
       const { data: seeded } = await supabase
         .from("exo_canvas_widgets")
         .select("*")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .eq("visible", true)
         .order("sort_order")
         .order("position_y")
@@ -69,14 +67,14 @@ export async function GET() {
     const existingTypes = widgets.map(
       (w: { widget_type: string }) => w.widget_type,
     );
-    const added = await ensureEssentialWidgets(user.id, existingTypes);
+    const added = await ensureEssentialWidgets(tenantId, existingTypes);
 
     if (added > 0) {
       // Re-fetch to include newly added widgets
       const { data: updated } = await supabase
         .from("exo_canvas_widgets")
         .select("*")
-        .eq("tenant_id", user.id)
+        .eq("tenant_id", tenantId)
         .eq("visible", true)
         .order("sort_order")
         .order("position_y")
@@ -101,14 +99,11 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const body = await request.json();
     const {
@@ -132,7 +127,7 @@ export async function POST(request: NextRequest) {
     const { data: widget, error } = await supabase
       .from("exo_canvas_widgets")
       .insert({
-        tenant_id: user.id,
+        tenant_id: tenantId,
         widget_type,
         title: title || null,
         mod_slug: mod_slug || null,

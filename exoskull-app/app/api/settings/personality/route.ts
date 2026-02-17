@@ -7,32 +7,29 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { DEFAULT_PERSONALITY } from "@/lib/iors/types";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     // Use select("*") so missing columns (pre-migration) don't fail the query
     const { data: tenant, error } = await supabase
       .from("exo_tenants")
       .select("*")
-      .eq("id", user.id)
+      .eq("id", tenantId)
       .single();
 
     if (error) {
       console.error("[PersonalityAPI] GET failed:", {
-        userId: user.id,
+        userId: tenantId,
         error: error.message,
       });
       return NextResponse.json(
@@ -61,15 +58,11 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const supabase = await createClient();
 
     const body = await req.json();
 
@@ -77,7 +70,7 @@ export async function PATCH(req: NextRequest) {
     const { data: tenant } = await supabase
       .from("exo_tenants")
       .select("*")
-      .eq("id", user.id)
+      .eq("id", tenantId)
       .single();
 
     const current = (tenant?.iors_personality as Record<string, unknown>) || {};
@@ -193,11 +186,11 @@ export async function PATCH(req: NextRequest) {
     const { error } = await supabase
       .from("exo_tenants")
       .update(updatePayload)
-      .eq("id", user.id);
+      .eq("id", tenantId);
 
     if (error) {
       console.error("[PersonalityAPI] Update failed:", {
-        userId: user.id,
+        userId: tenantId,
         error: error.message,
       });
       return NextResponse.json(
