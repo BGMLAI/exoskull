@@ -8,6 +8,8 @@
 import { transcribeAudio, type STTResult } from "./elevenlabs-stt";
 
 import { logger } from "@/lib/logger";
+
+const STT_TIMEOUT_MS = 30_000; // 30s timeout for transcription API calls
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -95,22 +97,25 @@ async function transcribeWithGroq(
   formData.append("temperature", "0.0");
   // No prompt — reduces hallucinations on short/noisy audio
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), STT_TIMEOUT_MS);
+
   const response = await fetch(
     "https://api.groq.com/openai/v1/audio/transcriptions",
     {
       method: "POST",
       headers: { Authorization: `Bearer ${groqKey}` },
       body: formData,
+      signal: controller.signal,
     },
-  );
+  ).finally(() => clearTimeout(timeoutId));
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(
-      "[TranscribeLib] Groq API error:",
-      response.status,
-      errorText,
-    );
+    logger.error("[TranscribeLib] Groq API error:", {
+      status: response.status,
+      error: errorText,
+    });
     return null;
   }
 
@@ -198,7 +203,7 @@ export async function transcribeVoiceNote(
     });
     return { text, provider: provider as "elevenlabs" | "deepgram" };
   } catch (error) {
-    console.error("[TranscribeLib] All providers failed:", {
+    logger.error("[TranscribeLib] All providers failed:", {
       error: (error as Error).message,
     });
     throw new Error(

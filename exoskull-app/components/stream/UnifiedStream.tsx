@@ -93,6 +93,7 @@ export function UnifiedStream({
   const scrollRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
+  const streamIdRef = useRef(0); // Monotonic counter to prevent stale SSE events
 
   // ---------------------------------------------------------------------------
   // TTS (Text-to-Speech) — reads AI responses aloud
@@ -398,10 +399,11 @@ export function UnifiedStream({
     async (text: string, type: "text" | "voice_transcript" = "text") => {
       if (!text.trim() || state.isLoading) return;
 
-      // Cancel any in-flight request
+      // Cancel any in-flight request and increment stream generation
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
+      const currentStreamId = ++streamIdRef.current;
 
       // Capture and clear reply-to context
       const currentReplyTo = state.replyTo;
@@ -487,6 +489,8 @@ export function UnifiedStream({
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          // Guard: stop processing if a newer stream has started
+          if (streamIdRef.current !== currentStreamId) break;
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n\n");

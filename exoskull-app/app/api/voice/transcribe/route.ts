@@ -10,9 +10,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHallucination } from "@/lib/voice/transcribe-voice-note";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { withApiLog } from "@/lib/api/request-logger";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
+
+const STT_TIMEOUT_MS = 30_000; // 30s timeout for transcription API calls
 
 // ---------------------------------------------------------------------------
 // Transcribe with OpenAI Whisper
@@ -31,15 +34,22 @@ async function tryOpenAI(
     form.append("response_format", "verbose_json");
     form.append("temperature", "0.0");
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), STT_TIMEOUT_MS);
+
     const res = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
       headers: { Authorization: `Bearer ${openaiKey}` },
       body: form,
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error("[Transcribe] OpenAI error:", res.status, errText);
+      logger.error("[Transcribe] OpenAI error:", {
+        status: res.status,
+        error: errText,
+      });
       return null;
     }
 
@@ -74,7 +84,13 @@ async function tryOpenAI(
 
     return { transcript: text, provider: "openai" };
   } catch (err) {
-    console.error("[Transcribe] OpenAI exception:", err);
+    if (err instanceof Error && err.name === "AbortError") {
+      logger.error("[Transcribe] OpenAI timeout after 30s");
+      return null;
+    }
+    logger.error("[Transcribe] OpenAI exception:", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }
@@ -96,18 +112,25 @@ async function tryGroq(
     form.append("response_format", "verbose_json");
     form.append("temperature", "0.0");
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), STT_TIMEOUT_MS);
+
     const res = await fetch(
       "https://api.groq.com/openai/v1/audio/transcriptions",
       {
         method: "POST",
         headers: { Authorization: `Bearer ${groqKey}` },
         body: form,
+        signal: controller.signal,
       },
-    );
+    ).finally(() => clearTimeout(timeoutId));
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error("[Transcribe] Groq error:", res.status, errText);
+      logger.error("[Transcribe] Groq error:", {
+        status: res.status,
+        error: errText,
+      });
       return null;
     }
 
@@ -139,7 +162,13 @@ async function tryGroq(
 
     return { transcript: text, provider: "groq" };
   } catch (err) {
-    console.error("[Transcribe] Groq exception:", err);
+    if (err instanceof Error && err.name === "AbortError") {
+      logger.error("[Transcribe] Groq timeout after 30s");
+      return null;
+    }
+    logger.error("[Transcribe] Groq exception:", {
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }
@@ -147,7 +176,7 @@ async function tryGroq(
 // ---------------------------------------------------------------------------
 // MAIN HANDLER
 // ---------------------------------------------------------------------------
-export async function POST(req: NextRequest) {
+export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
     if (!auth.ok) return auth.response;
@@ -201,10 +230,13 @@ export async function POST(req: NextRequest) {
     logger.info("[Transcribe] Both providers returned empty/filtered");
     return NextResponse.json({ transcript: "" });
   } catch (error) {
-    console.error("[Transcribe] Error:", error);
+    logger.error("[Transcribe] Error:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
       { error: "Transcription failed" },
       { status: 500 },
     );
   }
-}
+});

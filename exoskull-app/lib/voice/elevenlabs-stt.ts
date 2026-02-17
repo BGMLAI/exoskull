@@ -1,4 +1,8 @@
 import { logger } from "@/lib/logger";
+
+const STT_TIMEOUT_MS = 30_000; // 30s for transcription API calls
+const DOWNLOAD_TIMEOUT_MS = 20_000; // 20s for audio file downloads
+
 /**
  * ElevenLabs Speech-to-Text
  *
@@ -54,6 +58,9 @@ export async function speechToText(
     formData.append("model_id", modelId);
     formData.append("language_code", language);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), STT_TIMEOUT_MS);
+
     const response = await fetch(
       "https://api.elevenlabs.io/v1/speech-to-text",
       {
@@ -62,12 +69,13 @@ export async function speechToText(
           "xi-api-key": ELEVENLABS_API_KEY,
         },
         body: formData,
+        signal: controller.signal,
       },
-    );
+    ).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[ElevenLabs STT] API Error:", {
+      logger.error("[ElevenLabs STT] API Error:", {
         status: response.status,
         error: errorText,
       });
@@ -92,7 +100,13 @@ export async function speechToText(
       language,
     };
   } catch (error) {
-    console.error("[ElevenLabs STT] Error:", error);
+    if (error instanceof Error && error.name === "AbortError") {
+      logger.error("[ElevenLabs STT] Timeout after 30s");
+      throw new Error("ElevenLabs STT timeout");
+    }
+    logger.error("[ElevenLabs STT] Error:", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }
@@ -107,8 +121,16 @@ export async function speechToTextFromUrl(
   const startTime = Date.now();
 
   try {
-    // Download audio from URL
-    const audioResponse = await fetch(audioUrl);
+    // Download audio from URL (with timeout)
+    const dlController = new AbortController();
+    const dlTimeout = setTimeout(
+      () => dlController.abort(),
+      DOWNLOAD_TIMEOUT_MS,
+    );
+
+    const audioResponse = await fetch(audioUrl, {
+      signal: dlController.signal,
+    }).finally(() => clearTimeout(dlTimeout));
 
     if (!audioResponse.ok) {
       throw new Error(`Failed to download audio: ${audioResponse.status}`);
@@ -126,7 +148,15 @@ export async function speechToTextFromUrl(
     // Transcribe the downloaded audio
     return await speechToText(audioBuffer, options);
   } catch (error) {
-    console.error("[ElevenLabs STT] Error transcribing from URL:", error);
+    if (error instanceof Error && error.name === "AbortError") {
+      logger.error("[ElevenLabs STT] Audio download timeout after 20s", {
+        url: audioUrl.substring(0, 50),
+      });
+      throw new Error("Audio download timeout");
+    }
+    logger.error("[ElevenLabs STT] Error transcribing from URL:", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }
@@ -154,6 +184,9 @@ export async function speechToTextDeepgram(
   const startTime = Date.now();
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), STT_TIMEOUT_MS);
+
     const response = await fetch(
       `https://api.deepgram.com/v1/listen?language=${language}&smart_format=true`,
       {
@@ -163,12 +196,13 @@ export async function speechToTextDeepgram(
           "Content-Type": "audio/wav",
         },
         body: audioBuffer,
+        signal: controller.signal,
       },
-    );
+    ).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[Deepgram STT] API Error:", {
+      logger.error("[Deepgram STT] API Error:", {
         status: response.status,
         error: errorText,
       });
@@ -196,7 +230,13 @@ export async function speechToTextDeepgram(
       language,
     };
   } catch (error) {
-    console.error("[Deepgram STT] Error:", error);
+    if (error instanceof Error && error.name === "AbortError") {
+      logger.error("[Deepgram STT] Timeout after 30s");
+      throw new Error("Deepgram STT timeout");
+    }
+    logger.error("[Deepgram STT] Error:", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }
@@ -238,8 +278,24 @@ export async function transcribeAudioFromUrl(
   audioUrl: string,
   options: STTOptions = {},
 ): Promise<STTResult> {
-  // Download audio once
-  const audioResponse = await fetch(audioUrl);
+  // Download audio once (with timeout)
+  const dlController = new AbortController();
+  const dlTimeout = setTimeout(() => dlController.abort(), DOWNLOAD_TIMEOUT_MS);
+
+  let audioResponse: Response;
+  try {
+    audioResponse = await fetch(audioUrl, {
+      signal: dlController.signal,
+    }).finally(() => clearTimeout(dlTimeout));
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      logger.error("[STT] Audio download timeout after 20s", {
+        url: audioUrl.substring(0, 50),
+      });
+      throw new Error("Audio download timeout");
+    }
+    throw error;
+  }
 
   if (!audioResponse.ok) {
     throw new Error(`Failed to download audio: ${audioResponse.status}`);

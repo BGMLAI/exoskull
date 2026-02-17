@@ -8,6 +8,7 @@
  */
 
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { logger } from "@/lib/logger";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -87,7 +88,7 @@ export async function getOrCreateThread(tenantId: string): Promise<string> {
 
   if (selectError && selectError.code !== "PGRST116") {
     // PGRST116 = no rows found (expected for new tenants)
-    console.error("[UnifiedThread] Error finding thread:", {
+    logger.error("[UnifiedThread] Error finding thread:", {
       tenantId,
       error: selectError.message,
     });
@@ -112,7 +113,7 @@ export async function getOrCreateThread(tenantId: string): Promise<string> {
       if (retry?.id) return retry.id;
     }
 
-    console.error("[UnifiedThread] Error creating thread:", {
+    logger.error("[UnifiedThread] Error creating thread:", {
       tenantId,
       error: insertError.message,
     });
@@ -155,7 +156,7 @@ export async function appendMessage(
     .single();
 
   if (error) {
-    console.error("[UnifiedThread] Error appending message:", {
+    logger.error("[UnifiedThread] Error appending message:", {
       tenantId,
       channel: params.channel,
       role: params.role,
@@ -174,7 +175,7 @@ export async function appendMessage(
     .eq("id", threadId)
     .then(({ error: updateErr }) => {
       if (updateErr) {
-        console.error("[UnifiedThread] Metadata update failed:", {
+        logger.error("[UnifiedThread] Metadata update failed:", {
           threadId,
           error: updateErr.message,
         });
@@ -201,7 +202,7 @@ export async function getRecentMessages(
     .limit(limit);
 
   if (error) {
-    console.error("[UnifiedThread] Error fetching messages:", {
+    logger.error("[UnifiedThread] Error fetching messages:", {
       tenantId,
       error: error.message,
     });
@@ -235,7 +236,7 @@ export async function getConversationalMessages(
     .limit(fetchLimit);
 
   if (error) {
-    console.error("[UnifiedThread] Error fetching conversational messages:", {
+    logger.error("[UnifiedThread] Error fetching conversational messages:", {
       tenantId,
       error: error.message,
     });
