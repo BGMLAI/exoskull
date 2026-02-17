@@ -6,7 +6,7 @@
  * - get_feedback_summary: IORS reviews own feedback for self-improvement
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import {
   submitFeedback,
   getFeedbackSummary,

@@ -6,7 +6,7 @@
  * using Opus (Tier 4) for maximum reasoning quality.
  */
 
-import { ToolDefinition } from "./index";
+import { ToolDefinition } from "./shared";
 import { runDebate, DebateResult } from "@/lib/ai/agent-debate";
 
 // ============================================================================

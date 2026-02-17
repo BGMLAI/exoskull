@@ -9,9 +9,9 @@
  * - skill_exec: Reserved for future sandbox execution
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
+import { executeExtensionTool } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
-import { executeExtensionTool } from "./index";
 
 interface DynamicToolRow {
   id: string;

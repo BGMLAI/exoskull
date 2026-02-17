@@ -9,7 +9,7 @@
  * - deploy_app: Deploy to Vercel or return manual instructions
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import type { CodeGenerationTask } from "@/lib/code-generation/types";
 import { executeCodeGeneration } from "@/lib/code-generation/executor";
 import {

@@ -5,7 +5,7 @@
  * so the AI can analyze images and generate type-safe JSON on demand.
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 
 export const capabilitiesTools: ToolDefinition[] = [
   // ── analyze_image ──────────────────────────────────────────────────────────

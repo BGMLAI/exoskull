@@ -7,7 +7,7 @@
  * - search_memory: Search conversation history
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { logger } from "@/lib/logger";
 import {

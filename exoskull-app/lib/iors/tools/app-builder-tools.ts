@@ -3,7 +3,7 @@
 // Allows IORS to build custom apps from conversation
 // =====================================================
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { generateApp } from "@/lib/apps/generator/app-generator";
 import { getServiceSupabase } from "@/lib/supabase/service";
 

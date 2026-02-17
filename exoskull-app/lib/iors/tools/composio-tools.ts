@@ -8,7 +8,7 @@
  * - composio_action: Execute any Composio action by tool slug
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import {
   COMPOSIO_TOOLKITS,
   initiateConnection,

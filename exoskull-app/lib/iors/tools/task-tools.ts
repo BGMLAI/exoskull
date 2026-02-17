@@ -8,7 +8,7 @@
  * - list_tasks: Show current tasks
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import {
   createTask,
   completeTask,

@@ -6,7 +6,7 @@
  * - list_integrations: Show available integrations
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 
 export const integrationTools: ToolDefinition[] = [
   {

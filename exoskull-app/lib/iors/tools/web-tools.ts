@@ -6,7 +6,7 @@
  * - fetch_webpage: Fetch and extract content from a URL
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { logger } from "@/lib/logger";
 
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY;

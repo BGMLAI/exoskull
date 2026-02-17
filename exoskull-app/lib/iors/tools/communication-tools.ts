@@ -9,7 +9,7 @@
  * - send_messenger: Send a Facebook Messenger message (placeholder)
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { makeOutboundCall } from "@/lib/voice/twilio-client";
 import { appendMessage } from "@/lib/unified-thread";

@@ -4,7 +4,7 @@
  * - tau_assess: Run Tau 4-quadrant decision assessment on a situation
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 
 export const emotionTools: ToolDefinition[] = [
   {

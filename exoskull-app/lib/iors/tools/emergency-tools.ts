@@ -6,7 +6,7 @@
  * - verify_emergency_contact: Verify with code
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import {
   addEmergencyContact,
   verifyEmergencyContact,

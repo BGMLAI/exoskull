@@ -5,7 +5,7 @@
  * Values > Bieguny (Poles) > Quests > Missions > Ops > Notes
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const valueTools: ToolDefinition[] = [

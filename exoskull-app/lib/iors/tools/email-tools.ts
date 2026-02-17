@@ -15,7 +15,7 @@
  * - Graceful degradation on partial failures
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 // ============================================================================

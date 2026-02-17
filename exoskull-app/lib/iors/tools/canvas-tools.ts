@@ -5,7 +5,7 @@
  * IORS can add, remove, show, or hide widgets on the user's canvas.
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const canvasTools: ToolDefinition[] = [

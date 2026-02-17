@@ -14,7 +14,7 @@
  * - notion_create_page   — Create a Notion page
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { logger } from "@/lib/logger";
 
 // ============================================================================

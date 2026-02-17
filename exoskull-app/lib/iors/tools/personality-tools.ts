@@ -6,7 +6,7 @@
  * adjusts its personality parameters accordingly.
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { parsePersonalityFromDB } from "../personality";
 import type { IORSPersonality } from "../types";

@@ -6,7 +6,7 @@
  * These provide richer capabilities than the legacy task tools.
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 async function isQuestSystemEnabled(tenantId: string): Promise<boolean> {

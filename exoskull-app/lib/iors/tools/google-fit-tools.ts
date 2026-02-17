@@ -4,7 +4,7 @@
  * Exposes Google Fit adapter functions as IORS tools callable by AI.
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import {
   getHealthSummary,
   getSteps,

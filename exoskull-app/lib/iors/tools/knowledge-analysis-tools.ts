@@ -5,7 +5,7 @@
  * "what patterns do you see?" or "analyze my data".
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 
 export const knowledgeAnalysisTools: ToolDefinition[] = [
   {

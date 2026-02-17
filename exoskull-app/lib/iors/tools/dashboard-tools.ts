@@ -7,7 +7,7 @@
  * cockpit_update event to the client.
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 
 // ---------------------------------------------------------------------------
 // SSE directive helpers

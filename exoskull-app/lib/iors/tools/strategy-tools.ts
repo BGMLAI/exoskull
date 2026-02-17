@@ -5,7 +5,7 @@
  * Uses Opus for highest quality strategic thinking.
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import {
   analyzeIndustry,
   analyzeScenarios,

@@ -7,7 +7,7 @@
  * - revoke_autonomy: User revokes a permission
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import {
   proposePermission,
   grantPermission,

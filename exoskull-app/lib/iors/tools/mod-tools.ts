@@ -8,7 +8,7 @@
  * - create_mod: Create a custom mod on-the-fly
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const modTools: ToolDefinition[] = [

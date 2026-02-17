@@ -21,7 +21,7 @@
  * - code_load_agent   — Load an agent definition from ~/.claude/agents/
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { logger } from "@/lib/logger";
 
 // ============================================================================

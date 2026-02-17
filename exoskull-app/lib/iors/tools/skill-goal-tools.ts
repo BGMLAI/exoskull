@@ -9,7 +9,7 @@
  * - check_goals: Show goals and their progress
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { updateSuggestionStatus } from "@/lib/skills/detector";
 import { logger } from "@/lib/logger";

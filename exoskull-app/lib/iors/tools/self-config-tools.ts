@@ -10,7 +10,7 @@
  * All tools use the consent gate for permission checking.
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { checkSelfModifyConsent, logSelfModification } from "./consent-gate";
 import { logger } from "@/lib/logger";

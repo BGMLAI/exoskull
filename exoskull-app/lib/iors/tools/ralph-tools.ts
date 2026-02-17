@@ -7,7 +7,7 @@
  * - set_development_priority: tell system what to focus on
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const ralphTools: ToolDefinition[] = [

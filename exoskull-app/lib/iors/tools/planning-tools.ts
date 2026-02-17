@@ -9,7 +9,7 @@
  * - async_think: Queue deep analysis for later delivery
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { createTask } from "@/lib/async-tasks/queue";
 import { emitEvent } from "@/lib/iors/loop";

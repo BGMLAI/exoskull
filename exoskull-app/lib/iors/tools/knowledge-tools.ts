@@ -8,7 +8,7 @@
  * - import_url: Import a web page into the knowledge base
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { searchDocuments } from "@/lib/knowledge/document-processor";
 import { importUrl } from "@/lib/knowledge/url-processor";
 import { getServiceSupabase } from "@/lib/supabase/service";

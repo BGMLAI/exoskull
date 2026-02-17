@@ -4,7 +4,7 @@
  * Allows AI to proactively call or message the user.
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { callUser, isUserOnline } from "@/lib/communication/outbound-caller";
 
 export const outboundTools: ToolDefinition[] = [

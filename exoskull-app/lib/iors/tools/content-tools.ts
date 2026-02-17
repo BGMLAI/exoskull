@@ -4,7 +4,7 @@
  * Exposes document, image, video, and social media generation as IORS tools.
  */
 
-import type { ToolDefinition } from "./index";
+import type { ToolDefinition } from "./shared";
 import { generateDocument } from "@/lib/content-generation/document-generator";
 import {
   generateImage,
