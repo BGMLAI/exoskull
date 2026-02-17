@@ -3,9 +3,10 @@
 ## 1. Uruchom migrację SQL
 
 **Otwórz Supabase SQL Editor:**
-https://supabase.com/dashboard/project/ocixoxjozzldqldadrip/sql/new
+https://supabase.com/dashboard/project/uvupnwvkzreikurymncs/sql/new
 
 **Wklej i uruchom:**
+
 ```sql
 -- Skopiuj całą zawartość z:
 supabase/migrations/20260131000002_exoskull_schema.sql
@@ -20,11 +21,12 @@ To utworzy schema `exoskull` z wszystkimi tabelami (11 tabel + 5 core agents).
 ## 2. Pobierz Anon Key
 
 **Otwórz:**
-https://supabase.com/dashboard/project/ocixoxjozzldqldadrip/settings/api
+https://supabase.com/dashboard/project/uvupnwvkzreikurymncs/settings/api
 
 **Skopiuj "anon public" key**
 
 **Wklej do `.env.local`:**
+
 ```env
 NEXT_PUBLIC_SUPABASE_ANON_KEY=twój-anon-key-tutaj
 ```
@@ -44,7 +46,7 @@ Otwórz: http://localhost:3000
 ## 4. Utwórz pierwszego użytkownika
 
 **Metoda 1: Supabase Dashboard**
-https://supabase.com/dashboard/project/ocixoxjozzldqldadrip/auth/users
+https://supabase.com/dashboard/project/uvupnwvkzreikurymncs/auth/users
 → "Add user" → podaj email + hasło
 
 **Metoda 2: Kod (dodaj stronę /signup)**
@@ -54,6 +56,7 @@ https://supabase.com/dashboard/project/ocixoxjozzldqldadrip/auth/users
 ## Gotowe!
 
 Dashboard powinien działać i pokazywać:
+
 - 0 zadań (na start)
 - Brak check-in dzisiaj
 - 5 aktywnych agentów (core)

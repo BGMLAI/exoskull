@@ -1,9 +1,9 @@
 # 🧠 EXOSKULL - Adaptive Life Operating System
 ## Your Second Brain. Built For You. By AI.
 
-**Version:** 5.1
+**Version:** 6.0
 **Created:** 2026-02-01
-**Updated:** 2026-02-12
+**Updated:** 2026-02-17
 **Status:** 🟡 Active Development — MVP Live (exoskull.xyz)
 
 ---
@@ -40,17 +40,20 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 | Component | Status | Details |
 |-----------|--------|---------|
 | **Voice Pipeline** | ✅ Live | Twilio → Cartesia Sonic 3 STT → Claude Sonnet 4 (56 tools) → Cartesia Sonic 3 TTS + streaming Haiku pipeline |
-| **Memory System** | ✅ Live | Daily summaries, keyword search, 50+ msg context, user corrections |
+| **Memory System** | ✅ Live | Unified search (vector + keyword + notes + entity), HNSW index, score normalization, note embeddings, 50+ msg context |
 | **Data Lake** | ✅ Live | Bronze (R2 Parquet) → Silver (Postgres) → Gold (Materialized Views) |
-| **AI Router** | ✅ Live | 4-tier: Gemini 2.5 Flash → Haiku → Sonnet 4.5 → Opus 4.5 (de-escalation) |
+| **AI Router** | ✅ Live | Direct Anthropic Messages API with manual tool loop (replaced Agent SDK query()). Emergency Gemini fallback. 3 configs: WEB (10 turns, Sonnet), VOICE (6 turns, Haiku), ASYNC (15 turns, Sonnet) |
 | **Mod System** | ✅ Live | 5 mods: task-manager, mood, habit, sleep, activity |
 | **Rig System** | ✅ Live | 6 rigs: Oura, Google Fit, Google Workspace, MS 365, Notion, Todoist |
 | **Knowledge** | ✅ Live | RAG pipeline (pgvector embeddings, cosine similarity search), web search (Tavily), URL import (Firecrawl v2), local file sync (exo-agent CLI) |
-| **Local Agent** | ✅ New | Node.js CLI daemon: watches local folders → uploads to Knowledge Base via `/api/agent/upload` (Bearer JWT) |
+| **Local Agent** | ✅ Live | Node.js CLI daemon: watches local folders → uploads to Knowledge Base via R2 presigned URLs (was Supabase Storage). Blacklist MIME (~130 types), skips 17 junk dirs |
+| **VPS Code Execution** | ✅ New | 8 IORS tools (read/write/edit/bash/glob/grep/git/tree) backed by VPS Code API with sandbox security |
+| **MCP Bridge** | ✅ New | 512-line cross-tool orchestration layer for IORS tools |
+| **Unified Memory** | ✅ New | Single `unifiedSearch()` entry point: vector store + keyword + notes + entity search, score normalization, entity boost |
 | **Admin Panel** | ✅ Live | 9 pages, self-optimization engine, CRON management |
 | **CRON System** | ✅ Live | 28 jobs: ETL, morning-briefing, evening-reflection, impulse (6 handlers), email-sync, email-analyze, MAPEK loop, and more |
 | **Onboarding** | ✅ Live | Discovery interview (~60 topics), profile extraction, in-chat onboarding |
-| **Frontend** | ✅ Live | Dashboard, chat, tasks, knowledge, schedule, health, goals, skills, settings |
+| **Frontend** | ✅ Live | Cyberpunk cockpit HUD (BottomPanelGrid, CockpitActionBar, ReactionButtons), 3D orb scene, Polish landing page, login tabs, pricing, password reset |
 | **Auth** | ✅ Live | Supabase SSR, RLS, middleware guards |
 | **Outbound Calls** | ✅ Live | Call user + call third parties (delegate system) |
 | **Dynamic Skills** | ✅ Live | Full 6-stage pipeline: detector → generator → validator → sandbox → approval → registry. Dashboard UI, suggestions widget, circuit breaker |
@@ -67,7 +70,7 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 | **App Builder** | ✅ Live | AI JSON spec → validate → DB table → canvas widget, 4 IORS tools, auto-build in impulse Handler F |
 | **Canvas Widgets** | ✅ Live | 18 built-in types + dynamic (app:slug, dynamic_mod:slug), react-grid-layout v2.2.2 |
 | **Web Search** | ✅ Live | Tavily search + Firecrawl v2 URL import, 2 IORS tools |
-| **Presigned Uploads** | ✅ Live | Client → Supabase Storage direct upload (bypasses Vercel 4.5MB limit) |
+| **Presigned Uploads** | ✅ Live | Client → R2 presigned URLs (replaced Supabase Storage, no 10MB limit) |
 | **Settings Self-Modify** | ✅ Live | 22 permission categories, two-tier consent system (with_approval + autonomous) |
 | **Self-Optimization Dashboard** | ✅ Live | OptimizationWidget (8 parallel queries), InterventionInbox (approve/dismiss), InsightHistory |
 | **Agentic Execution Loop** | ✅ Live | Multi-step tool use (10 web, 3 voice, 15 async), budget-aware 55s cutoff, async overflow |

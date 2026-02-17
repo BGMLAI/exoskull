@@ -17,7 +17,7 @@
     "test:routes": "npx tsx scripts/test-all-routes.ts",
     "test:routes:prod": "npx tsx scripts/test-all-routes.ts --base-url https://exoskull.xyz",
     "prepare": "cd .. && husky exoskull-app/.husky || true",
-    "supabase:gen-types": "supabase gen types typescript --project-id ocixoxjozzldqldadrip > lib/database.types.ts",
+    "supabase:gen-types": "supabase gen types typescript --project-id uvupnwvkzreikurymncs > lib/database.types.ts",
     "migrate-tyrolka": "npx tsx scripts/migrate-to-tyrolka.ts"
   },
   "lint-staged": {

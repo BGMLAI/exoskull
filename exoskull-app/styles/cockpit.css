@@ -3,14 +3,18 @@
  * ============================================================================
  * Star Citizen / Elite Dangerous inspired cockpit overlay.
  * All colors use CSS custom properties for theme compatibility.
+ *
+ * V2 Layout: Full viewport 3D background, floating chat, bottom panels,
+ * action bar, channel orbs, reaction buttons.
  * ============================================================================ */
 
 /* ── Cockpit CSS Variables ── */
 .cockpit-hud {
   --hud-bg: rgba(10, 10, 28, 0.8);
   --hud-bg-solid: rgba(5, 5, 16, 0.92);
+  --hud-bg-glass: rgba(10, 10, 28, 0.65);
   --hud-border: rgba(255, 255, 255, 0.1);
-  --hud-border-hover: rgba(255, 255, 255, 0.12);
+  --hud-border-hover: rgba(255, 255, 255, 0.18);
   --hud-text: rgba(255, 255, 255, 0.85);
   --hud-text-dim: rgba(255, 255, 255, 0.55);
   --hud-text-muted: rgba(255, 255, 255, 0.35);
@@ -20,11 +24,330 @@
   --hud-green: #10b981;
   --hud-blue: #3b82f6;
   --hud-red: #ef4444;
-  --hud-panel-radius: 4px;
+  --hud-pink: #e1306c;
+  --hud-panel-radius: 6px;
   --hud-scanline-opacity: 0.015;
+  --hud-glass-blur: 14px;
 }
 
-/* ── HUD Panel Frame ── */
+/* ══════════════════════════════════════════════════════════════════════════════
+ * V2 LAYOUT — Fixed overlay zones
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+.cockpit-hud-v2 {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Zone: Top bar ── */
+.cockpit-zone--top {
+  flex-shrink: 0;
+}
+
+/* ── Zone: Chat (floating, centered) ── */
+.cockpit-zone--chat {
+  flex-shrink: 0;
+  margin: 0 auto;
+  width: min(720px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  background: var(--hud-bg-glass);
+  backdrop-filter: blur(var(--hud-glass-blur));
+  -webkit-backdrop-filter: blur(var(--hud-glass-blur));
+  border: 1px solid var(--hud-border);
+  border-radius: 12px 12px 8px 8px;
+  overflow: hidden;
+  transition: height 0.05s linear;
+}
+
+.cockpit-chat-drag-handle {
+  height: 18px;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.cockpit-chat-drag-pill {
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(6, 182, 212, 0.3);
+  transition: background 0.2s;
+}
+
+.cockpit-chat-drag-handle:hover .cockpit-chat-drag-pill {
+  background: rgba(6, 182, 212, 0.6);
+}
+
+/* ── Zone: Bottom panels ── */
+.cockpit-zone--panels {
+  flex-shrink: 0;
+  padding: 8px 16px;
+}
+
+/* ── Zone: Action bar ── */
+.cockpit-zone--actions {
+  flex-shrink: 0;
+  padding: 0 16px 8px;
+}
+
+/* ── Spacer between chat and panels ── */
+.cockpit-zone--chat + .cockpit-zone--panels {
+  margin-top: auto;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * BOTTOM PANEL GRID — 2x2 glass panels
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+.hud-bottom-panels {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.hud-panel-group {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hud-panel-group > * {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Glass morphism variant for bottom panels */
+.hud-panel-glass {
+  background: var(--hud-bg-glass) !important;
+  backdrop-filter: blur(var(--hud-glass-blur));
+  -webkit-backdrop-filter: blur(var(--hud-glass-blur));
+  border-radius: var(--hud-panel-radius) !important;
+}
+
+.hud-panel-glass .hud-panel-body {
+  max-height: 140px !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * ACTION BAR — 5-cell bottom bar
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+.hud-action-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  height: 52px;
+  background: var(--hud-bg-glass);
+  backdrop-filter: blur(var(--hud-glass-blur));
+  -webkit-backdrop-filter: blur(var(--hud-glass-blur));
+  border: 1px solid var(--hud-border);
+  border-radius: var(--hud-panel-radius);
+  padding: 4px;
+  overflow: hidden;
+}
+
+.hud-action-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--hud-text-dim);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s;
+  font-family: var(--font-mono), monospace;
+  flex-shrink: 0;
+}
+
+.hud-action-cell:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.hud-action-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Danger cell (delete) */
+.hud-action-cell--danger {
+  color: var(--hud-red);
+  opacity: 0.6;
+}
+.hud-action-cell--danger:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* Process cell */
+.hud-action-cell--process {
+  min-width: 140px;
+}
+
+/* Input cell (center, flex-grow) */
+.hud-action-cell--input {
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px;
+  cursor: default;
+}
+
+.hud-action-input {
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  color: var(--hud-text);
+  font-size: 12px;
+  font-family: var(--font-mono), monospace;
+  padding: 0 12px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.hud-action-input:focus {
+  border-color: var(--hud-cyan);
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.15);
+}
+
+.hud-action-input::placeholder {
+  color: var(--hud-text-muted);
+  font-size: 11px;
+}
+
+/* Knowledge cell */
+.hud-action-cell--knowledge:hover {
+  background: rgba(16, 185, 129, 0.06);
+}
+
+/* Save cell */
+.hud-action-cell--save:hover {
+  background: rgba(245, 158, 11, 0.06);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * CHANNEL ORBS — Floating top-right
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+.cockpit-channel-orbs {
+  position: fixed;
+  top: 44px;
+  right: 16px;
+  z-index: 12;
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.cockpit-channel-orb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--ch-color, #06b6d4) 8%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--ch-color, #06b6d4) 25%, transparent);
+  color: var(--ch-color, #06b6d4);
+  cursor: pointer;
+  transition: all 0.2s;
+  animation: hudPanelSlideIn 0.3s ease-out both;
+}
+
+.cockpit-channel-orb:hover {
+  box-shadow: 0 0 12px
+    color-mix(in srgb, var(--ch-color, #06b6d4) 30%, transparent);
+  border-color: var(--ch-color, #06b6d4);
+  transform: scale(1.1);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * REACTION BUTTONS — Floating top-left
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+.cockpit-reactions {
+  position: fixed;
+  top: 44px;
+  left: 16px;
+  z-index: 12;
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.cockpit-reaction-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(
+    in srgb,
+    var(--reaction-color, #06b6d4) 8%,
+    transparent
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--reaction-color, #06b6d4) 25%, transparent);
+  color: var(--reaction-color, #06b6d4);
+  cursor: pointer;
+  transition: all 0.2s;
+  animation: hudPanelSlideIn 0.3s ease-out both;
+}
+
+.cockpit-reaction-btn:hover {
+  box-shadow: 0 0 12px
+    color-mix(in srgb, var(--reaction-color, #06b6d4) 30%, transparent);
+  border-color: var(--reaction-color, #06b6d4);
+  transform: scale(1.1);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * HUD TOGGLE BUTTON
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+.cockpit-hud-toggle {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  cursor: pointer;
+  padding: 5px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 10px;
+  font-family: monospace;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  transition: all 0.2s;
+}
+
+.cockpit-hud-toggle:hover {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #10b981;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * HUD PANEL FRAME (shared by all panels)
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
 .hud-panel {
   position: relative;
   background: var(--hud-bg);
@@ -40,39 +363,77 @@
   border-color: var(--hud-border-hover);
 }
 
-/* Corner brackets (FUI accent marks) */
+/* Samolevsky-style chamfered corners via clip-path */
+.hud-panel {
+  clip-path: polygon(
+    0 8px,
+    8px 0,
+    calc(100% - 8px) 0,
+    100% 8px,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    8px 100%,
+    0 calc(100% - 8px)
+  );
+}
+
+/* Corner bracket accents (FUI accent marks) */
 .hud-panel::before,
 .hud-panel::after {
   content: "";
   position: absolute;
-  width: 12px;
-  height: 12px;
   pointer-events: none;
   z-index: 1;
 }
 
+/* Top-left corner bracket */
 .hud-panel::before {
-  top: -1px;
-  left: -1px;
-  border-top: 1px solid var(--hud-accent, var(--hud-cyan));
-  border-left: 1px solid var(--hud-accent, var(--hud-cyan));
-  opacity: 0.5;
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  border-top: 1.5px solid var(--hud-accent, var(--hud-cyan));
+  border-left: 1.5px solid var(--hud-accent, var(--hud-cyan));
+  clip-path: polygon(
+    0 8px,
+    8px 0,
+    16px 0,
+    16px 2px,
+    9px 2px,
+    2px 9px,
+    2px 16px,
+    0 16px
+  );
+  opacity: 0.6;
 }
 
+/* Bottom-right corner bracket */
 .hud-panel::after {
-  bottom: -1px;
-  right: -1px;
-  border-bottom: 1px solid var(--hud-accent, var(--hud-cyan));
-  border-right: 1px solid var(--hud-accent, var(--hud-cyan));
-  opacity: 0.3;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  border-bottom: 1.5px solid var(--hud-accent, var(--hud-cyan));
+  border-right: 1.5px solid var(--hud-accent, var(--hud-cyan));
+  clip-path: polygon(
+    16px 8px,
+    8px 16px,
+    0 16px,
+    0 14px,
+    7px 14px,
+    14px 7px,
+    14px 0,
+    16px 0
+  );
+  opacity: 0.35;
 }
 
 /* ── Panel Header ── */
 .hud-panel-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 6px 10px;
   cursor: pointer;
   border-bottom: 1px solid transparent;
   transition:
@@ -90,8 +451,8 @@
 }
 
 .hud-panel-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--hud-accent, var(--hud-cyan));
   box-shadow: 0 0 6px
@@ -101,7 +462,7 @@
 
 .hud-panel-title {
   flex: 1;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -110,13 +471,13 @@
 }
 
 .hud-panel-count {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--hud-text-muted);
   font-family: var(--font-mono), monospace;
 }
 
 .hud-panel-chevron {
-  font-size: 8px;
+  font-size: 7px;
   color: var(--hud-text-muted);
   transition: transform 0.2s ease;
 }
@@ -149,8 +510,8 @@
 .hud-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: 6px;
+  padding: 4px 10px;
   cursor: pointer;
   transition: background-color 0.12s;
   border-left: 2px solid transparent;
@@ -162,8 +523,8 @@
 }
 
 .hud-item-dot {
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
   background: var(--hud-accent, var(--hud-cyan));
   opacity: 0.5;
@@ -172,7 +533,7 @@
 
 .hud-item-label {
   flex: 1;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--hud-text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -181,13 +542,70 @@
 }
 
 .hud-item-meta {
-  font-size: 9px;
+  font-size: 8px;
   color: var(--hud-text-muted);
   font-family: var(--font-mono), monospace;
   flex-shrink: 0;
 }
 
-/* ── Scanline Overlay ── */
+/* ══════════════════════════════════════════════════════════════════════════════
+ * TOP BAR
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+.hud-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 36px;
+  background: var(--hud-bg-solid);
+  border-bottom: 1px solid var(--hud-border);
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hud-text-dim);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * BOTTOM BAR (legacy, kept for backward compatibility)
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+.hud-bottombar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 72px;
+  background: var(--hud-bg-solid);
+  border-top: 1px solid var(--hud-border);
+}
+
+.hud-quick-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--hud-panel-radius);
+  border: 1px solid var(--hud-border);
+  background: transparent;
+  color: var(--hud-text-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.hud-quick-action:hover {
+  border-color: var(--hud-cyan);
+  color: var(--hud-cyan);
+  background: rgba(6, 182, 212, 0.06);
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.15);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * SCANLINE OVERLAY
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
 .hud-scanlines::after {
   content: "";
   position: absolute;
@@ -203,7 +621,10 @@
   z-index: 2;
 }
 
-/* ── Resize Handle ── */
+/* ══════════════════════════════════════════════════════════════════════════════
+ * RESIZE HANDLE (kept for any remaining resize needs)
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
 .hud-resize-handle {
   position: relative;
   width: 6px;
@@ -238,62 +659,20 @@
   box-shadow: 0 0 12px color-mix(in srgb, var(--hud-cyan) 60%, transparent);
 }
 
-/* ── Top Bar ── */
-.hud-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  height: 36px;
-  background: var(--hud-bg-solid);
-  border-bottom: 1px solid var(--hud-border);
-  font-family: var(--font-mono), monospace;
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--hud-text-dim);
-}
+/* ══════════════════════════════════════════════════════════════════════════════
+ * SKELETON LOADING
+ * ══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── Bottom Bar ── */
-.hud-bottombar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 16px;
-  height: 72px;
-  background: var(--hud-bg-solid);
-  border-top: 1px solid var(--hud-border);
-}
-
-.hud-quick-action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--hud-panel-radius);
-  border: 1px solid var(--hud-border);
-  background: transparent;
-  color: var(--hud-text-dim);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.hud-quick-action:hover {
-  border-color: var(--hud-cyan);
-  color: var(--hud-cyan);
-  background: rgba(6, 182, 212, 0.06);
-  box-shadow: 0 0 8px rgba(6, 182, 212, 0.15);
-}
-
-/* ── Skeleton Loading ── */
 .hud-skeleton {
   background: rgba(255, 255, 255, 0.04);
   border-radius: 3px;
   animation: hudSkeletonPulse 1.5s ease-in-out infinite;
 }
 
-/* ── Animations ── */
+/* ══════════════════════════════════════════════════════════════════════════════
+ * ANIMATIONS
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
 @keyframes hudPanelSlideIn {
   from {
     opacity: 0;
@@ -346,15 +725,67 @@
   }
 }
 
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes channelPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 4px
+      color-mix(in srgb, var(--ch-color, #06b6d4) 20%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 12px
+      color-mix(in srgb, var(--ch-color, #06b6d4) 40%, transparent);
+  }
+}
+
 .hud-panel-enter {
   animation: hudPanelSlideIn 0.3s ease-out forwards;
+}
+
+/* Staggered entrance for panels in groups */
+.hud-panel-group .hud-panel-enter:nth-child(1) {
+  animation-delay: 0ms;
+}
+.hud-panel-group .hud-panel-enter:nth-child(2) {
+  animation-delay: 60ms;
+}
+.hud-panel-group .hud-panel-enter:nth-child(3) {
+  animation-delay: 120ms;
+}
+
+/* Chat message entrance animation */
+.hud-chat-message {
+  animation: messageIn 0.25s ease-out forwards;
+}
+
+.hud-chat-message:nth-last-child(1) {
+  animation-delay: 0ms;
+}
+.hud-chat-message:nth-last-child(2) {
+  animation-delay: 30ms;
+}
+.hud-chat-message:nth-last-child(3) {
+  animation-delay: 60ms;
 }
 
 .hud-indicator-pulse {
   animation: hudIndicatorPulse 2s ease-in-out infinite;
 }
 
-/* ── Status Indicators ── */
+/* ══════════════════════════════════════════════════════════════════════════════
+ * STATUS INDICATORS
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
 .hud-status-idle {
   color: var(--hud-text-muted);
 }
@@ -368,7 +799,10 @@
   color: var(--hud-red);
 }
 
-/* ── Preview Pane ── */
+/* ══════════════════════════════════════════════════════════════════════════════
+ * PREVIEW PANE
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
 .hud-preview {
   background: var(--hud-bg);
   backdrop-filter: blur(20px);
@@ -394,7 +828,53 @@
   color: var(--hud-text);
 }
 
-/* ── Wing columns ── */
+/* ══════════════════════════════════════════════════════════════════════════════
+ * FUI CHAT BUBBLES
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+/* User messages — right aligned, cyan accent */
+.hud-chat-bubble--user {
+  max-width: 85%;
+  margin-left: auto;
+  padding: 8px 12px;
+  background: rgba(6, 182, 212, 0.08);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+  border-radius: 8px 2px 8px 8px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--hud-text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* AI messages — left aligned, violet accent */
+.hud-chat-bubble--ai {
+  max-width: 85%;
+  margin-right: auto;
+  padding: 8px 12px;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 2px 8px 8px 8px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--hud-text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Chat timestamp */
+.hud-chat-time {
+  font-size: 9px;
+  font-family: var(--font-mono), monospace;
+  color: var(--hud-text-muted);
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * WING COLUMNS (legacy — kept for any components still using them)
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
 .hud-wing {
   display: flex;
   flex-direction: column;
@@ -406,4 +886,50 @@
 
 .hud-wing::-webkit-scrollbar {
   display: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * RESPONSIVE
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+/* Tablet: stack panels vertically */
+@media (max-width: 1024px) {
+  .hud-bottom-panels {
+    flex-direction: column;
+  }
+  .hud-panel-group {
+    flex-direction: row;
+  }
+  .cockpit-zone--chat {
+    width: calc(100% - 16px);
+  }
+}
+
+/* Mobile: simplified layout */
+@media (max-width: 640px) {
+  .cockpit-channel-orbs {
+    top: auto;
+    bottom: 70px;
+    right: 8px;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .cockpit-reactions {
+    display: none;
+  }
+  .hud-panel-group {
+    flex-direction: column;
+  }
+  .hud-action-bar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 6px;
+  }
+  .hud-action-cell--process,
+  .hud-action-cell--knowledge {
+    display: none;
+  }
+  .cockpit-zone--chat {
+    width: calc(100% - 8px);
+  }
 }

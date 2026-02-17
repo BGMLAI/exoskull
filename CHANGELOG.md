@@ -4,6 +4,184 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-17] Feature: Cockpit HUD Redesign + IORS Tools Expansion + Backlog UI/UX
+
+### What
+Full cockpit redesign: replaced wings/drawer layout with floating chat bubbles + bottom panel grid. Expanded IORS toolset with code execution, MCP bridge, and web tools. Updated VPS executor and local agent. Comprehensive backlog UI/UX implementation from 3-day audit.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **Cockpit layout** | Full-viewport 3D + floating chat bubbles + BottomPanelGrid (2x2 glass panels) |
+| **CockpitActionBar** | 5-cell bottom bar (delete, IORS, input, knowledge, save) |
+| **ReactionButtons** | Quick action overlay (reject, accept, react, attach) top-left |
+| **ChannelOrbs v2** | 6 channels (Instagram, WhatsApp, Messenger, Phone, Email, Discord) top-right |
+| **FUI corners** | Samolevsky-style chamfered corners via clip-path on all panels |
+| **Chat bubble CSS** | User (cyan) and AI (violet) FUI bubble styles with backdrop blur |
+| **Animations** | Staggered panel entrance, chat message entrance, channel pulse |
+| **Glass morphism** | `--hud-bg-glass` + `backdrop-filter: blur(14px)` on panels/action bar |
+| **/api/knowledge fix** | Graceful fallback when `get_document_stats` RPC fails (was HTTP 500) |
+| **Skip-to-content** | `<a href="#main">` accessibility link in root layout |
+| **Landing footer** | 3-column footer with brand, links, social icons (Twitter, GitHub) |
+| **Privacy page** | Table of contents + collapsible `<details>` sections for data categories |
+| **Responsive CSS** | Tablet (1024px) and mobile (640px) breakpoints for new layout |
+| **6 new IORS tools** | `web_search`, `web_fetch`, `deploy`, `list_skills`, `load_skill`, `load_agent` |
+| **MCP bridge tools** | 512-line cross-tool orchestration layer |
+| **VPS code routes** | Extended code execution service capabilities |
+| **Local agent** | Watcher enhancements + entry point updates |
+| **DB migration** | Fix gold email view refresh |
+
+### Files Changed (16)
+- `components/cockpit/BottomPanelGrid.tsx` — NEW (2x2 glass panels)
+- `components/cockpit/CockpitActionBar.tsx` — NEW (5-cell bottom bar)
+- `components/cockpit/ReactionButtons.tsx` — NEW (quick actions)
+- `components/cockpit/CockpitHUDShell.tsx` — Simplified layout
+- `components/cockpit/ChannelOrbs.tsx` — Repositioned
+- `lib/iors/tools/mcp-bridge-tools.ts` — NEW (512 lines)
+- `lib/iors/tools/code-execution-tools.ts` — Added 6 tools
+- `lib/iors/tools/channel-filters.ts` — Updated routing
+- `lib/agent-sdk/exoskull-agent.ts` — Config update
+- `vps-executor/src/routes/code.ts`, `services/code-executor.ts` — Extended
+- `local-agent/src/core/watcher.ts`, `src/index.ts` — Enhanced
+- `supabase/migrations/20260305000001_fix_gold_email_view_refresh.sql` — NEW
+
+---
+
+## [2026-02-17] Fix: P0+P1 UX Audit — Landing Page PL, Login, Pricing
+
+### What
+Full UX audit implementation. Translated landing page to Polish, added pricing section, redesigned login with tabs, added password reset flow.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **Landing hero** | Polish headline, nav anchor links (Funkcje, Jak to działa, Cennik, Opinie) |
+| **Pricing section** | Beta (free) / Pro (TBD) |
+| **Stats** | Replaced live user counts with product capability stats |
+| **Testimonials** | Colored initials avatars |
+| **Login tabs** | "Zaloguj się" / "Stwórz konto" toggle |
+| **Password UX** | Visibility toggle, length hint, "Zapomniałeś hasła?" link |
+| **Reset password** | New `/reset-password` page with Supabase flow |
+
+### Files Changed (8)
+- `app/page.tsx` — Full landing redesign (PL)
+- `app/login/page.tsx` — Split into server component + client LoginForm
+- `app/login/login-form.tsx` — NEW (tabs, password UX)
+- `app/login/actions.ts` — NEW (server actions: signIn, signUp, resetPassword)
+- `app/reset-password/page.tsx`, `reset-password-form.tsx` — NEW
+- `components/landing/SocialProof.tsx` — Avatars
+- `UX_AUDIT_2026-02-17.md` — NEW audit report
+
+---
+
+## [2026-02-17] Feature: Unified Memory Search
+
+### What
+Single entry point for all memory sources — vector store, keyword, notes, and entity search combined with score normalization and entity boost.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **unified-search.ts** | `unifiedSearch()` combines 4 sources, normalizes scores |
+| **Note embeddings** | Fire-and-forget embedding generation for notes |
+| **Dynamic context** | Enriched with highlights, knowledge graph summary, recent notes |
+| **Voice context** | Top 5 highlights for personalized voice |
+| **DB** | HNSW index + `vector_search_notes()` RPC |
+| **Backfill script** | `scripts/backfill-note-embeddings.ts` for existing notes |
+
+### Files Changed (10)
+- `lib/memory/unified-search.ts` — NEW (473 lines)
+- `lib/memory/types.ts` — NEW (unified types)
+- `lib/memory/note-embeddings.ts` — NEW
+- `lib/memory/search.ts`, `vector-store.ts` — Deprecation markers
+- `lib/iors/tools/memory-tools.ts` — Wired to unifiedSearch()
+- `lib/voice/dynamic-context.ts` — Enriched context
+- `scripts/backfill-note-embeddings.ts` — NEW
+- `supabase/migrations/20260304000001_notes_embedding_hnsw_index.sql` — NEW
+
+---
+
+## [2026-02-17] Feature: Conversation History in Agent
+
+### What
+Agent now remembers what was said earlier in the session. Thread context loaded in parallel with other Phase 1 tasks, prior messages prepended to Anthropic messages array.
+
+### Files Changed (1)
+- `lib/agent-sdk/exoskull-agent.ts` — +23 lines
+
+---
+
+## [2026-02-17] Feature: Sign-Out Button
+
+### What
+Added "Wyloguj" button in dashboard top-right corner. Previously no way to log out from UI.
+
+### Files Changed (1)
+- `components/dashboard/CyberpunkDashboard.tsx` — +14 lines
+
+---
+
+## [2026-02-17] Fix: Agent SDK → Direct Anthropic API (Vercel Serverless)
+
+### What
+Claude Agent SDK's `query()` spawns subprocess via `child_process.spawn` — doesn't work on Vercel serverless. Replaced with direct Anthropic Messages API call + manual tool execution loop.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **API** | `@anthropic-ai/sdk` (Messages API) instead of `@anthropic-ai/claude-agent-sdk` |
+| **Tools** | Load IORS tools directly, bypassing MCP server wrapper |
+| **Streaming** | Multi-turn tool loop with text deltas via SSE |
+| **Parallel execution** | Tool calls via Promise.all |
+| **Cost tracking** | Calculated from actual token usage |
+
+### Files Changed (1)
+- `lib/agent-sdk/exoskull-agent.ts` — Rewrite (+235/-179 lines)
+
+---
+
+## [2026-02-17] Feature: Agent Upload → R2 Data Lake
+
+### What
+Replaced Supabase Storage (10MB limit, 1GB free) with R2 presigned URLs for agent file sync. Expanded supported file types from 19-type whitelist to blacklist (~130 MIME types).
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **R2 presigned URLs** | `generateDocumentPath()`, `getPresignedPutUrl()`, `headObject()` |
+| **Document processor** | Reads from R2 for `r2://` paths with Supabase fallback |
+| **MIME types** | Blacklist approach (~130 types, exclude only system binaries) |
+| **Watcher** | Skips 17 junk directories |
+
+### Files Changed (8)
+- `app/api/agent/upload/route.ts` — R2 presigned URL flow
+- `lib/knowledge/document-processor.ts` — R2 support
+- `lib/storage/r2-client.ts` — New methods
+- `local-agent/src/core/config.ts`, `uploader.ts`, `watcher.ts` — R2 integration
+- `local-agent/src/utils/mime-types.ts` — Expanded to ~130 types
+
+---
+
+## [2026-02-17] Feature: VPS Code API + IORS Code Execution Tools
+
+### What
+Enable ExoSkull to edit files, run commands, and use git on VPS through the chat interface. 8 new IORS tools backed by VPS Code API with sandbox security.
+
+### Tools Added
+`code_read_file`, `code_write_file`, `code_edit_file`, `code_bash`, `code_glob`, `code_grep`, `code_git`, `code_tree`
+
+### Files Changed (8)
+- `lib/iors/tools/code-execution-tools.ts` — NEW (482 lines, 8 tools)
+- `lib/iors/tools/channel-filters.ts` — Added code tools to routing
+- `lib/iors/tools/index.ts` — Registered code tools
+- `vps-executor/src/routes/code.ts` — NEW (266 lines)
+- `vps-executor/src/services/code-executor.ts` — NEW (327 lines)
+- `vps-executor/src/middleware/sandbox.ts` — NEW (101 lines)
+- `vps-executor/docker-compose.yml` — Updated
+- `vps-executor/src/server.ts` — Registered routes
+
+---
+
 ## [2026-02-16] Feature: Orb System — Live API, Animations, Performance
 
 ### What
