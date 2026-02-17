@@ -33,6 +33,7 @@ import {
   VolumeX,
   Paperclip,
   Loader2,
+  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ import { MarkdownContent } from "@/components/ui/markdown-content";
 interface HomeChatProps {
   tenantId: string;
   assistantName?: string;
+  onFileChange?: (filePath: string, operation: string) => void;
 }
 
 interface TimelineItem {
@@ -62,7 +64,11 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
+export function HomeChat({
+  tenantId,
+  assistantName = "IORS",
+  onFileChange,
+}: HomeChatProps) {
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -70,6 +76,7 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
   const [loadingTimeline, setLoadingTimeline] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [toolActivity, setToolActivity] = useState<string | null>(null);
 
   const [isUploading, setIsUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -279,6 +286,12 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
               } else if (data.type === "done" && data.fullText) {
                 // Backup: use server's fullText if tracking missed some deltas
                 fullText = data.fullText;
+              } else if (data.type === "tool_start") {
+                setToolActivity(data.label || data.tool);
+              } else if (data.type === "tool_end") {
+                setToolActivity(null);
+              } else if (data.type === "file_change") {
+                onFileChange?.(data.filePath, data.operation);
               } else if (data.type === "error") {
                 setChatMessages((prev) =>
                   prev.map((msg) =>
@@ -514,6 +527,12 @@ export function HomeChat({ tenantId, assistantName = "IORS" }: HomeChatProps) {
           <span className="font-medium">Chat z {assistantName}</span>
         </div>
         <div className="flex items-center gap-1">
+          {toolActivity && (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-400 mr-1">
+              <Wrench className="w-3 h-3 animate-spin" />
+              <span className="truncate max-w-[120px]">{toolActivity}</span>
+            </div>
+          )}
           <Button
             variant="ghost"
             size="sm"

@@ -3,6 +3,7 @@
 import { CyberpunkScene } from "@/components/3d/CyberpunkScene";
 import { CockpitHUDShell } from "@/components/cockpit/CockpitHUDShell";
 import { ToolExecutionOverlay } from "./ToolExecutionOverlay";
+import { CodeSidebar } from "./CodeSidebar";
 import { FloatingCallButton } from "@/components/voice/FloatingCallButton";
 import { OrbContextMenuOverlay } from "@/components/3d/OrbContextMenu";
 import { WorkspaceLayout } from "@/components/layout/WorkspaceLayout";
@@ -31,6 +32,9 @@ export function CyberpunkDashboard({ tenantId }: CyberpunkDashboardProps) {
     return (
       <div className="fixed inset-0 overflow-hidden bg-[#050510]">
         <WorkspaceLayout tenantId={tenantId} />
+
+        {/* ── z-30: Code sidebar (file browser + code viewer) ── */}
+        <CodeSidebar />
 
         {/* ── z-50: View mode toggle ── */}
         <button
@@ -78,6 +82,9 @@ export function CyberpunkDashboard({ tenantId }: CyberpunkDashboardProps) {
 
       {/* ── z-30: Tool execution indicator ── */}
       <ToolExecutionOverlay />
+
+      {/* ── z-30: Code sidebar (file browser + code viewer) ── */}
+      <CodeSidebar />
 
       {/* ── z-50: View mode toggle ── */}
       <button

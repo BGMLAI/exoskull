@@ -234,19 +234,11 @@ export async function runExoSkullAgent(
   req: AgentRequest,
 ): Promise<AgentResponse> {
   const startMs = Date.now();
-  const isCodingIntent =
-    req.channel === "web_chat" &&
-    /\b(code|kod|napisz|implementuj|napraw|debug|refactor|deploy|git |commit|push|pull request|PR|npm|build|test|function|class|import|export|error|bug|feature)\b/i.test(
-      req.userMessage,
-    );
-
   const config = req.isAsync
     ? ASYNC_CONFIG
     : req.channel === "voice"
       ? VOICE_CONFIG
-      : isCodingIntent
-        ? CODING_CONFIG
-        : WEB_CONFIG;
+      : CODING_CONFIG;
 
   req.onThinkingStep?.("Ładuję kontekst", "running");
 
@@ -322,6 +314,17 @@ export async function runExoSkullAgent(
     parts.push(effectiveSystemPrompt);
     parts.push(dynamicContext);
     if (adaptive.mode !== "neutral") parts.push(adaptive.instruction);
+    // Add coding workspace context for web channels
+    if (req.channel !== "voice") {
+      parts.push(
+        `You have full coding capabilities via VPS tools.\n` +
+          `Admin workspace: /root/projects/exoskull/\n` +
+          `User workspace: /root/projects/users/${req.tenantId}/\n` +
+          `Use code_read_file before editing. Use code_tree to explore. Use code_bash for commands.\n` +
+          `Use code_glob/code_grep to search files. Use code_git for version control.\n` +
+          `Use code_web_search to find documentation. Use code_deploy to push to production.`,
+      );
+    }
     systemPrompt = parts.join("\n\n");
   }
 

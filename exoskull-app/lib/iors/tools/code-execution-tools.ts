@@ -162,7 +162,12 @@ Use code_read_file first to check if the file exists.`,
       try {
         const data = JSON.parse(result);
         if (data.success) {
-          return `Zapisano: ${filePath} (${data.lines} linii, ${data.size} bajtow)`;
+          const sseEvent = JSON.stringify({
+            type: "file_change",
+            filePath,
+            operation: "write",
+          });
+          return `__SSE__${sseEvent}__SSE__Zapisano: ${filePath} (${data.lines} linii, ${data.size} bajtow)`;
         }
         return result;
       } catch {
@@ -216,7 +221,12 @@ Always read the file first with code_read_file to get the exact string to replac
       try {
         const data = JSON.parse(result);
         if (data.success) {
-          return `Edytowano: ${filePath} (${data.replacements} zamian)`;
+          const sseEvent = JSON.stringify({
+            type: "file_change",
+            filePath,
+            operation: "edit",
+          });
+          return `__SSE__${sseEvent}__SSE__Edytowano: ${filePath} (${data.replacements} zamian)`;
         }
         return result;
       } catch {

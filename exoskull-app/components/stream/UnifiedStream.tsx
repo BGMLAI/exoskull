@@ -705,6 +705,12 @@ export function UnifiedStream({
                   break;
                 }
 
+                case "file_change": {
+                  // Notify cockpit store → opens code sidebar + highlights file
+                  useCockpitStore.getState().notifyFileChange(data.filePath);
+                  break;
+                }
+
                 // Workstream B: new inline event types
                 case "code_block": {
                   addEvent({

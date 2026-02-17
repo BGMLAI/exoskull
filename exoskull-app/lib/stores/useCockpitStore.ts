@@ -46,6 +46,10 @@ interface CockpitState {
   } | null;
   /** Dashboard view mode: classic 3D scene or mind map workspace */
   viewMode: ViewMode;
+  /** Code sidebar open state */
+  codeSidebarOpen: boolean;
+  /** Last file changed via SSE (triggers sidebar auto-open + highlight) */
+  lastChangedFile: string | null;
 
   // Actions
   selectWorld: (id: string | null) => void;
@@ -74,6 +78,9 @@ interface CockpitState {
   ) => void;
   setViewMode: (mode: ViewMode) => void;
   toggleViewMode: () => void;
+  toggleCodeSidebar: () => void;
+  /** Called when a file_change SSE event arrives — opens sidebar + highlights file */
+  notifyFileChange: (filePath: string) => void;
 }
 
 const DEFAULT_SECTIONS: CockpitSection[] = [
@@ -114,6 +121,8 @@ export const useCockpitStore = create<CockpitState>((set) => ({
   hudMinimized: false,
   orbContextMenu: null,
   viewMode: "mindmap",
+  codeSidebarOpen: false,
+  lastChangedFile: null,
 
   selectWorld: (id) => set({ selectedWorldId: id }),
 
@@ -211,4 +220,8 @@ export const useCockpitStore = create<CockpitState>((set) => ({
     set((s) => ({
       viewMode: s.viewMode === "classic" ? "mindmap" : "classic",
     })),
+  toggleCodeSidebar: () =>
+    set((s) => ({ codeSidebarOpen: !s.codeSidebarOpen })),
+  notifyFileChange: (filePath) =>
+    set({ codeSidebarOpen: true, lastChangedFile: filePath }),
 }));
