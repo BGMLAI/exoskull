@@ -4,6 +4,34 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-18] P2 Mind Map Persistence: Visual Type, Model, Thumbnail
+
+### DB Migration
+
+- Added `visual_type`, `model_url`, `thumbnail_url`, `source_urls`, `tags` columns to all 5 knowledge tables (exo_values, user_loops, user_quests, user_missions, user_challenges)
+
+### API (PATCH routes)
+
+- All 5 knowledge PATCH endpoints now accept and persist `visualType`, `modelUrl`, `thumbnailUrl`
+- Mapping: camelCase → snake_case (e.g. `visualType` → `visual_type`)
+
+### Read Path (useOrbData)
+
+- API interfaces include visual fields, `toVisualType()` helper validates/defaults to "orb"
+- `transformApiToOrbTree` maps DB visual fields to OrbNode hierarchy at all 5 levels
+
+### Write Path (MindMap3D)
+
+- `handleChangeVisual` now calls `updateNode(nodeId, type, { visualType })` — was a no-op stub
+- `handleModelSelect` now persists model URL + thumbnail + sets `visualType: "model3d"` — was a no-op stub
+- `updateNode` type extended to accept `visualType`, `modelUrl`, `thumbnailUrl`
+
+### Stream Events
+
+- Added `SearchResultsEvent` and `RichContentEvent` components for Gemini/Perplexity-style rich content
+
+---
+
 ## [2026-02-18] P1 Bug Fixes: Mod Slug, CSP, Messenger Gateway
 
 ### P1.1 — Mod Installation Check
