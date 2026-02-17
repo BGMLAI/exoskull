@@ -240,7 +240,7 @@ export async function runExoSkullAgent(
     ? ASYNC_CONFIG
     : req.channel === "voice"
       ? VOICE_CONFIG
-      : CODING_CONFIG;
+      : WEB_CONFIG;
 
   req.onThinkingStep?.("Ładuję kontekst", "running");
 

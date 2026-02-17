@@ -419,7 +419,7 @@ export async function handleInboundMessage(
     }
 
     // 6. Sync path: process with timeout safety net
-    const SYNC_TIMEOUT_MS = 40_000; // 40s — leaves 20s buffer before Vercel's 60s
+    const SYNC_TIMEOUT_MS = 50_000; // 50s — leaves 10s buffer before Vercel's 60s
 
     // ── Agent SDK path (ALL channels) ──
     const result = await Promise.race([

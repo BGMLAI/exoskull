@@ -108,8 +108,8 @@ export function useTTS(): UseTTSReturn {
         };
 
         setIsSpeaking(true);
-        audio.play().catch(() => {
-          // Browser autoplay policy blocked — silently degrade
+        audio.play().catch((err) => {
+          console.warn("[useTTS] Playback blocked:", err?.message || err);
           setIsSpeaking(false);
         });
       } catch (err) {

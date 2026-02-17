@@ -664,9 +664,14 @@ async function handleProactiveMessage(
 ): Promise<ExecutionResult> {
   const payload = intervention.action_payload as {
     message?: string;
-    params?: { message?: string; message_pl?: string };
+    params?: { message?: string; message_pl?: string; checkinType?: string };
   };
-  const message = payload.message || payload.params?.message;
+  // Try multiple payload locations: top-level → params → intervention description
+  const message =
+    payload.message ||
+    payload.params?.message ||
+    payload.params?.message_pl ||
+    intervention.description;
 
   if (!message) {
     return { success: false, message: "Missing message" };
