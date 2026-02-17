@@ -4,6 +4,39 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-18] Audit Final Cleanup: Circular Deps, Dead Code, Dep Hygiene
+
+- **Fixed InboxSidebar ↔ MessageListItem circular dependency** — extracted `UnifiedMessage` to `components/inbox/types.ts`
+- **Removed unused deps**: `@react-three/uikit` (0 imports), `pg` (0 imports) — 15 packages removed
+- **Deleted root `run-migration.js`** (duplicate of `scripts/run-migration.js`)
+- **Verified 4 questionable deps**: `react-force-graph-2d` (3 files), `recharts` (5 files) — both actively used
+- **Circular deps: 0** (was 36), **Dead files: 0** (was 13), **Unused deps: 0** (was 8)
+
+---
+
+## [2026-02-18] Audit P2.5 + P2.6: Rate Limiting & TODO Cleanup
+
+### P2.5 — Rate Limiting Expansion
+
+- Created composable `withRateLimit()` HOF at `lib/api/rate-limit-guard.ts`
+- Chains with `withApiLog()`: `withApiLog(withRateLimit("resource", handler))`
+- Applied to **9 consumer-facing routes** across 4 resource categories:
+  - **ai_requests**: onboarding/chat, birth-chat, emotion/analyze, skills/generate, apps/generate
+  - **voice_minutes**: voice/notes POST, voice/outbound, tts
+  - **coding_sessions**: claude-code/workspace POST
+- Features: fail-open on errors, fire-and-forget usage increment, custom tenant ID extraction
+- Added 9-test suite for the guard (auth, 429, skip increment, fail-open, context forwarding)
+- **134 tests passing** across 15 test files
+
+### P2.6 — TODO/FIXME Audit
+
+- Found **6 genuine TODOs** — all legitimate Phase 4 deferred work
+- Standardized MindMap3D TODOs with "Phase 4" prefix for consistency
+- Locations: MindMap3D.tsx (2), goals/engine.ts (3), swarm/data-collectors.ts (1)
+- No stale or forgotten TODOs found
+
+---
+
 ## [2026-02-18] Audit P2.1 + P2.2 + P2.3 + P2.4: Full Observability & Testing
 
 ### P2.1 — Structured Logging Migration
