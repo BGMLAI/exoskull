@@ -1,34 +1,26 @@
 /**
- * ExoSkull Agent — Claude Agent SDK orchestrator
+ * ExoSkull Agent — Direct Anthropic API orchestrator
  *
- * Replaces the manual Anthropic API loop in conversation-handler.ts
- * with the Agent SDK's `query()` function. The SDK handles:
- * - Multi-turn tool execution (agent loop)
- * - Streaming (token-by-token via SDKPartialAssistantMessage)
- * - Tool call visibility (SDKToolProgressMessage, SDKToolUseSummaryMessage)
- * - Session management
- *
- * IORS tools are injected as an in-process MCP server (zero network overhead).
- * The orchestrator model is always Claude (Haiku for voice, Sonnet for web).
- * IORS tools can internally use cheaper models (Gemini, Codex) for execution.
+ * Uses the Anthropic Messages API directly with a manual tool execution loop.
+ * IORS tools are called in-process (zero network overhead for tool dispatch).
  *
  * Architecture:
- *   User Message → SDK query() → Claude (orchestrator)
- *     ↓ tool calls
- *   IORS MCP Server → 60+ tools → {Gemini, Codex, DB, APIs}
- *     ↓ results
+ *   User Message → Anthropic Messages API → Claude (orchestrator)
+ *     ↓ tool_use blocks
+ *   IORS Tools executed directly → {DB, APIs, VPS, Gemini, etc.}
+ *     ↓ tool_result blocks
  *   Claude → Final Response → SSE stream to UI
+ *
+ * Previously used Claude Agent SDK's query() which spawns a subprocess —
+ * that doesn't work on Vercel serverless. This direct approach does.
  */
 
+import Anthropic from "@anthropic-ai/sdk";
 import {
-  query,
-  type SDKMessage,
-  type Options,
-  type SDKResultSuccess,
-  type SDKResultError,
-} from "@anthropic-ai/claude-agent-sdk";
-
-import { createIorsMcpServerWithDynamic } from "./iors-mcp-server";
+  IORS_EXTENSION_TOOLS,
+  type ToolDefinition,
+} from "@/lib/iors/tools/index";
+import { extractSSEDirective } from "@/lib/iors/tools/dashboard-tools";
 import { buildDynamicContext } from "@/lib/voice/dynamic-context";
 import { STATIC_SYSTEM_PROMPT } from "@/lib/voice/system-prompt";
 import { analyzeEmotion } from "@/lib/emotion";
@@ -110,31 +102,125 @@ const WEB_CONFIG = {
   maxTurns: 10,
   timeoutMs: 55_000,
   model: "claude-sonnet-4-5-20250929" as const,
-  effort: "high" as const,
 };
 
 const VOICE_CONFIG = {
   maxTurns: 6,
   timeoutMs: 40_000,
   model: "claude-haiku-4-5-20251001" as const,
-  effort: "medium" as const,
 };
 
 const ASYNC_CONFIG = {
   maxTurns: 15,
   timeoutMs: 50_000,
   model: "claude-sonnet-4-5-20250929" as const,
-  effort: "high" as const,
 };
+
+/** Max tool result size (50KB) to prevent hitting API limits */
+const MAX_TOOL_RESULT_LENGTH = 50_000;
+
+// ============================================================================
+// TOOL HELPERS
+// ============================================================================
+
+/**
+ * Load IORS tools (static + dynamic) and apply channel filter.
+ */
+async function loadFilteredTools(
+  tenantId: string,
+  toolFilter: Set<string> | null,
+): Promise<ToolDefinition[]> {
+  let allTools = [...IORS_EXTENSION_TOOLS];
+
+  try {
+    const { getDynamicToolsForTenant } =
+      await import("@/lib/iors/tools/dynamic-handler");
+    const dynamicTools = await getDynamicToolsForTenant(tenantId);
+    allTools = [...allTools, ...dynamicTools];
+  } catch (error) {
+    logger.warn("[ExoSkullAgent] Failed to load dynamic tools:", {
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+
+  if (toolFilter) {
+    allTools = allTools.filter((t) => toolFilter.has(t.definition.name));
+  }
+
+  return allTools;
+}
+
+/**
+ * Convert IORS ToolDefinitions to Anthropic API tool format.
+ */
+function toAnthropicTools(tools: ToolDefinition[]): Anthropic.Tool[] {
+  return tools.map((t) => ({
+    name: t.definition.name,
+    description: t.definition.description || t.definition.name,
+    input_schema: t.definition.input_schema as Anthropic.Tool["input_schema"],
+  }));
+}
+
+/**
+ * Execute a single IORS tool by name with timeout and SSE directive handling.
+ */
+async function executeIorsTool(
+  tools: ToolDefinition[],
+  name: string,
+  input: Record<string, unknown>,
+  tenantId: string,
+  onCustomEvent?: AgentRequest["onCustomEvent"],
+): Promise<{ result: string; isError: boolean }> {
+  const toolDef = tools.find((t) => t.definition.name === name);
+  if (!toolDef) {
+    return { result: `Tool not found: ${name}`, isError: true };
+  }
+
+  const timeout = toolDef.timeoutMs ?? 10_000;
+
+  try {
+    let result = await Promise.race([
+      toolDef.execute(input, tenantId),
+      new Promise<string>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Tool ${name} timed out after ${timeout}ms`)),
+          timeout,
+        ),
+      ),
+    ]);
+
+    // Extract embedded SSE directives (e.g. cockpit_update from dashboard tools)
+    if (result.startsWith("__SSE__")) {
+      const { sseEvent, cleanResult } = extractSSEDirective(result);
+      if (sseEvent && onCustomEvent) {
+        onCustomEvent(sseEvent);
+      }
+      result = cleanResult;
+    }
+
+    // Truncate very long results
+    if (result.length > MAX_TOOL_RESULT_LENGTH) {
+      result =
+        result.slice(0, MAX_TOOL_RESULT_LENGTH) +
+        `\n\n[Truncated — ${result.length} chars total]`;
+    }
+
+    return { result, isError: false };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error(`[ExoSkullAgent] Tool ${name} failed:`, { error: msg });
+    return { result: `Błąd: ${msg}`, isError: true };
+  }
+}
 
 // ============================================================================
 // MAIN AGENT FUNCTION
 // ============================================================================
 
 /**
- * Run ExoSkull agent via Claude Agent SDK.
+ * Run ExoSkull agent via direct Anthropic Messages API.
  *
- * Loads context, creates IORS MCP server, runs SDK query,
+ * Loads context, creates tool definitions, runs a multi-turn tool loop,
  * and streams results back to the caller.
  */
 export async function runExoSkullAgent(
@@ -152,14 +238,16 @@ export async function runExoSkullAgent(
   // ── Phase 1: Load everything in parallel ──
   const toolFilter = getToolFilterForChannel(req.channel, req.isAsync);
 
-  const [dynamicCtxResult, emotionState, mcpServer] = await Promise.all([
+  const [dynamicCtxResult, emotionState, filteredTools] = await Promise.all([
     buildDynamicContext(req.tenantId),
     analyzeEmotion(req.userMessage),
-    createIorsMcpServerWithDynamic(req.tenantId, req.onCustomEvent, toolFilter),
+    loadFilteredTools(req.tenantId, toolFilter),
   ]);
 
   const contextMs = Date.now() - startMs;
-  logger.info(`[ExoSkullAgent] Context loaded in ${contextMs}ms`);
+  logger.info(
+    `[ExoSkullAgent] Context loaded in ${contextMs}ms, ${filteredTools.length} tools`,
+  );
   req.onThinkingStep?.("Ładuję kontekst", "done");
 
   // ── Phase 2: Emotion / Crisis detection ──
@@ -220,7 +308,7 @@ export async function runExoSkullAgent(
     systemPrompt = parts.join("\n\n");
   }
 
-  // ── Phase 4: Run Agent SDK query ──
+  // ── Phase 4: Direct Anthropic API tool loop ──
   req.onThinkingStep?.("Generuję odpowiedź", "running");
 
   const abortController = new AbortController();
@@ -228,56 +316,112 @@ export async function runExoSkullAgent(
   const timeoutHandle = setTimeout(() => abortController.abort(), timeout);
 
   const toolsUsed: string[] = [];
-  const toolStartTimes = new Map<string, number>();
   let finalText = "";
-  let costUsd = 0;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
   let numTurns = 0;
 
   try {
-    const sdkQuery = query({
-      prompt: req.userMessage,
-      options: {
-        abortController,
-        agent: "exoskull",
-        agents: {
-          exoskull: {
-            description:
-              "ExoSkull IORS — adaptive life operating system agent with 60+ tools",
-            prompt: systemPrompt,
-            model: req.channel === "voice" ? "haiku" : "sonnet",
-            maxTurns: config.maxTurns,
-          },
-        },
-        mcpServers: { iors: mcpServer },
-        tools: [], // Disable all built-in file tools
-        maxTurns: config.maxTurns,
-        includePartialMessages: !!req.onTextDelta,
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
-        persistSession: false,
-        effort: config.effort,
-        env: {
-          ...process.env,
-          // Ensure Anthropic key is available to subprocess
-          ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-        },
-      } satisfies Options,
-    });
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const anthropicTools = toAnthropicTools(filteredTools);
 
-    // ── Phase 5: Process SDK event stream ──
-    for await (const msg of sdkQuery) {
-      handleSDKMessage(msg, {
-        req,
-        toolsUsed,
-        toolStartTimes,
-        onText: (text) => {
-          finalText = text;
+    // Message history for multi-turn tool loop
+    const messages: Anthropic.MessageParam[] = [
+      { role: "user", content: req.userMessage },
+    ];
+
+    while (numTurns < config.maxTurns) {
+      numTurns++;
+
+      const stream = client.messages.stream(
+        {
+          model: config.model,
+          max_tokens: req.maxTokens || 4096,
+          system: systemPrompt,
+          messages,
+          ...(anthropicTools.length > 0 ? { tools: anthropicTools } : {}),
         },
-        onCost: (cost, turns) => {
-          costUsd = cost;
-          numTurns = turns;
-        },
+        { signal: abortController.signal },
+      );
+
+      // Stream text deltas to SSE callback
+      if (req.onTextDelta) {
+        stream.on("text", (text) => req.onTextDelta!(text));
+      }
+
+      const response = await stream.finalMessage();
+
+      // Track token usage
+      totalInputTokens += response.usage.input_tokens;
+      totalOutputTokens += response.usage.output_tokens;
+
+      // Separate text and tool_use blocks
+      const textParts: string[] = [];
+      const toolUseBlocks: Anthropic.ToolUseBlock[] = [];
+
+      for (const block of response.content) {
+        if (block.type === "text") {
+          textParts.push(block.text);
+        } else if (block.type === "tool_use") {
+          toolUseBlocks.push(block);
+        }
+      }
+
+      // If Claude finished (no tool calls), capture final text and exit
+      if (response.stop_reason !== "tool_use" || toolUseBlocks.length === 0) {
+        finalText = textParts.join("");
+        break;
+      }
+
+      // Claude wants to use tools — add assistant message to history
+      messages.push({
+        role: "assistant",
+        content: response.content as Anthropic.ContentBlockParam[],
       });
+
+      // Execute all requested tools in parallel
+      const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+        toolUseBlocks.map(async (toolUse) => {
+          const toolName = toolUse.name;
+          if (!toolsUsed.includes(toolName)) toolsUsed.push(toolName);
+
+          req.onToolStart?.(toolName);
+          const toolStartMs = Date.now();
+
+          const { result, isError } = await executeIorsTool(
+            filteredTools,
+            toolName,
+            toolUse.input as Record<string, unknown>,
+            req.tenantId,
+            req.onCustomEvent,
+          );
+
+          const durationMs = Date.now() - toolStartMs;
+          logger.info(
+            `[ExoSkullAgent] Tool ${toolName}: ${isError ? "FAIL" : "OK"} (${durationMs}ms)`,
+          );
+          req.onToolEnd?.(toolName, durationMs, {
+            success: !isError,
+            resultSummary: result.slice(0, 200),
+          });
+
+          return {
+            type: "tool_result" as const,
+            tool_use_id: toolUse.id,
+            content: result,
+            ...(isError ? { is_error: true as const } : {}),
+          };
+        }),
+      );
+
+      // Add tool results to message history
+      messages.push({ role: "user", content: toolResults });
+    }
+
+    // Max turns reached without final answer
+    if (!finalText && numTurns >= config.maxTurns) {
+      finalText =
+        "Osiągnięto limit interakcji. Spróbuj ponownie z prostszym pytaniem.";
     }
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
@@ -289,7 +433,7 @@ export async function runExoSkullAgent(
           "Przepraszam, odpowiedź zajęła zbyt długo. Spróbuj ponownie.";
       }
     } else {
-      logger.error("[ExoSkullAgent] SDK query failed:", { error: errMsg });
+      logger.error("[ExoSkullAgent] API call failed:", { error: errMsg });
 
       // ── Emergency Gemini fallback (no tools, just conversation) ──
       const geminiText = await emergencyGeminiFallback(
@@ -310,12 +454,25 @@ export async function runExoSkullAgent(
 
   req.onThinkingStep?.("Generuję odpowiedź", "done");
 
+  // Calculate cost from token usage
+  // Sonnet: $3/MTok input, $15/MTok output
+  // Haiku: $0.80/MTok input, $4/MTok output
+  const isHaiku = config.model.includes("haiku");
+  const inputCostPerMTok = isHaiku ? 0.8 : 3.0;
+  const outputCostPerMTok = isHaiku ? 4.0 : 15.0;
+  const costUsd =
+    (totalInputTokens * inputCostPerMTok +
+      totalOutputTokens * outputCostPerMTok) /
+    1_000_000;
+
   const durationMs = Date.now() - startMs;
   logger.info("[ExoSkullAgent] Done:", {
     tenantId: req.tenantId,
     channel: req.channel,
     toolsUsed,
     numTurns,
+    totalInputTokens,
+    totalOutputTokens,
     costUsd: costUsd.toFixed(4),
     durationMs,
     contextMs,
@@ -333,118 +490,17 @@ export async function runExoSkullAgent(
 }
 
 // ============================================================================
-// SDK MESSAGE HANDLER
-// ============================================================================
-
-interface MessageHandlerContext {
-  req: AgentRequest;
-  toolsUsed: string[];
-  toolStartTimes: Map<string, number>;
-  onText: (text: string) => void;
-  onCost: (cost: number, turns: number) => void;
-}
-
-function handleSDKMessage(msg: SDKMessage, ctx: MessageHandlerContext): void {
-  switch (msg.type) {
-    case "stream_event": {
-      // Token streaming for SSE
-      if (!ctx.req.onTextDelta) break;
-      const event = msg.event;
-      if (
-        event.type === "content_block_delta" &&
-        "delta" in event &&
-        event.delta.type === "text_delta"
-      ) {
-        ctx.req.onTextDelta((event.delta as { text: string }).text);
-      }
-      break;
-    }
-
-    case "assistant": {
-      // Full assistant message — extract text and tool calls
-      for (const block of msg.message.content) {
-        if (block.type === "text") {
-          ctx.onText(block.text);
-        } else if (block.type === "tool_use") {
-          // MCP tools are prefixed: mcp__iors__<name>
-          const toolName = block.name.replace("mcp__iors__", "");
-          if (!ctx.toolsUsed.includes(toolName)) {
-            ctx.toolsUsed.push(toolName);
-          }
-          ctx.toolStartTimes.set(block.id, Date.now());
-          ctx.req.onToolStart?.(toolName);
-        }
-      }
-      break;
-    }
-
-    case "tool_progress": {
-      // Tool is running — fire onToolStart if we haven't already
-      const toolName = msg.tool_name.replace("mcp__iors__", "");
-      if (!ctx.toolStartTimes.has(msg.tool_use_id)) {
-        ctx.toolStartTimes.set(msg.tool_use_id, Date.now());
-        ctx.req.onToolStart?.(toolName);
-      }
-      break;
-    }
-
-    case "tool_use_summary": {
-      // Tool completed — fire onToolEnd
-      for (const toolUseId of msg.preceding_tool_use_ids) {
-        const startTime = ctx.toolStartTimes.get(toolUseId);
-        if (startTime) {
-          const durationMs = Date.now() - startTime;
-          // We don't have the tool name from the summary, extract from summary text
-          const nameMatch = msg.summary.match(/(?:mcp__iors__)?(\w+)/);
-          const name = nameMatch?.[1] || "unknown";
-          ctx.req.onToolEnd?.(name, durationMs, {
-            success: !msg.summary.includes("error"),
-            resultSummary: msg.summary.slice(0, 200),
-          });
-          ctx.toolStartTimes.delete(toolUseId);
-        }
-      }
-      break;
-    }
-
-    case "result": {
-      // Final result
-      if (msg.subtype === "success") {
-        const success = msg as SDKResultSuccess;
-        if (success.result) {
-          ctx.onText(success.result);
-        }
-        ctx.onCost(success.total_cost_usd, success.num_turns);
-      } else {
-        const error = msg as SDKResultError;
-        logger.error("[ExoSkullAgent] SDK error result:", {
-          errors: error.errors,
-          stopReason: error.stop_reason,
-          subtype: error.subtype,
-        });
-        ctx.onCost(error.total_cost_usd, error.num_turns);
-      }
-      break;
-    }
-
-    // Ignore other message types (system, auth_status, etc.)
-    default:
-      break;
-  }
-}
-
-// ============================================================================
 // EMERGENCY GEMINI FALLBACK
 // ============================================================================
 
 /**
- * Last-resort fallback when Claude Agent SDK fails completely.
+ * Last-resort fallback when Anthropic API fails completely.
  * Uses Gemini Flash for a no-tools conversational response.
  */
 async function emergencyGeminiFallback(
   req: AgentRequest,
   systemPrompt: string,
-  emotionState: EmotionState,
+  _emotionState: EmotionState,
 ): Promise<string | null> {
   try {
     const geminiKey = process.env.GOOGLE_AI_API_KEY;
