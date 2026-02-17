@@ -54,7 +54,19 @@ function loadFromStorage(): Record<string, PanelState> {
   if (typeof window === "undefined") return {};
   try {
     const raw = localStorage.getItem("exo-floating-panels");
-    return raw ? JSON.parse(raw) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, PanelState>;
+    // Clamp positions to viewport so panels are never offscreen after a resize
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    for (const id of Object.keys(parsed)) {
+      const p = parsed[id];
+      if (p.x + p.w > vw) p.x = Math.max(0, vw - p.w);
+      if (p.y + p.h > vh) p.y = Math.max(0, vh - p.h);
+      if (p.x < 0) p.x = 0;
+      if (p.y < 0) p.y = 0;
+    }
+    return parsed;
   } catch {
     return {};
   }

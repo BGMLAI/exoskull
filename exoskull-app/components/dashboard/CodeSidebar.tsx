@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { PanelRightClose, PanelRightOpen, Code2 } from "lucide-react";
+import { PanelRightClose, PanelRightOpen, Code2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WorkspaceFileBrowser } from "@/components/claude-code/WorkspaceFileBrowser";
 import { CodePanel } from "@/components/claude-code/CodePanel";
@@ -41,11 +41,11 @@ export function CodeSidebar() {
           "fixed z-[60] top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 px-2 py-3 text-xs font-mono rounded-l-lg",
           "backdrop-blur-sm border-l border-t border-b transition-all duration-200 shadow-lg",
           open
-            ? "right-[480px] text-cyan-300 bg-cyan-950/90 border-cyan-500/70 shadow-cyan-500/20 hover:bg-cyan-900/90"
-            : "right-0 text-cyan-400 bg-black/80 border-cyan-700/60 shadow-cyan-500/10 hover:bg-cyan-950/90 hover:text-cyan-300 hover:border-cyan-500/70",
+            ? "right-[480px] text-primary bg-card/90 border-primary/50 shadow-primary/20 hover:bg-accent"
+            : "right-0 text-primary bg-card/90 border-primary/50 shadow-primary/20 hover:bg-accent hover:text-foreground hover:border-primary/70",
           modifiedFiles.size > 0 &&
             !open &&
-            "border-amber-500/70 text-amber-400 bg-amber-950/80 shadow-amber-500/20",
+            "border-amber-500/70 text-amber-500 bg-amber-900/30 shadow-amber-500/20",
         )}
         title={open ? "Close code panel" : "Open code panel"}
       >
@@ -73,6 +73,19 @@ export function CodeSidebar() {
       >
         {open && (
           <>
+            {/* Header with close button */}
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
+              <span className="text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">
+                Code
+              </span>
+              <button
+                onClick={toggleCodeSidebar}
+                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                title="Zamknij"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
             {/* File browser — top portion */}
             <div className="h-[35%] border-b border-white/10 overflow-hidden">
               <WorkspaceFileBrowser

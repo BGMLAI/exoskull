@@ -87,7 +87,7 @@ export function convertOrbTreeToGraph(
       links.push({
         source: parentId,
         target: node.id,
-        color: `${node.color}40`,
+        color: `${node.color}cc`,
       });
     }
 

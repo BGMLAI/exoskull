@@ -14,8 +14,12 @@
    * .dark fallback kept for system dark mode compatibility
    */
 
+  /* ===== :root — Layout/structural only ===== */
+  :root {
+    --radius: 0.625rem;
+  }
+
   /* ===== Theme A: Dark Ops (default) ===== */
-  :root,
   .dark-ops,
   .dark {
     --background: 0 0% 7%;
@@ -37,7 +41,6 @@
     --border: 240 4% 22%;
     --input: 240 4% 22%;
     --ring: 191 100% 50%;
-    --radius: 0.625rem;
 
     /* Dark Ops specific */
     --sidebar-bg: 0 0% 5%;

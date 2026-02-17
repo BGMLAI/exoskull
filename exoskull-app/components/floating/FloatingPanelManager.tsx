@@ -127,46 +127,97 @@ interface TaskItem {
 }
 
 function TasksContent() {
+  const [newTitle, setNewTitle] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleAdd = async () => {
+    if (!newTitle.trim()) return;
+    setAdding(true);
+    try {
+      const res = await fetch("/api/canvas/data/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: newTitle.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      setNewTitle("");
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      console.error("[TasksContent] Failed to add task:", {
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+    } finally {
+      setAdding(false);
+    }
+  };
+
   return (
-    <DataPanel<TaskItem>
-      endpoint="/api/canvas/data/tasks"
-      emptyMessage="No tasks"
-      renderItem={(task, i) => (
-        <li
-          key={task.id ?? i}
-          className="flex items-start gap-2 px-2 py-1.5 rounded-md hover:bg-accent/50 transition-colors text-sm"
+    <div className="flex flex-col h-full">
+      {/* Add task form */}
+      <div className="p-2 border-b border-border flex gap-2">
+        <input
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+          placeholder="Nowe zadanie..."
+          className="flex-1 px-2 py-1 text-sm bg-background border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          disabled={adding}
+        />
+        <button
+          onClick={handleAdd}
+          disabled={adding || !newTitle.trim()}
+          className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
         >
-          <span
-            className={`mt-0.5 w-3.5 h-3.5 rounded-sm flex-shrink-0 border ${
-              task.done || task.completed
-                ? "bg-primary border-primary"
-                : "border-border"
-            }`}
-          />
-          <div className="flex-1 min-w-0">
-            <p
-              className={`truncate ${
+          {adding ? "..." : "+"}
+        </button>
+      </div>
+
+      {/* Task list — refreshKey in the endpoint forces DataPanel to re-fetch */}
+      <DataPanel<TaskItem>
+        endpoint={`/api/canvas/data/tasks?_r=${refreshKey}`}
+        emptyMessage="Brak zadan"
+        renderItem={(task, i) => (
+          <li
+            key={task.id ?? i}
+            className="flex items-start gap-2 px-2 py-1.5 rounded-md hover:bg-accent/50 transition-colors text-sm"
+          >
+            <span
+              className={`mt-0.5 w-3.5 h-3.5 rounded-sm flex-shrink-0 border ${
                 task.done || task.completed
-                  ? "line-through text-muted-foreground"
-                  : "text-foreground"
+                  ? "bg-primary border-primary"
+                  : "border-border"
               }`}
-            >
-              {task.title ?? task.name ?? "Untitled task"}
-            </p>
-            {task.due_date && (
-              <p className="text-xs text-muted-foreground">
-                {new Date(task.due_date).toLocaleDateString()}
+            />
+            <div className="flex-1 min-w-0">
+              <p
+                className={`truncate ${
+                  task.done || task.completed
+                    ? "line-through text-muted-foreground"
+                    : "text-foreground"
+                }`}
+              >
+                {task.title ?? task.name ?? "Untitled task"}
               </p>
+              {task.due_date && (
+                <p className="text-xs text-muted-foreground">
+                  {new Date(task.due_date).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+            {task.priority && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex-shrink-0">
+                {task.priority}
+              </span>
             )}
-          </div>
-          {task.priority && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex-shrink-0">
-              {task.priority}
-            </span>
-          )}
-        </li>
-      )}
-    />
+          </li>
+        )}
+      />
+    </div>
   );
 }
 

@@ -38,7 +38,7 @@ function evictOldest() {
 
 export function createModelObject(node: MindMapNode): THREE.Object3D {
   const group = new THREE.Group();
-  const scale = Math.sqrt(node.val) * 0.8;
+  const scale = Math.sqrt(node.val) * 2.5;
 
   if (node.modelUrl) {
     // Check cache first

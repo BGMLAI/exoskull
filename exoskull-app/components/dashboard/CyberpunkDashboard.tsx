@@ -10,6 +10,7 @@ import { MindmapLayout } from "@/components/layout/MindmapLayout";
 import { LayoutModeSwitch } from "@/components/layout/LayoutModeSwitch";
 import { useCockpitStore } from "@/lib/stores/useCockpitStore";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
+import { cn } from "@/lib/utils";
 
 interface CyberpunkDashboardProps {
   tenantId: string;
@@ -27,6 +28,7 @@ interface CyberpunkDashboardProps {
  */
 export function CyberpunkDashboard({ tenantId }: CyberpunkDashboardProps) {
   const viewMode = useCockpitStore((s) => s.viewMode);
+  const codeSidebarOpen = useCockpitStore((s) => s.codeSidebarOpen);
 
   if (viewMode === "mindmap") {
     return (
@@ -37,7 +39,12 @@ export function CyberpunkDashboard({ tenantId }: CyberpunkDashboardProps) {
         <CodeSidebar />
 
         {/* ── z-50: Controls bar (top-right) ── */}
-        <div className="fixed z-50 top-4 right-4 flex items-center gap-2">
+        <div
+          className={cn(
+            "fixed z-50 top-4 flex items-center gap-2 transition-all duration-300",
+            codeSidebarOpen ? "right-[496px]" : "right-4",
+          )}
+        >
           <LayoutModeSwitch />
           <ThemeSwitcher />
           <form action="/api/auth/signout" method="post">
@@ -77,7 +84,12 @@ export function CyberpunkDashboard({ tenantId }: CyberpunkDashboardProps) {
       <CodeSidebar />
 
       {/* ── z-50: Controls bar (top-right) ── */}
-      <div className="fixed z-50 top-4 right-4 flex items-center gap-2">
+      <div
+        className={cn(
+          "fixed z-50 top-4 flex items-center gap-2 transition-all duration-300",
+          codeSidebarOpen ? "right-[496px]" : "right-4",
+        )}
+      >
         <LayoutModeSwitch />
         <ThemeSwitcher />
         <form action="/api/auth/signout" method="post">

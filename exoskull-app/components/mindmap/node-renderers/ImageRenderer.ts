@@ -18,7 +18,7 @@ function getTexture(url: string): THREE.Texture {
 
 export function createImageObject(node: MindMapNode): THREE.Object3D {
   const group = new THREE.Group();
-  const scale = Math.sqrt(node.val) * 0.8;
+  const scale = Math.sqrt(node.val) * 2.5;
   const imgUrl = node.imageUrl || node.thumbnailUrl;
 
   if (imgUrl) {

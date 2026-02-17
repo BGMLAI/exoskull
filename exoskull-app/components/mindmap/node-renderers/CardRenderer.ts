@@ -7,7 +7,7 @@ import type { MindMapNode } from "@/lib/mindmap/graph-converter";
 
 export function createCardObject(node: MindMapNode): THREE.Object3D {
   const group = new THREE.Group();
-  const scale = Math.sqrt(node.val) * 0.8;
+  const scale = Math.sqrt(node.val) * 2.5;
 
   // Card canvas
   const canvas = document.createElement("canvas");

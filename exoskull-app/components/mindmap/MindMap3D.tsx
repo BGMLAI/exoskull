@@ -107,14 +107,14 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
     }
   }, []);
 
-  // Handle node click — zoom camera + toggle expand
+  // Handle node click — zoom camera + expand (never collapse)
   const handleNodeClick = useCallback(
     (node: Record<string, unknown>) => {
       const mapNode = node as unknown as MindMapNode;
 
       // Zoom camera to node
       if (fgRef.current) {
-        const distance = 100;
+        const distance = 80;
         const nodePos = node as { x?: number; y?: number; z?: number };
         fgRef.current.cameraPosition(
           {
@@ -127,12 +127,14 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
         );
       }
 
-      // Toggle expand and load children
-      toggleExpanded(mapNode.id);
-      loadChildren(mapNode.id);
+      // If not expanded, expand (load children); if already expanded, just focus
+      if (!expandedNodes.has(mapNode.id)) {
+        expandNode(mapNode.id);
+        loadChildren(mapNode.id);
+      }
       setFocusedNode(mapNode.id);
     },
-    [toggleExpanded, loadChildren, setFocusedNode],
+    [expandedNodes, expandNode, loadChildren, setFocusedNode],
   );
 
   // Handle node hover
@@ -206,7 +208,7 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
       if (source === focusedNodeId || target === focusedNodeId) {
         return "rgba(0, 212, 255, 0.5)";
       }
-      return (link.color as string) || "rgba(100, 130, 180, 0.15)";
+      return (link.color as string) || "rgba(100, 130, 180, 0.5)";
     },
     [focusedNodeId],
   );
@@ -225,8 +227,10 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
         onNodeRightClick={handleNodeRightClick}
         onNodeHover={handleNodeHover}
         linkColor={linkColor}
-        linkWidth={1}
-        linkOpacity={0.3}
+        dagMode="radialout"
+        dagLevelDistance={60}
+        linkWidth={2.5}
+        linkOpacity={0.7}
         linkDirectionalParticles={1}
         linkDirectionalParticleWidth={1.5}
         linkDirectionalParticleSpeed={0.004}

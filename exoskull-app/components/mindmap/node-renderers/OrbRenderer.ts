@@ -22,7 +22,7 @@ export function createOrbObject(node: MindMapNode): THREE.Object3D {
     roughness: 0.4,
   });
   const mesh = new THREE.Mesh(sphereGeo, mat);
-  const scale = Math.sqrt(node.val) * 0.8;
+  const scale = Math.sqrt(node.val) * 2.5;
   mesh.scale.setScalar(scale);
   group.add(mesh);
 
@@ -41,16 +41,16 @@ export function createOrbObject(node: MindMapNode): THREE.Object3D {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
   if (ctx) {
-    canvas.width = 256;
-    canvas.height = 64;
+    canvas.width = 512;
+    canvas.height = 128;
     ctx.fillStyle = "transparent";
-    ctx.fillRect(0, 0, 256, 64);
-    ctx.font = "bold 24px sans-serif";
+    ctx.fillRect(0, 0, 512, 128);
+    ctx.font = "bold 48px sans-serif";
     ctx.textAlign = "center";
     ctx.fillStyle = "#ffffff";
     ctx.shadowColor = node.color;
     ctx.shadowBlur = 8;
-    ctx.fillText(node.name.slice(0, 25), 128, 40);
+    ctx.fillText(node.name.slice(0, 25), 256, 80);
 
     const texture = new THREE.CanvasTexture(canvas);
     const spriteMat = new THREE.SpriteMaterial({
@@ -59,7 +59,7 @@ export function createOrbObject(node: MindMapNode): THREE.Object3D {
       depthWrite: false,
     });
     const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(scale * 4, scale * 1, 1);
+    sprite.scale.set(scale * 5, scale * 1.25, 1);
     sprite.position.y = scale * 1.8;
     group.add(sprite);
   }

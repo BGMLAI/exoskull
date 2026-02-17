@@ -33,6 +33,8 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
       attribute="class"
       defaultTheme="gemini-hybrid"
       themes={["dark-ops", "xo-minimal", "neural", "gemini-hybrid"]}
+      enableSystem={false}
+      storageKey="exo-theme"
       {...props}
     >
       {children}
