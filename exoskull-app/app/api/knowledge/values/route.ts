@@ -168,6 +168,11 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
     if (updates.color !== undefined) dbUpdates.color = updates.color;
     if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
     if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
+    if (updates.visualType !== undefined)
+      dbUpdates.visual_type = updates.visualType;
+    if (updates.modelUrl !== undefined) dbUpdates.model_url = updates.modelUrl;
+    if (updates.thumbnailUrl !== undefined)
+      dbUpdates.thumbnail_url = updates.thumbnailUrl;
 
     const { data, error } = await supabase
       .from("exo_values")

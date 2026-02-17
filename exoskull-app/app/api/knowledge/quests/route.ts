@@ -157,6 +157,11 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
     if (updates.deadline !== undefined) dbUpdates.deadline = updates.deadline;
     if (updates.tags !== undefined) dbUpdates.tags = updates.tags;
     if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.visualType !== undefined)
+      dbUpdates.visual_type = updates.visualType;
+    if (updates.modelUrl !== undefined) dbUpdates.model_url = updates.modelUrl;
+    if (updates.thumbnailUrl !== undefined)
+      dbUpdates.thumbnail_url = updates.thumbnailUrl;
 
     const { data, error } = await supabase
       .from("user_quests")

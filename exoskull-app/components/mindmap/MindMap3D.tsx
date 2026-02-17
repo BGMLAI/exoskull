@@ -43,7 +43,7 @@ interface MindMap3DProps {
 export function MindMap3D({ width, height }: MindMap3DProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fgRef = useRef<any>(null);
-  const { rootNodes, loadChildren } = useOrbData();
+  const { rootNodes, loadChildren, updateNode } = useOrbData();
   const {
     expandedNodes,
     focusedNodeId,
@@ -151,19 +151,35 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
 
   // Handle visual type change
   const handleChangeVisual = useCallback(
-    (_nodeId: string, _visualType: NodeVisualType) => {
-      // TODO Phase 4: persist visual type to API when mindmap backend supports it
+    (nodeId: string, visualType: NodeVisualType) => {
+      const node = graphData.nodes.find(
+        (n) => (n as MindMapNode).id === nodeId,
+      ) as MindMapNode | undefined;
+      if (node) {
+        updateNode(nodeId, node.type, { visualType });
+      }
     },
-    [],
+    [graphData.nodes, updateNode],
   );
 
   // Handle model selection from ModelPicker
   const handleModelSelect = useCallback(
-    (modelUrl: string, _thumbnailUrl?: string) => {
-      // TODO Phase 4: persist model selection to API when mindmap backend supports it
+    (modelUrl: string, thumbnailUrl?: string) => {
+      if (modelPickerNodeId) {
+        const node = graphData.nodes.find(
+          (n) => (n as MindMapNode).id === modelPickerNodeId,
+        ) as MindMapNode | undefined;
+        if (node) {
+          updateNode(modelPickerNodeId, node.type, {
+            visualType: "model3d",
+            modelUrl,
+            ...(thumbnailUrl ? { thumbnailUrl } : {}),
+          });
+        }
+      }
       setModelPickerNodeId(null);
     },
-    [],
+    [modelPickerNodeId, graphData.nodes, updateNode],
   );
 
   // Link color with glow for focused paths

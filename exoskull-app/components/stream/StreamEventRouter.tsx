@@ -30,6 +30,10 @@ import { CodeBlock } from "./events/CodeBlock";
 import { MediaContent } from "./events/MediaContent";
 import { ToolExecution } from "./events/ToolExecution";
 
+// Rich content components (Gemini/Perplexity-style)
+import { SearchResultsEvent } from "./events/SearchResultsEvent";
+import { RichContentEvent } from "./events/RichContentEvent";
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -84,6 +88,10 @@ function EventContent({ event }: { event: StreamEvent }) {
       return <MediaContent event={event} />;
     case "tool_execution":
       return <ToolExecution event={event} />;
+    case "search_results":
+      return <SearchResultsEvent event={event} />;
+    case "rich_content":
+      return <RichContentEvent event={event} />;
     default:
       return null;
   }
@@ -116,6 +124,8 @@ const SELF_BORDERED_TYPES = new Set([
   "user_voice",
   "ai_message",
   "emotion_reading",
+  "search_results",
+  "rich_content",
 ]);
 
 // ---------------------------------------------------------------------------

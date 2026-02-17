@@ -145,6 +145,11 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
       dbUpdates.start_date = updates.startDate;
     if (updates.targetDate !== undefined)
       dbUpdates.target_date = updates.targetDate;
+    if (updates.visualType !== undefined)
+      dbUpdates.visual_type = updates.visualType;
+    if (updates.modelUrl !== undefined) dbUpdates.model_url = updates.modelUrl;
+    if (updates.thumbnailUrl !== undefined)
+      dbUpdates.thumbnail_url = updates.thumbnailUrl;
 
     const { data, error } = await supabase
       .from("user_missions")

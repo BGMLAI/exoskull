@@ -36,6 +36,10 @@ interface ApiChallenge {
   difficulty: number;
   due_date: string | null;
   notes_count: number;
+  visual_type?: string;
+  model_url?: string | null;
+  thumbnail_url?: string | null;
+  tags?: string[];
 }
 
 interface ApiMission {
@@ -46,6 +50,11 @@ interface ApiMission {
   completed_ops: number;
   challenges_count: number;
   challenges: ApiChallenge[];
+  visual_type?: string;
+  model_url?: string | null;
+  thumbnail_url?: string | null;
+  source_urls?: string[];
+  tags?: string[];
 }
 
 interface ApiQuest {
@@ -56,6 +65,11 @@ interface ApiQuest {
   notes_count: number;
   missions_count: number;
   missions: ApiMission[];
+  visual_type?: string;
+  model_url?: string | null;
+  thumbnail_url?: string | null;
+  source_urls?: string[];
+  tags?: string[];
 }
 
 interface ApiLoop {
@@ -67,6 +81,11 @@ interface ApiLoop {
   notes_count: number;
   questCount: number;
   quests?: ApiQuest[];
+  visual_type?: string;
+  model_url?: string | null;
+  thumbnail_url?: string | null;
+  source_urls?: string[];
+  tags?: string[];
 }
 
 interface ApiValue {
@@ -79,6 +98,11 @@ interface ApiValue {
   is_default: boolean;
   notes_count: number;
   loops: ApiLoop[];
+  visual_type?: string;
+  model_url?: string | null;
+  thumbnail_url?: string | null;
+  source_urls?: string[];
+  tags?: string[];
 }
 
 function statusToOrb(s: string): string {
@@ -109,6 +133,11 @@ function difficultyToPriority(d: number): OrbNode["priority"] {
   return "low";
 }
 
+function toVisualType(vt?: string): OrbNode["visualType"] {
+  if (vt === "image" || vt === "model3d" || vt === "card") return vt;
+  return "orb";
+}
+
 function transformApiToOrbTree(values: ApiValue[]): OrbNode[] {
   return values.map((v) => ({
     id: v.id,
@@ -117,12 +146,22 @@ function transformApiToOrbTree(values: ApiValue[]): OrbNode[] {
     type: "value" as OrbNodeType,
     description: v.description,
     priority: priorityToOrb(v.priority || 5),
+    visualType: toVisualType(v.visual_type),
+    modelUrl: v.model_url || undefined,
+    thumbnailUrl: v.thumbnail_url || undefined,
+    sourceUrls: v.source_urls?.length ? v.source_urls : undefined,
+    tags: v.tags?.length ? v.tags : undefined,
     meta: { icon: v.icon, notes_count: v.notes_count },
     children: (v.loops || []).map((l) => ({
       id: l.id,
       label: l.name,
       color: l.color || v.color || "#888888",
       type: "loop" as OrbNodeType,
+      visualType: toVisualType(l.visual_type),
+      modelUrl: l.model_url || undefined,
+      thumbnailUrl: l.thumbnail_url || undefined,
+      sourceUrls: l.source_urls?.length ? l.source_urls : undefined,
+      tags: l.tags?.length ? l.tags : undefined,
       meta: { slug: l.slug, icon: l.icon, notes_count: l.notes_count },
       children: (l.quests || []).map((q) => ({
         id: q.id,
@@ -136,6 +175,11 @@ function transformApiToOrbTree(values: ApiValue[]): OrbNode[] {
                 ((q.ops_count - (q.ops_count || 0)) / q.ops_count) * 100,
               )
             : undefined,
+        visualType: toVisualType(q.visual_type),
+        modelUrl: q.model_url || undefined,
+        thumbnailUrl: q.thumbnail_url || undefined,
+        sourceUrls: q.source_urls?.length ? q.source_urls : undefined,
+        tags: q.tags?.length ? q.tags : undefined,
         meta: { ops_count: q.ops_count, notes_count: q.notes_count },
         children: (q.missions || []).map((m) => ({
           id: m.id,
@@ -147,6 +191,11 @@ function transformApiToOrbTree(values: ApiValue[]): OrbNode[] {
             m.total_ops > 0
               ? Math.round((m.completed_ops / m.total_ops) * 100)
               : undefined,
+          visualType: toVisualType(m.visual_type),
+          modelUrl: m.model_url || undefined,
+          thumbnailUrl: m.thumbnail_url || undefined,
+          sourceUrls: m.source_urls?.length ? m.source_urls : undefined,
+          tags: m.tags?.length ? m.tags : undefined,
           children: (m.challenges || []).map((c) => ({
             id: c.id,
             label: c.title,
@@ -155,6 +204,10 @@ function transformApiToOrbTree(values: ApiValue[]): OrbNode[] {
             status: statusToOrb(c.status),
             dueDate: c.due_date || undefined,
             priority: difficultyToPriority(c.difficulty),
+            visualType: toVisualType(c.visual_type),
+            modelUrl: c.model_url || undefined,
+            thumbnailUrl: c.thumbnail_url || undefined,
+            tags: c.tags?.length ? c.tags : undefined,
             meta: { notes_count: c.notes_count },
             children: [] as OrbNode[],
             childrenLoaded: false, // ops loaded lazily
@@ -614,6 +667,9 @@ export function useOrbData() {
         description: string;
         priority: string;
         status: string;
+        visualType: string;
+        modelUrl: string;
+        thumbnailUrl: string;
       }>,
     ): Promise<boolean> => {
       try {
