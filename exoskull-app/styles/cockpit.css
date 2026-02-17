@@ -909,16 +909,21 @@
 @media (max-width: 640px) {
   .cockpit-channel-orbs {
     top: auto;
-    bottom: 70px;
+    bottom: 60px;
     right: 8px;
     flex-direction: column;
     gap: 4px;
+    z-index: 5;
   }
   .cockpit-reactions {
     display: none;
   }
   .hud-panel-group {
     flex-direction: column;
+    gap: 4px;
+  }
+  .hud-panel-glass .hud-panel-body {
+    max-height: 100px !important;
   }
   .hud-action-bar {
     flex-wrap: wrap;
@@ -929,7 +934,21 @@
   .hud-action-cell--knowledge {
     display: none;
   }
+  .hud-action-cell {
+    padding: 0 8px;
+  }
   .cockpit-zone--chat {
     width: calc(100% - 8px);
+  }
+  .hud-item-label {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    font-size: 9px;
+  }
+  .hud-panel-group > * {
+    min-height: 0;
+    overflow: hidden;
   }
 }

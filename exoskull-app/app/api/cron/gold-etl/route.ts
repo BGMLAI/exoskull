@@ -80,10 +80,10 @@ async function postHandler(req: NextRequest) {
 }
 
 export const GET = withCronGuard(
-  { name: "gold-etl", dependencies: ["silver-etl"] },
+  { name: "gold-etl", dependencies: ["silver-etl"], stalenessBypassHours: 8 },
   postHandler,
 );
 export const POST = withCronGuard(
-  { name: "gold-etl", dependencies: ["silver-etl"] },
+  { name: "gold-etl", dependencies: ["silver-etl"], stalenessBypassHours: 8 },
   postHandler,
 );

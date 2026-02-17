@@ -147,7 +147,7 @@ export default async function LandingPage() {
 
         {/* Hero */}
         <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-7xl font-bold mb-6 leading-tight">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl lg:text-7xl font-bold mb-6 leading-tight">
             Twoj Drugi Mozg.
             <br />
             <span className="text-blue-400">

@@ -244,12 +244,16 @@ export function UnifiedStream({
   useEffect(() => {
     if (historyLoaded) return;
 
+    let cancelled = false;
+
     async function fetchHistory() {
       try {
         const [threadRes, eventsRes] = await Promise.allSettled([
           fetch("/api/unified-thread?limit=30"),
           fetch("/api/stream/events?limit=10"),
         ]);
+
+        if (cancelled) return;
 
         const historyEvents: StreamEvent[] = [];
 
@@ -259,23 +263,11 @@ export function UnifiedStream({
           const messages = data.messages || data || [];
 
           console.log(`[UnifiedStream] Loading ${messages.length} messages`);
-          const voiceMessages = messages.filter(
-            (m: any) => m.channel === "voice",
-          );
-          console.log(
-            `[UnifiedStream] Found ${voiceMessages.length} voice messages:`,
-            voiceMessages.map((m: any) => ({
-              id: m.id,
-              role: m.role,
-              direction: m.direction,
-              content: m.content?.slice(0, 30),
-            })),
-          );
 
           for (const msg of messages) {
             if (!msg.content) continue;
 
-            const evtId = `hist-${msg.id || Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            const evtId = `hist-${msg.id || Date.now()}`;
             const evtTs = new Date(msg.created_at || Date.now());
             const channel: string = msg.channel || "web_chat";
 
@@ -343,6 +335,8 @@ export function UnifiedStream({
           }
         }
 
+        if (cancelled) return;
+
         // Sort chronologically and load
         historyEvents.sort(
           (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
@@ -353,12 +347,19 @@ export function UnifiedStream({
       } catch (err) {
         console.error("[UnifiedStream] History load failed:", err);
       } finally {
-        setHistoryLoaded(true);
+        if (!cancelled) {
+          setHistoryLoaded(true);
+        }
       }
     }
 
     fetchHistory();
-  }, [historyLoaded, loadHistory]);
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Reply handler — sets reply-to context for next message

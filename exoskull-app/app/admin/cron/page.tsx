@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Fragment, useEffect, useState, useCallback } from "react";
 import { Play, ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -124,9 +124,8 @@ export default function AdminCronPage() {
                   : 0;
 
               return (
-                <>
+                <Fragment key={cron.name}>
                   <tr
-                    key={cron.name}
                     className="border-b border-border/50 hover:bg-muted/30 cursor-pointer"
                     onClick={() => toggleExpand(cron.name)}
                   >
@@ -236,7 +235,7 @@ export default function AdminCronPage() {
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
           </tbody>

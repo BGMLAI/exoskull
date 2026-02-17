@@ -19,19 +19,18 @@ type OpStatus = "pending" | "active" | "completed" | "dropped" | "blocked";
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const { searchParams } = new URL(request.url);
-    const tenantId = searchParams.get("tenantId");
     const questId = searchParams.get("questId");
     const loopSlug = searchParams.get("loop");
     const status = searchParams.get("status") as OpStatus | null;
     const overdue = searchParams.get("overdue");
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = parseInt(searchParams.get("offset") || "0");
-
-    if (!tenantId) {
-      return NextResponse.json({ error: "tenantId required" }, { status: 400 });
-    }
 
     let query = supabase
       .from("user_ops")
@@ -80,10 +79,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const body = await request.json();
     const {
-      tenantId,
       title,
       description,
       questId,
@@ -97,11 +99,8 @@ export async function POST(request: NextRequest) {
       recurrenceRule,
     } = body;
 
-    if (!tenantId || !title) {
-      return NextResponse.json(
-        { error: "tenantId and title required" },
-        { status: 400 },
-      );
+    if (!title) {
+      return NextResponse.json({ error: "title required" }, { status: 400 });
     }
 
     const { data, error } = await supabase
@@ -145,15 +144,16 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(request);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
     const supabase = getServiceSupabase();
     const body = await request.json();
-    const { opId, tenantId, ...updates } = body;
+    const { opId, ...updates } = body;
 
-    if (!opId || !tenantId) {
-      return NextResponse.json(
-        { error: "opId and tenantId required" },
-        { status: 400 },
-      );
+    if (!opId) {
+      return NextResponse.json({ error: "opId required" }, { status: 400 });
     }
 
     const dbUpdates: Record<string, unknown> = {

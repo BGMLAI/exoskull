@@ -14,7 +14,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { ModelRouter } from "@/lib/ai/model-router";
 import { getUserHighlights } from "@/lib/memory/highlights";
-import { getTasks } from "@/lib/tasks/task-service";
 import type { Task } from "@/lib/tasks/task-service";
 
 // ============================================================================
@@ -157,29 +156,61 @@ async function getTaskStatsForPeriod(
   until: Date,
 ): Promise<TaskStats> {
   try {
-    // Fetch all tasks via task-service (dual-read: Tyrolka first, legacy fallback)
-    const allTasks = await getTasks(tenantId, undefined, supabase);
-
-    const sinceISO = since.toISOString();
-    const untilISO = until.toISOString();
     const now = new Date();
 
-    // Filter to tasks created in the period
-    const rows = allTasks.filter(
-      (t) =>
-        t.created_at && t.created_at >= sinceISO && t.created_at <= untilISO,
-    );
+    // Query DB directly with date filter (avoids fetching ALL tasks)
+    const { data: rows, error } = await supabase
+      .from("user_ops")
+      .select("status, due_date")
+      .eq("tenant_id", tenantId)
+      .gte("created_at", since.toISOString())
+      .lte("created_at", until.toISOString());
 
+    if (error) {
+      // Fallback to legacy table if user_ops doesn't exist
+      const { data: legacyRows, error: legacyErr } = await supabase
+        .from("exo_tasks")
+        .select("status, due_date")
+        .eq("tenant_id", tenantId)
+        .gte("created_at", since.toISOString())
+        .lte("created_at", until.toISOString());
+
+      if (legacyErr) throw legacyErr;
+      const tasks = legacyRows || [];
+      return {
+        created: tasks.length,
+        completed: tasks.filter((t) => t.status === "done").length,
+        inProgress: tasks.filter(
+          (t) => t.status === "in_progress" || t.status === "pending",
+        ).length,
+        overdue: tasks.filter(
+          (t) =>
+            t.status !== "done" &&
+            t.status !== "cancelled" &&
+            t.due_date &&
+            new Date(t.due_date) < now,
+        ).length,
+      };
+    }
+
+    const tasks = rows || [];
     return {
-      created: rows.length,
-      completed: rows.filter((t) => t.status === "done").length,
-      inProgress: rows.filter(
-        (t) => t.status === "in_progress" || t.status === "pending",
+      created: tasks.length,
+      completed: tasks.filter(
+        (t) => t.status === "done" || t.status === "completed",
       ).length,
-      overdue: rows.filter(
+      inProgress: tasks.filter(
+        (t) =>
+          t.status === "in_progress" ||
+          t.status === "pending" ||
+          t.status === "active",
+      ).length,
+      overdue: tasks.filter(
         (t) =>
           t.status !== "done" &&
+          t.status !== "completed" &&
           t.status !== "cancelled" &&
+          t.status !== "dropped" &&
           t.due_date &&
           new Date(t.due_date) < now,
       ).length,

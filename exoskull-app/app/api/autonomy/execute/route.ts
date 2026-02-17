@@ -254,6 +254,29 @@ async function handleApprove(
   logger.info(`[Autonomy Execute] Approving intervention ${interventionId}`);
 
   const supabase = getServiceSupabase();
+
+  // Verify intervention belongs to tenant and is in proposed status
+  const { data: intervention, error: fetchError } = await supabase
+    .from("exo_interventions")
+    .select("id, status, tenant_id")
+    .eq("id", interventionId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (fetchError) {
+    throw new Error(`Failed to fetch intervention: ${fetchError.message}`);
+  }
+
+  if (!intervention) {
+    throw new Error("Intervention not found or does not belong to this user");
+  }
+
+  if (intervention.status !== "proposed") {
+    throw new Error(
+      `Cannot approve intervention in status '${intervention.status}' (must be 'proposed')`,
+    );
+  }
+
   const { data, error } = await supabase.rpc("approve_intervention", {
     p_intervention_id: interventionId,
     p_approved_by: "user",
@@ -263,8 +286,14 @@ async function handleApprove(
     throw new Error(error.message);
   }
 
+  if (data !== true) {
+    throw new Error(
+      "Approval failed — intervention may have been modified concurrently",
+    );
+  }
+
   return {
-    success: data === true,
+    success: true,
     interventionId,
     status: "approved",
   };

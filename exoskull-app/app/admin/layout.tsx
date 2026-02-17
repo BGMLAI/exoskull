@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { verifyAdmin } from "@/lib/admin/auth";
 import { AdminSidebarClient } from "@/components/admin/admin-sidebar-client";
+import { MobileAdminNav } from "@/components/admin/mobile-admin-nav";
 
 const ADMIN_NAV = [
   { href: "/admin", label: "Command Center", icon: LayoutDashboard },
@@ -42,8 +43,17 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Sidebar */}
-      <aside className="w-60 bg-sidebar-bg text-sidebar-text flex flex-col border-r border-sidebar-border">
+      {/* Mobile hamburger menu */}
+      <MobileAdminNav
+        items={ADMIN_NAV.map((n) => ({
+          href: n.href,
+          label: n.label,
+          iconName: n.icon.displayName || n.label,
+        }))}
+      />
+
+      {/* Sidebar — hidden on mobile */}
+      <aside className="hidden md:flex w-60 bg-sidebar-bg text-sidebar-text flex-col border-r border-sidebar-border">
         {/* Logo */}
         <div className="p-4 border-b border-sidebar-border">
           <Link href="/admin" className="flex items-center gap-2.5">
@@ -85,7 +95,9 @@ export default async function AdminLayout({
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 min-h-screen overflow-auto">{children}</main>
+      <main className="flex-1 min-h-screen overflow-auto pt-14 md:pt-0">
+        {children}
+      </main>
     </div>
   );
 }

@@ -37,6 +37,8 @@ interface CronGuardOptions {
   };
   /** Max execution time in ms (default: 55000) */
   timeoutMs?: number;
+  /** Hours without success before bypassing dependencies (default: 24) */
+  stalenessBypassHours?: number;
 }
 
 /**
@@ -57,6 +59,7 @@ export function withCronGuard(
     dependencies = [],
     circuitBreaker = {},
     timeoutMs = 55_000,
+    stalenessBypassHours = 24,
   } = options;
 
   const failureThreshold = circuitBreaker.failureThreshold ?? 3;
@@ -124,9 +127,9 @@ export function withCronGuard(
           ? (Date.now() - lastSuccess.getTime()) / (1000 * 60 * 60)
           : Infinity;
 
-        if (hoursSinceSuccess > 24) {
+        if (hoursSinceSuccess > stalenessBypassHours) {
           logger.warn(
-            `[CronGuard:${name}] Dependencies not met but CRON stale (${Math.round(hoursSinceSuccess)}h since last success) — bypassing`,
+            `[CronGuard:${name}] Dependencies not met but CRON stale (${Math.round(hoursSinceSuccess)}h since last success, bypass threshold: ${stalenessBypassHours}h) — bypassing`,
           );
         } else {
           const reasons = unsatisfied.map(

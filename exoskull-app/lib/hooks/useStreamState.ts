@@ -192,8 +192,11 @@ function streamReducer(state: StreamState, action: StreamAction): StreamState {
     case "SET_ERROR":
       return { ...state, error: action.error };
 
-    case "LOAD_HISTORY":
-      return { ...state, events: [...action.events, ...state.events] };
+    case "LOAD_HISTORY": {
+      const existingIds = new Set(state.events.map((e) => e.id));
+      const newEvents = action.events.filter((e) => !existingIds.has(e.id));
+      return { ...state, events: [...newEvents, ...state.events] };
+    }
 
     case "UPDATE_TOOL_EXECUTION":
       return {

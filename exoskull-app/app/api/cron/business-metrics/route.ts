@@ -42,10 +42,18 @@ async function handler(req: NextRequest) {
 }
 
 export const GET = withCronGuard(
-  { name: "business-metrics", dependencies: ["gold-etl"] },
+  {
+    name: "business-metrics",
+    dependencies: ["gold-etl"],
+    stalenessBypassHours: 8,
+  },
   handler,
 );
 export const POST = withCronGuard(
-  { name: "business-metrics", dependencies: ["gold-etl"] },
+  {
+    name: "business-metrics",
+    dependencies: ["gold-etl"],
+    stalenessBypassHours: 8,
+  },
   handler,
 );
