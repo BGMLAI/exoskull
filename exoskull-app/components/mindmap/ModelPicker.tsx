@@ -114,6 +114,16 @@ export function ModelPicker({ isOpen, onClose, onSelect }: ModelPickerProps) {
       const file = e.target.files?.[0];
       if (!file) return;
 
+      // Client-side size check — Vercel serverless limit is ~4.5MB
+      const MAX_UPLOAD_MB = 4;
+      if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+        setUploadError(
+          `Plik za duzy (${(file.size / 1024 / 1024).toFixed(1)}MB). Max: ${MAX_UPLOAD_MB}MB. Uzyj zakladki URL.`,
+        );
+        e.target.value = "";
+        return;
+      }
+
       setUploading(true);
       setUploadError(null);
       const formData = new FormData();
@@ -124,12 +134,22 @@ export function ModelPicker({ isOpen, onClose, onSelect }: ModelPickerProps) {
           method: "POST",
           body: formData,
         });
-        const data = await res.json();
+        // Safe JSON parse — Vercel may return plain text errors (e.g. 413)
+        const contentType = res.headers.get("content-type") || "";
+        let data: Record<string, unknown>;
+        if (contentType.includes("application/json")) {
+          data = await res.json();
+        } else {
+          const text = await res.text();
+          data = { error: text || `Upload failed (${res.status})` };
+        }
         if (res.ok && data.url) {
-          onSelect(data.url);
+          onSelect(data.url as string);
           onClose();
         } else {
-          setUploadError(data.error || "Upload failed — no URL returned");
+          setUploadError(
+            (data.error as string) || "Upload failed — no URL returned",
+          );
         }
       } catch (err) {
         console.error("[ModelPicker] Upload failed:", err);
@@ -269,7 +289,9 @@ export function ModelPicker({ isOpen, onClose, onSelect }: ModelPickerProps) {
                   )}
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {uploading ? "Wgrywanie..." : "Wgraj plik glTF, GLB lub FBX"}
+                  {uploading
+                    ? "Wgrywanie..."
+                    : "Wgraj plik glTF, GLB lub FBX (max 4MB)"}
                 </span>
                 <input
                   type="file"

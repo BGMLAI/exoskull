@@ -21,6 +21,12 @@
     },
     "app/api/gateway/**/*.ts": {
       "maxDuration": 60
+    },
+    "app/api/knowledge/upload/**/*.ts": {
+      "maxDuration": 60
+    },
+    "app/api/models/**/*.ts": {
+      "maxDuration": 30
     }
   },
   "crons": [
