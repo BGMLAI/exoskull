@@ -38,7 +38,7 @@ export function CodeSidebar() {
       <button
         onClick={toggleCodeSidebar}
         className={cn(
-          "fixed z-40 top-14 right-4 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-mono rounded",
+          "fixed z-50 top-4 right-44 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-mono rounded",
           "bg-black/50 backdrop-blur-sm border transition-all duration-200",
           open
             ? "text-cyan-400 border-cyan-600/50 hover:bg-cyan-900/30"
