@@ -39,6 +39,20 @@ export function CyberpunkDashboard({ tenantId }: CyberpunkDashboardProps) {
       <div className="fixed z-50 bottom-5 right-5">
         <FloatingCallButton tenantId={tenantId} />
       </div>
+
+      {/* ── z-50: Sign out button (top-right corner) ── */}
+      <form
+        action="/api/auth/signout"
+        method="post"
+        className="fixed z-50 top-4 right-4"
+      >
+        <button
+          type="submit"
+          className="px-3 py-1.5 text-xs font-mono text-slate-500 hover:text-white bg-black/40 hover:bg-red-900/40 border border-slate-800 hover:border-red-700/50 rounded backdrop-blur-sm transition-all duration-200"
+        >
+          ⏻ Wyloguj
+        </button>
+      </form>
     </div>
   );
 }
