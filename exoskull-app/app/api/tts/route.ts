@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { withRateLimit } from "@/lib/api/rate-limit-guard";
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
@@ -156,92 +157,103 @@ async function openaiTTS(text: string): Promise<Buffer | null> {
   }
 }
 
-export const POST = withApiLog(async function POST(req: NextRequest) {
-  try {
-    const auth = await verifyTenantAuth(req);
-    if (!auth.ok) return auth.response;
+export const POST = withApiLog(
+  withRateLimit("voice_minutes", async function POST(req: NextRequest) {
+    try {
+      const auth = await verifyTenantAuth(req);
+      if (!auth.ok) return auth.response;
 
-    const body = await req.json();
-    const { text, provider } = body;
+      const body = await req.json();
+      const { text, provider } = body;
 
-    if (!text || typeof text !== "string") {
-      return NextResponse.json({ error: "text is required" }, { status: 400 });
-    }
+      if (!text || typeof text !== "string") {
+        return NextResponse.json(
+          { error: "text is required" },
+          { status: 400 },
+        );
+      }
 
-    const clean = stripMarkdown(text);
-    if (!clean) {
-      return NextResponse.json({ error: "No speakable text" }, { status: 400 });
-    }
+      const clean = stripMarkdown(text);
+      if (!clean) {
+        return NextResponse.json(
+          { error: "No speakable text" },
+          { status: 400 },
+        );
+      }
 
-    const truncated = clean.slice(0, MAX_CHARS);
+      const truncated = clean.slice(0, MAX_CHARS);
 
-    // If specific provider requested, try only that one
-    if (provider === "gemini") {
-      const audio = await geminiTTS(truncated);
-      if (audio) {
-        return new NextResponse(new Uint8Array(audio), {
+      // If specific provider requested, try only that one
+      if (provider === "gemini") {
+        const audio = await geminiTTS(truncated);
+        if (audio) {
+          return new NextResponse(new Uint8Array(audio), {
+            status: 200,
+            headers: {
+              "Content-Type": "audio/wav",
+              "Content-Length": String(audio.length),
+              "Cache-Control": "no-cache",
+            },
+          });
+        }
+        return NextResponse.json(
+          { error: "Gemini TTS failed" },
+          { status: 500 },
+        );
+      }
+
+      // Default: 3-tier fallback chain
+      // Tier 1: ElevenLabs (best quality for Polish)
+      const elAudio = await elevenLabsTTS(truncated);
+      if (elAudio) {
+        return new NextResponse(new Uint8Array(elAudio), {
           status: 200,
           headers: {
-            "Content-Type": "audio/wav",
-            "Content-Length": String(audio.length),
+            "Content-Type": "audio/mpeg",
+            "Content-Length": String(elAudio.length),
             "Cache-Control": "no-cache",
           },
         });
       }
-      return NextResponse.json({ error: "Gemini TTS failed" }, { status: 500 });
-    }
 
-    // Default: 3-tier fallback chain
-    // Tier 1: ElevenLabs (best quality for Polish)
-    const elAudio = await elevenLabsTTS(truncated);
-    if (elAudio) {
-      return new NextResponse(new Uint8Array(elAudio), {
-        status: 200,
-        headers: {
-          "Content-Type": "audio/mpeg",
-          "Content-Length": String(elAudio.length),
-          "Cache-Control": "no-cache",
-        },
+      // Tier 2: OpenAI TTS
+      const oaiAudio = await openaiTTS(truncated);
+      if (oaiAudio) {
+        return new NextResponse(new Uint8Array(oaiAudio), {
+          status: 200,
+          headers: {
+            "Content-Type": "audio/mpeg",
+            "Content-Length": String(oaiAudio.length),
+            "Cache-Control": "no-cache",
+          },
+        });
+      }
+
+      // Tier 3: Gemini TTS (last resort)
+      const geminiAudio = await geminiTTS(truncated);
+      if (geminiAudio) {
+        return new NextResponse(new Uint8Array(geminiAudio), {
+          status: 200,
+          headers: {
+            "Content-Type": "audio/wav",
+            "Content-Length": String(geminiAudio.length),
+            "Cache-Control": "no-cache",
+          },
+        });
+      }
+
+      return NextResponse.json(
+        { error: "All TTS providers failed" },
+        { status: 500 },
+      );
+    } catch (error) {
+      logger.error("[TTS] Error:", {
+        error: error instanceof Error ? error.message : error,
       });
+      return NextResponse.json(
+        { error: "TTS generation failed" },
+        { status: 500 },
+      );
     }
-
-    // Tier 2: OpenAI TTS
-    const oaiAudio = await openaiTTS(truncated);
-    if (oaiAudio) {
-      return new NextResponse(new Uint8Array(oaiAudio), {
-        status: 200,
-        headers: {
-          "Content-Type": "audio/mpeg",
-          "Content-Length": String(oaiAudio.length),
-          "Cache-Control": "no-cache",
-        },
-      });
-    }
-
-    // Tier 3: Gemini TTS (last resort)
-    const geminiAudio = await geminiTTS(truncated);
-    if (geminiAudio) {
-      return new NextResponse(new Uint8Array(geminiAudio), {
-        status: 200,
-        headers: {
-          "Content-Type": "audio/wav",
-          "Content-Length": String(geminiAudio.length),
-          "Cache-Control": "no-cache",
-        },
-      });
-    }
-
-    return NextResponse.json(
-      { error: "All TTS providers failed" },
-      { status: 500 },
-    );
-  } catch (error) {
-    logger.error("[TTS] Error:", {
-      error: error instanceof Error ? error.message : error,
-    });
-    return NextResponse.json(
-      { error: "TTS generation failed" },
-      { status: 500 },
-    );
-  }
-});
+  }),
+);

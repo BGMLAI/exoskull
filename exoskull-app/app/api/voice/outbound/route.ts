@@ -20,6 +20,7 @@ import { callUser } from "@/lib/communication/outbound-caller";
 import type { OutboundCallRequest } from "@/lib/communication/outbound-caller";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { withRateLimit } from "@/lib/api/rate-limit-guard";
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
@@ -32,51 +33,53 @@ const VALID_REASONS: OutboundCallRequest["reason"][] = [
   "custom",
 ];
 
-export const POST = withApiLog(async function POST(req: NextRequest) {
-  try {
-    const auth = await verifyTenantAuth(req);
-    if (!auth.ok) return auth.response;
-    const tenantId = auth.tenantId;
+export const POST = withApiLog(
+  withRateLimit("voice_minutes", async function POST(req: NextRequest) {
+    try {
+      const auth = await verifyTenantAuth(req);
+      if (!auth.ok) return auth.response;
+      const tenantId = auth.tenantId;
 
-    const body = await req.json();
-    const { reason, message, priority, phoneNumber } = body;
+      const body = await req.json();
+      const { reason, message, priority, phoneNumber } = body;
 
-    // Validate reason
-    if (!reason || !VALID_REASONS.includes(reason)) {
+      // Validate reason
+      if (!reason || !VALID_REASONS.includes(reason)) {
+        return NextResponse.json(
+          {
+            error: `Invalid reason. Must be one of: ${VALID_REASONS.join(", ")}`,
+          },
+          { status: 400 },
+        );
+      }
+
+      // Validate message
+      if (!message || typeof message !== "string") {
+        return NextResponse.json(
+          { error: "Message is required" },
+          { status: 400 },
+        );
+      }
+
+      const result = await callUser({
+        tenantId: tenantId,
+        reason,
+        message,
+        priority: priority || "normal",
+        phoneNumber,
+      });
+
+      return NextResponse.json(result, {
+        status: result.success ? 200 : 422,
+      });
+    } catch (error) {
+      logger.error("[OutboundCallAPI] Error:", {
+        error: error instanceof Error ? error.message : error,
+      });
       return NextResponse.json(
-        {
-          error: `Invalid reason. Must be one of: ${VALID_REASONS.join(", ")}`,
-        },
-        { status: 400 },
+        { error: "Internal server error" },
+        { status: 500 },
       );
     }
-
-    // Validate message
-    if (!message || typeof message !== "string") {
-      return NextResponse.json(
-        { error: "Message is required" },
-        { status: 400 },
-      );
-    }
-
-    const result = await callUser({
-      tenantId: tenantId,
-      reason,
-      message,
-      priority: priority || "normal",
-      phoneNumber,
-    });
-
-    return NextResponse.json(result, {
-      status: result.success ? 200 : 422,
-    });
-  } catch (error) {
-    logger.error("[OutboundCallAPI] Error:", {
-      error: error instanceof Error ? error.message : error,
-    });
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
-  }
-});
+  }),
+);

@@ -10,6 +10,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@supabase/supabase-js";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { withRateLimit } from "@/lib/api/rate-limit-guard";
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
@@ -73,30 +74,32 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
 });
 
 // POST /api/claude-code/workspace — Initialize workspace
-export const POST = withApiLog(async function POST(request: NextRequest) {
-  try {
-    const auth = await verifyTenantAuth(request);
-    if (!auth.ok) return auth.response;
-    const tenantId = auth.tenantId;
-    const isAdmin = await isAdminUser(tenantId);
+export const POST = withApiLog(
+  withRateLimit("coding_sessions", async function POST(request: NextRequest) {
+    try {
+      const auth = await verifyTenantAuth(request);
+      if (!auth.ok) return auth.response;
+      const tenantId = auth.tenantId;
+      const isAdmin = await isAdminUser(tenantId);
 
-    const res = await fetch(
-      `${VPS_EXECUTOR_URL}/api/agent/code/workspace/init`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${VPS_EXECUTOR_SECRET}`,
+      const res = await fetch(
+        `${VPS_EXECUTOR_URL}/api/agent/code/workspace/init`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${VPS_EXECUTOR_SECRET}`,
+          },
+          body: JSON.stringify({ tenantId, isAdmin }),
         },
-        body: JSON.stringify({ tenantId, isAdmin }),
-      },
-    );
+      );
 
-    const data = await res.json();
-    return NextResponse.json(data);
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logger.error("[ClaudeCode] Workspace POST error:", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
-});
+      const data = await res.json();
+      return NextResponse.json(data);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error("[ClaudeCode] Workspace POST error:", msg);
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
+  }),
+);

@@ -152,8 +152,7 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
   // Handle visual type change
   const handleChangeVisual = useCallback(
     (_nodeId: string, _visualType: NodeVisualType) => {
-      // TODO: persist to API when backend supports it
-      // For now this is visual-only in the context menu
+      // TODO Phase 4: persist visual type to API when mindmap backend supports it
     },
     [],
   );
@@ -161,7 +160,7 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
   // Handle model selection from ModelPicker
   const handleModelSelect = useCallback(
     (modelUrl: string, _thumbnailUrl?: string) => {
-      // TODO: persist to API when backend supports it
+      // TODO Phase 4: persist model selection to API when mindmap backend supports it
       setModelPickerNodeId(null);
     },
     [],
