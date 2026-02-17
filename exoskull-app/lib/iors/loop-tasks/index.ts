@@ -4,13 +4,6 @@
  * Maps sub_loop names to their handler functions.
  */
 
-export { handleEmergency } from "./emergency";
-export { handleOutbound } from "./outbound";
-export { handleProactive } from "./proactive";
-export { handleObservation } from "./observation";
-export { handleOptimization } from "./optimization";
-export { handleMaintenance } from "./maintenance";
-
 import type { SubLoop, SubLoopHandler } from "@/lib/iors/loop-types";
 import type { PetlaWorkItem, SubLoopResult } from "@/lib/iors/loop-types";
 

@@ -36,29 +36,11 @@
  * ```
  */
 
-import { ModelRouter, getModelRouter } from "./model-router";
-import {
-  AIMessage,
-  AIRequestOptions,
-  AIResponse,
-  ModelId,
-  ModelTier,
-  TaskCategory,
-} from "./types";
+import { getModelRouter } from "./model-router";
+import { AIMessage, AIRequestOptions, AIResponse } from "./types";
 
 // Re-export types
 export * from "./types";
-export { MODEL_CONFIGS, TIER_MODELS, calculateCost } from "./config";
-export { classifyTask, estimateTokenCount } from "./task-classifier";
-export { getCircuitBreaker } from "./circuit-breaker";
-export { getModelRouter } from "./model-router";
-
-/**
- * Get the AI router instance
- */
-export function getAIRouter(): ModelRouter {
-  return getModelRouter();
-}
 
 /**
  * Convenience function for simple chat requests
@@ -86,7 +68,7 @@ export async function aiChat(
  * @param options - Optional routing hints
  * @returns Response content as string
  */
-export async function aiComplete(
+async function aiComplete(
   prompt: string,
   systemPrompt?: string,
   options?: Partial<Omit<AIRequestOptions, "messages">>,
@@ -104,10 +86,6 @@ export async function aiComplete(
 }
 
 /**
- * Tier-specific convenience functions
- */
-
-/**
  * Quick, cheap completion (Tier 1 - Gemini 3 Flash)
  * Best for: Classification, extraction, simple responses
  */
@@ -116,37 +94,4 @@ export async function aiQuick(
   systemPrompt?: string,
 ): Promise<string> {
   return aiComplete(prompt, systemPrompt, { forceTier: 1 });
-}
-
-/**
- * Balanced completion (Tier 2 - Gemini 3 Pro)
- * Best for: Summarization, analysis, pattern detection
- */
-export async function aiBalanced(
-  prompt: string,
-  systemPrompt?: string,
-): Promise<string> {
-  return aiComplete(prompt, systemPrompt, { forceTier: 2 });
-}
-
-/**
- * Deep reasoning (Tier 3 - Codex 5.2 / Sonnet 4.5)
- * Best for: Code generation, complex reasoning, multi-step tasks
- */
-export async function aiDeep(
-  prompt: string,
-  systemPrompt?: string,
-): Promise<string> {
-  return aiComplete(prompt, systemPrompt, { forceTier: 3 });
-}
-
-/**
- * Critical/strategic (Tier 4 - Claude Opus 4.6)
- * Best for: Crisis situations, meta-coordination, strategic decisions
- */
-export async function aiCritical(
-  prompt: string,
-  systemPrompt?: string,
-): Promise<string> {
-  return aiComplete(prompt, systemPrompt, { forceTier: 4 });
 }

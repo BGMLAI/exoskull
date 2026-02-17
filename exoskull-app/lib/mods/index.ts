@@ -2,10 +2,8 @@
 // MODS - User-facing Abilities & Extensions
 // =====================================================
 
-export * from "./types";
-
 // Mod definitions with capabilities and requirements
-export const MOD_DEFINITIONS = {
+const MOD_DEFINITIONS = {
   "sleep-tracker": {
     slug: "sleep-tracker" as const,
     name: "Sleep Tracker",
@@ -302,38 +300,9 @@ export const MOD_DEFINITIONS = {
   },
 } as const;
 
-export type ModSlugKey = keyof typeof MOD_DEFINITIONS;
+type ModSlugKey = keyof typeof MOD_DEFINITIONS;
 
 // Get mod definition by slug
 export function getModDefinition(slug: string) {
   return MOD_DEFINITIONS[slug as ModSlugKey];
-}
-
-// Get all mod slugs
-export function getAllModSlugs(): string[] {
-  return Object.keys(MOD_DEFINITIONS);
-}
-
-// Check if user has required rigs for a mod
-export function checkModRequirements(
-  modSlug: string,
-  connectedRigs: string[],
-): { satisfied: boolean; missing: string[] } {
-  const mod = MOD_DEFINITIONS[modSlug as ModSlugKey];
-  if (!mod) {
-    return { satisfied: false, missing: [] };
-  }
-
-  const requiredRigs = mod.requires_rigs;
-  if (requiredRigs.length === 0) {
-    return { satisfied: true, missing: [] };
-  }
-
-  // At least one required rig must be connected
-  const hasAtLeastOne = requiredRigs.some((r) => connectedRigs.includes(r));
-
-  return {
-    satisfied: hasAtLeastOne,
-    missing: hasAtLeastOne ? [] : [...requiredRigs],
-  };
 }

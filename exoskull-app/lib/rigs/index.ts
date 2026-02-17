@@ -465,14 +465,9 @@ export const RIG_DEFINITIONS = {
   },
 } as const;
 
-export type RigSlugKey = keyof typeof RIG_DEFINITIONS;
+type RigSlugKey = keyof typeof RIG_DEFINITIONS;
 
 // Get rig definition by slug
 export function getRigDefinition(slug: string) {
   return RIG_DEFINITIONS[slug as RigSlugKey];
-}
-
-// Get all rig slugs
-export function getAllRigSlugs(): string[] {
-  return Object.keys(RIG_DEFINITIONS);
 }

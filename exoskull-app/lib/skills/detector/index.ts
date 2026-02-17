@@ -19,12 +19,6 @@ import type {
   SkillSuggestion,
 } from "./types";
 
-export type {
-  DetectionContext,
-  DetectionResult,
-  SkillSuggestion,
-} from "./types";
-
 // =====================================================
 // MAIN DETECTION
 // =====================================================

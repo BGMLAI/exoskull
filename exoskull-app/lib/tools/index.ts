@@ -22,7 +22,7 @@ export * from "./types";
 // TOOL REGISTRY
 // =====================================================
 
-export const TOOL_REGISTRY: Record<string, ToolRegistration> = {
+const TOOL_REGISTRY: Record<string, ToolRegistration> = {
   task: {
     definition: taskTool,
     handler: taskHandler,
@@ -51,31 +51,6 @@ export const TOOL_REGISTRY: Record<string, ToolRegistration> = {
  */
 export function getAllToolDefinitions(): ExoTool[] {
   return Object.values(TOOL_REGISTRY).map((r) => r.definition);
-}
-
-/**
- * Get tool definitions by category
- */
-export function getToolsByCategory(
-  category: ToolRegistration["category"],
-): ExoTool[] {
-  return Object.values(TOOL_REGISTRY)
-    .filter((r) => r.category === category)
-    .map((r) => r.definition);
-}
-
-/**
- * Get a specific tool definition
- */
-export function getToolDefinition(name: string): ExoTool | undefined {
-  return TOOL_REGISTRY[name]?.definition;
-}
-
-/**
- * Check if a tool requires specific rigs
- */
-export function getToolRequirements(name: string): string[] | undefined {
-  return TOOL_REGISTRY[name]?.requires_rig;
 }
 
 /**
@@ -122,23 +97,6 @@ export async function executeTool(
       error: error instanceof Error ? error.message : "Tool execution failed",
     };
   }
-}
-
-/**
- * Execute multiple tools in parallel
- */
-export async function executeToolsBatch(
-  context: ToolContext,
-  calls: { name: string; params: Record<string, unknown> }[],
-): Promise<{ name: string; result: ToolResult }[]> {
-  const results = await Promise.all(
-    calls.map(async (call) => ({
-      name: call.name,
-      result: await executeTool(call.name, context, call.params),
-    })),
-  );
-
-  return results;
 }
 
 /**

@@ -18,14 +18,4 @@
  *   });
  */
 
-export {
-  runExoSkullAgent,
-  type AgentRequest,
-  type AgentResponse,
-  type AgentChannel,
-} from "./exoskull-agent";
-
-export {
-  createIorsMcpServer,
-  createIorsMcpServerWithDynamic,
-} from "./iors-mcp-server";
+export { runExoSkullAgent, type AgentChannel } from "./exoskull-agent";

@@ -19,40 +19,40 @@ import {
   hasDynamicSkill,
 } from "@/lib/skills/registry/dynamic-registry";
 
-// Factory functions for executors
-export function createMoodTrackerExecutor(): IModExecutor {
+// Factory functions for executors (used internally)
+function createMoodTrackerExecutor(): IModExecutor {
   return new MoodTrackerExecutor();
 }
 
-export function createHabitTrackerExecutor(): IModExecutor {
+function createHabitTrackerExecutor(): IModExecutor {
   return new HabitTrackerExecutor();
 }
 
-export function createSleepTrackerExecutor(): IModExecutor {
+function createSleepTrackerExecutor(): IModExecutor {
   return new SleepTrackerExecutor();
 }
 
-export function createActivityTrackerExecutor(): IModExecutor {
+function createActivityTrackerExecutor(): IModExecutor {
   return new ActivityTrackerExecutor();
 }
 
-export function createExerciseLoggerExecutor(): IModExecutor {
+function createExerciseLoggerExecutor(): IModExecutor {
   return new ExerciseLoggerExecutor();
 }
 
-export function createFoodLoggerExecutor(): IModExecutor {
+function createFoodLoggerExecutor(): IModExecutor {
   return new FoodLoggerExecutor();
 }
 
-export function createWaterTrackerExecutor(): IModExecutor {
+function createWaterTrackerExecutor(): IModExecutor {
   return new WaterTrackerExecutor();
 }
 
-export function createSocialTrackerExecutor(): IModExecutor {
+function createSocialTrackerExecutor(): IModExecutor {
   return new SocialTrackerExecutor();
 }
 
-export function createJournalExecutor(): IModExecutor {
+function createJournalExecutor(): IModExecutor {
   return new JournalExecutor();
 }
 
@@ -113,22 +113,3 @@ export async function hasModExecutor(
 
   return false;
 }
-
-/**
- * Get list of implemented static mod slugs
- */
-export function getImplementedMods(): BuiltinModSlug[] {
-  return Object.keys(EXECUTORS) as BuiltinModSlug[];
-}
-
-// Re-export executor classes
-export { TaskManagerExecutor, createTaskManagerExecutor };
-export { MoodTrackerExecutor };
-export { HabitTrackerExecutor };
-export { SleepTrackerExecutor };
-export { ActivityTrackerExecutor };
-export { ExerciseLoggerExecutor };
-export { FoodLoggerExecutor };
-export { WaterTrackerExecutor };
-export { SocialTrackerExecutor };
-export { JournalExecutor };

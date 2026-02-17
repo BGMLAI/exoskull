@@ -214,7 +214,7 @@ export async function runKnowledgeAnalysis(
 /**
  * Run knowledge analysis for ALL tenants (used by loop-daily CRON).
  */
-export async function runKnowledgeAnalysisForAllTenants(
+async function runKnowledgeAnalysisForAllTenants(
   analysisType: AnalysisType = "deep",
   trigger: AnalysisTrigger = "loop_daily",
 ): Promise<{ processed: number; errors: number }> {
