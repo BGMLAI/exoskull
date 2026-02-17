@@ -30,31 +30,66 @@ const VPS_TIMEOUT_MS = 5000; // 5s to establish connection, then stream
 
 // ---------------------------------------------------------------------------
 // VPS Circuit Breaker (prevents 5s latency spike when VPS is down)
+//
+// States: CLOSED (normal) → OPEN (skip VPS) → HALF_OPEN (probe 1 request)
+// Opens after 3 consecutive failures, probes after 30s, closes on 1 success.
 // ---------------------------------------------------------------------------
+type CircuitState = "closed" | "open" | "half_open";
+
 const VPS_CB_THRESHOLD = 3; // failures before opening
-const VPS_CB_RESET_MS = 30_000; // 30s before half-open retry
-let vpsFailures = 0;
-let vpsCircuitOpenAt = 0;
+const VPS_CB_RESET_MS = 30_000; // 30s before half-open probe
+
+const vpsCircuit = {
+  state: "closed" as CircuitState,
+  failures: 0,
+  openedAt: 0,
+};
 
 function isVpsCircuitOpen(): boolean {
-  if (vpsFailures < VPS_CB_THRESHOLD) return false;
-  // Check if reset period has passed (half-open)
-  if (Date.now() - vpsCircuitOpenAt >= VPS_CB_RESET_MS) {
-    return false; // Allow one probe request
+  if (vpsCircuit.state === "closed") return false;
+
+  if (vpsCircuit.state === "open") {
+    // Check if cooldown elapsed → transition to half-open (allow 1 probe)
+    if (Date.now() - vpsCircuit.openedAt >= VPS_CB_RESET_MS) {
+      vpsCircuit.state = "half_open";
+      logger.info("[ChatStream] VPS circuit breaker HALF_OPEN — probing");
+      return false; // Allow the probe request through
+    }
+    return true; // Still in cooldown — skip VPS
   }
-  return true;
+
+  // half_open — allow the probe request
+  return false;
 }
 
 function recordVpsSuccess(): void {
-  vpsFailures = 0;
-  vpsCircuitOpenAt = 0;
+  if (vpsCircuit.state === "half_open") {
+    logger.info("[ChatStream] VPS circuit breaker CLOSED — VPS recovered");
+  }
+  vpsCircuit.state = "closed";
+  vpsCircuit.failures = 0;
+  vpsCircuit.openedAt = 0;
 }
 
 function recordVpsFailure(): void {
-  vpsFailures++;
-  if (vpsFailures >= VPS_CB_THRESHOLD) {
-    vpsCircuitOpenAt = Date.now();
-    logger.warn("[ChatStream] VPS circuit breaker OPEN — skipping VPS for 30s");
+  vpsCircuit.failures++;
+
+  if (vpsCircuit.state === "half_open") {
+    // Probe failed — reopen immediately
+    vpsCircuit.state = "open";
+    vpsCircuit.openedAt = Date.now();
+    logger.warn(
+      "[ChatStream] VPS circuit breaker OPEN — probe failed, resetting 30s cooldown",
+    );
+    return;
+  }
+
+  if (vpsCircuit.failures >= VPS_CB_THRESHOLD) {
+    vpsCircuit.state = "open";
+    vpsCircuit.openedAt = Date.now();
+    logger.warn(
+      `[ChatStream] VPS circuit breaker OPEN after ${vpsCircuit.failures} failures — skipping VPS for 30s`,
+    );
   }
 }
 
@@ -68,7 +103,12 @@ async function tryVpsProxy(
   conversationId?: string,
 ): Promise<Response | null> {
   if (!VPS_AGENT_URL || !VPS_AGENT_SECRET) return null;
-  if (isVpsCircuitOpen()) return null;
+  if (isVpsCircuitOpen()) {
+    logger.debug(
+      "[ChatStream] VPS circuit OPEN — skipping proxy, using local fallback",
+    );
+    return null;
+  }
 
   try {
     const controller = new AbortController();

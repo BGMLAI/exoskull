@@ -71,11 +71,41 @@ export interface AppendMessageParams {
 /**
  * Get or create the unified thread for a tenant.
  * Each tenant has exactly one thread (all channels merge here).
+ *
+ * Uses upsert with onConflict to avoid race conditions when two messages
+ * arrive simultaneously for the same tenant — the database enforces
+ * uniqueness atomically, so only one thread is ever created.
  */
 export async function getOrCreateThread(tenantId: string): Promise<string> {
   const supabase = getServiceSupabase();
 
-  // Try to find existing thread
+  // Atomic upsert: insert if no thread exists, do nothing on conflict.
+  // The unique constraint on tenant_id ensures only one thread per tenant.
+  // ignoreDuplicates: true makes this "INSERT ... ON CONFLICT DO NOTHING".
+  const { data: upserted, error: upsertError } = await supabase
+    .from("exo_unified_threads")
+    .upsert(
+      { tenant_id: tenantId },
+      { onConflict: "tenant_id", ignoreDuplicates: true },
+    )
+    .select("id")
+    .single();
+
+  if (upserted?.id) {
+    return upserted.id;
+  }
+
+  // When ignoreDuplicates is true and the row already existed, some Supabase
+  // versions return no rows (PGRST116) instead of the existing row.
+  // Fall back to a select to retrieve the existing thread.
+  if (upsertError && upsertError.code !== "PGRST116") {
+    logger.error("[UnifiedThread] Upsert error:", {
+      tenantId,
+      error: upsertError.message,
+      code: upsertError.code,
+    });
+  }
+
   const { data: existing, error: selectError } = await supabase
     .from("exo_unified_threads")
     .select("id")
@@ -86,41 +116,14 @@ export async function getOrCreateThread(tenantId: string): Promise<string> {
     return existing.id;
   }
 
-  if (selectError && selectError.code !== "PGRST116") {
-    // PGRST116 = no rows found (expected for new tenants)
-    logger.error("[UnifiedThread] Error finding thread:", {
-      tenantId,
-      error: selectError.message,
-    });
-  }
-
-  // Create new thread
-  const { data: created, error: insertError } = await supabase
-    .from("exo_unified_threads")
-    .insert({ tenant_id: tenantId })
-    .select("id")
-    .single();
-
-  if (insertError) {
-    // Race condition: another request created the thread
-    if (insertError.code === "23505") {
-      const { data: retry } = await supabase
-        .from("exo_unified_threads")
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .single();
-
-      if (retry?.id) return retry.id;
-    }
-
-    logger.error("[UnifiedThread] Error creating thread:", {
-      tenantId,
-      error: insertError.message,
-    });
-    throw new Error(`Failed to create unified thread: ${insertError.message}`);
-  }
-
-  return created!.id;
+  logger.error("[UnifiedThread] Failed to get or create thread:", {
+    tenantId,
+    upsertError: upsertError?.message,
+    selectError: selectError?.message,
+  });
+  throw new Error(
+    `Failed to get or create unified thread for tenant ${tenantId}: ${selectError?.message || upsertError?.message}`,
+  );
 }
 
 // ============================================================================

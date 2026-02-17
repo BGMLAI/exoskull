@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
-import { createClient } from "@/lib/supabase/server";
+import { getServiceSupabase } from "@/lib/supabase/service";
 import { withApiLog } from "@/lib/api/request-logger";
 
 import { logger } from "@/lib/logger";
@@ -22,7 +22,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
     if (!auth.ok) return auth.response;
     const tenantId = auth.tenantId;
 
-    const supabase = await createClient();
+    const supabase = getServiceSupabase();
 
     // Fetch user's voice sessions
     const { data: sessions, error } = await supabase
