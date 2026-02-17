@@ -34,6 +34,10 @@ const ALLOWED_TYPES = [
   "video/mp4",
   "video/webm",
   "video/quicktime",
+  // 3D models
+  "model/gltf-binary", // .glb
+  "model/gltf+json", // .gltf
+  "application/octet-stream", // .glb/.fbx fallback (browsers often send this)
 ];
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
 
@@ -58,8 +62,12 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Validate file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    // Validate file type (also allow by extension for 3D files that browsers mistype)
+    const ext3d = [".glb", ".gltf", ".fbx", ".obj"];
+    const fileExt = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
+    const isAllowedByType = ALLOWED_TYPES.includes(file.type);
+    const isAllowedByExt = ext3d.includes(fileExt);
+    if (!isAllowedByType && !isAllowedByExt) {
       return NextResponse.json(
         {
           error: `File type not allowed. Allowed: ${ALLOWED_TYPES.join(", ")}`,
@@ -148,8 +156,14 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         logger.error("[KnowledgeUpload] Processing trigger failed:", err);
       });
 
+    // Get public URL for the uploaded file
+    const { data: urlData } = supabase.storage
+      .from("user-documents")
+      .getPublicUrl(filename);
+
     return NextResponse.json({
       success: true,
+      url: urlData.publicUrl,
       document: {
         id: document.id,
         filename: document.original_name,

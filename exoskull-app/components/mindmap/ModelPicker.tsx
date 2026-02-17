@@ -63,15 +63,38 @@ export function ModelPicker({ isOpen, onClose, onSelect }: ModelPickerProps) {
     return () => clearTimeout(searchTimeout.current);
   }, [query, activeTab]);
 
-  // Handle model selection
-  const handleConfirm = useCallback(() => {
-    if (selectedModel) {
-      onSelect(
-        selectedModel.viewerUrl, // Use viewer URL; actual download URL via separate API
-        selectedModel.thumbnailUrl,
+  // Handle model selection — fetch download URL from Sketchfab proxy
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  const handleConfirm = useCallback(async () => {
+    if (!selectedModel) return;
+
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const res = await fetch(`/api/models/${selectedModel.uid}/download`);
+      if (!res.ok) {
+        const errData = await res
+          .json()
+          .catch(() => ({ error: "Download failed" }));
+        throw new Error(errData.error || `Download failed (${res.status})`);
+      }
+      const data = await res.json();
+      if (data.url) {
+        onSelect(data.url, selectedModel.thumbnailUrl);
+        onClose();
+      } else {
+        throw new Error("No download URL returned");
+      }
+    } catch (err) {
+      console.error("[ModelPicker] Download URL fetch failed:", err);
+      setDownloadError(
+        err instanceof Error ? err.message : "Failed to get download URL",
       );
+    } finally {
+      setDownloading(false);
     }
-    onClose();
   }, [selectedModel, onSelect, onClose]);
 
   // Handle URL submit
@@ -83,27 +106,36 @@ export function ModelPicker({ isOpen, onClose, onSelect }: ModelPickerProps) {
   }, [urlInput, onSelect, onClose]);
 
   // Handle file upload
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   const handleFileUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
 
+      setUploading(true);
+      setUploadError(null);
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("category", "3d-model");
       try {
         const res = await fetch("/api/knowledge/upload", {
           method: "POST",
           body: formData,
         });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.url) {
-            onSelect(data.url);
-            onClose();
-          }
+        const data = await res.json();
+        if (res.ok && data.url) {
+          onSelect(data.url);
+          onClose();
+        } else {
+          setUploadError(data.error || "Upload failed — no URL returned");
         }
       } catch (err) {
         console.error("[ModelPicker] Upload failed:", err);
+        setUploadError(err instanceof Error ? err.message : "Upload failed");
+      } finally {
+        setUploading(false);
       }
       e.target.value = "";
     },
@@ -230,18 +262,28 @@ export function ModelPicker({ isOpen, onClose, onSelect }: ModelPickerProps) {
             <div className="text-center py-12">
               <label className="inline-flex flex-col items-center gap-3 cursor-pointer">
                 <div className="w-20 h-20 rounded-xl border-2 border-dashed border-cyan-800/30 flex items-center justify-center hover:border-cyan-600/40 transition-colors">
-                  <Upload className="w-8 h-8 text-cyan-700" />
+                  {uploading ? (
+                    <Loader2 className="w-8 h-8 text-cyan-700 animate-spin" />
+                  ) : (
+                    <Upload className="w-8 h-8 text-cyan-700" />
+                  )}
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  Wgraj plik glTF, GLB lub FBX
+                  {uploading ? "Wgrywanie..." : "Wgraj plik glTF, GLB lub FBX"}
                 </span>
                 <input
                   type="file"
                   accept=".gltf,.glb,.fbx,.obj"
                   onChange={handleFileUpload}
+                  disabled={uploading}
                   className="hidden"
                 />
               </label>
+              {uploadError && (
+                <div className="mt-3 text-[11px] text-red-400">
+                  {uploadError}
+                </div>
+              )}
             </div>
           )}
 
@@ -273,31 +315,43 @@ export function ModelPicker({ isOpen, onClose, onSelect }: ModelPickerProps) {
 
         {/* Footer (with confirm button for Sketchfab) */}
         {activeTab === "sketchfab" && selectedModel && (
-          <div className="px-5 py-3 border-t border-border flex items-center justify-between bg-muted/50">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Box className="w-3.5 h-3.5 text-cyan-500" />
-              <span className="truncate max-w-[200px]">
-                {selectedModel.name}
-              </span>
+          <div className="px-5 py-3 border-t border-border bg-muted/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Box className="w-3.5 h-3.5 text-cyan-500" />
+                <span className="truncate max-w-[200px]">
+                  {selectedModel.name}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <a
+                  href={selectedModel.viewerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Podglad
+                </a>
+                <button
+                  onClick={handleConfirm}
+                  disabled={downloading}
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {downloading ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Download className="w-3 h-3" />
+                  )}
+                  {downloading ? "Pobieranie..." : "Uzyj modelu"}
+                </button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <a
-                href={selectedModel.viewerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ExternalLink className="w-3 h-3" />
-                Podglad
-              </a>
-              <button
-                onClick={handleConfirm}
-                className="flex items-center gap-1.5 px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium rounded-lg transition-colors"
-              >
-                <Download className="w-3 h-3" />
-                Uzyj modelu
-              </button>
-            </div>
+            {downloadError && (
+              <div className="mt-2 text-[11px] text-red-400">
+                {downloadError}
+              </div>
+            )}
           </div>
         )}
       </div>
