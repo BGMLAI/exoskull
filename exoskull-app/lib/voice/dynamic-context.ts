@@ -10,6 +10,11 @@ import { getThreadSummary } from "../unified-thread";
 import { getPendingSuggestions } from "../skills/detector";
 import { listConnections } from "@/lib/integrations/composio-adapter";
 import { getTaskStats } from "@/lib/tasks/task-service";
+import {
+  getUserHighlights,
+  formatHighlightsForPrompt,
+} from "@/lib/memory/highlights";
+import { getGraphSummary } from "@/lib/memory/knowledge-graph";
 
 import { logger } from "@/lib/logger";
 
@@ -107,7 +112,7 @@ export async function buildDynamicContext(
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
-  // ── ALL queries in parallel (10 queries, ~150-300ms) ──
+  // ── ALL queries in parallel (14 queries, ~150-400ms) ──
   const [
     tenantResult,
     taskResult,
@@ -120,6 +125,9 @@ export async function buildDynamicContext(
     appsResult,
     proactiveResult,
     memoryResult,
+    highlightsResult,
+    graphResult,
+    recentNotesResult,
   ] = await Promise.allSettled([
     // 1. User profile + custom instructions + presets + AI config + prompt override
     supabase
@@ -190,6 +198,17 @@ export async function buildDynamicContext(
         .eq("tenant_id", tenantId)
         .limit(1),
     ]).catch(() => [null, null, null]),
+    // 12. Memory highlights content (top 10 by importance)
+    getUserHighlights(supabase, tenantId, 10).catch(() => []),
+    // 13. Knowledge graph summary
+    getGraphSummary(tenantId).catch(() => ""),
+    // 14. Recent notes (last 5)
+    supabase
+      .from("user_notes")
+      .select("title, ai_summary, type, captured_at")
+      .eq("tenant_id", tenantId)
+      .order("captured_at", { ascending: false })
+      .limit(5),
   ]);
 
   // ── Extract results safely ──
@@ -389,6 +408,45 @@ export async function buildDynamicContext(
     context += `- Pamięć: aktywna (brak danych — to nowy użytkownik). Narzędzia "search_memory" i "get_daily_summary" dostępne.\n`;
   }
 
+  // Memory highlights (top facts about user, grouped by category)
+  const highlights =
+    highlightsResult.status === "fulfilled" ? highlightsResult.value : [];
+  if (Array.isArray(highlights) && highlights.length > 0) {
+    const highlightsPrompt = formatHighlightsForPrompt(highlights);
+    if (highlightsPrompt) {
+      context += `\n${highlightsPrompt}\n`;
+    }
+  }
+
+  // Knowledge graph summary (top entities + relationships)
+  const graphSummary =
+    graphResult.status === "fulfilled" ? graphResult.value : "";
+  if (graphSummary && graphSummary !== "Knowledge graph: empty.") {
+    context += `\n### GRAF WIEDZY\n${graphSummary}\n`;
+  }
+
+  // Recent notes (last 5)
+  const recentNotes =
+    recentNotesResult.status === "fulfilled"
+      ? (recentNotesResult.value.data as Array<{
+          title: string | null;
+          ai_summary: string | null;
+          type: string;
+          captured_at: string;
+        }> | null)
+      : null;
+  if (recentNotes && recentNotes.length > 0) {
+    context += `\n### OSTATNIE NOTATKI\n`;
+    for (const note of recentNotes) {
+      const date = new Date(note.captured_at).toLocaleDateString("pl-PL", {
+        day: "numeric",
+        month: "short",
+      });
+      const desc = note.ai_summary || note.title || "(bez tytułu)";
+      context += `- ${date} [${note.type}]: ${desc}\n`;
+    }
+  }
+
   // Connected integrations (Composio)
   if (connections.length > 0) {
     const connList = connections.map((c) => c.toolkit).join(", ");
@@ -485,8 +543,8 @@ export async function buildVoiceContext(
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
-  // 3 queries (vs 8 in full context) — added thread summary for cross-channel awareness
-  const [tenantResult, taskResult, threadSummaryResult] =
+  // 4 queries (vs 14 in full context) — added thread summary + highlights
+  const [tenantResult, taskResult, threadSummaryResult, voiceHighlightsResult] =
     await Promise.allSettled([
       supabase
         .from("exo_tenants")
@@ -498,6 +556,8 @@ export async function buildVoiceContext(
       // Pending tasks count (via task-service: dual-read Tyrolka first, legacy fallback)
       getTaskStats(tenantId, supabase).then((s) => ({ count: s.pending })),
       getThreadSummary(tenantId),
+      // Top 5 highlights for voice context (+20ms, within budget)
+      getUserHighlights(supabase, tenantId, 5).catch(() => []),
     ]);
 
   const tenant =
@@ -536,6 +596,18 @@ export async function buildVoiceContext(
 
   context += `- Kanal: ROZMOWA GLOSOWA. Odpowiadaj KROTKO (1-2 zdania). Unikaj list, markdown, emoji.\n`;
   context += `- WAZNE: Masz kontekst z WSZYSTKICH kanalow (chat, SMS, email). Odwoluj sie do nich naturalnie.\n`;
+
+  // Highlights — key facts about the user for personalized voice
+  const voiceHighlights =
+    voiceHighlightsResult.status === "fulfilled"
+      ? voiceHighlightsResult.value
+      : [];
+  if (Array.isArray(voiceHighlights) && voiceHighlights.length > 0) {
+    const highlightsPrompt = formatHighlightsForPrompt(voiceHighlights);
+    if (highlightsPrompt) {
+      context += `\n${highlightsPrompt}\n`;
+    }
+  }
 
   // Custom instructions (highest priority)
   const customInstructions = (tenant as Record<string, unknown>)

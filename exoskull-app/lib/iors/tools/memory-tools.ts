@@ -19,6 +19,10 @@ import {
   keywordSearch,
   formatSearchResultsForResponse,
 } from "@/lib/memory/search";
+import {
+  unifiedSearch,
+  formatUnifiedResultsForResponse,
+} from "@/lib/memory/unified-search";
 
 export const memoryTools: ToolDefinition[] = [
   {
@@ -190,7 +194,7 @@ export const memoryTools: ToolDefinition[] = [
       });
 
       try {
-        const results = await keywordSearch({
+        const results = await unifiedSearch({
           tenantId,
           query,
           limit: 10,
@@ -198,7 +202,7 @@ export const memoryTools: ToolDefinition[] = [
           dateTo,
         });
 
-        return formatSearchResultsForResponse(results, query);
+        return formatUnifiedResultsForResponse(results, query);
       } catch (searchError) {
         console.error("[MemoryTools] search_memory error:", searchError);
         return `Nie udało się przeszukać pamięci. Spróbuj jeszcze raz.`;

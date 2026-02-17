@@ -50,6 +50,8 @@ function getAdminClient(): SupabaseClient {
 
 /**
  * Keyword search across all memory sources
+ * @deprecated Use `unifiedSearch` from `lib/memory/unified-search.ts` instead.
+ * This function is still called internally by unifiedSearch.
  */
 export async function keywordSearch(
   options: SearchOptions,
@@ -341,6 +343,7 @@ export async function getMemoryTimeline(
 
 /**
  * Format search results for voice/text response
+ * @deprecated Use `formatUnifiedResultsForResponse` from `lib/memory/unified-search.ts` instead.
  */
 export function formatSearchResultsForResponse(
   results: SearchResult[],

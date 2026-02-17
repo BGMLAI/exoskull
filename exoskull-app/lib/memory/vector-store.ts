@@ -331,6 +331,8 @@ export interface SearchOptions {
 /**
  * Hybrid search: vector similarity + full-text keyword + recency boost.
  * Uses the hybrid_search SQL function for server-side scoring.
+ * @deprecated Use `unifiedSearch` from `lib/memory/unified-search.ts` instead.
+ * This function is still called internally by unifiedSearch.
  */
 export async function hybridSearch(
   tenantId: string,

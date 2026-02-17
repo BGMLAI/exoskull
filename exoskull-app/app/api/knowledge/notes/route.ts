@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import { generateAndStoreNoteEmbedding } from "@/lib/memory/note-embeddings";
 
 export const dynamic = "force-dynamic";
 
@@ -164,6 +165,11 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error("[Notes API] POST error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
+    }
+
+    // Fire-and-forget: generate embedding for the note (does not block response)
+    if (data?.id && (content || title)) {
+      generateAndStoreNoteEmbedding(data.id, content, title).catch(() => {});
     }
 
     return NextResponse.json({ success: true, note: data });
