@@ -17,6 +17,7 @@ import { getToolLabel } from "@/lib/stream/tool-labels";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // ---------------------------------------------------------------------------
@@ -295,7 +296,7 @@ function createLocalStream(
 // Main Handler
 // ---------------------------------------------------------------------------
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -347,10 +348,13 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[Chat Stream] Error:", error);
+    logger.error("[Chat Stream] Error:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return new Response(JSON.stringify({ error: "Failed to start stream" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
   }
-}
+});

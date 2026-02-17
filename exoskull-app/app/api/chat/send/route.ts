@@ -11,9 +11,10 @@ import type { GatewayMessage } from "@/lib/gateway/types";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -65,10 +66,13 @@ export async function POST(request: NextRequest) {
         `chat-${tenantId}-${new Date().toISOString().slice(0, 10)}`,
     });
   } catch (error) {
-    console.error("[Chat Send] Error:", error);
+    logger.error("[Chat Send] Error:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
       { error: "Failed to send message" },
       { status: 500 },
     );
   }
-}
+});

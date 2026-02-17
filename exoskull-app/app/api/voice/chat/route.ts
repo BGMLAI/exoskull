@@ -19,13 +19,14 @@ import { WEB_CHAT_SYSTEM_OVERRIDE } from "@/lib/voice/system-prompt";
 import { appendMessage } from "@/lib/unified-thread";
 
 import { logger } from "@/lib/logger";
+import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
 // POST /api/voice/chat
 // ============================================================================
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -129,14 +130,13 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
-    const errStack = error instanceof Error ? error.stack : undefined;
-    console.error("[Voice Chat] Error:", {
-      message: errMsg,
-      stack: errStack,
+    logger.error("[Voice Chat] Error:", {
+      error: errMsg,
+      stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
       { error: "Failed to process voice message", detail: errMsg },
       { status: 500 },
     );
   }
-}
+});

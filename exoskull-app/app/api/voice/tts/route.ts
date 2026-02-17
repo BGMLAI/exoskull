@@ -8,10 +8,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { textToSpeech } from "@/lib/voice/elevenlabs-tts";
+import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ audio: audioBase64 });
   } catch (error) {
-    console.error("[TTS API] Error:", {
+    logger.error("[TTS API] Error:", {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });
@@ -39,4 +41,4 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
-}
+});

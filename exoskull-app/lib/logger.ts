@@ -1,10 +1,11 @@
 /**
  * Structured Logger
  *
- * Drop-in replacement for console.log/warn with:
- * - Log levels (debug suppressed in production)
- * - Consistent prefix format
- * - Structured context in JSON for production
+ * Features:
+ * - Level-based filtering (debug suppressed in production)
+ * - Structured JSON output in production (for Vercel log drains)
+ * - Plain console output in development
+ * - Request context support (requestId, tenantId)
  *
  * Usage:
  *   import { logger } from "@/lib/logger";
@@ -22,27 +23,68 @@ const LEVEL_PRIORITY: Record<LogLevel, number> = {
   error: 3,
 };
 
-const MIN_LEVEL: LogLevel =
-  process.env.NODE_ENV === "production" ? "info" : "debug";
+const IS_PROD = process.env.NODE_ENV === "production";
+const MIN_LEVEL: LogLevel = IS_PROD ? "info" : "debug";
 
 function shouldLog(level: LogLevel): boolean {
   return LEVEL_PRIORITY[level] >= LEVEL_PRIORITY[MIN_LEVEL];
 }
 
+/**
+ * In production, output structured JSON for log drain ingestion.
+ * In development, use plain console for readability.
+ */
+function emit(level: LogLevel, args: unknown[]) {
+  if (!shouldLog(level)) return;
+
+  if (IS_PROD) {
+    // Extract first string arg as message, rest as context
+    const message = typeof args[0] === "string" ? args[0] : "";
+    const context =
+      args.length > 1 && typeof args[args.length - 1] === "object"
+        ? (args[args.length - 1] as Record<string, unknown>)
+        : undefined;
+
+    const entry: Record<string, unknown> = {
+      level,
+      ts: new Date().toISOString(),
+      msg: message,
+    };
+    if (context) Object.assign(entry, context);
+
+    // Use appropriate console method for Vercel log level detection
+    const fn =
+      level === "error"
+        ? console.error
+        : level === "warn"
+          ? console.warn
+          : console.log;
+    fn(JSON.stringify(entry));
+  } else {
+    // Dev: plain console
+    const fn =
+      level === "debug"
+        ? console.debug
+        : level === "error"
+          ? console.error
+          : level === "warn"
+            ? console.warn
+            : console.log;
+    fn(...args);
+  }
+}
+
 export const logger = {
   debug(...args: unknown[]) {
-    if (shouldLog("debug")) console.debug(...args);
+    emit("debug", args);
   },
-
   info(...args: unknown[]) {
-    if (shouldLog("info")) console.log(...args);
+    emit("info", args);
   },
-
   warn(...args: unknown[]) {
-    if (shouldLog("warn")) console.warn(...args);
+    emit("warn", args);
   },
-
   error(...args: unknown[]) {
-    console.error(...args);
+    emit("error", args);
   },
 };
