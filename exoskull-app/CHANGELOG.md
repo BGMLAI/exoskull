@@ -4,6 +4,26 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-18] P1 UX/Reliability: Auth, Voice Guard, Data Freshness
+
+### Unified-Thread Auth Migration
+
+- Replaced legacy `getUser()`/`createClient` with `verifyTenantAuth()` — mobile conversation history now works
+
+### Voice Recording Guard
+
+- `VoiceRecorder` accepts `disabled` prop — visually grayed out, click blocked
+- `ConversationPanel` + `BirthChat` disable mic when AI is speaking (`isSpeaking`)
+- Prevents audio loopback (recording AI voice output)
+
+### Data Freshness Tracking
+
+- `useOrbData` + `useAutonomyData`: `_lastRefreshed` timestamp + 30-minute auto-refresh interval
+- `DataFreshness` component: "Ostatnia aktualizacja: X min temu" with manual refresh button
+- Users now see how fresh their dashboard data is
+
+---
+
 ## [2026-02-18] P0 Reliability: VPS Circuit Breaker + Thread Race Fix
 
 ### F3.1 — VPS Circuit Breaker
