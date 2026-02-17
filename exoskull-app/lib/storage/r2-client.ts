@@ -43,7 +43,8 @@ export type DataType =
   | "voice_calls"
   | "sms_logs"
   | "transactions"
-  | "emails";
+  | "emails"
+  | "documents";
 
 export interface BronzeWriteParams {
   tenantId: string;
@@ -76,6 +77,62 @@ export function generateBronzePath(params: {
   const timestamp = date.toISOString().replace(/[:.]/g, "-");
 
   return `${params.tenantId}/bronze/${params.dataType}/year=${year}/month=${month}/day=${day}/${timestamp}.parquet`;
+}
+
+/**
+ * Generate Bronze layer path for raw document uploads (keeps original extension).
+ * Path: {tenant_id}/bronze/documents/{category}/year={YYYY}/month={MM}/day={DD}/{timestamp}-{random}.{ext}
+ */
+export function generateDocumentPath(params: {
+  tenantId: string;
+  category: string;
+  extension: string;
+  date?: Date;
+}): string {
+  const date = params.date || new Date();
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).slice(2, 8);
+
+  return `${params.tenantId}/bronze/documents/${params.category}/year=${year}/month=${month}/day=${day}/${timestamp}-${random}.${params.extension}`;
+}
+
+/**
+ * Generate a presigned PUT URL for direct client upload to R2.
+ */
+export async function getPresignedPutUrl(
+  key: string,
+  contentType: string,
+  expiresIn: number = 3600,
+): Promise<{ url: string }> {
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+  });
+  const url = await getSignedUrl(r2Client, command, { expiresIn });
+  return { url };
+}
+
+/**
+ * Check if a file exists in R2 (HeadObject).
+ */
+export async function headObject(
+  key: string,
+): Promise<{ exists: boolean; contentLength?: number }> {
+  try {
+    const response = await r2Client.send(
+      new HeadObjectCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: key,
+      }),
+    );
+    return { exists: true, contentLength: response.ContentLength };
+  } catch {
+    return { exists: false };
+  }
 }
 
 /**
@@ -262,6 +319,7 @@ export async function getBronzeStats(tenantId?: string): Promise<{
     "sms_logs",
     "transactions",
     "emails",
+    "documents",
   ];
 
   for (const dataType of dataTypes) {

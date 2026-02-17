@@ -2,10 +2,10 @@
  * POST /api/agent/upload
  *
  * Unified endpoint for ExoSkull Local Agent file sync.
- * Combines upload-url + confirm-upload + status into single endpoint with Bearer JWT auth.
+ * Uses R2 presigned URLs for direct upload (no Supabase Storage).
  *
  * Actions:
- *   get-url       → { signedUrl, token, storagePath, documentId, mimeType }
+ *   get-url       → { presignedUrl, r2Key, documentId, mimeType }
  *   confirm       → { success, document }  (triggers processDocument)
  *   status        → { documentId, status, chunks, error }
  *   batch-status  → { documents: [...] }
@@ -14,6 +14,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import {
+  generateDocumentPath,
+  getPresignedPutUrl,
+  headObject,
+} from "@/lib/storage/r2-client";
 
 export const dynamic = "force-dynamic";
 
@@ -47,32 +52,125 @@ async function authenticateRequest(
 }
 
 // ---------------------------------------------------------------------------
-// MIME mapping (mirrors upload-url)
+// MIME mapping (expanded — blacklist approach, fallback to octet-stream)
 // ---------------------------------------------------------------------------
 
 const EXT_TO_MIME: Record<string, string> = {
+  // Documents
   pdf: "application/pdf",
   txt: "text/plain",
   md: "text/markdown",
+  rst: "text/x-rst",
+  rtf: "application/rtf",
+  odt: "application/vnd.oasis.opendocument.text",
+  ods: "application/vnd.oasis.opendocument.spreadsheet",
+  odp: "application/vnd.oasis.opendocument.presentation",
+  // Office
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  // Data
   json: "application/json",
   csv: "text/csv",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  doc: "application/msword",
-  xls: "application/vnd.ms-excel",
-  ppt: "application/vnd.ms-powerpoint",
+  tsv: "text/tab-separated-values",
+  xml: "text/xml",
+  yaml: "text/yaml",
+  yml: "text/yaml",
+  toml: "application/toml",
+  // Code
+  js: "text/javascript",
+  ts: "text/typescript",
+  jsx: "text/jsx",
+  tsx: "text/tsx",
+  py: "text/x-python",
+  rb: "text/x-ruby",
+  go: "text/x-go",
+  rs: "text/x-rust",
+  java: "text/x-java",
+  c: "text/x-c",
+  cpp: "text/x-c++",
+  h: "text/x-c",
+  cs: "text/x-csharp",
+  php: "text/x-php",
+  sh: "text/x-shellscript",
+  sql: "application/sql",
+  // Web
+  html: "text/html",
+  css: "text/css",
+  svg: "image/svg+xml",
+  // Images
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
   png: "image/png",
+  gif: "image/gif",
   webp: "image/webp",
+  bmp: "image/bmp",
+  tiff: "image/tiff",
+  tif: "image/tiff",
+  avif: "image/avif",
+  heic: "image/heic",
+  psd: "image/vnd.adobe.photoshop",
+  // Audio
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  flac: "audio/flac",
+  aac: "audio/aac",
+  ogg: "audio/ogg",
+  m4a: "audio/mp4",
+  // Video
   mp4: "video/mp4",
   webm: "video/webm",
   mov: "video/quicktime",
+  avi: "video/x-msvideo",
+  mkv: "video/x-matroska",
+  wmv: "video/x-ms-wmv",
+  // Archives
+  zip: "application/zip",
+  "7z": "application/x-7z-compressed",
+  rar: "application/x-rar-compressed",
+  tar: "application/x-tar",
+  gz: "application/gzip",
+  // Ebooks
+  epub: "application/epub+zip",
+  mobi: "application/x-mobipocket-ebook",
 };
 
-const ALLOWED_EXTENSIONS = Object.keys(EXT_TO_MIME);
-const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+/** Extensions that should never be uploaded */
+const EXCLUDED_EXTENSIONS = new Set([
+  "exe",
+  "dll",
+  "sys",
+  "msi",
+  "drv",
+  "cpl",
+  "scr",
+  "o",
+  "obj",
+  "lib",
+  "a",
+  "so",
+  "dylib",
+  "pdb",
+  "class",
+  "jar",
+  "pyc",
+  "pyo",
+  "iso",
+  "img",
+  "vmdk",
+  "vhd",
+  "qcow2",
+  "dat",
+  "reg",
+  "lnk",
+  "cab",
+  "wim",
+]);
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB (R2 single-PUT max)
 
 // ---------------------------------------------------------------------------
 // Action handlers
@@ -92,47 +190,52 @@ async function handleGetUrl(
   }
 
   const ext = filename.split(".").pop()?.toLowerCase() || "";
-  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+
+  if (EXCLUDED_EXTENSIONS.has(ext)) {
     return NextResponse.json(
-      {
-        error: `File type .${ext} not allowed`,
-        allowedTypes: ALLOWED_EXTENSIONS,
-      },
+      { error: `File type .${ext} is excluded (system binary/artifact)` },
       { status: 400 },
     );
   }
 
   if (fileSize && fileSize > MAX_FILE_SIZE) {
     return NextResponse.json(
-      { error: `File too large (max ${MAX_FILE_SIZE / 1024 / 1024}MB)` },
+      { error: `File too large (max ${MAX_FILE_SIZE / 1024 / 1024 / 1024}GB)` },
       { status: 413 },
     );
   }
 
-  const supabase = getServiceSupabase();
-  const storagePath = `${tenantId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const mimeType = EXT_TO_MIME[ext] || "application/octet-stream";
+  const r2Key = generateDocumentPath({
+    tenantId,
+    category: category || "other",
+    extension: ext || "bin",
+  });
 
-  const { data: signedData, error: signedError } = await supabase.storage
-    .from("user-documents")
-    .createSignedUploadUrl(storagePath);
-
-  if (signedError || !signedData) {
-    console.error("[AgentUpload] Signed URL failed:", signedError);
+  // Generate R2 presigned PUT URL
+  let presignedUrl: string;
+  try {
+    const result = await getPresignedPutUrl(r2Key, mimeType, 3600);
+    presignedUrl = result.url;
+  } catch (error) {
+    console.error("[AgentUpload] R2 presigned URL failed:", error);
     return NextResponse.json(
       { error: "Failed to create upload URL" },
       { status: 500 },
     );
   }
 
+  // Insert document record
+  const supabase = getServiceSupabase();
   const { data: document, error: dbError } = await supabase
     .from("exo_user_documents")
     .insert({
       tenant_id: tenantId,
-      filename: storagePath,
+      filename: r2Key,
       original_name: filename,
       file_type: ext,
       file_size: fileSize || 0,
-      storage_path: storagePath,
+      storage_path: `r2://${r2Key}`,
       category: category || "other",
       status: "uploading",
     })
@@ -148,11 +251,10 @@ async function handleGetUrl(
   }
 
   return NextResponse.json({
-    signedUrl: signedData.signedUrl,
-    token: signedData.token,
-    storagePath,
+    presignedUrl,
+    r2Key,
     documentId: document.id,
-    mimeType: EXT_TO_MIME[ext],
+    mimeType,
   });
 }
 
@@ -194,28 +296,31 @@ async function handleConfirm(
     });
   }
 
-  // Verify file exists in storage
-  const { data: fileCheck } = await supabase.storage
-    .from("user-documents")
-    .list(doc.storage_path.split("/").slice(0, -1).join("/"), {
-      search: doc.storage_path.split("/").pop(),
-    });
+  // Verify file exists in R2 via HeadObject
+  const r2Key = doc.storage_path.replace(/^r2:\/\//, "");
+  const headResult = await headObject(r2Key);
 
-  if (!fileCheck || fileCheck.length === 0) {
+  if (!headResult.exists) {
     await supabase
       .from("exo_user_documents")
       .update({ status: "failed" })
       .eq("id", documentId);
 
     return NextResponse.json(
-      { error: "File not found in storage" },
+      { error: "File not found in R2 storage" },
       { status: 400 },
     );
   }
 
+  // Update file_size from R2 if we have it
+  const updateData: Record<string, unknown> = { status: "uploaded" };
+  if (headResult.contentLength) {
+    updateData.file_size = headResult.contentLength;
+  }
+
   await supabase
     .from("exo_user_documents")
-    .update({ status: "uploaded" })
+    .update(updateData)
     .eq("id", documentId);
 
   // Fire-and-forget processing

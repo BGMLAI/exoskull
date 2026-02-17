@@ -143,6 +143,22 @@ export function startWatching(): FSWatcher {
       /(^|[\/\\])\../, // Hidden files/dirs
       /node_modules/,
       /\.git/,
+      /\.next/,
+      /\bdist\b/,
+      /__pycache__/,
+      /\.cache/,
+      /\.vscode/,
+      /\.idea/,
+      /AppData/,
+      /\$RECYCLE\.BIN/,
+      /System Volume Information/,
+      /\.Trash/,
+      /__MACOSX/,
+      /\.tox/,
+      /\.mypy_cache/,
+      /\.pytest_cache/,
+      /\.parcel-cache/,
+      /\.turbo/,
     ],
   });
 

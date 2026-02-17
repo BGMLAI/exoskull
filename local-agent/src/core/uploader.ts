@@ -11,14 +11,13 @@ import path from "node:path";
 import { getValidToken, getApiUrl } from "./auth.js";
 import { upsertFile, markSynced, markFailed, hashExists } from "./state.js";
 import { hashFile } from "../utils/file-hash.js";
-import { getExtension } from "../utils/mime-types.js";
+import { getExtension, getMimeType } from "../utils/mime-types.js";
 import { retry } from "../utils/retry.js";
 import { logger } from "./logger.js";
 
 interface GetUrlResponse {
-  signedUrl: string;
-  token: string;
-  storagePath: string;
+  presignedUrl: string;
+  r2Key: string;
   documentId: string;
   mimeType: string;
 }
@@ -109,22 +108,23 @@ export async function uploadFile(
       { attempts: 3, label: `get-url:${filename}` },
     );
 
-    // Step 2: Upload file to signed URL
+    // Step 2: Upload file to R2 presigned URL
     const fileBuffer = fs.readFileSync(filePath);
+    const contentType = urlData.mimeType || getMimeType(filePath);
 
     await retry(
       async () => {
-        const uploadRes = await fetch(urlData.signedUrl, {
+        const uploadRes = await fetch(urlData.presignedUrl, {
           method: "PUT",
-          headers: { "Content-Type": urlData.mimeType },
+          headers: { "Content-Type": contentType },
           body: fileBuffer,
         });
 
         if (!uploadRes.ok) {
-          throw new Error(`Storage upload failed: ${uploadRes.status} ${uploadRes.statusText}`);
+          throw new Error(`R2 upload failed: ${uploadRes.status} ${uploadRes.statusText}`);
         }
       },
-      { attempts: 3, label: `storage-put:${filename}` },
+      { attempts: 3, label: `r2-put:${filename}` },
     );
 
     // Step 3: Confirm upload

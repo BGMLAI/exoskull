@@ -484,8 +484,13 @@ function scanFolder(folder: {
       const fullPath = path.join(dir, entry.name);
 
       if (entry.isDirectory()) {
-        // Skip hidden dirs, node_modules, .git
-        if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+        const SKIP_DIRS = new Set([
+          "node_modules", ".git", ".next", "dist", "__pycache__",
+          ".cache", ".vscode", ".idea", "AppData", "$RECYCLE.BIN",
+          "System Volume Information", ".Trash", "__MACOSX",
+          ".tox", ".mypy_cache", ".pytest_cache", ".parcel-cache", ".turbo",
+        ]);
+        if (entry.name.startsWith(".") || SKIP_DIRS.has(entry.name)) continue;
         if (folder.recursive) walk(fullPath);
       } else if (entry.isFile()) {
         if (!isSupported(fullPath)) continue;

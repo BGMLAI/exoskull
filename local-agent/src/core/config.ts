@@ -107,8 +107,11 @@ export function addFolder(
     category: options.category || "other",
     recursive: options.recursive !== false,
     filters: {
-      include: options.include || ["*.pdf", "*.docx", "*.doc", "*.txt", "*.md", "*.csv", "*.json", "*.xlsx", "*.xls", "*.pptx", "*.ppt"],
-      exclude: options.exclude || ["~$*", "*.tmp", "*.bak", ".DS_Store", "Thumbs.db"],
+      include: options.include || [],
+      exclude: options.exclude || [
+        "~$*", "*.tmp", "*.bak", ".DS_Store", "Thumbs.db",
+        "*.swp", "*.lock", "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
+      ],
     },
   });
 

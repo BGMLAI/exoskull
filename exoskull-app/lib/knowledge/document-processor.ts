@@ -18,6 +18,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import OpenAI from "openai";
 import { chunkText } from "@/lib/memory/chunking-pipeline";
 import { hashContent } from "@/lib/memory/chunking-pipeline";
+import { readFromBronze } from "@/lib/storage/r2-client";
 
 import { logger } from "@/lib/logger";
 
@@ -78,15 +79,30 @@ export async function processDocument(
   });
 
   try {
-    // 2. Download file from storage
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from("user-documents")
-      .download(doc.storage_path || doc.filename);
+    // 2. Download file from storage (R2 or legacy Supabase Storage)
+    let fileData: Blob;
+    const storagePath = doc.storage_path || doc.filename;
 
-    if (downloadError || !fileData) {
-      throw new Error(
-        `Download failed: ${downloadError?.message || "No data"}`,
-      );
+    if (storagePath.startsWith("r2://") || storagePath.includes("/bronze/")) {
+      // R2 path — read from R2
+      const r2Key = storagePath.replace(/^r2:\/\//, "");
+      const r2Result = await readFromBronze(r2Key);
+      if (!r2Result.success || !r2Result.data) {
+        throw new Error(`R2 download failed: ${r2Result.error || "No data"}`);
+      }
+      fileData = new Blob([new Uint8Array(r2Result.data)]);
+    } else {
+      // Legacy Supabase Storage path
+      const { data: sbData, error: downloadError } = await supabase.storage
+        .from("user-documents")
+        .download(storagePath);
+
+      if (downloadError || !sbData) {
+        throw new Error(
+          `Download failed: ${downloadError?.message || "No data"}`,
+        );
+      }
+      fileData = sbData;
     }
 
     // 3. Extract text
