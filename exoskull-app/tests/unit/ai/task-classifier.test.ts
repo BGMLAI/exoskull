@@ -107,7 +107,7 @@ describe("classifyTask", () => {
 
   describe("summarization (Tier 2)", () => {
     it("detects summarize keywords", () => {
-      const result = classifyTask(makeOptions("summarize this article for me"));
+      const result = classifyTask(makeOptions("summarize this text for me"));
       expect(result.suggestedTier).toBe(2);
       expect(result.category).toBe("summarization");
     });

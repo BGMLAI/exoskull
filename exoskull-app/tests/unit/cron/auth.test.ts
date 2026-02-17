@@ -40,9 +40,9 @@ describe("verifyCronAuth", () => {
     expect(verifyCronAuth(req)).toBe(false);
   });
 
-  it("allows any request in development mode", () => {
+  it("rejects unauthenticated requests even in development mode", () => {
     vi.stubEnv("NODE_ENV", "development");
     const req = createMockRequest();
-    expect(verifyCronAuth(req)).toBe(true);
+    expect(verifyCronAuth(req)).toBe(false);
   });
 });
