@@ -406,17 +406,27 @@ export async function reclassifyTenants(): Promise<number> {
 
   if (error || !configs?.length) return 0;
 
-  let reclassified = 0;
+  // Collect all reclassifications, then batch update
+  const updates: { tenantId: string; newClass: ActivityClass }[] = [];
 
   for (const config of configs as TenantLoopConfig[]) {
     const newClass = classifyActivity(config);
     if (newClass !== config.activity_class) {
-      await updateTenantLoopState(config.tenant_id, newClass);
-      reclassified++;
+      updates.push({ tenantId: config.tenant_id, newClass });
     }
   }
 
-  return reclassified;
+  // Batch: run up to 10 updates in parallel
+  const BATCH = 10;
+  for (let i = 0; i < updates.length; i += BATCH) {
+    await Promise.allSettled(
+      updates
+        .slice(i, i + BATCH)
+        .map((u) => updateTenantLoopState(u.tenantId, u.newClass)),
+    );
+  }
+
+  return updates.length;
 }
 
 /**

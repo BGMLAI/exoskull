@@ -124,79 +124,91 @@ async function handler(req: NextRequest) {
         .limit(10);
 
       if (activeTenants && activeTenants.length > 0) {
-        for (const t of activeTenants) {
+        // Process tenants in batches of 3 for parallelism
+        const COACHING_BATCH = 3;
+        for (let i = 0; i < activeTenants.length; i += COACHING_BATCH) {
           if (Date.now() - startTime > TIMEOUT_MS - 20_000) break;
-          try {
-            const [healthResult, crossResult, effectResult] =
-              await Promise.allSettled([
-                analyzeHealthTrends(t.tenant_id),
-                analyzeCrossDomain(t.tenant_id),
-                measureEffectiveness(t.tenant_id),
-              ]);
+          const tenantBatch = activeTenants.slice(i, i + COACHING_BATCH);
 
-            // Store insights for the coaching engine (emit events for significant findings)
-            if (
-              healthResult.status === "fulfilled" &&
-              healthResult.value.alerts.length > 0
-            ) {
-              await emitEvent({
-                tenantId: t.tenant_id,
-                eventType: "coaching_trigger",
-                priority: 2,
-                source: "loop-daily/health-trends",
-                payload: {
-                  handler: "deliver_proactive",
-                  alerts: healthResult.value.alerts,
-                  summary: healthResult.value.summary,
-                },
-                dedupKey: `health-trends-${new Date().toISOString().slice(0, 10)}`,
-              });
-            }
+          const batchResults = await Promise.allSettled(
+            tenantBatch.map(async (t) => {
+              const [healthResult, crossResult, effectResult] =
+                await Promise.allSettled([
+                  analyzeHealthTrends(t.tenant_id),
+                  analyzeCrossDomain(t.tenant_id),
+                  measureEffectiveness(t.tenant_id),
+                ]);
 
-            if (
-              crossResult.status === "fulfilled" &&
-              crossResult.value.topInsight
-            ) {
-              await emitEvent({
-                tenantId: t.tenant_id,
-                eventType: "coaching_trigger",
-                priority: 3,
-                source: "loop-daily/cross-domain",
-                payload: {
-                  handler: "deliver_proactive",
-                  insight: crossResult.value.topInsight,
-                },
-                dedupKey: `cross-domain-${new Date().toISOString().slice(0, 10)}`,
-              });
-            }
+              const today = new Date().toISOString().slice(0, 10);
+              const events: Promise<string | null>[] = [];
 
-            // Feed effectiveness recommendations into optimization
-            if (
-              effectResult.status === "fulfilled" &&
-              effectResult.value.recommendations.length > 0
-            ) {
-              await emitEvent({
-                tenantId: t.tenant_id,
-                eventType: "optimization_signal",
-                priority: 4,
-                source: "loop-daily/effectiveness",
-                payload: {
-                  recommendations: effectResult.value.recommendations,
-                  ackRate: effectResult.value.ackRate,
-                  actionRate: effectResult.value.actionRate,
-                  avgRating: effectResult.value.avgRating,
-                },
-                dedupKey: `effectiveness-${new Date().toISOString().slice(0, 10)}`,
-              });
-            }
+              if (
+                healthResult.status === "fulfilled" &&
+                healthResult.value.alerts.length > 0
+              ) {
+                events.push(
+                  emitEvent({
+                    tenantId: t.tenant_id,
+                    eventType: "coaching_trigger",
+                    priority: 2,
+                    source: "loop-daily/health-trends",
+                    payload: {
+                      handler: "deliver_proactive",
+                      alerts: healthResult.value.alerts,
+                      summary: healthResult.value.summary,
+                    },
+                    dedupKey: `health-trends-${today}`,
+                  }),
+                );
+              }
 
-            coachingAnalyzed++;
-          } catch (err) {
-            logger.warn("[LoopDaily] Coaching analytics failed for tenant:", {
-              tenantId: t.tenant_id,
-              error: err instanceof Error ? err.message : err,
-            });
-          }
+              if (
+                crossResult.status === "fulfilled" &&
+                crossResult.value.topInsight
+              ) {
+                events.push(
+                  emitEvent({
+                    tenantId: t.tenant_id,
+                    eventType: "coaching_trigger",
+                    priority: 3,
+                    source: "loop-daily/cross-domain",
+                    payload: {
+                      handler: "deliver_proactive",
+                      insight: crossResult.value.topInsight,
+                    },
+                    dedupKey: `cross-domain-${today}`,
+                  }),
+                );
+              }
+
+              if (
+                effectResult.status === "fulfilled" &&
+                effectResult.value.recommendations.length > 0
+              ) {
+                events.push(
+                  emitEvent({
+                    tenantId: t.tenant_id,
+                    eventType: "optimization_signal",
+                    priority: 4,
+                    source: "loop-daily/effectiveness",
+                    payload: {
+                      recommendations: effectResult.value.recommendations,
+                      ackRate: effectResult.value.ackRate,
+                      actionRate: effectResult.value.actionRate,
+                      avgRating: effectResult.value.avgRating,
+                    },
+                    dedupKey: `effectiveness-${today}`,
+                  }),
+                );
+              }
+
+              await Promise.allSettled(events);
+            }),
+          );
+
+          coachingAnalyzed += batchResults.filter(
+            (r) => r.status === "fulfilled",
+          ).length;
         }
       }
     }
@@ -223,29 +235,36 @@ async function handler(req: NextRequest) {
       .single();
 
     if (anyTenant) {
-      for (const task of maintenanceTasks) {
-        await supabase.from("exo_petla_queue").insert({
-          tenant_id: anyTenant.id,
-          sub_loop: "maintenance",
-          priority: task.priority,
-          handler: task.handler,
-          params: { triggered_by: "loop-daily" },
-          status: "queued",
-        });
-        maintenanceSeeded++;
-      }
+      const rows = maintenanceTasks.map((task) => ({
+        tenant_id: anyTenant.id,
+        sub_loop: "maintenance",
+        priority: task.priority,
+        handler: task.handler,
+        params: { triggered_by: "loop-daily" },
+        status: "queued",
+      }));
+      await supabase.from("exo_petla_queue").insert(rows);
+      maintenanceSeeded = rows.length;
     }
 
     // Step 4: Process ALL queued maintenance/optimization items (time permitting)
+    // Batch-parallel: claim up to BATCH_SIZE items, dispatch in parallel
+    const BATCH_SIZE = 5;
     let workProcessed = 0;
     while (Date.now() - startTime < TIMEOUT_MS - 15_000) {
-      const workItem = await claimQueuedWork(workerId, [
-        "optimization",
-        "maintenance",
-      ]);
-      if (!workItem) break;
-      await dispatchToHandler(workItem);
-      workProcessed++;
+      const batch: Awaited<ReturnType<typeof claimQueuedWork>>[] = [];
+      for (let i = 0; i < BATCH_SIZE; i++) {
+        const item = await claimQueuedWork(workerId, [
+          "optimization",
+          "maintenance",
+        ]);
+        if (!item) break;
+        batch.push(item);
+      }
+      if (batch.length === 0) break;
+
+      await Promise.allSettled(batch.map((item) => dispatchToHandler(item!)));
+      workProcessed += batch.length;
     }
 
     // Step 5: Prune old events and work items
