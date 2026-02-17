@@ -12,6 +12,8 @@
 import type { ToolDefinition } from "./shared";
 import { executeExtensionTool } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { executeInSandbox } from "@/lib/skills/sandbox/restricted-function";
+import type { SkillExecutionContext } from "@/lib/skills/types";
 
 import { logger } from "@/lib/logger";
 interface DynamicToolRow {
@@ -125,7 +127,7 @@ function buildToolDefinition(
         case "composite":
           return executeComposite(input, tenantId, row.handler_config);
         case "skill_exec":
-          return "Skill execution nie jest jeszcze zaimplementowane.";
+          return executeSkill(input, tenantId, row.handler_config);
         default:
           return `Nieznany handler_type: ${row.handler_type}`;
       }
@@ -300,4 +302,82 @@ async function executeComposite(
   }
 
   return results.join("\n\n");
+}
+
+/**
+ * skill_exec: Execute an approved generated skill in the restricted sandbox.
+ * handler_config: { skill_id: string }
+ */
+async function executeSkill(
+  input: Record<string, unknown>,
+  tenantId: string,
+  config: Record<string, unknown>,
+): Promise<string> {
+  const skillId = config.skill_id as string;
+  if (!skillId) return "Error: brak skill_id w konfiguracji toola";
+
+  try {
+    const supabase = getServiceSupabase();
+
+    // Fetch approved skill with code
+    const { data: skill, error } = await supabase
+      .from("exo_generated_skills")
+      .select("id, name, executor_code, tenant_id, approval_status")
+      .eq("id", skillId)
+      .eq("tenant_id", tenantId)
+      .eq("approval_status", "approved")
+      .single();
+
+    if (error || !skill) {
+      return "Error: skill nie znaleziony lub nie zatwierdzony.";
+    }
+
+    if (!skill.executor_code) {
+      return "Error: skill nie ma kodu do wykonania.";
+    }
+
+    // Build execution context
+    const action = (input.action as string) || "getData";
+    const params = (input.params as Record<string, unknown>) || {};
+
+    const context: SkillExecutionContext = {
+      skill_id: skillId,
+      tenant_id: tenantId,
+      method:
+        action === "getData" || action === "getInsights"
+          ? action
+          : "executeAction",
+      args:
+        action === "getData" || action === "getInsights"
+          ? []
+          : [action, params],
+    };
+
+    // Execute in restricted sandbox
+    const result = await executeInSandbox(context, skill.executor_code);
+
+    if (!result.success) {
+      logger.error("[DynamicTools] Skill execution failed:", {
+        skillId,
+        tenantId,
+        error: result.error,
+        executionTimeMs: result.executionTimeMs,
+      });
+      return `Error: ${result.error}`;
+    }
+
+    // Format result for AI consumption
+    const output = result.result;
+    if (typeof output === "string") return output;
+    if (output === undefined || output === null)
+      return "Skill wykonany pomyślnie (brak wyniku).";
+    return JSON.stringify(output, null, 2).slice(0, 4000);
+  } catch (err) {
+    logger.error("[DynamicTools] Skill exec error:", {
+      skillId,
+      tenantId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return `Error: ${err instanceof Error ? err.message : String(err)}`;
+  }
 }

@@ -121,10 +121,24 @@ export async function sendProactiveMessage(
       result.channel || "web_chat",
     );
 
+    // Store message_sid for delivery tracking (if SMS was used)
+    if (result.messageSid) {
+      const supabase = getServiceSupabase();
+      await supabase
+        .from("exo_proactive_log")
+        .update({ message_sid: result.messageSid })
+        .eq("tenant_id", tenantId)
+        .eq("trigger_type", triggerType)
+        .is("message_sid", null)
+        .order("created_at", { ascending: false })
+        .limit(1);
+    }
+
     logger.info(`[${source}] Proactive message sent:`, {
       tenantId,
       triggerType,
       channel: result.channel,
+      messageSid: result.messageSid,
     });
 
     return { success: result.success, channel: result.channel };

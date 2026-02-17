@@ -64,6 +64,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       conversationId:
         conversationId ||
         `chat-${tenantId}-${new Date().toISOString().slice(0, 10)}`,
+      ...(result.errorCode && { errorCode: result.errorCode }),
     });
   } catch (error) {
     logger.error("[Chat Send] Error:", {

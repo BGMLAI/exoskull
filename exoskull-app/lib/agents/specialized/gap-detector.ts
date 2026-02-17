@@ -474,6 +474,7 @@ export class GapDetectorAgent extends BaseAgent {
       if (gap.severity === "mild") continue;
 
       try {
+        // Standard check-in intervention for all moderate/severe gaps
         await this.supabase.rpc("propose_intervention", {
           p_tenant_id: tenantId,
           p_type: "gap_detection",
@@ -492,6 +493,32 @@ export class GapDetectorAgent extends BaseAgent {
           p_scheduled_for: null,
         });
         count++;
+
+        // For severe gaps: also propose building a tracker app
+        if (gap.severity === "severe") {
+          await this.supabase.rpc("propose_intervention", {
+            p_tenant_id: tenantId,
+            p_type: "build_app",
+            p_title: `Build tracker: ${gap.area.name}`,
+            p_description: `Severe blind spot detected in ${gap.area.name} (${gap.coveragePercent}% coverage, ${gap.daysSinceActivity}+ days without activity). Build a simple ${gap.area.slug} tracker to help monitor this area.`,
+            p_action_payload: {
+              action: "build_app",
+              params: {
+                description: `Simple ${gap.area.name} tracker — log entries, view timeline, track ${gap.area.slug} activities. Auto-detected blind spot with ${gap.coveragePercent}% coverage.`,
+                area_slug: gap.area.slug,
+                area_name: gap.area.name,
+              },
+            },
+            p_priority: "high",
+            p_source_agent: this.id,
+            p_requires_approval: true, // Building an app requires user approval
+            p_scheduled_for: null,
+          });
+          count++;
+          logger.info(
+            `[GapDetector] Proposed build_app for severe gap: ${gap.area.slug}`,
+          );
+        }
       } catch (error) {
         logger.error(
           `[GapDetector] Failed to create intervention for ${gap.area.slug}:`,

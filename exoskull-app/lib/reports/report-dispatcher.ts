@@ -30,6 +30,7 @@ export interface DispatchReportResult {
   success: boolean;
   channel: string;
   error?: string;
+  messageSid?: string;
 }
 
 interface TenantChannelInfo {
@@ -137,10 +138,26 @@ async function sendViaImessage(address: string, text: string): Promise<void> {
   await imessageAdapter.sendResponse(address, text);
 }
 
-async function sendViaSms(phone: string, text: string): Promise<void> {
+async function sendViaSms(
+  phone: string,
+  text: string,
+): Promise<string | undefined> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID!;
   const authToken = process.env.TWILIO_AUTH_TOKEN!;
   const fromNumber = process.env.TWILIO_PHONE_NUMBER!;
+
+  const statusCallbackUrl = process.env.NEXT_PUBLIC_APP_URL
+    ? `${process.env.NEXT_PUBLIC_APP_URL}/api/twilio/sms-status`
+    : undefined;
+
+  const params: Record<string, string> = {
+    To: phone,
+    From: fromNumber,
+    Body: text,
+  };
+  if (statusCallbackUrl) {
+    params.StatusCallback = statusCallbackUrl;
+  }
 
   const response = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
@@ -152,11 +169,7 @@ async function sendViaSms(phone: string, text: string): Promise<void> {
           Buffer.from(`${accountSid}:${authToken}`).toString("base64"),
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: new URLSearchParams({
-        To: phone,
-        From: fromNumber,
-        Body: text,
-      }),
+      body: new URLSearchParams(params),
     },
   );
 
@@ -164,6 +177,10 @@ async function sendViaSms(phone: string, text: string): Promise<void> {
     const data = await response.json();
     throw new Error(data.message || `Twilio SMS error: ${response.status}`);
   }
+
+  // Return message SID for delivery tracking
+  const data = await response.json();
+  return data.sid as string | undefined;
 }
 
 async function sendViaEmail(
@@ -224,36 +241,35 @@ async function sendToChannel(
   tenant: TenantChannelInfo,
   text: string,
   reportType: ReportType,
-): Promise<void> {
+): Promise<string | undefined> {
   switch (channel) {
     case "telegram":
       await sendViaTelegram(tenant.telegram_chat_id!, text);
-      break;
+      return undefined;
     case "whatsapp":
       await sendViaWhatsApp(tenant.phone!, text);
-      break;
+      return undefined;
     case "slack":
       await sendViaSlack(tenant.slack_user_id!, text);
-      break;
+      return undefined;
     case "discord":
       await sendViaDiscord(tenant.discord_user_id!, text);
-      break;
+      return undefined;
     case "signal":
       await sendViaSignal(tenant.signal_phone!, text);
-      break;
+      return undefined;
     case "imessage":
       await sendViaImessage(tenant.imessage_address!, text);
-      break;
+      return undefined;
     case "sms":
-      await sendViaSms(tenant.phone!, text);
-      break;
+      return sendViaSms(tenant.phone!, text);
     case "email":
       await sendViaEmail(tenant.email!, text, reportType, tenant.language);
-      break;
+      return undefined;
     case "web_chat":
       // No external send needed — message will be logged to unified thread below
       // User sees it next time they open the dashboard chat
-      break;
+      return undefined;
     default:
       throw new Error(`Unsupported channel: ${channel}`);
   }
@@ -314,7 +330,12 @@ export async function dispatchReport(
     if (!canSendVia(channel, info)) continue;
 
     try {
-      await sendToChannel(channel, info, reportText, reportType);
+      const messageSid = await sendToChannel(
+        channel,
+        info,
+        reportText,
+        reportType,
+      );
 
       // Log to unified thread
       const unifiedChannel: UnifiedChannel =
@@ -345,7 +366,7 @@ export async function dispatchReport(
           `[ReportDispatcher] ${reportType} report sent to ${tenantId} via ${channel}`,
         );
       }
-      return { success: true, channel };
+      return { success: true, channel, messageSid };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       errors.push(`${channel}: ${msg}`);

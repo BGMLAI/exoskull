@@ -546,10 +546,14 @@ export async function handleInboundMessage(
       stack: err.stack,
     });
 
+    // Classify error for client-side retry logic
+    const errorCode = classifyGatewayError(err);
+
     return {
       text: "Przepraszam, wystąpił błąd. Spróbuj ponownie za chwilę.",
       toolsUsed: [],
       channel: msg.channel,
+      errorCode,
     };
   }
 }
@@ -577,4 +581,42 @@ export async function sendOutbound(
 
   // Send via adapter
   await adapter.sendResponse(to, text);
+}
+
+/**
+ * Classify gateway errors into actionable error codes for the client.
+ */
+function classifyGatewayError(err: Error): string {
+  const msg = err.message.toLowerCase();
+
+  if (
+    msg.includes("api key") ||
+    msg.includes("api_key") ||
+    msg.includes("unauthorized") ||
+    msg.includes("401")
+  ) {
+    return "api_key_missing";
+  }
+  if (
+    msg.includes("rate limit") ||
+    msg.includes("429") ||
+    msg.includes("too many")
+  ) {
+    return "rate_limited";
+  }
+  if (
+    msg.includes("timeout") ||
+    msg.includes("timed out") ||
+    msg.includes("aborted")
+  ) {
+    return "timeout";
+  }
+  if (
+    msg.includes("overloaded") ||
+    msg.includes("529") ||
+    msg.includes("503")
+  ) {
+    return "overloaded";
+  }
+  return "internal_error";
 }

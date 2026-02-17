@@ -12,6 +12,7 @@ import {
   formatDisclosureForSms,
   formatDisclosureForEmail,
 } from "./disclosure-generator";
+import { invalidateDynamicToolCache } from "@/lib/iors/tools/dynamic-handler";
 
 function getServiceSupabase() {
   return createClient(
@@ -314,6 +315,54 @@ async function activateSkill(skillId: string): Promise<void> {
       approved_by: "user",
     })
     .eq("id", skillId);
+
+  // Register approved skill as a dynamic tool so it's callable via chat
+  try {
+    const { data: skill } = await supabase
+      .from("exo_generated_skills")
+      .select("name, description, input_schema, tenant_id")
+      .eq("id", skillId)
+      .single();
+
+    if (skill) {
+      const toolName = skill.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_|_$/g, "")
+        .slice(0, 50);
+
+      await supabase.from("exo_dynamic_tools").upsert(
+        {
+          tenant_id: skill.tenant_id,
+          name: toolName,
+          description: skill.description || `Skill: ${skill.name}`,
+          input_schema: skill.input_schema || {
+            type: "object",
+            properties: {
+              action: { type: "string", description: "Action to execute" },
+              params: { type: "object", description: "Action parameters" },
+            },
+            required: ["action"],
+          },
+          handler_type: "skill_exec",
+          handler_config: { skill_id: skillId },
+          enabled: true,
+        },
+        { onConflict: "tenant_id,name" },
+      );
+
+      invalidateDynamicToolCache(skill.tenant_id);
+      logger.info(
+        `[ApprovalGateway] Skill ${skillId} registered as dynamic tool: dyn_${toolName}`,
+      );
+    }
+  } catch (regErr) {
+    // Non-fatal: skill is approved but tool registration failed
+    logger.error(
+      `[ApprovalGateway] Failed to register skill ${skillId} as dynamic tool:`,
+      regErr,
+    );
+  }
 
   logger.info(`[ApprovalGateway] Skill ${skillId} activated`);
 }

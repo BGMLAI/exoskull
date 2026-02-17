@@ -45,6 +45,7 @@ export interface GatewayResponse {
   text: string;
   toolsUsed: string[];
   channel: GatewayChannel;
+  errorCode?: string;
 }
 
 /**

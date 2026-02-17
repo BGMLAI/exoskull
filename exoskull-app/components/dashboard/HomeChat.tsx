@@ -43,6 +43,46 @@ import { DiffViewer } from "@/components/chat/DiffViewer";
 import { TerminalOutput } from "@/components/chat/TerminalOutput";
 import { FileChange } from "@/components/chat/FileChange";
 
+function classifyClientError(msg: string): string {
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes("api key") ||
+    lower.includes("401") ||
+    lower.includes("unauthorized")
+  )
+    return "api_key_missing";
+  if (
+    lower.includes("rate limit") ||
+    lower.includes("429") ||
+    lower.includes("too many")
+  )
+    return "rate_limited";
+  if (lower.includes("timeout") || lower.includes("timed out"))
+    return "timeout";
+  if (
+    lower.includes("overloaded") ||
+    lower.includes("503") ||
+    lower.includes("529")
+  )
+    return "overloaded";
+  return "internal_error";
+}
+
+function getErrorLabel(code?: string): string {
+  switch (code) {
+    case "api_key_missing":
+      return "Brak klucza API — skontaktuj się z administratorem";
+    case "rate_limited":
+      return "Zbyt wiele wiadomości — odczekaj chwilę";
+    case "timeout":
+      return "Czas oczekiwania upłynął — spróbuj ponownie";
+    case "overloaded":
+      return "Serwer przeciążony — spróbuj za chwilę";
+    default:
+      return "Wystąpił błąd — spróbuj ponownie";
+  }
+}
+
 interface HomeChatProps {
   tenantId: string;
   assistantName?: string;
@@ -81,6 +121,7 @@ interface ChatMessage {
   content: string;
   blocks: ChatBlock[];
   timestamp: Date;
+  errorCode?: string;
 }
 
 export function HomeChat({
@@ -96,6 +137,10 @@ export function HomeChat({
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [toolActivity, setToolActivity] = useState<string | null>(null);
+  const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(
+    null,
+  );
+  const [lastErrorCode, setLastErrorCode] = useState<string | null>(null);
 
   const [isUploading, setIsUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -240,6 +285,8 @@ export function HomeChat({
 
       setChatMessages((prev) => [...prev, userMsg]);
       setIsLoading(true);
+      setLastFailedMessage(null);
+      setLastErrorCode(null);
 
       const assistantMsgId = `assistant-${Date.now()}`;
       setChatMessages((prev) => [
@@ -386,10 +433,13 @@ export function HomeChat({
                   }),
                 );
               } else if (data.type === "error") {
+                const errorLabel = getErrorLabel(data.errorCode);
+                setLastFailedMessage(messageText);
+                setLastErrorCode(data.errorCode || "internal_error");
                 setChatMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === assistantMsgId
-                      ? { ...msg, content: data.message }
+                      ? { ...msg, content: `Błąd: ${errorLabel}` }
                       : msg,
                   ),
                 );
@@ -412,10 +462,13 @@ export function HomeChat({
         if (err instanceof DOMException && err.name === "AbortError") return;
         console.error("[HomeChat] Send error:", err);
         const errorMsg = err instanceof Error ? err.message : "Nieznany błąd";
+        const errorCode = classifyClientError(errorMsg);
+        setLastFailedMessage(messageText);
+        setLastErrorCode(errorCode);
         setChatMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMsgId
-              ? { ...msg, content: `Błąd: ${errorMsg}` }
+              ? { ...msg, content: `Błąd: ${getErrorLabel(errorCode)}` }
               : msg,
           ),
         );
@@ -574,6 +627,14 @@ export function HomeChat({
         return <Clock className="w-3.5 h-3.5 text-muted-foreground" />;
     }
   };
+
+  const retryLastMessage = useCallback(() => {
+    if (lastFailedMessage) {
+      setLastFailedMessage(null);
+      setLastErrorCode(null);
+      sendMessageDirect(lastFailedMessage);
+    }
+  }, [lastFailedMessage, sendMessageDirect]);
 
   const detectFileCategory = (file: File): string => {
     const type = file.type.toLowerCase();
@@ -880,6 +941,27 @@ export function HomeChat({
           </div>
         ))}
       </div>
+
+      {/* Retry bar */}
+      {lastFailedMessage && !isLoading && (
+        <div className="px-3 py-2 border-t bg-red-50 dark:bg-red-950/50 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 min-w-0">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span className="truncate">
+              {getErrorLabel(lastErrorCode ?? undefined)}
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={retryLastMessage}
+            className="shrink-0 gap-1 border-red-300 text-red-600 hover:bg-red-100 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Ponów
+          </Button>
+        </div>
+      )}
 
       {/* Input */}
       <div className="p-3 border-t bg-muted/30">

@@ -316,14 +316,18 @@ function createLocalStream(
 
         controller.close();
       } catch (error) {
+        const errMsg = error instanceof Error ? error.message : "Unknown error";
         logger.error("[Chat Stream] Gateway processing error:", {
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: errMsg,
           tenantId,
           stack: error instanceof Error ? error.stack : undefined,
         });
+
+        // Classify error for client-side retry logic
+        const errorCode = classifyStreamError(errMsg);
         controller.enqueue(
           encoder.encode(
-            `data: ${JSON.stringify({ type: "error", message: "Wystapil blad. Sprobuj ponownie." })}\n\n`,
+            `data: ${JSON.stringify({ type: "error", message: "Wystapil blad. Sprobuj ponownie.", errorCode })}\n\n`,
           ),
         );
         controller.close();
@@ -335,6 +339,36 @@ function createLocalStream(
 // ---------------------------------------------------------------------------
 // Main Handler
 // ---------------------------------------------------------------------------
+
+function classifyStreamError(msg: string): string {
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes("api key") ||
+    lower.includes("api_key") ||
+    lower.includes("unauthorized") ||
+    lower.includes("401")
+  )
+    return "api_key_missing";
+  if (
+    lower.includes("rate limit") ||
+    lower.includes("429") ||
+    lower.includes("too many")
+  )
+    return "rate_limited";
+  if (
+    lower.includes("timeout") ||
+    lower.includes("timed out") ||
+    lower.includes("aborted")
+  )
+    return "timeout";
+  if (
+    lower.includes("overloaded") ||
+    lower.includes("529") ||
+    lower.includes("503")
+  )
+    return "overloaded";
+  return "internal_error";
+}
 
 export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
