@@ -7,6 +7,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -26,13 +27,13 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("[AppList] Error:", error);
+      logger.error("[AppList] Error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ apps: apps || [] });
   } catch (error) {
-    console.error("[AppList] Error:", error);
+    logger.error("[AppList] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

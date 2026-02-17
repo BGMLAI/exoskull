@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -60,7 +61,7 @@ export const PUT = withApiLog(async function PUT(
         .single();
 
       if (error) {
-        console.error("[Canvas] PUT pinned widget failed:", error.message);
+        logger.error("[Canvas] PUT pinned widget failed:", error.message);
         return NextResponse.json(
           { error: "Failed to update widget" },
           { status: 500 },
@@ -95,7 +96,7 @@ export const PUT = withApiLog(async function PUT(
       .single();
 
     if (error) {
-      console.error("[Canvas] PUT widget failed:", error.message);
+      logger.error("[Canvas] PUT widget failed:", error.message);
       return NextResponse.json(
         { error: "Failed to update widget" },
         { status: 500 },
@@ -104,7 +105,7 @@ export const PUT = withApiLog(async function PUT(
 
     return NextResponse.json({ widget });
   } catch (error) {
-    console.error("[Canvas] PUT error:", error);
+    logger.error("[Canvas] PUT error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -155,7 +156,7 @@ export const DELETE = withApiLog(async function DELETE(
       .eq("tenant_id", tenantId);
 
     if (error) {
-      console.error("[Canvas] DELETE widget failed:", error.message);
+      logger.error("[Canvas] DELETE widget failed:", error.message);
       return NextResponse.json(
         { error: "Failed to remove widget" },
         { status: 500 },
@@ -164,7 +165,7 @@ export const DELETE = withApiLog(async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[Canvas] DELETE error:", error);
+    logger.error("[Canvas] DELETE error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

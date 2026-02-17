@@ -204,7 +204,7 @@ Rules:
     );
     return response.content;
   } catch (error) {
-    console.error("[EveningReflection] AI formatting failed:", error);
+    logger.error("[EveningReflection] AI formatting failed:", error);
     // Fallback message
     return language === "pl"
       ? `Dobry wieczor${tenantName ? `, ${tenantName}` : ""}! Jak minal Ci dzien? Napisz kilka slow - chetnie poslucha.`
@@ -285,7 +285,7 @@ async function handler(req: NextRequest) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
         results.errors.push(`${tenant.id}: ${errorMessage}`);
-        console.error(
+        logger.error(
           `[EveningReflection] Error processing tenant ${tenant.id}:`,
           error,
         );
@@ -302,7 +302,7 @@ async function handler(req: NextRequest) {
     logger.info("[EveningReflection] Completed:", response);
     return NextResponse.json(response);
   } catch (error) {
-    console.error("[EveningReflection] Fatal error:", error);
+    logger.error("[EveningReflection] Fatal error:", error);
     return NextResponse.json(
       {
         success: false,

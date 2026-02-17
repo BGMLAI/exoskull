@@ -20,6 +20,7 @@ import { callUser } from "@/lib/communication/outbound-caller";
 import type { OutboundCallRequest } from "@/lib/communication/outbound-caller";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const VALID_REASONS: OutboundCallRequest["reason"][] = [
@@ -70,7 +71,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       status: result.success ? 200 : 422,
     });
   } catch (error) {
-    console.error("[OutboundCallAPI] Error:", {
+    logger.error("[OutboundCallAPI] Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(

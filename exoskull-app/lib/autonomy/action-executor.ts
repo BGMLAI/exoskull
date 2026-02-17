@@ -113,7 +113,7 @@ export class ActionExecutor {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error(`[ActionExecutor] Error executing ${request.type}:`, error);
+      logger.error(`[ActionExecutor] Error executing ${request.type}:`, error);
 
       // Record error for circuit breaker
       if (!request.skipPermissionCheck) {
@@ -544,7 +544,7 @@ export class ActionExecutor {
         .single();
 
       if (loadError || !automation) {
-        console.error("[ActionExecutor] Automation not found:", {
+        logger.error("[ActionExecutor] Automation not found:", {
           automationId,
           error: loadError?.message,
         });
@@ -558,7 +558,7 @@ export class ActionExecutor {
 
       // 2. Verify tenant ownership
       if (automation.tenant_id !== request.tenantId) {
-        console.error("[ActionExecutor] Tenant mismatch for automation:", {
+        logger.error("[ActionExecutor] Tenant mismatch for automation:", {
           automationId,
           automationTenant: automation.tenant_id,
           requestTenant: request.tenantId,
@@ -690,7 +690,7 @@ export class ActionExecutor {
         })
         .then(({ error: logError }) => {
           if (logError) {
-            console.error(
+            logger.error(
               "[ActionExecutor] Failed to log automation execution:",
               {
                 automationId,
@@ -732,7 +732,7 @@ export class ActionExecutor {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error("[ActionExecutor] handleRunAutomation failed:", {
+      logger.error("[ActionExecutor] handleRunAutomation failed:", {
         automationId,
         error: errorMessage,
         stack: error instanceof Error ? error.stack : undefined,
@@ -762,7 +762,7 @@ export class ActionExecutor {
         const availableActions = Object.keys(this.customActionRegistry).join(
           ", ",
         );
-        console.error("[ActionExecutor] Unknown custom action:", {
+        logger.error("[ActionExecutor] Unknown custom action:", {
           actionName,
           availableActions,
         });
@@ -802,7 +802,7 @@ export class ActionExecutor {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      console.error("[ActionExecutor] handleCustomAction failed:", {
+      logger.error("[ActionExecutor] handleCustomAction failed:", {
         actionName,
         error: errorMessage,
         stack: error instanceof Error ? error.stack : undefined,
@@ -845,7 +845,7 @@ export class ActionExecutor {
         agent_id: "action-executor",
       });
     } catch (error) {
-      console.error("[ActionExecutor] Failed to log execution:", error);
+      logger.error("[ActionExecutor] Failed to log execution:", error);
     }
   }
 

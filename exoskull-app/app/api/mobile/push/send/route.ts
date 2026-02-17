@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendPushToTenant } from "@/lib/push/fcm";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const POST = withApiLog(async function POST(req: NextRequest) {
   // Internal auth via CRON_SECRET
   const authHeader = req.headers.get("authorization");
@@ -40,7 +41,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("[PushSend] Error:", {
+    logger.error("[PushSend] Error:", {
       error: error instanceof Error ? error.message : error,
       tenantId,
     });

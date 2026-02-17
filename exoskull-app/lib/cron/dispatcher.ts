@@ -234,7 +234,7 @@ export async function dispatchVoiceCall(
         provider: "twilio",
       };
     } else {
-      console.error(
+      logger.error(
         `[Dispatcher] Twilio call failed for ${user.tenant_id}:`,
         data,
       );
@@ -247,7 +247,7 @@ export async function dispatchVoiceCall(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(
+    logger.error(
       `[Dispatcher] Twilio dispatch error for ${user.tenant_id}:`,
       errorMessage,
     );
@@ -346,7 +346,7 @@ export async function dispatchSms(
         provider: "twilio",
       };
     } else {
-      console.error(`[Dispatcher] SMS failed for ${user.tenant_id}:`, data);
+      logger.error(`[Dispatcher] SMS failed for ${user.tenant_id}:`, data);
       return {
         success: false,
         channel: "sms",
@@ -356,10 +356,7 @@ export async function dispatchSms(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(
-      `[Dispatcher] SMS error for ${user.tenant_id}:`,
-      errorMessage,
-    );
+    logger.error(`[Dispatcher] SMS error for ${user.tenant_id}:`, errorMessage);
     return { success: false, channel: "sms", error: errorMessage };
   }
 }
@@ -421,7 +418,7 @@ export async function dispatchEmail(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(
+      logger.error(
         `[Dispatcher] Email failed for ${user.tenant_id}:`,
         errorText,
       );
@@ -437,7 +434,7 @@ export async function dispatchEmail(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(
+    logger.error(
       `[Dispatcher] Email error for ${user.tenant_id}:`,
       errorMessage,
     );
@@ -488,7 +485,7 @@ export async function dispatchWhatsApp(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(`[Dispatcher] WhatsApp error for ${user.tenant_id}:`, {
+    logger.error(`[Dispatcher] WhatsApp error for ${user.tenant_id}:`, {
       error: errorMessage,
       phone: user.phone,
     });
@@ -541,7 +538,7 @@ export async function dispatchMessenger(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(`[Dispatcher] Messenger error for ${user.tenant_id}:`, {
+    logger.error(`[Dispatcher] Messenger error for ${user.tenant_id}:`, {
       error: errorMessage,
       psid: messengerPsid,
     });
@@ -584,7 +581,7 @@ export async function dispatchTelegram(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(`[Dispatcher] Telegram error for ${user.tenant_id}:`, {
+    logger.error(`[Dispatcher] Telegram error for ${user.tenant_id}:`, {
       error: errorMessage,
       chatId,
     });
@@ -629,7 +626,7 @@ export async function dispatchSlack(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(`[Dispatcher] Slack error for ${user.tenant_id}:`, {
+    logger.error(`[Dispatcher] Slack error for ${user.tenant_id}:`, {
       error: errorMessage,
       channelId: slackChannelId,
     });
@@ -674,7 +671,7 @@ export async function dispatchDiscord(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(`[Dispatcher] Discord error for ${user.tenant_id}:`, {
+    logger.error(`[Dispatcher] Discord error for ${user.tenant_id}:`, {
       error: errorMessage,
       channelId: discordChannelId,
     });
@@ -717,7 +714,7 @@ export async function dispatchSignal(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(`[Dispatcher] Signal error for ${user.tenant_id}:`, {
+    logger.error(`[Dispatcher] Signal error for ${user.tenant_id}:`, {
       error: errorMessage,
       phone: signalPhone,
     });
@@ -760,7 +757,7 @@ export async function dispatchImessage(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(`[Dispatcher] iMessage error for ${user.tenant_id}:`, {
+    logger.error(`[Dispatcher] iMessage error for ${user.tenant_id}:`, {
       error: errorMessage,
       address: imessageAddress,
     });

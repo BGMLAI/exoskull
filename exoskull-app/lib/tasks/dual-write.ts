@@ -15,6 +15,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
@@ -87,7 +88,7 @@ async function isDualWriteEnabled(
     .single();
 
   if (error || !data) {
-    console.warn("[DualWrite] Failed to check feature flags:", error);
+    logger.warn("[DualWrite] Failed to check feature flags:", error);
     return false;
   }
 
@@ -162,7 +163,7 @@ export async function dualWriteTask(
     .single();
 
   if (legacyError || !legacyTask) {
-    console.error("[DualWrite] Legacy task insert failed:", legacyError);
+    logger.error("[DualWrite] Legacy task insert failed:", legacyError);
     return {
       id: "",
       dual_write_success: false,
@@ -201,7 +202,7 @@ export async function dualWriteTask(
       .single();
 
     if (tyrolkaError || !tyrolkaOp) {
-      console.error(
+      logger.error(
         "[DualWrite] Tyrolka ops insert failed (legacy write succeeded):",
         tyrolkaError,
       );
@@ -231,7 +232,7 @@ export async function dualWriteTask(
       },
     });
 
-    console.log(
+    logger.info(
       `[DualWrite] Task ${legacyId} written to both legacy and Tyrolka`,
     );
 
@@ -242,7 +243,7 @@ export async function dualWriteTask(
       dual_write_success: true,
     };
   } catch (error) {
-    console.error("[DualWrite] Tyrolka write failed with exception:", error);
+    logger.error("[DualWrite] Tyrolka write failed with exception:", error);
     return {
       id: legacyId,
       legacy_id: legacyId,
@@ -289,7 +290,7 @@ export async function dualWriteGoal(
     .single();
 
   if (legacyError || !legacyGoal) {
-    console.error("[DualWrite] Legacy goal insert failed:", legacyError);
+    logger.error("[DualWrite] Legacy goal insert failed:", legacyError);
     return {
       id: "",
       dual_write_success: false,
@@ -327,7 +328,7 @@ export async function dualWriteGoal(
       .single();
 
     if (tyrolkaError || !tyrolkaQuest) {
-      console.error(
+      logger.error(
         "[DualWrite] Tyrolka quest insert failed (legacy write succeeded):",
         tyrolkaError,
       );
@@ -356,7 +357,7 @@ export async function dualWriteGoal(
       },
     });
 
-    console.log(
+    logger.info(
       `[DualWrite] Goal ${legacyId} written to both legacy and Tyrolka`,
     );
 
@@ -367,7 +368,7 @@ export async function dualWriteGoal(
       dual_write_success: true,
     };
   } catch (error) {
-    console.error("[DualWrite] Tyrolka write failed with exception:", error);
+    logger.error("[DualWrite] Tyrolka write failed with exception:", error);
     return {
       id: legacyId,
       legacy_id: legacyId,
@@ -403,7 +404,7 @@ export async function dualUpdateTask(
     .eq("tenant_id", tenantId);
 
   if (legacyError) {
-    console.error("[DualUpdate] Legacy task update failed:", legacyError);
+    logger.error("[DualUpdate] Legacy task update failed:", legacyError);
     return { success: false, error: legacyError.message };
   }
 
@@ -433,7 +434,7 @@ export async function dualUpdateTask(
       .eq("tenant_id", tenantId);
 
     if (tyrolkaError) {
-      console.error("[DualUpdate] Tyrolka ops update failed:", tyrolkaError);
+      logger.error("[DualUpdate] Tyrolka ops update failed:", tyrolkaError);
       return {
         success: false,
         error: `Tyrolka update failed: ${tyrolkaError.message}`,
@@ -442,7 +443,7 @@ export async function dualUpdateTask(
 
     return { success: true };
   } catch (error) {
-    console.error("[DualUpdate] Tyrolka update failed with exception:", error);
+    logger.error("[DualUpdate] Tyrolka update failed with exception:", error);
     return {
       success: false,
       error: `Tyrolka exception: ${error instanceof Error ? error.message : "Unknown"}`,
@@ -469,7 +470,7 @@ export async function dualUpdateGoal(
     .eq("tenant_id", tenantId);
 
   if (legacyError) {
-    console.error("[DualUpdate] Legacy goal update failed:", legacyError);
+    logger.error("[DualUpdate] Legacy goal update failed:", legacyError);
     return { success: false, error: legacyError.message };
   }
 
@@ -498,7 +499,7 @@ export async function dualUpdateGoal(
       .eq("tenant_id", tenantId);
 
     if (tyrolkaError) {
-      console.error("[DualUpdate] Tyrolka quest update failed:", tyrolkaError);
+      logger.error("[DualUpdate] Tyrolka quest update failed:", tyrolkaError);
       return {
         success: false,
         error: `Tyrolka update failed: ${tyrolkaError.message}`,
@@ -507,7 +508,7 @@ export async function dualUpdateGoal(
 
     return { success: true };
   } catch (error) {
-    console.error("[DualUpdate] Tyrolka update failed with exception:", error);
+    logger.error("[DualUpdate] Tyrolka update failed with exception:", error);
     return {
       success: false,
       error: `Tyrolka exception: ${error instanceof Error ? error.message : "Unknown"}`,

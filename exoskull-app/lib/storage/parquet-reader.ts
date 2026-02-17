@@ -123,7 +123,7 @@ export async function readParquetFromR2<T>(
       metadata,
     };
   } catch (error) {
-    console.error("[ParquetReader] Failed to read Parquet:", error);
+    logger.error("[ParquetReader] Failed to read Parquet:", error);
     return {
       success: false,
       error:
@@ -204,7 +204,7 @@ export async function readBronzeFilesSince<T>(params: {
       files: processedFiles,
     };
   } catch (error) {
-    console.error("[ParquetReader] Failed to read Bronze files:", error);
+    logger.error("[ParquetReader] Failed to read Bronze files:", error);
     return {
       success: false,
       records: [],

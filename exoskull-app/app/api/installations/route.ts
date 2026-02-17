@@ -3,6 +3,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/installations - Get user's installed Mods, Rigs, and Quests
@@ -27,7 +28,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       .order("installed_at", { ascending: false });
 
     if (error) {
-      console.error("[Installations] Error fetching:", error);
+      logger.error("[Installations] Error fetching:", error);
       return NextResponse.json(
         { error: "Failed to fetch installations" },
         { status: 500 },
@@ -75,7 +76,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[Installations] Unexpected error:", error);
+    logger.error("[Installations] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -166,7 +167,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error("[Installations] Insert error:", insertError);
+      logger.error("[Installations] Insert error:", insertError);
       return NextResponse.json({ error: "Failed to install" }, { status: 500 });
     }
 
@@ -176,7 +177,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       message: `${registryItem.name} installed successfully`,
     });
   } catch (error) {
-    console.error("[Installations] Unexpected error:", error);
+    logger.error("[Installations] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

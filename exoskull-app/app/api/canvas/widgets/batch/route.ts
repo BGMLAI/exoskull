@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 interface LayoutItem {
@@ -60,7 +61,7 @@ export const PUT = withApiLog(async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, updated });
   } catch (error) {
-    console.error("[Canvas] Batch PUT error:", error);
+    logger.error("[Canvas] Batch PUT error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

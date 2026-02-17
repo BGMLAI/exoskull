@@ -7,6 +7,7 @@
 
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export type ActivityType =
   | "chat_message"
   | "tool_call"
@@ -31,7 +32,7 @@ export interface LogActivityParams {
  */
 export function logActivity(params: LogActivityParams): void {
   _logActivityAsync(params).catch((err) => {
-    console.error("[ActivityLog] Failed to log activity:", {
+    logger.error("[ActivityLog] Failed to log activity:", {
       error: err instanceof Error ? err.message : err,
       actionName: params.actionName,
       tenantId: params.tenantId,
@@ -53,7 +54,7 @@ async function _logActivityAsync(params: LogActivityParams): Promise<void> {
   });
 
   if (error) {
-    console.error("[ActivityLog] Insert failed:", {
+    logger.error("[ActivityLog] Insert failed:", {
       error: error.message,
       tenantId: params.tenantId,
       actionName: params.actionName,
@@ -68,7 +69,7 @@ export function logActivities(entries: LogActivityParams[]): void {
   if (entries.length === 0) return;
 
   _logActivitiesBatch(entries).catch((err) => {
-    console.error("[ActivityLog] Batch log failed:", {
+    logger.error("[ActivityLog] Batch log failed:", {
       error: err instanceof Error ? err.message : err,
       count: entries.length,
     });
@@ -93,7 +94,7 @@ async function _logActivitiesBatch(
   const { error } = await supabase.from("exo_activity_log").insert(rows);
 
   if (error) {
-    console.error("[ActivityLog] Batch insert failed:", {
+    logger.error("[ActivityLog] Batch insert failed:", {
       error: error.message,
       count: rows.length,
     });

@@ -120,7 +120,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
         results[phrase.key] = { success: false, error: errorMessage };
-        console.error(`❌ Failed ${phrase.key}:`, errorMessage);
+        logger.error(`❌ Failed ${phrase.key}:`, errorMessage);
       }
     }
 
@@ -141,7 +141,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       results,
     });
   } catch (error) {
-    console.error("❌ Audio cache generation error:", error);
+    logger.error("❌ Audio cache generation error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",
@@ -187,7 +187,7 @@ export const GET = withApiLog(async function GET() {
       phrases: status,
     });
   } catch (error) {
-    console.error("❌ Error fetching cache status:", error);
+    logger.error("❌ Error fetching cache status:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",

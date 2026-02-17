@@ -12,6 +12,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@supabase/supabase-js";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const POST = withApiLog(async function POST(req: NextRequest) {
   const auth = await verifyTenantAuth(req);
   if (!auth.ok) return auth.response;
@@ -45,7 +46,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     );
 
     if (error) {
-      console.error("[PushRegister] Failed to register token:", error);
+      logger.error("[PushRegister] Failed to register token:", error);
       return NextResponse.json(
         { error: "Failed to register token" },
         { status: 500 },
@@ -54,7 +55,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[PushRegister] Error:", {
+    logger.error("[PushRegister] Error:", {
       error: error instanceof Error ? error.message : error,
       userId: tenantId,
     });
@@ -91,7 +92,7 @@ export const DELETE = withApiLog(async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[PushRegister] Delete error:", {
+    logger.error("[PushRegister] Delete error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(

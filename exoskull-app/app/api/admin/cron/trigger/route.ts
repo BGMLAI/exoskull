@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin/auth";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const CRON_ROUTES: Record<string, string> = {
@@ -62,7 +63,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     });
   } catch (error) {
     if (error instanceof Response) return error;
-    console.error("[AdminCronTrigger] Error:", error);
+    logger.error("[AdminCronTrigger] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

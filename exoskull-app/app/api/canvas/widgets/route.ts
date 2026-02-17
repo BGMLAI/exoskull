@@ -15,6 +15,7 @@ import {
 import type { CanvasWidget } from "@/lib/canvas/types";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -40,7 +41,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       .order("position_x");
 
     if (error) {
-      console.error("[Canvas] GET widgets failed:", error.message);
+      logger.error("[Canvas] GET widgets failed:", error.message);
       return NextResponse.json(
         { error: "Failed to load widgets" },
         { status: 500 },
@@ -86,7 +87,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
 
     return NextResponse.json({ widgets });
   } catch (error) {
-    console.error("[Canvas] GET error:", error);
+    logger.error("[Canvas] GET error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -150,7 +151,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
           { status: 409 },
         );
       }
-      console.error("[Canvas] POST widget failed:", error.message);
+      logger.error("[Canvas] POST widget failed:", error.message);
       return NextResponse.json(
         { error: "Failed to add widget" },
         { status: 500 },
@@ -159,7 +160,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     return NextResponse.json({ widget }, { status: 201 });
   } catch (error) {
-    console.error("[Canvas] POST error:", error);
+    logger.error("[Canvas] POST error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

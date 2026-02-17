@@ -18,6 +18,7 @@
 import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // RETRY WRAPPER — 3 attempts, exponential backoff
 // ============================================================================
@@ -37,7 +38,7 @@ async function retryQuery<T>(
 
       if (result.error) {
         lastError = result.error;
-        console.warn(
+        logger.warn(
           `[EmailTools:${label}] Attempt ${attempt}/${MAX_RETRIES} query error:`,
           {
             error: result.error.message,
@@ -53,13 +54,13 @@ async function retryQuery<T>(
       }
 
       if (attempt > 1) {
-        console.info(`[EmailTools:${label}] Succeeded on attempt ${attempt}`);
+        logger.info(`[EmailTools:${label}] Succeeded on attempt ${attempt}`);
       }
       return result;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       lastError = { message: msg };
-      console.warn(
+      logger.warn(
         `[EmailTools:${label}] Attempt ${attempt}/${MAX_RETRIES} threw:`,
         {
           error: msg,
@@ -136,7 +137,7 @@ export const emailTools: ToolDefinition[] = [
       const since = new Date(Date.now() - daysBack * 86400_000).toISOString();
       const searchQuery = input.query as string;
 
-      console.info("[EmailTools:search_emails:start]", {
+      logger.info("[EmailTools:search_emails:start]", {
         tenantId: tenantId.slice(0, 8),
         query: searchQuery,
         daysBack,
@@ -176,7 +177,7 @@ export const emailTools: ToolDefinition[] = [
       });
 
       if (result.error) {
-        console.error("[EmailTools:search_emails:failed]", {
+        logger.error("[EmailTools:search_emails:failed]", {
           tenantId: tenantId.slice(0, 8),
           error: result.error.message,
         });
@@ -199,7 +200,7 @@ export const emailTools: ToolDefinition[] = [
         return `Nie znaleziono emaili pasujacych do "${searchQuery}"`;
       }
 
-      console.info("[EmailTools:search_emails:success]", {
+      logger.info("[EmailTools:search_emails:success]", {
         tenantId: tenantId.slice(0, 8),
         results: emails.length,
       });
@@ -302,7 +303,7 @@ export const emailTools: ToolDefinition[] = [
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      console.info("[EmailTools:email_summary:start]", {
+      logger.info("[EmailTools:email_summary:start]", {
         tenantId: tenantId.slice(0, 8),
       });
 
@@ -393,7 +394,7 @@ export const emailTools: ToolDefinition[] = [
         }
       }
 
-      console.info("[EmailTools:email_summary:success]", {
+      logger.info("[EmailTools:email_summary:success]", {
         tenantId: tenantId.slice(0, 8),
         unread,
         urgent,
@@ -445,7 +446,7 @@ export const emailTools: ToolDefinition[] = [
       const supabase = getServiceSupabase();
       const includeOverdue = input.include_overdue !== false;
 
-      console.info("[EmailTools:email_follow_ups:start]", {
+      logger.info("[EmailTools:email_follow_ups:start]", {
         tenantId: tenantId.slice(0, 8),
         includeOverdue,
       });
@@ -470,7 +471,7 @@ export const emailTools: ToolDefinition[] = [
       });
 
       if (result.error) {
-        console.error("[EmailTools:email_follow_ups:failed]", {
+        logger.error("[EmailTools:email_follow_ups:failed]", {
           tenantId: tenantId.slice(0, 8),
           error: result.error.message,
         });
@@ -515,7 +516,7 @@ export const emailTools: ToolDefinition[] = [
         header += `\n${overdueCount} przeterminowanych!`;
       }
 
-      console.info("[EmailTools:email_follow_ups:success]", {
+      logger.info("[EmailTools:email_follow_ups:success]", {
         tenantId: tenantId.slice(0, 8),
         total: emails.length,
         overdue: overdueCount,
@@ -548,7 +549,7 @@ export const emailTools: ToolDefinition[] = [
       const supabase = getServiceSupabase();
       const emailAddr = (input.email as string).toLowerCase();
 
-      console.info("[EmailTools:email_sender_info:start]", {
+      logger.info("[EmailTools:email_sender_info:start]", {
         tenantId: tenantId.slice(0, 8),
         email: emailAddr,
       });
@@ -621,7 +622,7 @@ export const emailTools: ToolDefinition[] = [
         }
       }
 
-      console.info("[EmailTools:email_sender_info:success]", {
+      logger.info("[EmailTools:email_sender_info:success]", {
         tenantId: tenantId.slice(0, 8),
         email: emailAddr,
         hasProfile: !!profile,
@@ -643,7 +644,7 @@ async function fetchFullEmail(
 ): Promise<string> {
   const supabase = getServiceSupabase();
 
-  console.info("[EmailTools:get_full_email:start]", {
+  logger.info("[EmailTools:get_full_email:start]", {
     tenantId: tenantId.slice(0, 8),
     hasId: !!input.email_id,
     subject: input.subject ? String(input.subject).slice(0, 40) : undefined,
@@ -683,7 +684,7 @@ async function fetchFullEmail(
   const result = await retryQuery("get_full_email:query", queryFn);
 
   if (result.error) {
-    console.error("[EmailTools:get_full_email:failed]", {
+    logger.error("[EmailTools:get_full_email:failed]", {
       tenantId: tenantId.slice(0, 8),
       error: result.error.message,
     });
@@ -784,7 +785,7 @@ async function fetchFullEmail(
     lines.push(`\nFOLLOW-UP wymagany do: ${followBy}`);
   }
 
-  console.info("[EmailTools:get_full_email:success]", {
+  logger.info("[EmailTools:get_full_email:success]", {
     tenantId: tenantId.slice(0, 8),
     emailId: e.id,
     bodyLength: (e.body_text || "").length,

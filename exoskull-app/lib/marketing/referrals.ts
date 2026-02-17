@@ -83,7 +83,7 @@ export async function processReferralSignup(
 
     return { success: true, referrerId: referrer.id };
   } catch (error) {
-    console.error("[Referrals] processReferralSignup error:", {
+    logger.error("[Referrals] processReferralSignup error:", {
       error: error instanceof Error ? error.message : String(error),
       referralCode,
       newTenantId,
@@ -156,7 +156,7 @@ export async function grantReferralReward(
       reward: rewardAmount,
     });
   } catch (error) {
-    console.error("[Referrals] grantReferralReward error:", {
+    logger.error("[Referrals] grantReferralReward error:", {
       error: error instanceof Error ? error.message : String(error),
       referredTenantId,
     });

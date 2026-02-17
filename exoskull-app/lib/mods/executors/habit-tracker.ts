@@ -5,6 +5,7 @@
 import { IModExecutor, ModInsight, ModAction, ModSlug } from "../types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // Types
 // =====================================================
@@ -73,7 +74,7 @@ export class HabitTrackerExecutor implements IModExecutor {
         .order("created_at", { ascending: true });
 
       if (habitsError) {
-        console.error("[HabitTracker] Error fetching habits:", habitsError);
+        logger.error("[HabitTracker] Error fetching habits:", habitsError);
         throw habitsError;
       }
 
@@ -92,7 +93,7 @@ export class HabitTrackerExecutor implements IModExecutor {
           .order("completed_at", { ascending: false });
 
       if (completionsError) {
-        console.error(
+        logger.error(
           "[HabitTracker] Error fetching completions:",
           completionsError,
         );
@@ -161,7 +162,7 @@ export class HabitTrackerExecutor implements IModExecutor {
         },
       };
     } catch (error) {
-      console.error("[HabitTracker] getData error:", error);
+      logger.error("[HabitTracker] getData error:", error);
       return {
         habits: [],
         today: { completed: 0, pending: 0, total: 0, progress_percent: 0 },
@@ -302,7 +303,7 @@ export class HabitTrackerExecutor implements IModExecutor {
 
       return insights;
     } catch (error) {
-      console.error("[HabitTracker] getInsights error:", error);
+      logger.error("[HabitTracker] getInsights error:", error);
       return [
         {
           type: "warning",
@@ -356,7 +357,7 @@ export class HabitTrackerExecutor implements IModExecutor {
             .single();
 
           if (error) {
-            console.error("[HabitTracker] create_habit error:", error);
+            logger.error("[HabitTracker] create_habit error:", error);
             return { success: false, error: error.message };
           }
 
@@ -417,7 +418,7 @@ export class HabitTrackerExecutor implements IModExecutor {
             .single();
 
           if (error) {
-            console.error("[HabitTracker] complete_habit error:", error);
+            logger.error("[HabitTracker] complete_habit error:", error);
             return { success: false, error: error.message };
           }
 
@@ -528,7 +529,7 @@ export class HabitTrackerExecutor implements IModExecutor {
           return { success: false, error: `Unknown action: ${action}` };
       }
     } catch (error) {
-      console.error("[HabitTracker] executeAction error:", error);
+      logger.error("[HabitTracker] executeAction error:", error);
       return {
         success: false,
         error: (error as Error).message,

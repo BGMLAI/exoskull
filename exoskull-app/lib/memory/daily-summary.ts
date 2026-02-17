@@ -95,7 +95,7 @@ async function getTodayMessages(
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("[DailySummary] Failed to fetch messages:", error);
+    logger.error("[DailySummary] Failed to fetch messages:", error);
     return [];
   }
 
@@ -224,7 +224,7 @@ Odpowiedz w formacie JSON:
     // Parse JSON response
     const jsonMatch = response.content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      console.error("[DailySummary] Failed to parse AI response");
+      logger.error("[DailySummary] Failed to parse AI response");
       return {
         draft_summary: `Dziś było ${messages.length} wiadomości. Ukończono ${tasks.completed} zadań.`,
         mood_score: null,
@@ -268,7 +268,7 @@ Odpowiedz w formacie JSON:
       ),
     };
   } catch (error) {
-    console.error("[DailySummary] AI generation failed:", error);
+    logger.error("[DailySummary] AI generation failed:", error);
     return {
       draft_summary: `Dziś było ${messages.length} wiadomości. Ukończono ${tasks.completed} zadań.`,
       mood_score: null,
@@ -339,7 +339,7 @@ export async function createDailySummary(
       .single();
 
     if (error) {
-      console.error("[DailySummary] Update failed:", error);
+      logger.error("[DailySummary] Update failed:", error);
       return null;
     }
     return data as DailySummary;
@@ -352,7 +352,7 @@ export async function createDailySummary(
       .single();
 
     if (error) {
-      console.error("[DailySummary] Insert failed:", error);
+      logger.error("[DailySummary] Insert failed:", error);
       return null;
     }
     return data as DailySummary;
@@ -376,7 +376,7 @@ export async function applyCorrection(
     .single();
 
   if (!current) {
-    console.error("[DailySummary] Summary not found");
+    logger.error("[DailySummary] Summary not found");
     return null;
   }
 
@@ -399,7 +399,7 @@ export async function applyCorrection(
     .single();
 
   if (error) {
-    console.error("[DailySummary] Correction failed:", error);
+    logger.error("[DailySummary] Correction failed:", error);
     return null;
   }
 
@@ -423,7 +423,7 @@ export async function finalizeSummary(
     .single();
 
   if (!current) {
-    console.error("[DailySummary] Summary not found");
+    logger.error("[DailySummary] Summary not found");
     return null;
   }
 
@@ -465,7 +465,7 @@ Napisz poprawione podsumowanie (zachowaj styl, uwzględnij wszystkie korekty):`;
       });
       finalSummary = response.content;
     } catch (error) {
-      console.error("[DailySummary] Finalization AI failed:", error);
+      logger.error("[DailySummary] Finalization AI failed:", error);
       // Fall back to draft with manual corrections
       finalSummary = current.draft_summary || "";
     }
@@ -485,7 +485,7 @@ Napisz poprawione podsumowanie (zachowaj styl, uwzględnij wszystkie korekty):`;
     .single();
 
   if (error) {
-    console.error("[DailySummary] Finalization save failed:", error);
+    logger.error("[DailySummary] Finalization save failed:", error);
     return null;
   }
 
@@ -565,7 +565,7 @@ export async function getRecentSummaries(
     .order("summary_date", { ascending: false });
 
   if (error) {
-    console.error("[DailySummary] Failed to fetch recent summaries:", error);
+    logger.error("[DailySummary] Failed to fetch recent summaries:", error);
     return [];
   }
 

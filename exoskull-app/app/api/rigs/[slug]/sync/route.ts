@@ -431,7 +431,7 @@ export const POST = withApiLog(async function POST(
     const duration = Date.now() - startTime;
     const errorMessage = (error as Error).message;
 
-    console.error(`[Rig Sync] ${slug} failed:`, error);
+    logger.error(`[Rig Sync] ${slug} failed:`, error);
 
     // Update connection status
     await supabase
@@ -520,7 +520,7 @@ async function upsertHealthMetrics(metrics: HealthMetricInsert[]) {
     });
 
   if (error) {
-    console.error("[Rig Sync] Failed to upsert health metrics:", {
+    logger.error("[Rig Sync] Failed to upsert health metrics:", {
       error: error.message,
       count: metrics.length,
     });

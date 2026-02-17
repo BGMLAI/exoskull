@@ -83,7 +83,7 @@ async function postHandler(req: NextRequest) {
       error_details: errorMessages,
     });
   } catch (error) {
-    console.error("[Silver ETL] Fatal error:", error);
+    logger.error("[Silver ETL] Fatal error:", error);
     return NextResponse.json(
       {
         status: "failed",

@@ -69,7 +69,7 @@ export async function generateSkill(
         lastValidationErrors = staticResult.blockedPatterns.map(
           (p) => p.pattern,
         );
-        console.error(
+        logger.error(
           "[SkillGenerator] Static analysis failed:",
           staticResult.blockedPatterns,
         );
@@ -81,7 +81,7 @@ export async function generateSkill(
       if (!schemaResult.valid) {
         lastError = "Schema validation failed";
         lastValidationErrors = schemaResult.errors;
-        console.error(
+        logger.error(
           "[SkillGenerator] Schema validation failed:",
           schemaResult.errors,
         );
@@ -96,7 +96,7 @@ export async function generateSkill(
       if (!securityAudit.passed) {
         lastError = "Security audit failed";
         lastValidationErrors = securityAudit.blockedPatterns;
-        console.error("[SkillGenerator] Security audit failed:", securityAudit);
+        logger.error("[SkillGenerator] Security audit failed:", securityAudit);
         continue;
       }
 
@@ -110,10 +110,7 @@ export async function generateSkill(
       if (!smokeResult.passed) {
         lastError = "Smoke test failed — generated code crashes at runtime";
         lastValidationErrors = smokeResult.errors;
-        console.error(
-          "[SkillGenerator] Smoke test failed:",
-          smokeResult.errors,
-        );
+        logger.error("[SkillGenerator] Smoke test failed:", smokeResult.errors);
         continue;
       }
 
@@ -152,7 +149,7 @@ export async function generateSkill(
         .single();
 
       if (insertError) {
-        console.error("[SkillGenerator] DB insert error:", insertError);
+        logger.error("[SkillGenerator] DB insert error:", insertError);
         return {
           success: false,
           error: `Database error: ${insertError.message}`,
@@ -169,7 +166,7 @@ export async function generateSkill(
       };
     } catch (error) {
       lastError = (error as Error).message;
-      console.error(`[SkillGenerator] Attempt ${attempt} failed:`, error);
+      logger.error(`[SkillGenerator] Attempt ${attempt} failed:`, error);
     }
   }
 

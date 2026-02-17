@@ -51,7 +51,7 @@ export const GET = withApiLog(async function GET(
     }
 
     if (!config.clientId) {
-      console.error(`[MagicConnect] Missing client ID for ${slug}`);
+      logger.error(`[MagicConnect] Missing client ID for ${slug}`);
       return NextResponse.json(
         {
           error: `${slug} integration is not configured. Missing API credentials.`,
@@ -74,7 +74,7 @@ export const GET = withApiLog(async function GET(
 
     return NextResponse.redirect(authUrl);
   } catch (error) {
-    console.error("[MagicConnect] Error:", error);
+    logger.error("[MagicConnect] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

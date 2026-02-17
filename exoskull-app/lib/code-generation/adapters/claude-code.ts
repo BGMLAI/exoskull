@@ -14,6 +14,7 @@ import {
 } from "../prompts/code-gen-prompt";
 import { parseCodeResponse } from "../response-parser";
 
+import { logger } from "@/lib/logger";
 export class ClaudeCodeAdapter implements CodeExecutor {
   model = "claude-code" as const;
 
@@ -36,7 +37,7 @@ export class ClaudeCodeAdapter implements CodeExecutor {
     try {
       const { aiChat } = await import("@/lib/ai");
 
-      console.log("[ClaudeCode] Generating code:", {
+      logger.info("[ClaudeCode] Generating code:", {
         tenantId: this.tenantId,
         description: task.description.slice(0, 80),
         requirements: task.requirements.length,
@@ -58,7 +59,7 @@ export class ClaudeCodeAdapter implements CodeExecutor {
       const parsed = parseCodeResponse(response.content);
 
       if (parsed.files.length === 0) {
-        console.warn("[ClaudeCode] No files parsed from response:", {
+        logger.warn("[ClaudeCode] No files parsed from response:", {
           contentLength: response.content.length,
           preview: response.content.slice(0, 200),
         });
@@ -71,7 +72,7 @@ export class ClaudeCodeAdapter implements CodeExecutor {
         };
       }
 
-      console.log("[ClaudeCode] Generated:", {
+      logger.info("[ClaudeCode] Generated:", {
         files: parsed.files.length,
         duration: Date.now() - startTime,
       });
@@ -85,7 +86,7 @@ export class ClaudeCodeAdapter implements CodeExecutor {
         dependencies: parsed.dependencies,
       };
     } catch (error) {
-      console.error("[ClaudeCode] Execution failed:", {
+      logger.error("[ClaudeCode] Execution failed:", {
         error: error instanceof Error ? error.message : String(error),
         tenantId: this.tenantId,
         task: task.description.slice(0, 100),

@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { DataPoint } from "@/lib/dashboard/types";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -99,7 +100,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       lastUpdated: now.toISOString(),
     });
   } catch (error) {
-    console.error("[Canvas] Conversations data error:", error);
+    logger.error("[Canvas] Conversations data error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

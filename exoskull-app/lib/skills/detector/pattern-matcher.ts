@@ -15,6 +15,7 @@ import type {
   SkillSuggestion,
 } from "./types";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // TOPIC → MOD MAPPING
 // =====================================================
@@ -120,7 +121,7 @@ export async function matchPatterns(
 
     return gaps;
   } catch (error) {
-    console.error("[PatternMatcher] Error:", {
+    logger.error("[PatternMatcher] Error:", {
       error: error instanceof Error ? error.message : error,
       tenant_id: context.tenant_id,
     });
@@ -200,7 +201,7 @@ Return ONLY valid JSON array, no markdown, no explanation.`,
         sample_mentions: t.sample_mentions || [],
       }));
   } catch (error) {
-    console.error("[PatternMatcher] AI extraction failed:", {
+    logger.error("[PatternMatcher] AI extraction failed:", {
       error: error instanceof Error ? error.message : error,
     });
     return [];

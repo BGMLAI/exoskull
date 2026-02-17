@@ -101,7 +101,7 @@ export async function textToSpeech(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[Cartesia TTS] API Error:", {
+      logger.error("[Cartesia TTS] API Error:", {
         status: response.status,
         error: errorText,
       });
@@ -121,18 +121,16 @@ export async function textToSpeech(
   } catch (error) {
     if (error instanceof Error) {
       if (error.name === "AbortError") {
-        console.error(
-          "[Cartesia TTS] Timeout po 5s - fallback do Twilio voice",
-        );
+        logger.error("[Cartesia TTS] Timeout po 5s - fallback do Twilio voice");
         throw new Error("Cartesia TTS timeout - using fallback voice");
       }
-      console.error("[Cartesia TTS] Error:", {
+      logger.error("[Cartesia TTS] Error:", {
         name: error.name,
         message: error.message,
         voiceId,
       });
     } else {
-      console.error("[Cartesia TTS] Unknown error:", error);
+      logger.error("[Cartesia TTS] Unknown error:", error);
     }
     throw error;
   }
@@ -175,7 +173,7 @@ export async function uploadTTSAudio(
     });
 
   if (uploadError) {
-    console.error("[Cartesia TTS] Upload error:", uploadError);
+    logger.error("[Cartesia TTS] Upload error:", uploadError);
     throw new Error(`Failed to upload TTS audio: ${uploadError.message}`);
   }
 
@@ -294,7 +292,7 @@ export async function precacheCommonPhrases(): Promise<void> {
       // Rate limit: wait 200ms between requests (Cartesia is faster than ElevenLabs)
       await new Promise((resolve) => setTimeout(resolve, 200));
     } catch (error) {
-      console.error("[Cartesia TTS] Failed to cache phrase:", phrase, error);
+      logger.error("[Cartesia TTS] Failed to cache phrase:", phrase, error);
     }
   }
 
@@ -316,7 +314,7 @@ export async function cleanupSessionAudio(sessionId: string): Promise<void> {
     .list(sessionId);
 
   if (listError) {
-    console.error("[Cartesia TTS] List error:", listError);
+    logger.error("[Cartesia TTS] List error:", listError);
     return;
   }
 
@@ -331,7 +329,7 @@ export async function cleanupSessionAudio(sessionId: string): Promise<void> {
     .remove(filesToDelete);
 
   if (deleteError) {
-    console.error("[Cartesia TTS] Delete error:", deleteError);
+    logger.error("[Cartesia TTS] Delete error:", deleteError);
     return;
   }
 

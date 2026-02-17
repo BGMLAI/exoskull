@@ -25,14 +25,14 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     // Verify BlueBubbles password (Bearer header only — query params leak to logs)
     const expectedPassword = process.env.BLUEBUBBLES_PASSWORD;
     if (!expectedPassword) {
-      console.error("[iMessage Route] BLUEBUBBLES_PASSWORD not configured");
+      logger.error("[iMessage Route] BLUEBUBBLES_PASSWORD not configured");
       return NextResponse.json({ error: "Not configured" }, { status: 500 });
     }
     const headerPassword = req.headers
       .get("authorization")
       ?.replace("Bearer ", "");
     if (headerPassword !== expectedPassword) {
-      console.error("[iMessage Route] Invalid or missing Bearer token");
+      logger.error("[iMessage Route] Invalid or missing Bearer token");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -66,7 +66,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[iMessage Route] Error:", {
+    logger.error("[iMessage Route] Error:", {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });

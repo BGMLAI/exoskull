@@ -92,7 +92,7 @@ async function handler(req: NextRequest) {
     });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error("[GuardianValues] Cron failed:", { error: errorMsg });
+    logger.error("[GuardianValues] Cron failed:", { error: errorMsg });
     return NextResponse.json(
       { status: "failed", error: errorMsg },
       { status: 500 },

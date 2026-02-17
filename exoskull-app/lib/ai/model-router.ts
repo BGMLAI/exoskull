@@ -97,7 +97,7 @@ export class ModelRouter {
     const effectiveTier = options.forceTier ?? classification.suggestedTier;
 
     if (ROUTER_CONFIG.logLevel === "debug") {
-      console.debug("[ModelRouter] Classification:", {
+      logger.debug("[ModelRouter] Classification:", {
         category: classification.category,
         complexity: classification.complexity,
         suggestedTier: classification.suggestedTier,
@@ -210,7 +210,7 @@ export class ModelRouter {
 
     // Escalate to next tier if allowed
     if (escalationCount < ROUTER_CONFIG.maxEscalations && tier < 4) {
-      console.info(
+      logger.info(
         `[ModelRouter] Escalating from Tier ${tier} to Tier ${tier + 1}`,
       );
       return this.routeToTier(
@@ -235,7 +235,7 @@ export class ModelRouter {
         );
 
         if (untried.length > 0) {
-          console.info(
+          logger.info(
             `[ModelRouter] De-escalating to Tier ${fallbackTier} (fallback)`,
           );
           for (const model of untried) {
@@ -333,7 +333,7 @@ export class ModelRouter {
    * Log usage (can be extended to write to database)
    */
   private logUsage(options: AIRequestOptions, response: AIResponse): void {
-    console.info("[ModelRouter] Usage:", {
+    logger.info("[ModelRouter] Usage:", {
       model: response.model,
       tier: response.tier,
       inputTokens: response.usage.inputTokens,

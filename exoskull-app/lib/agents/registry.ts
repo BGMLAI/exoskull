@@ -158,7 +158,7 @@ class AgentRegistryImpl implements IAgentRegistry {
       );
       return agent;
     } catch (error) {
-      console.error(`[AgentRegistry] Failed to spawn ${name}:`, error);
+      logger.error(`[AgentRegistry] Failed to spawn ${name}:`, error);
       this.failures++;
       return null;
     }
@@ -197,7 +197,7 @@ class AgentRegistryImpl implements IAgentRegistry {
         // Release
         if (agent.onRelease) {
           agent.onRelease().catch((err) => {
-            console.error(`[AgentRegistry] Error during release:`, err);
+            logger.error(`[AgentRegistry] Error during release:`, err);
           });
         }
 

@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 // =====================================================
 // MESSENGER (FACEBOOK) API CLIENT
 // Send API: https://developers.facebook.com/docs/messenger-platform/reference/send-api
@@ -111,7 +113,7 @@ export class MessengerClient {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error("[Messenger] API error:", {
+        logger.error("[Messenger] API error:", {
           endpoint,
           status: response.status,
           error: data.error?.message || JSON.stringify(data),
@@ -131,7 +133,7 @@ export class MessengerClient {
       ) {
         throw error;
       }
-      console.error("[Messenger] Request failed:", {
+      logger.error("[Messenger] Request failed:", {
         endpoint,
         error: error instanceof Error ? error.message : "Unknown error",
       });
@@ -380,7 +382,7 @@ export function extractMessagingEvent(payload: MessengerWebhookPayload): {
       pageId: entry.id,
     };
   } catch (error) {
-    console.error("[Messenger] Failed to extract messaging event:", {
+    logger.error("[Messenger] Failed to extract messaging event:", {
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return null;
@@ -402,7 +404,7 @@ export function getMessengerClient(): MessengerClient | null {
   const pageAccessToken = process.env.MESSENGER_PAGE_ACCESS_TOKEN;
 
   if (!pageAccessToken) {
-    console.error("[Messenger] Missing env var: MESSENGER_PAGE_ACCESS_TOKEN");
+    logger.error("[Messenger] Missing env var: MESSENGER_PAGE_ACCESS_TOKEN");
     return null;
   }
 

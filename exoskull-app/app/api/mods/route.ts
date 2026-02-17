@@ -6,6 +6,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -31,7 +32,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       .eq("active", true);
 
     if (error) {
-      console.error("[Mods API] Error:", error);
+      logger.error("[Mods API] Error:", error);
       return NextResponse.json(
         { error: "Failed to fetch mods" },
         { status: 500 },
@@ -40,7 +41,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
 
     return NextResponse.json({ mods: data || [] });
   } catch (error) {
-    console.error("[Mods API] Error:", error);
+    logger.error("[Mods API] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

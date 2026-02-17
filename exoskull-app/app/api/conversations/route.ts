@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/conversations - Get user's conversation history
@@ -29,7 +30,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
 
     return NextResponse.json({ conversations });
   } catch (error) {
-    console.error("[Conversations] GET error:", error);
+    logger.error("[Conversations] GET error:", error);
     return NextResponse.json(
       { error: "Failed to fetch conversations" },
       { status: 500 },
@@ -66,7 +67,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       tenant_id: tenantId,
     });
   } catch (error) {
-    console.error("[Conversations] POST error:", error);
+    logger.error("[Conversations] POST error:", error);
     return NextResponse.json(
       { error: "Failed to create conversation" },
       { status: 500 },

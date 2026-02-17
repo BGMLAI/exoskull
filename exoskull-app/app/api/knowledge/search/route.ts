@@ -10,6 +10,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { searchDocuments } from "@/lib/knowledge/document-processor";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const POST = withApiLog(async function POST(request: NextRequest) {
@@ -28,7 +29,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     return NextResponse.json({ results });
   } catch (error) {
-    console.error("[KnowledgeSearch] Error:", {
+    logger.error("[KnowledgeSearch] Error:", {
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return NextResponse.json({ error: "Search failed" }, { status: 500 });

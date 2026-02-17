@@ -344,7 +344,7 @@ export async function runRalphCycle(
       journalEntryId,
     };
   } catch (error) {
-    console.error("[RalphLoop] Cycle failed:", {
+    logger.error("[RalphLoop] Cycle failed:", {
       tenantId,
       error: error instanceof Error ? error.message : error,
     });
@@ -662,7 +662,7 @@ Return ONLY JSON.`;
       params: parsed.params || {},
     };
   } catch (error) {
-    console.error("[RalphLoop:Analyze] AI analysis failed:", {
+    logger.error("[RalphLoop:Analyze] AI analysis failed:", {
       tenantId,
       error: error instanceof Error ? error.message : error,
     });
@@ -1150,7 +1150,7 @@ async function notifyUser(
     );
   } catch (error) {
     // Non-critical — don't break the loop
-    console.error("[RalphLoop:Notify] Failed:", {
+    logger.error("[RalphLoop:Notify] Failed:", {
       tenantId,
       error: error instanceof Error ? error.message : error,
     });
@@ -1181,7 +1181,7 @@ async function logToJournal(
     .single();
 
   if (error) {
-    console.error("[RalphLoop:Journal] Failed to log:", {
+    logger.error("[RalphLoop:Journal] Failed to log:", {
       tenantId,
       error: error.message,
     });

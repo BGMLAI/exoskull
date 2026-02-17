@@ -13,6 +13,7 @@ import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 /** Canonical extension → MIME mapping (must match bucket allowed_mime_types exactly) */
@@ -95,7 +96,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       .createSignedUploadUrl(storagePath);
 
     if (signedError || !signedData) {
-      console.error("[UploadURL] Signed URL failed:", signedError);
+      logger.error("[UploadURL] Signed URL failed:", signedError);
       return NextResponse.json(
         { error: "Failed to create upload URL" },
         { status: 500 },
@@ -119,7 +120,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       .single();
 
     if (dbError) {
-      console.error("[UploadURL] DB insert failed:", dbError);
+      logger.error("[UploadURL] DB insert failed:", dbError);
       return NextResponse.json(
         { error: "Failed to create document record" },
         { status: 500 },
@@ -134,7 +135,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       mimeType: EXT_TO_MIME[ext],
     });
   } catch (error) {
-    console.error("[UploadURL] Error:", {
+    logger.error("[UploadURL] Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(

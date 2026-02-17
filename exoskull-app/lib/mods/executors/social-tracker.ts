@@ -7,6 +7,7 @@
 import { IModExecutor, ModInsight, ModAction, ModSlug } from "../types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // Types
 // =====================================================
@@ -56,7 +57,7 @@ export class SocialTrackerExecutor implements IModExecutor {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("[SocialTracker] Fetch error:", error);
+        logger.error("[SocialTracker] Fetch error:", error);
         throw error;
       }
 
@@ -74,7 +75,7 @@ export class SocialTrackerExecutor implements IModExecutor {
         monthly: { entries: all, stats: this.calculateStats(all, 20) },
       };
     } catch (error) {
-      console.error("[SocialTracker] getData error:", error);
+      logger.error("[SocialTracker] getData error:", error);
       return {
         recent: [],
         weekly: { entries: [], stats: null },
@@ -165,7 +166,7 @@ export class SocialTrackerExecutor implements IModExecutor {
 
       return insights;
     } catch (error) {
-      console.error("[SocialTracker] getInsights error:", error);
+      logger.error("[SocialTracker] getInsights error:", error);
       return [
         {
           type: "warning",
@@ -240,7 +241,7 @@ export class SocialTrackerExecutor implements IModExecutor {
           return { success: false, error: `Unknown action: ${action}` };
       }
     } catch (error) {
-      console.error("[SocialTracker] executeAction error:", error);
+      logger.error("[SocialTracker] executeAction error:", error);
       return { success: false, error: (error as Error).message };
     }
   }

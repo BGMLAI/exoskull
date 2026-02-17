@@ -51,7 +51,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       });
 
     if (uploadError) {
-      console.error("Voice note upload error:", uploadError);
+      logger.error("Voice note upload error:", uploadError);
       return NextResponse.json(
         {
           error: `Upload failed: ${uploadError.message}`,
@@ -76,7 +76,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       .single();
 
     if (dbError) {
-      console.error("Voice note DB error:", dbError);
+      logger.error("Voice note DB error:", dbError);
       // Try to clean up the uploaded file
       await supabase.storage.from("voice-notes").remove([filename]);
       return NextResponse.json(
@@ -105,7 +105,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("POST /api/voice/notes error:", error);
+    logger.error("POST /api/voice/notes error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",
@@ -164,7 +164,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       voice_notes: notesWithUrls,
     });
   } catch (error) {
-    console.error("GET /api/voice/notes error:", error);
+    logger.error("GET /api/voice/notes error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",
@@ -216,7 +216,7 @@ export const DELETE = withApiLog(async function DELETE(req: NextRequest) {
       .remove([voiceNote.audio_path]);
 
     if (storageError) {
-      console.error("Storage delete error:", storageError);
+      logger.error("Storage delete error:", storageError);
     }
 
     // Delete record
@@ -232,7 +232,7 @@ export const DELETE = withApiLog(async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("DELETE /api/voice/notes error:", error);
+    logger.error("DELETE /api/voice/notes error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",

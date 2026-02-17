@@ -61,7 +61,7 @@ export async function submitFeedback(
     .single();
 
   if (error) {
-    console.error("[Feedback] submitFeedback failed:", {
+    logger.error("[Feedback] submitFeedback failed:", {
       tenantId,
       type: input.type,
       error: error.message,
@@ -100,7 +100,7 @@ export async function getFeedbackSummary(
     .gte("created_at", since);
 
   if (error || !data) {
-    console.error("[Feedback] getFeedbackSummary failed:", {
+    logger.error("[Feedback] getFeedbackSummary failed:", {
       tenantId,
       error: error?.message,
     });
@@ -170,7 +170,7 @@ export async function getRecentFeedback(
     .limit(limit);
 
   if (error) {
-    console.error("[Feedback] getRecentFeedback failed:", {
+    logger.error("[Feedback] getRecentFeedback failed:", {
       tenantId,
       error: error.message,
     });

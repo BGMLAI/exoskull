@@ -99,7 +99,7 @@ async function updateSyncTime(
     );
 
   if (error) {
-    console.error(`[Bronze ETL] Failed to update sync log:`, error);
+    logger.error(`[Bronze ETL] Failed to update sync log:`, error);
   }
 }
 
@@ -188,7 +188,7 @@ export async function etlConversations(tenantId: string): Promise<ETLResult> {
       duration_ms: Date.now() - startTime,
     };
   } catch (error) {
-    console.error(`[Bronze ETL] Conversations failed for ${tenantId}:`, error);
+    logger.error(`[Bronze ETL] Conversations failed for ${tenantId}:`, error);
     return {
       tenant_id: tenantId,
       data_type: dataType,
@@ -281,7 +281,7 @@ export async function etlMessages(tenantId: string): Promise<ETLResult> {
       duration_ms: Date.now() - startTime,
     };
   } catch (error) {
-    console.error(`[Bronze ETL] Messages failed for ${tenantId}:`, error);
+    logger.error(`[Bronze ETL] Messages failed for ${tenantId}:`, error);
     return {
       tenant_id: tenantId,
       data_type: dataType,
@@ -397,7 +397,7 @@ export async function etlJobLogs(tenantId: string): Promise<ETLResult> {
       duration_ms: Date.now() - startTime,
     };
   } catch (error) {
-    console.error(`[Bronze ETL] Job logs failed for ${tenantId}:`, error);
+    logger.error(`[Bronze ETL] Job logs failed for ${tenantId}:`, error);
     return {
       tenant_id: tenantId,
       data_type: dataType,
@@ -495,7 +495,7 @@ export async function etlEmails(tenantId: string): Promise<ETLResult> {
       duration_ms: Date.now() - startTime,
     };
   } catch (error) {
-    console.error(`[Bronze ETL] Emails failed for ${tenantId}:`, error);
+    logger.error(`[Bronze ETL] Emails failed for ${tenantId}:`, error);
     return {
       tenant_id: tenantId,
       data_type: dataType,
@@ -527,7 +527,7 @@ export async function runBronzeETL(): Promise<ETLSummary> {
     .select("id");
 
   if (error) {
-    console.error("[Bronze ETL] Failed to fetch tenants:", error);
+    logger.error("[Bronze ETL] Failed to fetch tenants:", error);
     return {
       started_at: startedAt.toISOString(),
       completed_at: new Date().toISOString(),

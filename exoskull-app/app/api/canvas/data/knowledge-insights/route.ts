@@ -9,6 +9,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -29,7 +30,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       .limit(5);
 
     if (error) {
-      console.error("[Canvas] Knowledge insights error:", error);
+      logger.error("[Canvas] Knowledge insights error:", error);
       return NextResponse.json(
         { error: "Failed to load insights" },
         { status: 500 },
@@ -41,7 +42,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       lastUpdated: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("[Canvas] Knowledge insights error:", error);
+    logger.error("[Canvas] Knowledge insights error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

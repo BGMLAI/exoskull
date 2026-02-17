@@ -73,7 +73,7 @@ async function postHandler(req: NextRequest) {
     .eq("is_active", true);
 
   if (jobsError) {
-    console.error("❌ Failed to fetch jobs:", jobsError);
+    logger.error("❌ Failed to fetch jobs:", jobsError);
     return NextResponse.json({ error: jobsError.message }, { status: 500 });
   }
 
@@ -101,7 +101,7 @@ async function postHandler(req: NextRequest) {
     );
 
     if (usersError) {
-      console.error(
+      logger.error(
         `   ❌ Failed to get users for ${job.job_name}:`,
         usersError,
       );
@@ -183,7 +183,7 @@ async function postHandler(req: NextRequest) {
         // Small delay between users to avoid rate limiting
         await new Promise((resolve) => setTimeout(resolve, 200));
       } catch (userError) {
-        console.error(`      ❌ Error for user ${user.tenant_id}:`, userError);
+        logger.error(`      ❌ Error for user ${user.tenant_id}:`, userError);
         results.errors.push(
           `${job.job_name} for ${user.tenant_id}: ${userError instanceof Error ? userError.message : String(userError)}`,
         );
@@ -248,7 +248,7 @@ async function logJobExecution(
       p_twilio_sid: result?.message_sid || null,
     });
   } catch (error) {
-    console.error("Failed to log job execution:", error);
+    logger.error("Failed to log job execution:", error);
   }
 }
 
@@ -282,7 +282,7 @@ async function processCustomScheduledJobs(results: {
       .eq("is_enabled", true);
 
     if (customError) {
-      console.error("❌ Failed to fetch custom jobs:", customError);
+      logger.error("❌ Failed to fetch custom jobs:", customError);
       results.errors.push(`Custom jobs: ${customError.message}`);
       return;
     }
@@ -392,7 +392,7 @@ async function processCustomScheduledJobs(results: {
         // Small delay between jobs
         await new Promise((resolve) => setTimeout(resolve, 200));
       } catch (jobError) {
-        console.error(
+        logger.error(
           `   ❌ Error processing custom job ${customJob.display_name}:`,
           jobError,
         );
@@ -402,7 +402,7 @@ async function processCustomScheduledJobs(results: {
       }
     }
   } catch (error) {
-    console.error("❌ Failed to process custom jobs:", error);
+    logger.error("❌ Failed to process custom jobs:", error);
     results.errors.push(
       `Custom jobs processing: ${error instanceof Error ? error.message : String(error)}`,
     );
@@ -463,6 +463,6 @@ async function logCustomJobExecution(
         error_message: errorMessage || result?.error || null,
       });
   } catch (error) {
-    console.error("Failed to log custom job execution:", error);
+    logger.error("Failed to log custom job execution:", error);
   }
 }

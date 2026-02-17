@@ -10,6 +10,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
@@ -73,7 +74,7 @@ export const GET = withApiLog(async function GET(
       installation: installation || null,
     });
   } catch (error) {
-    console.error("[Mods API] GET error:", error);
+    logger.error("[Mods API] GET error:", error);
     return NextResponse.json(
       { error: "Failed to get mod data", details: (error as Error).message },
       { status: 500 },
@@ -163,7 +164,7 @@ export const POST = withApiLog(async function POST(
       result: result.result,
     });
   } catch (error) {
-    console.error("[Mods API] POST error:", error);
+    logger.error("[Mods API] POST error:", error);
     return NextResponse.json(
       { error: "Failed to execute action", details: (error as Error).message },
       { status: 500 },

@@ -9,6 +9,7 @@
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { generateEmbedding } from "./vector-store";
 
+import { logger } from "@/lib/logger";
 /**
  * Generate and store embedding for a single note.
  * Fire-and-forget — errors are logged but not thrown.
@@ -34,13 +35,13 @@ export async function generateAndStoreNoteEmbedding(
       .eq("id", noteId);
 
     if (error) {
-      console.error("[NoteEmbeddings] Failed to store embedding:", {
+      logger.error("[NoteEmbeddings] Failed to store embedding:", {
         noteId,
         error: error.message,
       });
     }
   } catch (error) {
-    console.error("[NoteEmbeddings] Embedding generation failed:", {
+    logger.error("[NoteEmbeddings] Embedding generation failed:", {
       noteId,
       error: error instanceof Error ? error.message : error,
     });

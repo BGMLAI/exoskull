@@ -113,7 +113,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       to: targetPhone,
     });
   } catch (error) {
-    console.error("[Twilio Outbound] Error:", error);
+    logger.error("[Twilio Outbound] Error:", error);
 
     const message = error instanceof Error ? error.message : "Unknown error";
 

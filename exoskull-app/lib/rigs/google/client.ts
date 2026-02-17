@@ -3,8 +3,8 @@
 // Combines: Google Fit + Google Workspace + YouTube + Photos + Contacts
 // =====================================================
 
-import { RigConnection, RigSyncResult } from '../types';
-import { GoogleFitClient } from '../google-fit/client';
+import { RigConnection, RigSyncResult } from "../types";
+import { GoogleFitClient } from "../google-fit/client";
 import {
   GoogleWorkspaceClient,
   GmailMessage,
@@ -12,16 +12,17 @@ import {
   DriveFile,
   GoogleTask,
   GoogleTaskList,
-} from '../google-workspace/client';
+} from "../google-workspace/client";
 
+import { logger } from "@/lib/logger";
 // YouTube API
-const YOUTUBE_API = 'https://www.googleapis.com/youtube/v3';
+const YOUTUBE_API = "https://www.googleapis.com/youtube/v3";
 
 // People API (Contacts)
-const PEOPLE_API = 'https://people.googleapis.com/v1';
+const PEOPLE_API = "https://people.googleapis.com/v1";
 
 // Photos API
-const PHOTOS_API = 'https://photoslibrary.googleapis.com/v1';
+const PHOTOS_API = "https://photoslibrary.googleapis.com/v1";
 
 export interface YouTubeChannel {
   id: string;
@@ -120,7 +121,7 @@ export class GoogleClient {
       ...options,
       headers: {
         Authorization: `Bearer ${this.accessToken}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...options.headers,
       },
     });
@@ -152,7 +153,8 @@ export class GoogleClient {
   // Convenience accessors
   get gmail() {
     return {
-      getRecentEmails: (max?: number) => this.workspaceClient.getRecentEmails(max),
+      getRecentEmails: (max?: number) =>
+        this.workspaceClient.getRecentEmails(max),
       getUnreadCount: () => this.workspaceClient.getUnreadCount(),
       sendEmail: (to: string, subject: string, body: string) =>
         this.workspaceClient.sendEmail(to, subject, body),
@@ -161,7 +163,8 @@ export class GoogleClient {
       createDraft: (to: string, subject: string, body: string) =>
         this.workspaceClient.createDraft(to, subject, body),
       sendDraft: (draftId: string) => this.workspaceClient.sendDraft(draftId),
-      deleteDraft: (draftId: string) => this.workspaceClient.deleteDraft(draftId),
+      deleteDraft: (draftId: string) =>
+        this.workspaceClient.deleteDraft(draftId),
     };
   }
 
@@ -184,8 +187,11 @@ export class GoogleClient {
         this.workspaceClient.getTodaysEvents(calendarId),
       createEvent: (calendarId: string, event: Partial<CalendarEvent>) =>
         this.workspaceClient.createEvent(calendarId, event),
-      updateEvent: (calendarId: string, eventId: string, updates: Partial<CalendarEvent>) =>
-        this.workspaceClient.updateEvent(calendarId, eventId, updates),
+      updateEvent: (
+        calendarId: string,
+        eventId: string,
+        updates: Partial<CalendarEvent>,
+      ) => this.workspaceClient.updateEvent(calendarId, eventId, updates),
       deleteEvent: (calendarId: string, eventId: string) =>
         this.workspaceClient.deleteEvent(calendarId, eventId),
       getFreeBusy: (timeMin: string, timeMax: string, calendars?: string[]) =>
@@ -195,7 +201,8 @@ export class GoogleClient {
 
   get drive() {
     return {
-      getRecentFiles: (max?: number) => this.workspaceClient.getRecentFiles(max),
+      getRecentFiles: (max?: number) =>
+        this.workspaceClient.getRecentFiles(max),
       searchFiles: (query: string, max?: number) =>
         this.workspaceClient.searchFiles(query, max),
     };
@@ -206,12 +213,16 @@ export class GoogleClient {
       getTaskLists: () => this.workspaceClient.getTaskLists(),
       getTasks: (listId?: string, showCompleted?: boolean) =>
         this.workspaceClient.getTasks(listId, showCompleted),
-      createTask: (listId: string, task: { title: string; notes?: string; due?: string }) =>
-        this.workspaceClient.createTask(listId, task),
+      createTask: (
+        listId: string,
+        task: { title: string; notes?: string; due?: string },
+      ) => this.workspaceClient.createTask(listId, task),
       completeTask: (listId: string, taskId: string) =>
         this.workspaceClient.completeTask(listId, taskId),
-      getActiveTasks: (listId?: string) => this.workspaceClient.getActiveTasks(listId),
-      getOverdueTasks: (listId?: string) => this.workspaceClient.getOverdueTasks(listId),
+      getActiveTasks: (listId?: string) =>
+        this.workspaceClient.getActiveTasks(listId),
+      getOverdueTasks: (listId?: string) =>
+        this.workspaceClient.getOverdueTasks(listId),
       getAllTasks: (options?: { showCompleted?: boolean }) =>
         this.workspaceClient.getAllTasks(options),
     };
@@ -226,8 +237,16 @@ export class GoogleClient {
       const response = await this.fetch<{
         items: {
           id: string;
-          snippet: { title: string; description: string; thumbnails: { default: { url: string } } };
-          statistics: { subscriberCount: string; videoCount: string; viewCount: string };
+          snippet: {
+            title: string;
+            description: string;
+            thumbnails: { default: { url: string } };
+          };
+          statistics: {
+            subscriberCount: string;
+            videoCount: string;
+            viewCount: string;
+          };
         }[];
       }>(`${YOUTUBE_API}/channels?part=snippet,statistics&mine=true`);
 
@@ -257,18 +276,21 @@ export class GoogleClient {
 
       if (!channelResponse.items?.length) return [];
 
-      const uploadsPlaylistId = channelResponse.items[0].contentDetails.relatedPlaylists.uploads;
+      const uploadsPlaylistId =
+        channelResponse.items[0].contentDetails.relatedPlaylists.uploads;
 
       // Get videos from uploads playlist
       const playlistResponse = await this.fetch<{
         items: { snippet: { resourceId: { videoId: string } } }[];
       }>(
-        `${YOUTUBE_API}/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=${maxResults}`
+        `${YOUTUBE_API}/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=${maxResults}`,
       );
 
       if (!playlistResponse.items?.length) return [];
 
-      const videoIds = playlistResponse.items.map((item) => item.snippet.resourceId.videoId);
+      const videoIds = playlistResponse.items.map(
+        (item) => item.snippet.resourceId.videoId,
+      );
 
       // Get video details
       const videosResponse = await this.fetch<{
@@ -283,7 +305,7 @@ export class GoogleClient {
           statistics: { viewCount: string; likeCount: string };
         }[];
       }>(
-        `${YOUTUBE_API}/videos?part=snippet,statistics&id=${videoIds.join(',')}`
+        `${YOUTUBE_API}/videos?part=snippet,statistics&id=${videoIds.join(",")}`,
       );
 
       return videosResponse.items.map((video) => ({
@@ -291,7 +313,7 @@ export class GoogleClient {
         title: video.snippet.title,
         description: video.snippet.description.slice(0, 200),
         publishedAt: video.snippet.publishedAt,
-        thumbnailUrl: video.snippet.thumbnails.medium?.url || '',
+        thumbnailUrl: video.snippet.thumbnails.medium?.url || "",
         viewCount: video.statistics.viewCount,
         likeCount: video.statistics.likeCount,
       }));
@@ -317,12 +339,12 @@ export class GoogleClient {
         }[];
         totalPeople: number;
       }>(
-        `${PEOPLE_API}/people/me/connections?personFields=names,emailAddresses,phoneNumbers,organizations,photos&pageSize=${maxResults}`
+        `${PEOPLE_API}/people/me/connections?personFields=names,emailAddresses,phoneNumbers,organizations,photos&pageSize=${maxResults}`,
       );
 
       return (response.connections || []).map((contact) => ({
         resourceName: contact.resourceName,
-        name: contact.names?.[0]?.displayName || 'Unknown',
+        name: contact.names?.[0]?.displayName || "Unknown",
         email: contact.emailAddresses?.[0]?.value,
         phone: contact.phoneNumbers?.[0]?.value,
         organization: contact.organizations?.[0]?.name,
@@ -336,7 +358,7 @@ export class GoogleClient {
   async getContactsCount(): Promise<number> {
     try {
       const response = await this.fetch<{ totalPeople: number }>(
-        `${PEOPLE_API}/people/me/connections?personFields=names&pageSize=1`
+        `${PEOPLE_API}/people/me/connections?personFields=names&pageSize=1`,
       );
       return response.totalPeople || 0;
     } catch {
@@ -355,7 +377,11 @@ export class GoogleClient {
           id: string;
           filename: string;
           mimeType: string;
-          mediaMetadata: { creationTime: string; width: string; height: string };
+          mediaMetadata: {
+            creationTime: string;
+            width: string;
+            height: string;
+          };
           baseUrl: string;
         }[];
       }>(`${PHOTOS_API}/mediaItems?pageSize=${pageSize}`);
@@ -403,7 +429,12 @@ export class GoogleClient {
         gmail: { unreadCount: 0, recentEmails: [] },
         calendar: { todaysEvents: [], nextMeeting: null },
         drive: { recentFiles: [] },
-        tasks: { activeCount: 0, overdueCount: 0, activeTasks: [], overdueTasks: [] },
+        tasks: {
+          activeCount: 0,
+          overdueCount: 0,
+          activeTasks: [],
+          overdueTasks: [],
+        },
       })),
       this.getMyChannel(),
       this.getMyVideos(5),
@@ -413,13 +444,15 @@ export class GoogleClient {
     ]);
 
     // Calculate today's stats
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
     const todaySteps = fitData.steps.find((s) => s.date === today)?.steps || 0;
-    const todayCalories = fitData.calories.find((c) => c.date === today)?.calories || 0;
+    const todayCalories =
+      fitData.calories.find((c) => c.date === today)?.calories || 0;
     const avgHeartRate =
       fitData.heartRate.length > 0
         ? Math.round(
-            fitData.heartRate.reduce((sum, h) => sum + h.bpm, 0) / fitData.heartRate.length
+            fitData.heartRate.reduce((sum, h) => sum + h.bpm, 0) /
+              fitData.heartRate.length,
           )
         : 0;
 
@@ -455,11 +488,11 @@ export class GoogleClient {
 
 export async function syncGoogleData(
   connection: RigConnection,
-  days: number = 7
+  days: number = 7,
 ): Promise<RigSyncResult> {
   try {
     if (!connection.access_token) {
-      return { success: false, records_synced: 0, error: 'No access token' };
+      return { success: false, records_synced: 0, error: "No access token" };
     }
 
     const client = new GoogleClient(connection.access_token);
@@ -476,12 +509,17 @@ export async function syncGoogleData(
       data.workspace.calendar.todaysEvents.length +
       data.workspace.drive.recentFiles.length +
       data.workspace.tasks.activeTasks.length;
-    const youtubeRecords = data.youtube.recentVideos.length + (data.youtube.channel ? 1 : 0);
+    const youtubeRecords =
+      data.youtube.recentVideos.length + (data.youtube.channel ? 1 : 0);
     const contactsRecords = data.contacts.recentContacts.length;
     const photosRecords = data.photos.recentPhotos.length;
 
     const totalRecords =
-      fitRecords + workspaceRecords + youtubeRecords + contactsRecords + photosRecords;
+      fitRecords +
+      workspaceRecords +
+      youtubeRecords +
+      contactsRecords +
+      photosRecords;
 
     const endDate = new Date();
     const startDate = new Date();
@@ -496,17 +534,19 @@ export async function syncGoogleData(
       },
     };
   } catch (error) {
-    console.error('[Google] Sync error:', error);
+    logger.error("[Google] Sync error:", error);
     return {
       success: false,
       records_synced: 0,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }
 
 // Create client from connection
-export function createGoogleClient(connection: RigConnection): GoogleClient | null {
+export function createGoogleClient(
+  connection: RigConnection,
+): GoogleClient | null {
   if (!connection.access_token) return null;
   return new GoogleClient(connection.access_token);
 }

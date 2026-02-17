@@ -186,7 +186,7 @@ export async function runGoldETL(): Promise<GoldETLSummary> {
         `[GoldETL] ${viewName}: ${result.rowsCount} rows in ${result.durationMs}ms`,
       );
     } else {
-      console.error(`[GoldETL] ${viewName} FAILED: ${result.error}`);
+      logger.error(`[GoldETL] ${viewName} FAILED: ${result.error}`);
     }
   }
 

@@ -570,7 +570,7 @@ export class SelfOptimizerAgent extends BaseAgent {
           );
           applied++;
         } catch (error) {
-          console.error("[SelfOptimizer] Failed to store pattern:", error);
+          logger.error("[SelfOptimizer] Failed to store pattern:", error);
         }
       }
 
@@ -593,7 +593,7 @@ export class SelfOptimizerAgent extends BaseAgent {
           });
           applied++;
         } catch (error) {
-          console.error(
+          logger.error(
             "[SelfOptimizer] Failed to create optimization intervention:",
             error,
           );
@@ -634,7 +634,7 @@ export class SelfOptimizerAgent extends BaseAgent {
           agent_id: this.id,
         });
       } catch (error) {
-        console.error("[SelfOptimizer] Failed to store learning:", error);
+        logger.error("[SelfOptimizer] Failed to store learning:", error);
       }
     }
   }

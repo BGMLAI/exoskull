@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin, getAdminSupabase } from "@/lib/admin/auth";
 import { withApiLog } from "@/lib/api/request-logger";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET() {
@@ -58,7 +59,7 @@ export const GET = withApiLog(async function GET() {
     });
   } catch (error) {
     if (error instanceof Response) return error;
-    console.error("[AdminOverview] Error:", error);
+    logger.error("[AdminOverview] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

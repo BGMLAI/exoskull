@@ -103,7 +103,7 @@ export const communicationTools: ToolDefinition[] = [
           .single();
 
         if (sessionError) {
-          console.error(
+          logger.error(
             "[CommunicationTools] Delegate session error:",
             sessionError,
           );
@@ -126,7 +126,7 @@ export const communicationTools: ToolDefinition[] = [
       } catch (callError) {
         const errMsg =
           callError instanceof Error ? callError.message : String(callError);
-        console.error("[CommunicationTools] make_call error:", {
+        logger.error("[CommunicationTools] make_call error:", {
           error: errMsg,
           phoneNumber,
           purpose,
@@ -193,7 +193,7 @@ export const communicationTools: ToolDefinition[] = [
         });
         return `SMS wysłany do ${input.phone_number}`;
       } catch (smsError) {
-        console.error("[CommunicationTools] send_sms error:", smsError);
+        logger.error("[CommunicationTools] send_sms error:", smsError);
         return `Nie udało się wysłać SMS do ${input.phone_number}`;
       }
     },
@@ -289,7 +289,7 @@ export const communicationTools: ToolDefinition[] = [
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(
+          logger.error(
             "[CommunicationTools] send_email Resend error:",
             errorText,
           );
@@ -314,7 +314,7 @@ export const communicationTools: ToolDefinition[] = [
         });
         return `Email wysłany do ${toEmail} (z iors@exoskull.xyz)`;
       } catch (emailError) {
-        console.error("[CommunicationTools] send_email error:", emailError);
+        logger.error("[CommunicationTools] send_email error:", emailError);
         return `Nie udało się wysłać emaila do ${toEmail}`;
       }
     },
@@ -381,7 +381,7 @@ export const communicationTools: ToolDefinition[] = [
 
         return `WhatsApp wysłany do ${input.phone_number}`;
       } catch (waError) {
-        console.error("[CommunicationTools] send_whatsapp error:", {
+        logger.error("[CommunicationTools] send_whatsapp error:", {
           error: waError instanceof Error ? waError.message : String(waError),
           phoneNumber,
         });
@@ -455,7 +455,7 @@ export const communicationTools: ToolDefinition[] = [
 
         return `Nie udało się wysłać Messengera do ${contactName}: ${result.error || "nieznany błąd"}`;
       } catch (err) {
-        console.error("[CommunicationTools] send_messenger error:", {
+        logger.error("[CommunicationTools] send_messenger error:", {
           tenantId,
           contact: contactName,
           error: err instanceof Error ? err.message : err,

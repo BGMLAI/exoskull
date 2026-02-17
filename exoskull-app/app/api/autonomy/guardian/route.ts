@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -93,7 +94,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       conflicts: conflicts || [],
     });
   } catch (error) {
-    console.error("[GuardianAPI] GET error:", {
+    logger.error("[GuardianAPI] GET error:", {
       error: error instanceof Error ? error.message : String(error),
     });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
@@ -173,7 +174,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }
   } catch (error) {
-    console.error("[GuardianAPI] POST error:", {
+    logger.error("[GuardianAPI] POST error:", {
       error: error instanceof Error ? error.message : String(error),
     });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

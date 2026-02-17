@@ -95,7 +95,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     const sessionId = url.searchParams.get("session_id");
 
     if (!sessionId) {
-      console.error("[Delegate] No session_id provided");
+      logger.error("[Delegate] No session_id provided");
       return new NextResponse(generateErrorTwiML(), {
         headers: { "Content-Type": "application/xml" },
       });
@@ -115,7 +115,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       .single();
 
     if (!session) {
-      console.error("[Delegate] Session not found:", sessionId);
+      logger.error("[Delegate] Session not found:", sessionId);
       return new NextResponse(generateErrorTwiML(), {
         headers: { "Content-Type": "application/xml" },
       });
@@ -257,7 +257,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
           session.tenant_id,
           metadata,
           messages,
-        ).catch((e) => console.error("[Delegate] Notify error:", e));
+        ).catch((e) => logger.error("[Delegate] Notify error:", e));
 
         return new NextResponse(
           generateEndCallTwiML({ farewellText: responseText }),
@@ -294,7 +294,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         session.tenant_id,
         metadata,
         messages,
-      ).catch((e) => console.error("[Delegate] Notify error:", e));
+      ).catch((e) => logger.error("[Delegate] Notify error:", e));
 
       return NextResponse.json({ success: true });
     }
@@ -303,7 +303,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       headers: { "Content-Type": "application/xml" },
     });
   } catch (error) {
-    console.error("[Delegate] Fatal error:", error);
+    logger.error("[Delegate] Fatal error:", error);
     return new NextResponse(generateErrorTwiML(), {
       headers: { "Content-Type": "application/xml" },
     });
@@ -388,7 +388,7 @@ async function notifyUserAboutDelegateResult(
       success: result.success,
     });
   } catch (dispatchError) {
-    console.error("[Delegate] Notification dispatch failed:", {
+    logger.error("[Delegate] Notification dispatch failed:", {
       error:
         dispatchError instanceof Error
           ? dispatchError.message

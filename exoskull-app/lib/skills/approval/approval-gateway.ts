@@ -79,7 +79,7 @@ export async function initiateApproval(
       .single();
 
     if (insertError || !approvalRequest) {
-      console.error(
+      logger.error(
         "[ApprovalGateway] Failed to create approval request:",
         insertError,
       );
@@ -97,7 +97,7 @@ export async function initiateApproval(
     );
 
     if (!sendResult.success) {
-      console.error(
+      logger.error(
         "[ApprovalGateway] Failed to send notification:",
         sendResult.error,
       );
@@ -115,7 +115,7 @@ export async function initiateApproval(
       approvalRequestId: approvalRequest.id,
     };
   } catch (error) {
-    console.error("[ApprovalGateway] Error initiating approval:", error);
+    logger.error("[ApprovalGateway] Error initiating approval:", error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -250,7 +250,7 @@ export async function confirmChannel(
       error: `Unexpected request status: ${request.status}`,
     };
   } catch (error) {
-    console.error("[ApprovalGateway] Error confirming channel:", error);
+    logger.error("[ApprovalGateway] Error confirming channel:", error);
     return { status: "invalid_code", error: (error as Error).message };
   }
 }
@@ -292,7 +292,7 @@ export async function rejectApproval(
 
     return { success: true };
   } catch (error) {
-    console.error("[ApprovalGateway] Error rejecting:", error);
+    logger.error("[ApprovalGateway] Error rejecting:", error);
     return { success: false };
   }
 }
@@ -362,7 +362,7 @@ async function sendSmNotification(
 
     return { success: true };
   } catch (error) {
-    console.error("[ApprovalGateway] SMS send error:", error);
+    logger.error("[ApprovalGateway] SMS send error:", error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -411,7 +411,7 @@ async function sendChannel2Notification(
       );
       return { success: true };
     } catch (error) {
-      console.error("[ApprovalGateway] Channel 2 email error:", error);
+      logger.error("[ApprovalGateway] Channel 2 email error:", error);
       return { success: false, error: (error as Error).message };
     }
   }

@@ -9,6 +9,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 interface RespondBody {
@@ -106,7 +107,7 @@ export const POST = withApiLog(async function POST(
 
     return NextResponse.json({ success: true, action: body.action });
   } catch (error) {
-    console.error("[Interventions] Respond error:", error);
+    logger.error("[Interventions] Respond error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

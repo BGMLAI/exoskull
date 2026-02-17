@@ -35,7 +35,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       .order("created_at", { ascending: true });
 
     if (messagesError) {
-      console.error("[Extract API] Error fetching messages:", messagesError);
+      logger.error("[Extract API] Error fetching messages:", messagesError);
       return NextResponse.json(
         { error: "Failed to fetch messages" },
         { status: 500 },
@@ -77,7 +77,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     if (!extractionResponse.ok) {
       const errorText = await extractionResponse.text();
-      console.error("[Extract API] Gemini error:", errorText);
+      logger.error("[Extract API] Gemini error:", errorText);
       return NextResponse.json({ error: "Extraction failed" }, { status: 500 });
     }
 
@@ -86,7 +86,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       extractionResult.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!extractedText) {
-      console.error("[Extract API] No extraction result");
+      logger.error("[Extract API] No extraction result");
       return NextResponse.json(
         { error: "No extraction result" },
         { status: 500 },
@@ -98,7 +98,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
     try {
       profileData = JSON.parse(extractedText);
     } catch (e) {
-      console.error("[Extract API] Failed to parse extraction:", e);
+      logger.error("[Extract API] Failed to parse extraction:", e);
       return NextResponse.json(
         { error: "Invalid extraction format" },
         { status: 500 },
@@ -135,7 +135,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       .eq("id", tenantId);
 
     if (updateError) {
-      console.error("[Extract API] Error saving profile:", updateError);
+      logger.error("[Extract API] Error saving profile:", updateError);
       return NextResponse.json(
         { error: "Failed to save profile" },
         { status: 500 },
@@ -177,7 +177,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       profile: profileData,
     });
   } catch (error) {
-    console.error("[Extract API] Unexpected error:", error);
+    logger.error("[Extract API] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

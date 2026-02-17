@@ -162,7 +162,7 @@ async function handler(req: NextRequest) {
       } catch (error) {
         const msg = error instanceof Error ? error.message : "Unknown";
         results.errors.push(`${tenant.id}: ${msg}`);
-        console.error(`[MorningBriefing] Error for ${tenant.id}:`, error);
+        logger.error(`[MorningBriefing] Error for ${tenant.id}:`, error);
       }
     }
 
@@ -177,7 +177,7 @@ async function handler(req: NextRequest) {
       durationMs: Date.now() - startTime,
     });
   } catch (error) {
-    console.error("[MorningBriefing] Fatal:", error);
+    logger.error("[MorningBriefing] Fatal:", error);
     return NextResponse.json(
       {
         error: "Morning briefing failed",

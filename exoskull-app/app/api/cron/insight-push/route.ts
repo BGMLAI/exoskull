@@ -27,7 +27,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     .in("subscription_status", ["active", "trial"]);
 
   if (tenantsErr) {
-    console.error("[InsightPush] Failed to fetch tenants:", {
+    logger.error("[InsightPush] Failed to fetch tenants:", {
       error: tenantsErr.message,
     });
     return NextResponse.json(
@@ -68,7 +68,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error(`[InsightPush] Error for tenant ${tenant.id}:`, {
+      logger.error(`[InsightPush] Error for tenant ${tenant.id}:`, {
         error: msg,
       });
       results.errors.push(`${tenant.id}: ${msg}`);

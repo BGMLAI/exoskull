@@ -279,7 +279,7 @@ export async function dispatchReport(
     .single();
 
   if (tenantErr || !tenant) {
-    console.error("[ReportDispatcher] Tenant not found:", {
+    logger.error("[ReportDispatcher] Tenant not found:", {
       tenantId,
       error: tenantErr?.message,
     });
@@ -329,7 +329,7 @@ export async function dispatchReport(
           metadata: { report_type: reportType, dispatched_via: channel },
         });
       } catch (logErr) {
-        console.error("[ReportDispatcher] Failed to log message:", {
+        logger.error("[ReportDispatcher] Failed to log message:", {
           tenantId,
           error: logErr instanceof Error ? logErr.message : String(logErr),
         });
@@ -349,7 +349,7 @@ export async function dispatchReport(
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       errors.push(`${channel}: ${msg}`);
-      console.error(`[ReportDispatcher] ${channel} failed for ${tenantId}:`, {
+      logger.error(`[ReportDispatcher] ${channel} failed for ${tenantId}:`, {
         error: msg,
       });
     }
@@ -357,7 +357,7 @@ export async function dispatchReport(
 
   // All channels failed
   const errorSummary = errors.join("; ");
-  console.error(`[ReportDispatcher] All channels failed for ${tenantId}:`, {
+  logger.error(`[ReportDispatcher] All channels failed for ${tenantId}:`, {
     errors,
   });
   return {

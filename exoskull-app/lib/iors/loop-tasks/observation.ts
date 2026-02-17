@@ -64,7 +64,7 @@ export async function handleObservation(
             }
           }
         } catch (mapeErr) {
-          console.error("[Petla:Observation] MAPE-K failed:", {
+          logger.error("[Petla:Observation] MAPE-K failed:", {
             tenantId: tenant_id,
             error: mapeErr instanceof Error ? mapeErr.message : mapeErr,
           });
@@ -84,7 +84,7 @@ export async function handleObservation(
     return { handled: true, cost_cents: 0 };
   } catch (error) {
     const err = error as Error;
-    console.error("[Petla:Observation] Failed:", {
+    logger.error("[Petla:Observation] Failed:", {
       tenantId: tenant_id,
       error: err.message,
     });

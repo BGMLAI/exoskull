@@ -19,6 +19,7 @@ import type {
   PermissionCheckResult,
 } from "./types";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // PERMISSION CHECK
 // ============================================================================
@@ -99,7 +100,7 @@ export async function grantPermission(
   );
 
   if (error) {
-    console.error("[Autonomy] grantPermission failed:", {
+    logger.error("[Autonomy] grantPermission failed:", {
       tenantId,
       actionType,
       domain,
@@ -130,7 +131,7 @@ export async function revokePermission(
     .eq("domain", domain);
 
   if (error) {
-    console.error("[Autonomy] revokePermission failed:", {
+    logger.error("[Autonomy] revokePermission failed:", {
       tenantId,
       actionType,
       domain,
@@ -155,7 +156,7 @@ export async function listPermissions(
     .order("action_type");
 
   if (error) {
-    console.error("[Autonomy] listPermissions failed:", {
+    logger.error("[Autonomy] listPermissions failed:", {
       tenantId,
       error: error.message,
     });

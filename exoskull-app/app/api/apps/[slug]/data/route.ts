@@ -9,6 +9,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 /** Get app config from registry */
@@ -48,7 +49,7 @@ export const GET = withApiLog(async function GET(
     .limit(100);
 
   if (error) {
-    console.error("[AppAPI] GET error:", error);
+    logger.error("[AppAPI] GET error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -103,7 +104,7 @@ export const POST = withApiLog(async function POST(
     .single();
 
   if (error) {
-    console.error("[AppAPI] POST error:", error);
+    logger.error("[AppAPI] POST error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

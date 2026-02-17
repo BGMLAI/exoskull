@@ -155,7 +155,7 @@ export async function handleProactive(
     return { handled: true, cost_cents: 0 };
   } catch (error) {
     const err = error as Error;
-    console.error("[Petla:Proactive] Failed:", {
+    logger.error("[Petla:Proactive] Failed:", {
       tenantId: tenant_id,
       error: err.message,
     });

@@ -12,6 +12,7 @@ import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const POST = withApiLog(async function POST(req: NextRequest) {
@@ -60,7 +61,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       tenant_id: tenantId,
     });
   } catch (error) {
-    console.error("[EmotionAnalyze] API error:", error);
+    logger.error("[EmotionAnalyze] API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

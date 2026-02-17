@@ -14,6 +14,7 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 
+import { logger } from "@/lib/logger";
 /**
  * A tool definition + its execution handler, bundled together.
  */
@@ -118,7 +119,7 @@ export async function executeExtensionTool(
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
 
-    console.error(`[IORSTools] Tool ${toolName} failed:`, {
+    logger.error(`[IORSTools] Tool ${toolName} failed:`, {
       tenantId,
       error: errorMsg,
     });
@@ -157,7 +158,7 @@ function logToolExecution(
         .then(({ error }) => {
           if (error) {
             // Silently log — telemetry should never break the main flow
-            console.warn("[IORSTools:Telemetry] Insert failed:", error.message);
+            logger.warn("[IORSTools:Telemetry] Insert failed:", error.message);
           }
         });
     })

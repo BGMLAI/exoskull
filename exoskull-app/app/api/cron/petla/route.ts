@@ -18,6 +18,7 @@ import {
 import { isUrgent } from "@/lib/iors/loop-classifier";
 import { logActivity } from "@/lib/activity-log";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -117,7 +118,7 @@ async function handler(req: NextRequest) {
       durationMs: Date.now() - startTime,
     });
   } catch (error) {
-    console.error("[Petla] Error:", error);
+    logger.error("[Petla] Error:", error);
     return NextResponse.json(
       {
         error: "Petla processing failed",

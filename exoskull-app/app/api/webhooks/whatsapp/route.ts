@@ -42,7 +42,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
   const verifyToken = process.env.META_WEBHOOK_VERIFY_TOKEN;
 
   if (!verifyToken) {
-    console.error("[WhatsApp] Webhook verify token not configured");
+    logger.error("[WhatsApp] Webhook verify token not configured");
     return NextResponse.json(
       { error: "Server not configured" },
       { status: 500 },
@@ -54,7 +54,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
     return new NextResponse(challenge, { status: 200 });
   }
 
-  console.error("[WhatsApp] Webhook verification failed:", {
+  logger.error("[WhatsApp] Webhook verification failed:", {
     mode,
     tokenMatch: token === verifyToken,
   });
@@ -94,7 +94,7 @@ async function resolveWhatsAppClient(
   }
 
   if (error && error.code !== "PGRST116") {
-    console.error("[WhatsApp] DB lookup error:", {
+    logger.error("[WhatsApp] DB lookup error:", {
       phoneNumberId,
       error: error.message,
     });
@@ -116,14 +116,14 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     // Verify X-Hub-Signature-256 (mandatory)
     const appSecret = process.env.META_APP_SECRET;
     if (!appSecret) {
-      console.error(
+      logger.error(
         "[WhatsApp] META_APP_SECRET not configured — rejecting request",
       );
       return NextResponse.json({ error: "Not configured" }, { status: 500 });
     }
     const signature = req.headers.get("x-hub-signature-256");
     if (!verifyMetaSignature(rawBody, signature, appSecret)) {
-      console.error("[WhatsApp] HMAC signature verification failed");
+      logger.error("[WhatsApp] HMAC signature verification failed");
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
@@ -164,7 +164,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       try {
         await client.markAsRead(messageId);
       } catch (error) {
-        console.error("[WhatsApp] Failed to mark as read:", {
+        logger.error("[WhatsApp] Failed to mark as read:", {
           error: error instanceof Error ? error.message : "Unknown error",
           messageId,
         });
@@ -266,7 +266,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         responseLength: response.text.length,
       });
     } catch (error) {
-      console.error("[WhatsApp] Gateway processing failed:", {
+      logger.error("[WhatsApp] Gateway processing failed:", {
         error: error instanceof Error ? error.message : "Unknown error",
         from,
         phoneNumberId,
@@ -284,7 +284,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         try {
           await client.sendTextMessage(from, fallback);
         } catch (sendError) {
-          console.error("[WhatsApp] Fallback message failed:", {
+          logger.error("[WhatsApp] Fallback message failed:", {
             error:
               sendError instanceof Error ? sendError.message : "Unknown error",
           });
@@ -294,7 +294,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("[WhatsApp] Webhook processing error:", {
+    logger.error("[WhatsApp] Webhook processing error:", {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });

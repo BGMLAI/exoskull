@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -35,7 +36,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
     const optimizations =
       optResult.status === "fulfilled" ? (optResult.value.data ?? []) : [];
     if (optResult.status === "fulfilled" && optResult.value.error) {
-      console.error("[OptimizationsAPI] GET optimizations failed:", {
+      logger.error("[OptimizationsAPI] GET optimizations failed:", {
         tenantId,
         error: optResult.value.error.message,
       });
@@ -53,7 +54,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       permissions,
     });
   } catch (error) {
-    console.error("[OptimizationsAPI] GET Error:", {
+    logger.error("[OptimizationsAPI] GET Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(
@@ -100,7 +101,7 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
       .eq("id", tenantId);
 
     if (error) {
-      console.error("[OptimizationsAPI] PATCH permissions failed:", {
+      logger.error("[OptimizationsAPI] PATCH permissions failed:", {
         tenantId,
         error: error.message,
       });
@@ -112,7 +113,7 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ permissions: body.permissions });
   } catch (error) {
-    console.error("[OptimizationsAPI] PATCH Error:", {
+    logger.error("[OptimizationsAPI] PATCH Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(
@@ -223,7 +224,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         );
     }
   } catch (error) {
-    console.error("[OptimizationsAPI] POST Error:", {
+    logger.error("[OptimizationsAPI] POST Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(

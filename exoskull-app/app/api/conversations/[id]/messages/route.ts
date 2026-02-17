@@ -32,7 +32,7 @@ export const GET = withApiLog(async function GET(
 
     return NextResponse.json({ messages });
   } catch (error) {
-    console.error("[Messages] GET error:", error);
+    logger.error("[Messages] GET error:", error);
     return NextResponse.json(
       { error: "Failed to fetch messages" },
       { status: 500 },
@@ -101,7 +101,7 @@ export const POST = withApiLog(async function POST(
 
     return NextResponse.json({ message });
   } catch (error) {
-    console.error("[Messages] POST error:", error);
+    logger.error("[Messages] POST error:", error);
     return NextResponse.json(
       { error: "Failed to add message" },
       { status: 500 },

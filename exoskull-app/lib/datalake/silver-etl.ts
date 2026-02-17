@@ -25,6 +25,7 @@ import {
 import { DataType } from "../storage/r2-client";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // Supabase Client
 // ============================================================================
@@ -628,7 +629,7 @@ export async function runSilverETL(): Promise<ETLSummary> {
       totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
     };
   } catch (error) {
-    console.error("[SilverETL] Fatal error:", error);
+    logger.error("[SilverETL] Fatal error:", error);
     return {
       startedAt,
       completedAt: new Date(),
@@ -690,7 +691,7 @@ export async function runDirectSilverETL(): Promise<ETLSummary> {
       totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
     };
   } catch (error) {
-    console.error("[DirectSilverETL] Fatal error:", error);
+    logger.error("[DirectSilverETL] Fatal error:", error);
     return {
       startedAt,
       completedAt: new Date(),

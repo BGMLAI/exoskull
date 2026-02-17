@@ -15,6 +15,7 @@ import type {
   TaskClassification,
 } from "./types";
 
+import { logger } from "@/lib/logger";
 /**
  * Classify task complexity and requirements
  */
@@ -201,10 +202,10 @@ export async function selectCodeModel(opts: {
     task.description.match(/entire codebase|large repo|50k line/i)
   ) {
     if (availability["kimi-code"] === "healthy") {
-      console.log("[ModelSelector] Long context detected → Kimi Code");
+      logger.info("[ModelSelector] Long context detected → Kimi Code");
       return "kimi-code";
     } else {
-      console.warn(
+      logger.warn(
         "[ModelSelector] Kimi Code unavailable, falling back to Claude Code",
       );
       return "claude-code";
@@ -218,13 +219,13 @@ export async function selectCodeModel(opts: {
     task.description.match(/algorithm|optimize|proof|complexity|O\(/i)
   ) {
     if (availability["codex-5-2"] !== "down") {
-      console.log("[ModelSelector] Deep reasoning detected → Codex 5.2");
+      logger.info("[ModelSelector] Deep reasoning detected → Codex 5.2");
       return "codex-5-2";
     } else if (availability["gpt-o1-code"] === "healthy") {
-      console.log("[ModelSelector] Codex unavailable, fallback → GPT-o1");
+      logger.info("[ModelSelector] Codex unavailable, fallback → GPT-o1");
       return "gpt-o1-code";
     } else {
-      console.warn(
+      logger.warn(
         "[ModelSelector] Codex+GPT-o1 unavailable, falling back to Claude Code",
       );
       return "claude-code";
@@ -233,12 +234,12 @@ export async function selectCodeModel(opts: {
 
   // Rule 3: Default → Codex 5.2 (cheapest for code, best at code generation)
   if (availability["codex-5-2"] !== "down") {
-    console.log("[ModelSelector] General task → Codex 5.2 (default)");
+    logger.info("[ModelSelector] General task → Codex 5.2 (default)");
     return "codex-5-2";
   }
 
   // Fallback → Claude Code
-  console.log("[ModelSelector] Codex unavailable → Claude Code (fallback)");
+  logger.info("[ModelSelector] Codex unavailable → Claude Code (fallback)");
   return "claude-code";
 }
 
@@ -250,7 +251,7 @@ export async function routeCodeGeneration(
 ): Promise<CodeModel> {
   const classification = await classifyTask(task);
 
-  console.log("[CodeRouter] Task classification:", {
+  logger.info("[CodeRouter] Task classification:", {
     complexity: classification.complexity,
     type: classification.type,
     estimatedTokens: classification.estimatedTokens,
@@ -259,7 +260,7 @@ export async function routeCodeGeneration(
 
   const selectedModel = await selectCodeModel({ task, classification });
 
-  console.log("[CodeRouter] Selected model:", selectedModel);
+  logger.info("[CodeRouter] Selected model:", selectedModel);
 
   return selectedModel;
 }

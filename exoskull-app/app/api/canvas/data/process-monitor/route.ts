@@ -12,6 +12,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { systemBus } from "@/lib/system/inter-system-bus";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 interface ProcessInfo {
@@ -166,7 +167,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       timestamp: now.toISOString(),
     });
   } catch (error) {
-    console.error("[ProcessMonitor] Error:", error);
+    logger.error("[ProcessMonitor] Error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },

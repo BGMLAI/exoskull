@@ -7,6 +7,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/rigs/[slug]/emails - Fetch recent emails
@@ -94,7 +95,7 @@ export const GET = withApiLog(async function GET(
       fetchedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error(`[Rig Emails] ${slug} failed:`, {
+    logger.error(`[Rig Emails] ${slug} failed:`, {
       error: (error as Error).message,
       tenantId,
     });

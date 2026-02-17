@@ -9,6 +9,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 import { withApiLog } from "@/lib/api/request-logger";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -32,7 +33,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       .limit(20);
 
     if (error) {
-      console.error("[Voice Sessions] Error:", error);
+      logger.error("[Voice Sessions] Error:", error);
       return NextResponse.json(
         { error: "Failed to fetch sessions" },
         { status: 500 },
@@ -43,7 +44,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       sessions: sessions || [],
     });
   } catch (error) {
-    console.error("[Voice Sessions] Fatal error:", error);
+    logger.error("[Voice Sessions] Fatal error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

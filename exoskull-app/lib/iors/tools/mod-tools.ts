@@ -11,6 +11,7 @@
 import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const modTools: ToolDefinition[] = [
   {
     definition: {
@@ -54,7 +55,7 @@ export const modTools: ToolDefinition[] = [
       });
 
       if (error) {
-        console.error("[ModTools] log_mod_data error:", {
+        logger.error("[ModTools] log_mod_data error:", {
           error,
           modSlug,
           tenantId,
@@ -153,7 +154,7 @@ export const modTools: ToolDefinition[] = [
       );
 
       if (error) {
-        console.error("[ModTools] install_mod error:", error);
+        logger.error("[ModTools] install_mod error:", error);
         return `Błąd: nie udało się zainstalować Moda`;
       }
 
@@ -237,7 +238,7 @@ export const modTools: ToolDefinition[] = [
         .single();
 
       if (createError || !newMod) {
-        console.error("[ModTools] create_mod error:", createError);
+        logger.error("[ModTools] create_mod error:", createError);
         return `Nie udało się stworzyć Moda: ${createError?.message}`;
       }
 

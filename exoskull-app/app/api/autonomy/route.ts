@@ -32,7 +32,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("[Autonomy] GET error:", error);
+      logger.error("[Autonomy] GET error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
@@ -50,7 +50,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       total: data?.length || 0,
     });
   } catch (error) {
-    console.error("[Autonomy] GET error:", error);
+    logger.error("[Autonomy] GET error:", error);
     return NextResponse.json(
       { error: "Failed to fetch autonomy grants" },
       { status: 500 },
@@ -113,7 +113,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
           { status: 409 },
         );
       }
-      console.error("[Autonomy] POST error:", error);
+      logger.error("[Autonomy] POST error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
@@ -126,7 +126,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       grant: data,
     });
   } catch (error) {
-    console.error("[Autonomy] POST error:", error);
+    logger.error("[Autonomy] POST error:", error);
     return NextResponse.json(
       { error: "Failed to create autonomy grant" },
       { status: 500 },
@@ -170,7 +170,7 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[Autonomy] PATCH error:", error);
+      logger.error("[Autonomy] PATCH error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
@@ -183,7 +183,7 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
       grant: data,
     });
   } catch (error) {
-    console.error("[Autonomy] PATCH error:", error);
+    logger.error("[Autonomy] PATCH error:", error);
     return NextResponse.json(
       { error: "Failed to update autonomy grant" },
       { status: 500 },
@@ -216,7 +216,7 @@ export const DELETE = withApiLog(async function DELETE(request: NextRequest) {
       .eq("user_id", userId);
 
     if (error) {
-      console.error("[Autonomy] DELETE error:", error);
+      logger.error("[Autonomy] DELETE error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
@@ -224,7 +224,7 @@ export const DELETE = withApiLog(async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[Autonomy] DELETE error:", error);
+    logger.error("[Autonomy] DELETE error:", error);
     return NextResponse.json(
       { error: "Failed to revoke autonomy grant" },
       { status: 500 },

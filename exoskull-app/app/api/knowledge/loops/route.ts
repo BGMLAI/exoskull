@@ -10,6 +10,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -34,7 +35,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       .order("priority", { ascending: false });
 
     if (error) {
-      console.error("[Loops API] GET error:", error);
+      logger.error("[Loops API] GET error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
@@ -78,7 +79,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
 
     return NextResponse.json({ loops: data });
   } catch (error) {
-    console.error("[Loops API] GET error:", error);
+    logger.error("[Loops API] GET error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
@@ -108,7 +109,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       });
 
       if (error) {
-        console.error("[Loops API] Init defaults error:", error);
+        logger.error("[Loops API] Init defaults error:", error);
         return NextResponse.json({ error: "Database error" }, { status: 500 });
       }
 
@@ -151,13 +152,13 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
           { status: 409 },
         );
       }
-      console.error("[Loops API] POST error:", error);
+      logger.error("[Loops API] POST error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, loop: data });
   } catch (error) {
-    console.error("[Loops API] POST error:", error);
+    logger.error("[Loops API] POST error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
@@ -209,13 +210,13 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[Loops API] PATCH error:", error);
+      logger.error("[Loops API] PATCH error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, loop: data });
   } catch (error) {
-    console.error("[Loops API] PATCH error:", error);
+    logger.error("[Loops API] PATCH error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
@@ -263,13 +264,13 @@ export const DELETE = withApiLog(async function DELETE(request: NextRequest) {
       .eq("tenant_id", tenantId);
 
     if (error) {
-      console.error("[Loops API] DELETE error:", error);
+      logger.error("[Loops API] DELETE error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[Loops API] DELETE error:", error);
+    logger.error("[Loops API] DELETE error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },

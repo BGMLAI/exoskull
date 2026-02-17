@@ -24,6 +24,7 @@ import { aiChat } from "@/lib/ai";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { generateEmbedding } from "./vector-store";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -417,7 +418,7 @@ export async function traverseGraph(
   );
 
   if (error) {
-    console.warn("[KnowledgeGraph:traverse:rpcFailed]", error.message);
+    logger.warn("[KnowledgeGraph:traverse:rpcFailed]", error.message);
     // Fallback to direct connections only
     const result = await queryEntity(tenantId, entityName);
     if (!result.entity) return [];
@@ -512,7 +513,7 @@ export async function searchEntities(
   });
 
   if (error) {
-    console.warn("[KnowledgeGraph:searchEntities:rpcFailed]", error.message);
+    logger.warn("[KnowledgeGraph:searchEntities:rpcFailed]", error.message);
     // Fallback to ILIKE
     let q = supabase
       .from("exo_knowledge_entities")
@@ -553,7 +554,7 @@ export async function processContentForGraph(
 
   const result = await storeEntities(tenantId, entities, relationships);
 
-  console.info("[KnowledgeGraph:processed]", {
+  logger.info("[KnowledgeGraph:processed]", {
     tenantId: tenantId.slice(0, 8),
     sourceType,
     sourceId: sourceId?.slice(0, 8),

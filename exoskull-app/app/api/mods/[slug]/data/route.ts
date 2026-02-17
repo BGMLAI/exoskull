@@ -6,6 +6,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // GET - Fetch recent data entries for a Mod
@@ -32,7 +33,7 @@ export const GET = withApiLog(async function GET(
       .limit(limit);
 
     if (error) {
-      console.error(`[Mod Data] GET error for ${slug}:`, error);
+      logger.error(`[Mod Data] GET error for ${slug}:`, error);
       return NextResponse.json(
         { error: "Failed to fetch data" },
         { status: 500 },
@@ -41,7 +42,7 @@ export const GET = withApiLog(async function GET(
 
     return NextResponse.json({ data: data || [] });
   } catch (error) {
-    console.error("[Mod Data] GET error:", error);
+    logger.error("[Mod Data] GET error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -74,7 +75,7 @@ export const POST = withApiLog(async function POST(
       .single();
 
     if (error) {
-      console.error(`[Mod Data] POST error for ${slug}:`, error);
+      logger.error(`[Mod Data] POST error for ${slug}:`, error);
       return NextResponse.json(
         { error: "Failed to save data" },
         { status: 500 },
@@ -83,7 +84,7 @@ export const POST = withApiLog(async function POST(
 
     return NextResponse.json({ success: true, entry: data });
   } catch (error) {
-    console.error("[Mod Data] POST error:", error);
+    logger.error("[Mod Data] POST error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

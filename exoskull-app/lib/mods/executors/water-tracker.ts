@@ -7,6 +7,7 @@
 import { IModExecutor, ModInsight, ModAction, ModSlug } from "../types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // Types
 // =====================================================
@@ -50,7 +51,7 @@ export class WaterTrackerExecutor implements IModExecutor {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("[WaterTracker] Fetch error:", error);
+        logger.error("[WaterTracker] Fetch error:", error);
         throw error;
       }
 
@@ -73,7 +74,7 @@ export class WaterTrackerExecutor implements IModExecutor {
         weekly: { entries: all, stats: this.calculateStats(all, dailyGoal) },
       };
     } catch (error) {
-      console.error("[WaterTracker] getData error:", error);
+      logger.error("[WaterTracker] getData error:", error);
       return {
         today: { entries: [], total_ml: 0, goal_ml: 2500, progress: 0 },
         weekly: { entries: [], stats: null },
@@ -141,7 +142,7 @@ export class WaterTrackerExecutor implements IModExecutor {
 
       return insights;
     } catch (error) {
-      console.error("[WaterTracker] getInsights error:", error);
+      logger.error("[WaterTracker] getInsights error:", error);
       return [
         {
           type: "warning",
@@ -218,7 +219,7 @@ export class WaterTrackerExecutor implements IModExecutor {
           return { success: false, error: `Unknown action: ${action}` };
       }
     } catch (error) {
-      console.error("[WaterTracker] executeAction error:", error);
+      logger.error("[WaterTracker] executeAction error:", error);
       return { success: false, error: (error as Error).message };
     }
   }

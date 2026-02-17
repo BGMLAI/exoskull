@@ -28,6 +28,7 @@ import {
   updateTask as updateTaskService,
 } from "../../tasks/task-service";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // TYPES
 // =====================================================
@@ -274,7 +275,7 @@ export class TaskManagerExecutor implements IModExecutor {
           ...googleTasks.map((t) => this.googleTaskToUnified(t, taskListId)),
         );
       } catch (err) {
-        console.error("[TaskManager] Google Tasks fetch failed:", err);
+        logger.error("[TaskManager] Google Tasks fetch failed:", err);
         errors.push(`Google Tasks: ${(err as Error).message}`);
       }
     }
@@ -300,7 +301,7 @@ export class TaskManagerExecutor implements IModExecutor {
           );
         }
       } catch (err) {
-        console.error("[TaskManager] Notion fetch failed:", err);
+        logger.error("[TaskManager] Notion fetch failed:", err);
         errors.push(`Notion: ${(err as Error).message}`);
       }
     }
@@ -319,7 +320,7 @@ export class TaskManagerExecutor implements IModExecutor {
         }
         tasks.push(...todoistTasks.map((t) => this.todoistToUnified(t)));
       } catch (err) {
-        console.error("[TaskManager] Todoist fetch failed:", err);
+        logger.error("[TaskManager] Todoist fetch failed:", err);
         errors.push(`Todoist: ${(err as Error).message}`);
       }
     }
@@ -354,7 +355,7 @@ export class TaskManagerExecutor implements IModExecutor {
         );
       }
     } catch (err) {
-      console.error("[TaskManager] ExoSkull fetch failed:", err);
+      logger.error("[TaskManager] ExoSkull fetch failed:", err);
       errors.push(`ExoSkull: ${(err as Error).message}`);
     }
 
@@ -690,7 +691,7 @@ export class TaskManagerExecutor implements IModExecutor {
           return { success: false, error: `Unknown action: ${action}` };
       }
     } catch (err) {
-      console.error(`[TaskManager] Action ${action} failed:`, err);
+      logger.error(`[TaskManager] Action ${action} failed:`, err);
       return { success: false, error: (err as Error).message };
     }
   }

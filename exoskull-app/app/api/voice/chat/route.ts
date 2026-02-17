@@ -116,7 +116,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
         const audioBuffer = await textToSpeech(result.text);
         audioBase64 = Buffer.from(audioBuffer).toString("base64");
       } catch (ttsError) {
-        console.error("[Voice Chat] TTS error:", ttsError);
+        logger.error("[Voice Chat] TTS error:", ttsError);
         // Continue without audio - text response is still valid
       }
     }

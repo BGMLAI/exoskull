@@ -22,6 +22,7 @@ import {
 } from "../types";
 import { calculateCost } from "../config";
 
+import { logger } from "@/lib/logger";
 const KIMI_BASE_URL = "https://api.moonshot.cn/v1";
 
 interface KimiChatMessage {
@@ -131,7 +132,7 @@ export class KimiProvider implements IAIProvider {
         const errorMsg =
           (errorData as Record<string, Record<string, string>>)?.error
             ?.message || `${response.status} ${response.statusText}`;
-        console.error("[KimiProvider] API error:", {
+        logger.error("[KimiProvider] API error:", {
           status: response.status,
           error: errorMsg,
           model,
@@ -184,7 +185,7 @@ export class KimiProvider implements IAIProvider {
 
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      console.error("[KimiProvider] Chat failed:", {
+      logger.error("[KimiProvider] Chat failed:", {
         error: errorMessage,
         model,
         tenantId: options.tenantId,

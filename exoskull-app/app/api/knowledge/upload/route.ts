@@ -9,6 +9,7 @@ import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { withApiLog } from "@/lib/api/request-logger";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const ALLOWED_TYPES = [
@@ -90,7 +91,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       });
 
     if (uploadError) {
-      console.error("Storage upload error:", uploadError);
+      logger.error("Storage upload error:", uploadError);
       return NextResponse.json(
         {
           error: `Upload failed: ${uploadError.message}`,
@@ -116,7 +117,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       .single();
 
     if (dbError) {
-      console.error("Database insert error:", dbError);
+      logger.error("Database insert error:", dbError);
       // Try to clean up the uploaded file
       await supabase.storage.from("user-documents").remove([filename]);
       return NextResponse.json(
@@ -133,18 +134,18 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       .then(({ processDocument }) => processDocument(document.id, tenantId))
       .then((result) => {
         if (result.success) {
-          console.log(
+          logger.info(
             `[KnowledgeUpload] Processed ${document.original_name}: ${result.chunks} chunks`,
           );
         } else {
-          console.error(
+          logger.error(
             `[KnowledgeUpload] Processing failed for ${document.original_name}:`,
             result.error,
           );
         }
       })
       .catch((err) => {
-        console.error("[KnowledgeUpload] Processing trigger failed:", err);
+        logger.error("[KnowledgeUpload] Processing trigger failed:", err);
       });
 
     return NextResponse.json({
@@ -157,7 +158,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Upload error:", error);
+    logger.error("Upload error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",

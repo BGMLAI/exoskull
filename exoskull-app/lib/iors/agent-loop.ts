@@ -258,7 +258,7 @@ export async function runAgentLoop(
       serializedToAsync: false,
     };
   } catch (error) {
-    console.error("[AgentLoop] Final summary call failed:", {
+    logger.error("[AgentLoop] Final summary call failed:", {
       error: error instanceof Error ? error.message : error,
       tenantId: ctx.tenantId,
     });

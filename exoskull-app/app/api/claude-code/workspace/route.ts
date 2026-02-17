@@ -10,6 +10,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@supabase/supabase-js";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const VPS_EXECUTOR_URL =
@@ -66,7 +67,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.error("[ClaudeCode] Workspace GET error:", msg);
+    logger.error("[ClaudeCode] Workspace GET error:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 });
@@ -95,7 +96,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.error("[ClaudeCode] Workspace POST error:", msg);
+    logger.error("[ClaudeCode] Workspace POST error:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 });

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { executeTool } from "@/lib/tools";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 interface SearchRequest {
@@ -70,7 +71,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       execution_time_ms: executionTime,
     });
   } catch (error) {
-    console.error("[API/tools/search] Error:", {
+    logger.error("[API/tools/search] Error:", {
       error: error instanceof Error ? error.message : error,
       duration_ms: Date.now() - startTime,
     });

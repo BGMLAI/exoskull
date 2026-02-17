@@ -27,7 +27,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     .in("subscription_status", ["active", "trial"]);
 
   if (tenantsErr) {
-    console.error("[WeeklySummary] Failed to fetch tenants:", {
+    logger.error("[WeeklySummary] Failed to fetch tenants:", {
       error: tenantsErr.message,
     });
     return NextResponse.json(
@@ -69,7 +69,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error(`[WeeklySummary] Error for tenant ${tenant.id}:`, {
+      logger.error(`[WeeklySummary] Error for tenant ${tenant.id}:`, {
         error: msg,
       });
       results.errors.push(`${tenant.id}: ${msg}`);

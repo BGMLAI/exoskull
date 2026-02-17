@@ -10,6 +10,7 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET() {
@@ -35,7 +36,7 @@ export const GET = withApiLog(async function GET() {
       .order("name", { ascending: true });
 
     if (error) {
-      console.error("[Projects API] Query error:", error);
+      logger.error("[Projects API] Query error:", error);
       return NextResponse.json(
         { error: "Failed to fetch projects" },
         { status: 500 },
@@ -46,7 +47,7 @@ export const GET = withApiLog(async function GET() {
       projects: projects || [],
     });
   } catch (error) {
-    console.error("[Projects API] Error:", error);
+    logger.error("[Projects API] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -93,7 +94,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[Projects API] Insert error:", error);
+      logger.error("[Projects API] Insert error:", error);
       return NextResponse.json(
         { error: "Failed to create project" },
         { status: 500 },
@@ -105,7 +106,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       project,
     });
   } catch (error) {
-    console.error("[Projects API] Error:", error);
+    logger.error("[Projects API] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

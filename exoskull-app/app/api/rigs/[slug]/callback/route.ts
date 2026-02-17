@@ -34,7 +34,7 @@ export const GET = withApiLog(async function GET(
 
     // Handle OAuth error
     if (error) {
-      console.error(`[OAuth] ${slug} error:`, error, errorDescription);
+      logger.error(`[OAuth] ${slug} error:`, error, errorDescription);
       return NextResponse.redirect(
         new URL(
           `/dashboard/settings?rig=${slug}&error=${encodeURIComponent(errorDescription || error)}`,
@@ -79,7 +79,7 @@ export const GET = withApiLog(async function GET(
       .single();
 
     if (connError || !connection) {
-      console.error("[OAuth] Connection not found:", connError);
+      logger.error("[OAuth] Connection not found:", connError);
       return NextResponse.redirect(
         new URL(
           `/dashboard/settings?rig=${slug}&error=invalid_state`,
@@ -90,7 +90,7 @@ export const GET = withApiLog(async function GET(
 
     // Verify state matches
     if (connection.metadata?.oauth_state !== state) {
-      console.error("[OAuth] State mismatch");
+      logger.error("[OAuth] State mismatch");
       return NextResponse.redirect(
         new URL(
           `/dashboard/settings?rig=${slug}&error=state_mismatch`,
@@ -115,7 +115,7 @@ export const GET = withApiLog(async function GET(
     try {
       tokens = await exchangeCodeForTokens(config, code);
     } catch (tokenError) {
-      console.error("[OAuth] Token exchange failed:", tokenError);
+      logger.error("[OAuth] Token exchange failed:", tokenError);
       return NextResponse.redirect(
         new URL(
           `/dashboard/settings?rig=${slug}&error=token_exchange_failed`,
@@ -149,7 +149,7 @@ export const GET = withApiLog(async function GET(
       .eq("id", connection.id);
 
     if (updateError) {
-      console.error("[OAuth] Failed to save tokens:", updateError);
+      logger.error("[OAuth] Failed to save tokens:", updateError);
       return NextResponse.redirect(
         new URL(
           `/dashboard/settings?rig=${slug}&error=save_failed`,
@@ -186,7 +186,7 @@ export const GET = withApiLog(async function GET(
       try {
         await syncFacebookPages(tenantId, tokens.access_token);
       } catch (fbError) {
-        console.error("[OAuth] Facebook page sync failed (non-blocking):", {
+        logger.error("[OAuth] Facebook page sync failed (non-blocking):", {
           error: fbError instanceof Error ? fbError.message : "Unknown",
         });
       }
@@ -197,7 +197,7 @@ export const GET = withApiLog(async function GET(
       new URL(`/dashboard/settings?rig=${slug}&connected=true`, request.url),
     );
   } catch (error) {
-    console.error("[OAuth] Callback error:", error);
+    logger.error("[OAuth] Callback error:", error);
     const { slug } = await params;
     return NextResponse.redirect(
       new URL(
@@ -228,7 +228,7 @@ async function handleMagicLinkCallback(
   // Validate magic token
   const validation = await validateMagicToken(slug, magicToken);
   if (!validation || validation.tenantId !== tenantId) {
-    console.error("[OAuth] Magic token validation failed:", { slug, tenantId });
+    logger.error("[OAuth] Magic token validation failed:", { slug, tenantId });
     return new NextResponse(
       `<html><body style="font-family:system-ui;text-align:center;margin:60px auto;max-width:400px">
         <h1>Link wygasł</h1><p>Poproś o nowy link w czacie.</p>
@@ -250,7 +250,7 @@ async function handleMagicLinkCallback(
   try {
     tokens = await exchangeCodeForTokens(config, code);
   } catch (tokenError) {
-    console.error("[OAuth] Magic-link token exchange failed:", tokenError);
+    logger.error("[OAuth] Magic-link token exchange failed:", tokenError);
     return new NextResponse(
       `<html><body style="font-family:system-ui;text-align:center;margin:60px auto;max-width:400px">
         <h1>Błąd autoryzacji</h1><p>Spróbuj ponownie — poproś o nowy link w czacie.</p>
@@ -302,7 +302,7 @@ async function handleMagicLinkCallback(
   // Facebook-specific
   if (slug === "facebook" && tokens.access_token) {
     syncFacebookPages(tenantId, tokens.access_token).catch((err) =>
-      console.error("[OAuth] FB sync failed:", err),
+      logger.error("[OAuth] FB sync failed:", err),
     );
   }
 
@@ -383,13 +383,13 @@ async function syncFacebookPages(
       );
       const subData = await subRes.json();
       if (!subData.success) {
-        console.error("[OAuth/FB] Failed to subscribe page:", {
+        logger.error("[OAuth/FB] Failed to subscribe page:", {
           pageId: page.id,
           error: subData.error?.message,
         });
       }
     } catch (subError) {
-      console.error("[OAuth/FB] Webhook subscribe failed:", {
+      logger.error("[OAuth/FB] Webhook subscribe failed:", {
         pageId: page.id,
         error: subError instanceof Error ? subError.message : "Unknown",
       });
@@ -415,7 +415,7 @@ async function syncFacebookPages(
     );
 
     if (error) {
-      console.error("[OAuth/FB] Page upsert failed:", {
+      logger.error("[OAuth/FB] Page upsert failed:", {
         pageId: page.id,
         error: error.message,
       });

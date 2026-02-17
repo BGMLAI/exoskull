@@ -111,7 +111,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("[Autonomy Execute] Error:", error);
+    logger.error("[Autonomy Execute] Error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
@@ -177,7 +177,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
         );
     }
   } catch (error) {
-    console.error("[Autonomy Execute] GET Error:", error);
+    logger.error("[Autonomy Execute] GET Error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },

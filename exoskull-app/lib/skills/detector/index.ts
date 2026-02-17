@@ -19,6 +19,7 @@ import type {
   SkillSuggestion,
 } from "./types";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // MAIN DETECTION
 // =====================================================
@@ -77,7 +78,7 @@ export async function detectSkillNeeds(
 
     return { suggestions: stored, stats };
   } catch (error) {
-    console.error("[SkillNeedDetector] Detection failed:", {
+    logger.error("[SkillNeedDetector] Detection failed:", {
       error: error instanceof Error ? error.message : error,
       tenant_id: tenantId,
     });
@@ -100,7 +101,7 @@ export async function getPendingSuggestions(
     });
     return (data as SkillSuggestion[]) || [];
   } catch (error) {
-    console.error("[SkillNeedDetector] getPendingSuggestions failed:", {
+    logger.error("[SkillNeedDetector] getPendingSuggestions failed:", {
       error: error instanceof Error ? error.message : error,
     });
     return [];
@@ -127,7 +128,7 @@ export async function updateSuggestionStatus(
     .eq("id", suggestionId);
 
   if (error) {
-    console.error("[SkillNeedDetector] Status update failed:", {
+    logger.error("[SkillNeedDetector] Status update failed:", {
       error: error.message,
       suggestionId,
       status,
@@ -299,7 +300,7 @@ async function storeSuggestions(
     .select();
 
   if (error) {
-    console.error("[SkillNeedDetector] Store failed:", {
+    logger.error("[SkillNeedDetector] Store failed:", {
       error: error.message,
       count: rows.length,
     });

@@ -14,6 +14,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
@@ -76,7 +77,7 @@ async function isDualReadEnabled(
     .single();
 
   if (error || !data) {
-    console.warn("[DualRead] Failed to check feature flags:", error);
+    logger.warn("[DualRead] Failed to check feature flags:", error);
     return false;
   }
 
@@ -230,7 +231,7 @@ export async function dualReadTasks(
 
   const { data: tyrolkaOps, error: tyrolkaError } = await tyrolkaQuery;
   if (tyrolkaError) {
-    console.error(
+    logger.error(
       "[DualRead] Tyrolka ops query failed, falling back to legacy:",
       tyrolkaError,
     );
@@ -397,7 +398,7 @@ export async function dualReadGoals(
 
   const { data: tyrolkaQuests, error: tyrolkaError } = await tyrolkaQuery;
   if (tyrolkaError) {
-    console.error("[DualRead] Tyrolka quests query failed:", tyrolkaError);
+    logger.error("[DualRead] Tyrolka quests query failed:", tyrolkaError);
   }
 
   // Get migration map

@@ -11,6 +11,7 @@
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
 // Types
 export interface SearchResult {
   type: "message" | "summary" | "highlight";
@@ -92,7 +93,7 @@ export async function keywordSearch(
     const { data: messages, error: messagesError } = await messagesQuery;
 
     if (messagesError) {
-      console.error("[MemorySearch] Messages search error:", messagesError);
+      logger.error("[MemorySearch] Messages search error:", messagesError);
     } else if (messages) {
       for (const msg of messages) {
         // Calculate simple relevance score based on term frequency
@@ -140,7 +141,7 @@ export async function keywordSearch(
     const { data: summaries, error: summariesError } = await summariesQuery;
 
     if (summariesError) {
-      console.error("[MemorySearch] Summaries search error:", summariesError);
+      logger.error("[MemorySearch] Summaries search error:", summariesError);
     } else if (summaries) {
       for (const summary of summaries) {
         const content = summary.final_summary || summary.draft_summary || "";
@@ -174,7 +175,7 @@ export async function keywordSearch(
       .limit(Math.ceil(limit / 4));
 
     if (highlightsError) {
-      console.error("[MemorySearch] Highlights search error:", highlightsError);
+      logger.error("[MemorySearch] Highlights search error:", highlightsError);
     } else if (highlights) {
       for (const highlight of highlights) {
         // Score based on importance + term match

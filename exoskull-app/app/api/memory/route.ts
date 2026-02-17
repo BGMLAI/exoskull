@@ -13,6 +13,7 @@ import { getMemoryTimeline, keywordSearch } from "@/lib/memory/search";
 import { getUserHighlights } from "@/lib/memory/highlights";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(request: NextRequest) {
@@ -63,7 +64,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
         );
     }
   } catch (error) {
-    console.error("[Memory API] Error:", {
+    logger.error("[Memory API] Error:", {
       error: error instanceof Error ? error.message : error,
       stack: error instanceof Error ? error.stack : undefined,
     });

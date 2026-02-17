@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { logger } from "@/lib/logger";
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({
     request: {
@@ -146,7 +147,7 @@ export async function updateSession(request: NextRequest) {
         }
       } catch (error) {
         // If tenant doesn't exist yet, allow access
-        console.error("[Middleware] Error checking onboarding status:", error);
+        logger.error("[Middleware] Error checking onboarding status:", error);
       }
     }
   }

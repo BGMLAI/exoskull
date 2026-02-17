@@ -66,7 +66,7 @@ export class CircuitBreaker {
     state.state = "closed";
     state.cooldownUntil = null;
 
-    console.debug(`[CircuitBreaker] Reset for ${modelId}`);
+    logger.debug(`[CircuitBreaker] Reset for ${modelId}`);
   }
 
   /**
@@ -83,7 +83,7 @@ export class CircuitBreaker {
         // Check if cooldown has passed
         if (state.cooldownUntil && new Date() >= state.cooldownUntil) {
           state.state = "half-open";
-          console.info(
+          logger.info(
             `[CircuitBreaker] Half-open for ${modelId}, allowing test request`,
           );
           return true;
@@ -124,7 +124,7 @@ export class CircuitBreaker {
       state: "closed",
       cooldownUntil: null,
     });
-    console.info(`[CircuitBreaker] Manually reset for ${modelId}`);
+    logger.info(`[CircuitBreaker] Manually reset for ${modelId}`);
   }
 
   /**
@@ -132,7 +132,7 @@ export class CircuitBreaker {
    */
   resetAll(): void {
     this.states.clear();
-    console.info("[CircuitBreaker] All circuit breakers reset");
+    logger.info("[CircuitBreaker] All circuit breakers reset");
   }
 }
 

@@ -28,12 +28,12 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     // Verify secret token (mandatory)
     const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET;
     if (!secretToken) {
-      console.error("[Telegram Route] TELEGRAM_WEBHOOK_SECRET not configured");
+      logger.error("[Telegram Route] TELEGRAM_WEBHOOK_SECRET not configured");
       return NextResponse.json({ error: "Not configured" }, { status: 500 });
     }
     const headerToken = req.headers.get("x-telegram-bot-api-secret-token");
     if (headerToken !== secretToken) {
-      console.error("[Telegram Route] Invalid secret token");
+      logger.error("[Telegram Route] Invalid secret token");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -67,7 +67,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[Telegram Route] Error:", {
+    logger.error("[Telegram Route] Error:", {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });

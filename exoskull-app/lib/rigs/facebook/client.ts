@@ -5,6 +5,7 @@
 
 import { RigConnection, RigSyncResult } from "../types";
 
+import { logger } from "@/lib/logger";
 const GRAPH_API = "https://graph.facebook.com/v21.0";
 
 // =====================================================
@@ -170,7 +171,7 @@ export class FacebookClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      console.error("[Facebook] API error:", {
+      logger.error("[Facebook] API error:", {
         endpoint,
         status: response.status,
         error: error.error?.message || JSON.stringify(error),
@@ -532,7 +533,7 @@ export async function syncFacebookData(
       records_synced: totalRecords,
     };
   } catch (error) {
-    console.error("[Facebook] Sync error:", error);
+    logger.error("[Facebook] Sync error:", error);
     return {
       success: false,
       records_synced: 0,

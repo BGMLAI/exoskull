@@ -7,6 +7,7 @@
 
 import type { RawEmail, AttachmentMeta } from "../types";
 
+import { logger } from "@/lib/logger";
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 /**
@@ -37,7 +38,7 @@ export async function fetchGmailEmails(
       const afterEpoch = Math.floor(afterDate.getTime() / 1000);
       q = `after:${afterEpoch} ${q}`.trim();
     } catch (err) {
-      console.error("[GmailProvider] Failed to resolve sinceMessageId:", err);
+      logger.error("[GmailProvider] Failed to resolve sinceMessageId:", err);
     }
   }
 

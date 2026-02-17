@@ -10,6 +10,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { logProgress } from "@/lib/goals/engine";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const POST = withApiLog(async function POST(
@@ -43,7 +44,7 @@ export const POST = withApiLog(async function POST(
     return NextResponse.json({ checkpoint });
   } catch (error) {
     const err = error as Error;
-    console.error("[Goals/Log] Failed:", {
+    logger.error("[Goals/Log] Failed:", {
       error: err.message,
       stack: err.stack,
     });

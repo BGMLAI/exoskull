@@ -5,6 +5,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { getTasks } from "@/lib/tasks/task-service";
 
+import { logger } from "@/lib/logger";
 function getServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -187,7 +188,7 @@ export async function calculateAllEngagementScores(): Promise<{
       await calculateEngagementScore(tenant.id);
       processed++;
     } catch (error) {
-      console.error("[Engagement] Score error:", {
+      logger.error("[Engagement] Score error:", {
         error: error instanceof Error ? error.message : String(error),
         tenantId: tenant.id,
       });

@@ -146,7 +146,7 @@ export class SelfUpdater {
             );
           }
         } catch (error) {
-          console.error(
+          logger.error(
             `[SelfUpdater] Skill detection failed for ${tenantId}:`,
             error instanceof Error ? error.message : error,
           );
@@ -172,7 +172,7 @@ export class SelfUpdater {
           `${highlightsAdded} added, ${highlightsBoosted} boosted`,
       );
     } catch (error) {
-      console.error("[SelfUpdater] Cycle failed:", error);
+      logger.error("[SelfUpdater] Cycle failed:", error);
     }
 
     return {
@@ -282,7 +282,7 @@ export class SelfUpdater {
       // 6. Mark conversation as processed
       await this.markProcessed(conv.id, added);
     } catch (error) {
-      console.error(
+      logger.error(
         `[SelfUpdater] Error processing conversation ${conv.id}:`,
         error,
       );
@@ -327,7 +327,7 @@ export class SelfUpdater {
       const { data: staleHighlights, error } = await query;
 
       if (error) {
-        console.error("[SelfUpdater] Error fetching stale highlights:", error);
+        logger.error("[SelfUpdater] Error fetching stale highlights:", error);
         return { decayed: 0 };
       }
 
@@ -359,7 +359,7 @@ export class SelfUpdater {
 
       logger.info(`[SelfUpdater] Decayed ${decayed} highlights`);
     } catch (error) {
-      console.error("[SelfUpdater] Decay cycle failed:", error);
+      logger.error("[SelfUpdater] Decay cycle failed:", error);
     }
 
     return { decayed };
@@ -473,7 +473,7 @@ Respond ONLY with a valid JSON array of objects with these fields:
           };
         });
     } catch (error) {
-      console.error(
+      logger.error(
         "[SelfUpdater] AI validation failed, using regex candidates:",
         error,
       );
@@ -497,7 +497,7 @@ Respond ONLY with a valid JSON array of objects with these fields:
     );
 
     if (error) {
-      console.error("[SelfUpdater] Error fetching conversations:", error);
+      logger.error("[SelfUpdater] Error fetching conversations:", error);
       return [];
     }
 
@@ -556,7 +556,7 @@ Respond ONLY with a valid JSON array of objects with these fields:
         p_agent_id: event.agentId || null,
       });
     } catch (error) {
-      console.error("[SelfUpdater] Failed to log event:", error);
+      logger.error("[SelfUpdater] Failed to log event:", error);
     }
   }
 }

@@ -13,6 +13,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 interface TyrolkaContext {
@@ -125,7 +126,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
 
     return NextResponse.json({ context });
   } catch (error) {
-    console.error("[Tyrolka API] GET error:", error);
+    logger.error("[Tyrolka API] GET error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },

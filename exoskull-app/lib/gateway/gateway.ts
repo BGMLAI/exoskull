@@ -131,7 +131,7 @@ async function autoRegisterTenant(
     .single();
 
   if (error) {
-    console.error("[Gateway] Auto-register failed:", {
+    logger.error("[Gateway] Auto-register failed:", {
       channel,
       from,
       error: error.message,
@@ -252,7 +252,7 @@ export async function handleInboundMessage(
             );
           }
         } catch (leadErr) {
-          console.error("[Gateway] Lead system failed, falling back:", {
+          logger.error("[Gateway] Lead system failed, falling back:", {
             error: leadErr instanceof Error ? leadErr.message : leadErr,
           });
         }
@@ -512,7 +512,7 @@ export async function handleInboundMessage(
       },
       dedupKey: `gateway:msg:${tenantId}:${new Date().toISOString().slice(0, 16)}`,
       expiresMinutes: 360, // 6 hours — prevent premature expiry
-    }).catch((err) => console.error("[Gateway] emitEvent failed:", err));
+    }).catch((err) => logger.error("[Gateway] emitEvent failed:", err));
 
     return {
       text: result.text,
@@ -521,7 +521,7 @@ export async function handleInboundMessage(
     };
   } catch (error) {
     const err = error as Error;
-    console.error("[Gateway] handleInboundMessage failed:", {
+    logger.error("[Gateway] handleInboundMessage failed:", {
       channel: msg.channel,
       from: msg.from,
       error: err.message,

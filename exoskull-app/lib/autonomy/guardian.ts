@@ -136,7 +136,7 @@ export class AlignmentGuardian {
         valueAlignmentScore: valueAlignment,
       };
     } catch (error) {
-      console.error("[Guardian] verifyBenefit error:", {
+      logger.error("[Guardian] verifyBenefit error:", {
         error: error instanceof Error ? error.message : String(error),
         tenantId,
         interventionType: intervention.type,
@@ -212,7 +212,7 @@ export class AlignmentGuardian {
         metrics: { before: preMetrics, after: currentMetrics },
       };
     } catch (error) {
-      console.error("[Guardian] measureEffectiveness error:", {
+      logger.error("[Guardian] measureEffectiveness error:", {
         error: error instanceof Error ? error.message : String(error),
         interventionId,
       });
@@ -299,7 +299,7 @@ export class AlignmentGuardian {
 
       return { driftDetected, areas, suggestReconfirmation };
     } catch (error) {
-      console.error("[Guardian] detectValueDrift error:", {
+      logger.error("[Guardian] detectValueDrift error:", {
         error: error instanceof Error ? error.message : String(error),
         tenantId,
       });

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { withApiLog } from "@/lib/api/request-logger";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // Valid metric types for health data
@@ -91,7 +92,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       .order("recorded_at", { ascending: true });
 
     if (error) {
-      console.error("[HealthMetrics] Query error:", {
+      logger.error("[HealthMetrics] Query error:", {
         error: error.message,
         metricType,
         tenantId,
@@ -153,7 +154,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[HealthMetrics] Unexpected error:", error);
+    logger.error("[HealthMetrics] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

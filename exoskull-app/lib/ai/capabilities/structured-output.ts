@@ -106,7 +106,7 @@ export async function generateStructured<T = Record<string, unknown>>(
   try {
     data = JSON.parse(rawJson) as T;
   } catch (parseError) {
-    console.error("[StructuredOutput] JSON parse failed:", {
+    logger.error("[StructuredOutput] JSON parse failed:", {
       rawJson: rawJson.substring(0, 200),
       error: parseError instanceof Error ? parseError.message : parseError,
       tenantId: opts.tenantId,

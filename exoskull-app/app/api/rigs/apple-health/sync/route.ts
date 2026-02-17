@@ -8,6 +8,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // Valid metric types (same as Health Connect)
@@ -139,7 +140,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
         .single();
 
       if (createError) {
-        console.error(
+        logger.error(
           "[Apple Health] Failed to create connection:",
           createError,
         );
@@ -175,7 +176,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       });
 
     if (insertError) {
-      console.error("[Apple Health] Failed to insert metrics:", insertError);
+      logger.error("[Apple Health] Failed to insert metrics:", insertError);
       return NextResponse.json(
         { error: "Failed to save metrics", details: insertError.message },
         { status: 500 },
@@ -231,7 +232,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
     const duration = Date.now() - startTime;
     const errorMessage = (error as Error).message;
 
-    console.error("[Apple Health] Sync failed:", error);
+    logger.error("[Apple Health] Sync failed:", error);
 
     return NextResponse.json(
       {

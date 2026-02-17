@@ -31,7 +31,7 @@ async function postHandler(req: NextRequest) {
   // Check R2 connection first
   const r2Check = await checkR2Connection();
   if (!r2Check.connected) {
-    console.error("[Bronze ETL] R2 not connected:", r2Check.error);
+    logger.error("[Bronze ETL] R2 not connected:", r2Check.error);
     return NextResponse.json(
       {
         error: "R2 connection failed",
@@ -75,7 +75,7 @@ async function postHandler(req: NextRequest) {
       ...summary,
     });
   } catch (error) {
-    console.error("[Bronze ETL] Fatal error:", error);
+    logger.error("[Bronze ETL] Fatal error:", error);
     return NextResponse.json(
       {
         status: "failed",

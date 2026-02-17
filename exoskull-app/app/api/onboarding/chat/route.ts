@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { DISCOVERY_SYSTEM_PROMPT } from "@/lib/onboarding/discovery-prompt";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 interface ChatMessage {
@@ -61,7 +62,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     // Verify OpenAI API key before calling
     if (!process.env.OPENAI_API_KEY) {
-      console.error("[Chat API] OPENAI_API_KEY not configured");
+      logger.error("[Chat API] OPENAI_API_KEY not configured");
       return NextResponse.json(
         { error: "Chat service unavailable — OPENAI_API_KEY not configured" },
         { status: 503 },
@@ -88,7 +89,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     if (!openaiResponse.ok) {
       const errorText = await openaiResponse.text();
-      console.error("[Chat API] OpenAI error:", errorText);
+      logger.error("[Chat API] OpenAI error:", errorText);
       return NextResponse.json({ error: "AI request failed" }, { status: 500 });
     }
 
@@ -113,7 +114,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
           .replace(/###PROFILE_DATA###[\s\S]*###END_PROFILE_DATA###/, "")
           .trim();
       } catch (e) {
-        console.error("[Chat API] Failed to parse profile data:", e);
+        logger.error("[Chat API] Failed to parse profile data:", e);
       }
     }
 
@@ -123,7 +124,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       profileData,
     });
   } catch (error) {
-    console.error("[Chat API] Unexpected error:", error);
+    logger.error("[Chat API] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

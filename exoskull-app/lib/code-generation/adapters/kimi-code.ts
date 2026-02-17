@@ -15,6 +15,7 @@ import {
 } from "../prompts/code-gen-prompt";
 import { parseCodeResponse } from "../response-parser";
 
+import { logger } from "@/lib/logger";
 const KIMI_BASE_URL = "https://api.moonshot.cn/v1";
 
 export class KimiCodeAdapter implements CodeExecutor {
@@ -54,7 +55,7 @@ export class KimiCodeAdapter implements CodeExecutor {
         }
       }
 
-      console.log("[KimiCode] Generating:", {
+      logger.info("[KimiCode] Generating:", {
         tenantId: this.tenantId,
         desc: task.description.slice(0, 80),
       });
@@ -83,7 +84,7 @@ export class KimiCodeAdapter implements CodeExecutor {
         const msg =
           (err as Record<string, Record<string, string>>)?.error?.message ||
           `${res.status} ${res.statusText}`;
-        console.error("[KimiCode] API error:", msg);
+        logger.error("[KimiCode] API error:", msg);
         return {
           success: false,
           model: "kimi-code",
@@ -116,7 +117,7 @@ export class KimiCodeAdapter implements CodeExecutor {
         };
       }
 
-      console.log("[KimiCode] Generated:", {
+      logger.info("[KimiCode] Generated:", {
         files: parsed.files.length,
         duration: Date.now() - startTime,
       });
@@ -131,7 +132,7 @@ export class KimiCodeAdapter implements CodeExecutor {
       };
     } catch (error) {
       const isTimeout = error instanceof Error && error.name === "TimeoutError";
-      console.error("[KimiCode] Failed:", {
+      logger.error("[KimiCode] Failed:", {
         error: error instanceof Error ? error.message : String(error),
       });
       return {

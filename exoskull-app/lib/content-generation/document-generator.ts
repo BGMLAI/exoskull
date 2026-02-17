@@ -9,6 +9,7 @@
 
 import { aiChat } from "@/lib/ai";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -198,7 +199,7 @@ async function generateDocx(req: DocumentRequest): Promise<DocumentResult> {
     };
   } catch (err) {
     // Fallback to HTML if docx library not available
-    console.warn(
+    logger.warn(
       "[DocGen] docx library not available, falling back to HTML:",
       err,
     );
@@ -252,7 +253,7 @@ function markdownToHtml(md: string): string {
 export async function generateDocument(
   req: DocumentRequest,
 ): Promise<DocumentResult> {
-  console.info("[DocGen:start]", {
+  logger.info("[DocGen:start]", {
     type: req.type,
     title: req.title.slice(0, 50),
     tone: req.tone,
@@ -285,7 +286,7 @@ export async function generateDocument(
       result = await generateMarkdown(req);
   }
 
-  console.info("[DocGen:success]", {
+  logger.info("[DocGen:success]", {
     type: req.type,
     filename: result.filename,
     wordCount: result.wordCount,

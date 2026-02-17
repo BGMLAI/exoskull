@@ -34,7 +34,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     if (!webhookSecret) {
-      console.error(
+      logger.error(
         "[StripeWebhook] CRITICAL: STRIPE_WEBHOOK_SECRET not configured",
       );
       return NextResponse.json(
@@ -43,13 +43,13 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       );
     }
     if (!signature) {
-      console.error("[StripeWebhook] Missing stripe-signature header");
+      logger.error("[StripeWebhook] Missing stripe-signature header");
       return NextResponse.json({ error: "Missing signature" }, { status: 400 });
     }
     const stripe = await getStripe();
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (error) {
-    console.error("[StripeWebhook] Signature verification failed:", {
+    logger.error("[StripeWebhook] Signature verification failed:", {
       error: error instanceof Error ? error.message : String(error),
     });
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
@@ -211,7 +211,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true, eventType });
   } catch (error) {
-    console.error("[StripeWebhook] Processing error:", {
+    logger.error("[StripeWebhook] Processing error:", {
       error: error instanceof Error ? error.message : String(error),
       eventType: event?.type,
     });

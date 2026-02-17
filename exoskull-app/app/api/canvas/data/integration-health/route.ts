@@ -10,6 +10,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export interface IntegrationHealthItem {
@@ -53,7 +54,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       .order("integration_type");
 
     if (error) {
-      console.error("[IntegrationHealth:API] Query failed:", {
+      logger.error("[IntegrationHealth:API] Query failed:", {
         tenantId: tenantId.slice(0, 8),
         error: error.message,
       });
@@ -64,7 +65,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       integrations: (data || []) as IntegrationHealthItem[],
     });
   } catch (err) {
-    console.error("[IntegrationHealth:API] Unexpected error:", {
+    logger.error("[IntegrationHealth:API] Unexpected error:", {
       tenantId: tenantId.slice(0, 8),
       error: err instanceof Error ? err.message : err,
     });

@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 /**
  * Image Generator
  *
@@ -202,7 +204,7 @@ function selectProvider(quality: ImageQuality): ImageProvider {
 export async function generateImage(req: ImageRequest): Promise<ImageResult> {
   const provider = req.provider || selectProvider(req.quality || "standard");
 
-  console.info("[ImageGen:start]", {
+  logger.info("[ImageGen:start]", {
     provider,
     quality: req.quality,
     size: req.size,
@@ -223,7 +225,7 @@ export async function generateImage(req: ImageRequest): Promise<ImageResult> {
         result = await generateFlux(req);
     }
 
-    console.info("[ImageGen:success]", {
+    logger.info("[ImageGen:success]", {
       provider: result.provider,
       cost: result.cost,
       url: result.url.slice(0, 80),
@@ -233,7 +235,7 @@ export async function generateImage(req: ImageRequest): Promise<ImageResult> {
   } catch (err) {
     // Fallback: if premium fails, try standard
     if (provider === "dalle3") {
-      console.warn("[ImageGen:dalle3Failed:fallbackToFlux]", err);
+      logger.warn("[ImageGen:dalle3Failed:fallbackToFlux]", err);
       return generateFlux(req);
     }
     throw err;

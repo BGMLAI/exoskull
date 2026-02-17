@@ -19,6 +19,7 @@
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { ensureFreshToken } from "@/lib/rigs/oauth";
 
+import { logger } from "@/lib/logger";
 const GOOGLE_FIT_BASE = "https://www.googleapis.com/fitness/v1/users/me";
 
 // ============================================================================
@@ -47,7 +48,7 @@ async function getValidToken(tenantId: string): Promise<string | null> {
         // ensureFreshToken handles refresh if needed and updates DB
         return await ensureFreshToken(connection);
       } catch (err) {
-        console.error(`[GoogleFit] Token refresh failed for ${slug}:`, err);
+        logger.error(`[GoogleFit] Token refresh failed for ${slug}:`, err);
         continue; // Try next slug
       }
     }

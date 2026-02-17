@@ -77,16 +77,13 @@ async function sendSummarySmS(
       logger.info(`[DailySummaryCron] SMS sent to ${tenantId}: ${data.sid}`);
       return { success: true, sid: data.sid };
     } else {
-      console.error(`[DailySummaryCron] SMS failed for ${tenantId}:`, data);
+      logger.error(`[DailySummaryCron] SMS failed for ${tenantId}:`, data);
       return { success: false, error: data.message || JSON.stringify(data) };
     }
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
-    console.error(
-      `[DailySummaryCron] SMS error for ${tenantId}:`,
-      errorMessage,
-    );
+    logger.error(`[DailySummaryCron] SMS error for ${tenantId}:`, errorMessage);
     return { success: false, error: errorMessage };
   }
 }
@@ -112,7 +109,7 @@ async function getActiveTenants(): Promise<
     .not("phone", "is", null);
 
   if (error) {
-    console.error("[DailySummaryCron] Failed to fetch tenants:", error);
+    logger.error("[DailySummaryCron] Failed to fetch tenants:", error);
     return [];
   }
 
@@ -169,7 +166,7 @@ async function hasTodayConversations(tenantId: string): Promise<boolean> {
     .gte("created_at", `${today}T00:00:00`);
 
   if (error) {
-    console.error("[DailySummaryCron] Failed to check conversations:", error);
+    logger.error("[DailySummaryCron] Failed to check conversations:", error);
     return false;
   }
 
@@ -242,7 +239,7 @@ async function getHandler(request: NextRequest) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
         results.errors.push(`${tenant.id}: ${errorMessage}`);
-        console.error(
+        logger.error(
           `[DailySummaryCron] Error processing tenant ${tenant.id}:`,
           error,
         );
@@ -259,7 +256,7 @@ async function getHandler(request: NextRequest) {
     logger.info("[DailySummaryCron] Completed:", response);
     return NextResponse.json(response);
   } catch (error) {
-    console.error("[DailySummaryCron] Fatal error:", error);
+    logger.error("[DailySummaryCron] Fatal error:", error);
     return NextResponse.json(
       {
         success: false,
@@ -346,7 +343,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       sms: smsResult,
     });
   } catch (error) {
-    console.error("[DailySummaryCron] Manual trigger failed:", error);
+    logger.error("[DailySummaryCron] Manual trigger failed:", error);
     return NextResponse.json(
       {
         success: false,

@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const MAX_CHARS = 4000;
@@ -70,7 +71,7 @@ async function geminiTTS(text: string): Promise<Buffer | null> {
 
     return null;
   } catch (err) {
-    console.error("[TTS] Gemini TTS error:", {
+    logger.error("[TTS] Gemini TTS error:", {
       error: err instanceof Error ? err.message : err,
     });
     return null;
@@ -115,14 +116,14 @@ async function elevenLabsTTS(text: string): Promise<Buffer | null> {
       return Buffer.from(await res.arrayBuffer());
     }
 
-    console.error(
+    logger.error(
       "[TTS] ElevenLabs failed:",
       res.status,
       await res.text().catch(() => ""),
     );
     return null;
   } catch (err) {
-    console.error("[TTS] ElevenLabs error:", {
+    logger.error("[TTS] ElevenLabs error:", {
       error: err instanceof Error ? err.message : err,
     });
     return null;
@@ -148,7 +149,7 @@ async function openaiTTS(text: string): Promise<Buffer | null> {
 
     return Buffer.from(await response.arrayBuffer());
   } catch (err) {
-    console.error("[TTS] OpenAI error:", {
+    logger.error("[TTS] OpenAI error:", {
       error: err instanceof Error ? err.message : err,
     });
     return null;
@@ -235,7 +236,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       { status: 500 },
     );
   } catch (error) {
-    console.error("[TTS] Error:", {
+    logger.error("[TTS] Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(

@@ -11,6 +11,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const POST = withApiLog(async function POST(
@@ -70,7 +71,7 @@ export const POST = withApiLog(async function POST(
       message: `Rolled back to version ${version}`,
     });
   } catch (error) {
-    console.error("[Skills API] Rollback error:", error);
+    logger.error("[Skills API] Rollback error:", error);
     return NextResponse.json(
       { error: "Failed to rollback", details: (error as Error).message },
       { status: 500 },

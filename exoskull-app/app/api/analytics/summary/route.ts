@@ -17,6 +17,7 @@ import {
 } from "@/lib/analytics/queries";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -64,7 +65,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
         );
     }
   } catch (error) {
-    console.error("[Analytics API] Error:", error);
+    logger.error("[Analytics API] Error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal error" },
       { status: 500 },

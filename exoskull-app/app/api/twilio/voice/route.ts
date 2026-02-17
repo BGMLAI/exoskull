@@ -94,7 +94,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
           formData,
         )
       ) {
-        console.error("[Twilio Voice] Signature verification failed");
+        logger.error("[Twilio Voice] Signature verification failed");
         return new NextResponse(generateErrorTwiML(), {
           status: 403,
           headers: { "Content-Type": "text/xml" },
@@ -136,7 +136,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         // Only allow tenant_id override from verified CRON calls
         const validCronSecret = process.env.CRON_SECRET;
         if (!validCronSecret || cronSecret !== validCronSecret) {
-          console.error(
+          logger.error(
             "[Twilio Voice] Rejected tenant_id override — invalid cron_secret",
           );
           const tenant = await findTenantByPhone(from);
@@ -226,7 +226,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         audioUrl = await uploadTTSAudio(audioBuffer, session.id, 0);
         logger.info("[Twilio Voice] TTS greeting uploaded:", audioUrl);
       } catch (ttsError) {
-        console.error("[Twilio Voice] TTS Error:", ttsError);
+        logger.error("[Twilio Voice] TTS Error:", ttsError);
         // Will fall back to Twilio Say
       }
 
@@ -297,13 +297,13 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       try {
         await updateSession(session.id, userText, result.text);
       } catch (e) {
-        console.error("[Twilio Voice] Session update error:", e);
+        logger.error("[Twilio Voice] Session update error:", e);
       }
 
       // Check if call should end
       if (result.shouldEndCall) {
         endSession(session.id).catch((e) =>
-          console.error("[Twilio Voice] End session error:", e),
+          logger.error("[Twilio Voice] End session error:", e),
         );
 
         // Try ElevenLabs TTS for farewell
@@ -335,7 +335,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
           session.messages.length + 1,
         );
       } catch (ttsError) {
-        console.error("[Twilio Voice] TTS Error:", ttsError);
+        logger.error("[Twilio Voice] TTS Error:", ttsError);
       }
 
       if (audioUrl) {
@@ -374,7 +374,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         await endSession(session.id);
         logger.info("[Twilio Voice] Call ended:", callSid);
       } catch (error) {
-        console.error("[Twilio Voice] Error ending session:", error);
+        logger.error("[Twilio Voice] Error ending session:", error);
       }
 
       return NextResponse.json({ success: true });
@@ -386,7 +386,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       headers: { "Content-Type": "application/xml" },
     });
   } catch (error) {
-    console.error("[Twilio Voice] Fatal error:", error);
+    logger.error("[Twilio Voice] Fatal error:", error);
 
     return new NextResponse(generateErrorTwiML(), {
       headers: { "Content-Type": "application/xml" },

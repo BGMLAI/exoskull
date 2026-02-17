@@ -13,6 +13,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(request: NextRequest) {
@@ -51,13 +52,13 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     const { data: ops, error } = await query;
 
     if (error) {
-      console.error("[CanvasOps] Query error:", error);
+      logger.error("[CanvasOps] Query error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     return NextResponse.json({ ops: ops || [] });
   } catch (error) {
-    console.error("[CanvasOps] Error:", error);
+    logger.error("[CanvasOps] Error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },

@@ -42,13 +42,13 @@ function parseSignedRequest(
       .digest();
 
     if (!crypto.timingSafeEqual(sig, expectedSig)) {
-      console.error("[MetaDeauth] Invalid signature");
+      logger.error("[MetaDeauth] Invalid signature");
       return null;
     }
 
     return data;
   } catch (error) {
-    console.error("[MetaDeauth] Failed to parse signed_request:", {
+    logger.error("[MetaDeauth] Failed to parse signed_request:", {
       error: error instanceof Error ? error.message : "Unknown",
     });
     return null;
@@ -69,7 +69,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     const appSecret = process.env.FACEBOOK_APP_SECRET;
     if (!appSecret) {
-      console.error("[MetaDeauth] FACEBOOK_APP_SECRET not configured");
+      logger.error("[MetaDeauth] FACEBOOK_APP_SECRET not configured");
       return NextResponse.json(
         { error: "Server not configured" },
         { status: 500 },
@@ -116,7 +116,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       confirmation_code: confirmationCode,
     });
   } catch (error) {
-    console.error("[MetaDeauth] Error:", {
+    logger.error("[MetaDeauth] Error:", {
       error: error instanceof Error ? error.message : "Unknown",
     });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

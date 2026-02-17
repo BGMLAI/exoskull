@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/registry - List all available Mods, Rigs, and Quests
@@ -34,7 +35,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error("[Registry] Error fetching registry:", error);
+      logger.error("[Registry] Error fetching registry:", error);
       return NextResponse.json(
         { error: "Failed to fetch registry" },
         { status: 500 },
@@ -66,7 +67,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       categories,
     });
   } catch (error) {
-    console.error("[Registry] Unexpected error:", error);
+    logger.error("[Registry] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

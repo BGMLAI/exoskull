@@ -38,7 +38,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("[MetaPages] List error:", {
+      logger.error("[MetaPages] List error:", {
         error: error.message,
         tenantId,
       });
@@ -50,7 +50,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
 
     return NextResponse.json({ pages: pages || [] });
   } catch (error) {
-    console.error("[MetaPages] GET error:", {
+    logger.error("[MetaPages] GET error:", {
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
@@ -89,7 +89,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     if (!pagesRes.ok) {
       const err = await pagesRes.json();
-      console.error("[MetaPages] Failed to fetch pages:", {
+      logger.error("[MetaPages] Failed to fetch pages:", {
         status: pagesRes.status,
         error: err.error?.message,
       });
@@ -140,7 +140,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
           const subData = await subRes.json();
 
           if (!subData.success) {
-            console.error("[MetaPages] Failed to subscribe page:", {
+            logger.error("[MetaPages] Failed to subscribe page:", {
               pageId: page.id,
               pageName: page.name,
               error: subData.error?.message,
@@ -170,7 +170,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
           );
 
         if (upsertError) {
-          console.error("[MetaPages] Upsert error:", {
+          logger.error("[MetaPages] Upsert error:", {
             pageId: page.id,
             error: upsertError.message,
           });
@@ -187,7 +187,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
           });
         }
       } catch (pageError) {
-        console.error("[MetaPages] Page connection error:", {
+        logger.error("[MetaPages] Page connection error:", {
           pageId: page.id,
           error: pageError instanceof Error ? pageError.message : "Unknown",
         });
@@ -219,7 +219,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error("[MetaPages] POST error:", {
+    logger.error("[MetaPages] POST error:", {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });
@@ -252,7 +252,7 @@ export const DELETE = withApiLog(async function DELETE(req: NextRequest) {
       .eq("tenant_id", tenantId);
 
     if (error) {
-      console.error("[MetaPages] Delete error:", {
+      logger.error("[MetaPages] Delete error:", {
         pageId,
         tenantId,
         error: error.message,
@@ -265,7 +265,7 @@ export const DELETE = withApiLog(async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true, page_id: pageId });
   } catch (error) {
-    console.error("[MetaPages] DELETE error:", {
+    logger.error("[MetaPages] DELETE error:", {
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

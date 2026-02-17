@@ -11,6 +11,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { generateAndStoreNoteEmbedding } from "@/lib/memory/note-embeddings";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 type NoteType =
@@ -68,7 +69,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     const { data, error, count } = await query;
 
     if (error) {
-      console.error("[Notes API] GET error:", error);
+      logger.error("[Notes API] GET error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
@@ -79,7 +80,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       offset,
     });
   } catch (error) {
-    console.error("[Notes API] GET error:", error);
+    logger.error("[Notes API] GET error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
@@ -164,7 +165,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[Notes API] POST error:", error);
+      logger.error("[Notes API] POST error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
@@ -175,7 +176,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, note: data });
   } catch (error) {
-    console.error("[Notes API] POST error:", error);
+    logger.error("[Notes API] POST error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
@@ -230,13 +231,13 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[Notes API] PATCH error:", error);
+      logger.error("[Notes API] PATCH error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, note: data });
   } catch (error) {
-    console.error("[Notes API] PATCH error:", error);
+    logger.error("[Notes API] PATCH error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
@@ -269,13 +270,13 @@ export const DELETE = withApiLog(async function DELETE(request: NextRequest) {
       .eq("tenant_id", tenantId);
 
     if (error) {
-      console.error("[Notes API] DELETE error:", error);
+      logger.error("[Notes API] DELETE error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[Notes API] DELETE error:", error);
+    logger.error("[Notes API] DELETE error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },

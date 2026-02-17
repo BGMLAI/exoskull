@@ -11,6 +11,7 @@
 import nodeCrypto from "node:crypto";
 import type { ChannelAdapter, GatewayMessage } from "../types";
 
+import { logger } from "@/lib/logger";
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
 const DISCORD_PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY;
 const DISCORD_API = "https://discord.com/api/v10";
@@ -113,7 +114,7 @@ export const discordAdapter: ChannelAdapter = {
     metadata?: Record<string, unknown>,
   ): Promise<void> {
     if (!DISCORD_BOT_TOKEN) {
-      console.error("[Discord] DISCORD_BOT_TOKEN not set");
+      logger.error("[Discord] DISCORD_BOT_TOKEN not set");
       return;
     }
 
@@ -137,7 +138,7 @@ export const discordAdapter: ChannelAdapter = {
 
       if (!response.ok) {
         const error = await response.text();
-        console.error("[Discord] Failed to send message:", {
+        logger.error("[Discord] Failed to send message:", {
           channelId,
           status: response.status,
           error,
@@ -199,7 +200,7 @@ export function verifyDiscordSignature(
 
       return nodeCrypto.verify(null, message, keyObject, signatureBuf);
     } catch (error) {
-      console.error("[Discord] Signature verification failed:", error);
+      logger.error("[Discord] Signature verification failed:", error);
       return false;
     }
   }

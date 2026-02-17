@@ -14,6 +14,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import type { StreamEvent } from "@/lib/stream/types";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const TIMEOUT_MS = 3000;
@@ -172,7 +173,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
 
     return NextResponse.json({ events: limited });
   } catch (error) {
-    console.error("[StreamEvents] Error:", error);
+    logger.error("[StreamEvents] Error:", error);
     return NextResponse.json(
       { error: "Failed to fetch events" },
       { status: 500 },
@@ -239,7 +240,7 @@ async function enrichInsight(
       }
     }
   } catch (err) {
-    console.error("[StreamEvents] Enrich failed:", {
+    logger.error("[StreamEvents] Enrich failed:", {
       sourceTable,
       sourceId,
       error: err instanceof Error ? err.message : err,

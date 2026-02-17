@@ -22,6 +22,7 @@ import {
 } from "../types";
 import { calculateCost } from "../config";
 
+import { logger } from "@/lib/logger";
 interface OpenAIChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
@@ -145,7 +146,7 @@ export class SelfHostedProvider implements IAIProvider {
         const errorMsg =
           (errorData as Record<string, Record<string, string>>)?.error
             ?.message || `${response.status} ${response.statusText}`;
-        console.error("[SelfHostedProvider] API error:", {
+        logger.error("[SelfHostedProvider] API error:", {
           status: response.status,
           error: errorMsg,
           model,
@@ -199,7 +200,7 @@ export class SelfHostedProvider implements IAIProvider {
 
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      console.error("[SelfHostedProvider] Chat failed:", {
+      logger.error("[SelfHostedProvider] Chat failed:", {
         error: errorMessage,
         model,
         tenantId: options.tenantId,

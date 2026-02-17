@@ -13,6 +13,7 @@ import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const POST = withApiLog(async function POST(req: NextRequest) {
@@ -96,18 +97,18 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       .then(({ processDocument }) => processDocument(documentId, tenantId))
       .then((result) => {
         if (result.success) {
-          console.log(
+          logger.info(
             `[ConfirmUpload] Processed ${doc.original_name}: ${result.chunks} chunks`,
           );
         } else {
-          console.error(
+          logger.error(
             `[ConfirmUpload] Processing failed for ${doc.original_name}:`,
             result.error,
           );
         }
       })
       .catch((err) => {
-        console.error("[ConfirmUpload] Processing trigger failed:", err);
+        logger.error("[ConfirmUpload] Processing trigger failed:", err);
       });
 
     return NextResponse.json({
@@ -120,7 +121,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[ConfirmUpload] Error:", {
+    logger.error("[ConfirmUpload] Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(

@@ -87,7 +87,7 @@ export async function executeIntervention(
     .single();
 
   if (loadError || !intervention) {
-    console.error("[Executor] Intervention not found:", interventionId);
+    logger.error("[Executor] Intervention not found:", interventionId);
     return {
       success: false,
       message: "Intervention not found",
@@ -182,7 +182,7 @@ export async function executeIntervention(
         message: result.message,
       },
       dedupKey: `executor:${interventionId}`,
-    }).catch((err) => console.error("[Executor] emitEvent failed:", err));
+    }).catch((err) => logger.error("[Executor] emitEvent failed:", err));
 
     // Notify user about completed action
     await notifyUser(intervention as Intervention, result);
@@ -242,7 +242,7 @@ export async function executeIntervention(
         .eq("intervention_id", interventionId);
     }
 
-    console.error("[Executor] Failed:", {
+    logger.error("[Executor] Failed:", {
       interventionId,
       error: errorMessage,
       retryCount,
@@ -421,7 +421,7 @@ async function handleSendSms(
     source_type: "intervention",
     source_id: intervention.id,
   }).catch((err) => {
-    console.error("[Executor] Failed to log SMS message:", {
+    logger.error("[Executor] Failed to log SMS message:", {
       error: err instanceof Error ? err.message : String(err),
       tenantId: intervention.tenant_id,
       interventionId: intervention.id,
@@ -472,7 +472,7 @@ async function handleSendEmail(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("[Executor] Resend email error:", errorText);
+    logger.error("[Executor] Resend email error:", errorText);
     return { success: false, message: `Email failed: ${response.status}` };
   }
 
@@ -484,7 +484,7 @@ async function handleSendEmail(
     source_type: "intervention",
     source_id: intervention.id,
   }).catch((err) => {
-    console.error("[Executor] Failed to log email message:", {
+    logger.error("[Executor] Failed to log email message:", {
       error: err instanceof Error ? err.message : String(err),
       tenantId: intervention.tenant_id,
       interventionId: intervention.id,
@@ -528,7 +528,7 @@ async function handleSendWhatsApp(
     source_type: "intervention",
     source_id: intervention.id,
   }).catch((err) => {
-    console.error("[Executor] Failed to log WhatsApp message:", {
+    logger.error("[Executor] Failed to log WhatsApp message:", {
       error: err instanceof Error ? err.message : String(err),
       tenantId: intervention.tenant_id,
       interventionId: intervention.id,
@@ -566,7 +566,7 @@ async function handleMakeCall(
     source_type: "intervention",
     source_id: intervention.id,
   }).catch((err) => {
-    console.error("[Executor] Failed to log call message:", {
+    logger.error("[Executor] Failed to log call message:", {
       error: err instanceof Error ? err.message : String(err),
       tenantId: intervention.tenant_id,
       interventionId: intervention.id,
@@ -723,7 +723,7 @@ async function handleNotifyEmergencyContact(
     source_type: "intervention",
     source_id: intervention.id,
   }).catch((err) => {
-    console.error("[Executor] Failed to log emergency notification:", {
+    logger.error("[Executor] Failed to log emergency notification:", {
       error: err instanceof Error ? err.message : String(err),
       tenantId: intervention.tenant_id,
       interventionId: intervention.id,
@@ -755,7 +755,7 @@ async function notifyUser(
     source_id: intervention.id,
     metadata: { executionResult: result },
   }).catch((err) => {
-    console.error("[Executor] Failed to log user notification:", {
+    logger.error("[Executor] Failed to log user notification:", {
       error: err instanceof Error ? err.message : String(err),
       tenantId: intervention.tenant_id,
       interventionId: intervention.id,

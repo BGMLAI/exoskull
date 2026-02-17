@@ -62,7 +62,7 @@ export async function handleEmergency(
     return { handled: true, cost_cents: 0 };
   } catch (error) {
     const err = error as Error;
-    console.error("[Petla:Emergency] Failed:", {
+    logger.error("[Petla:Emergency] Failed:", {
       tenantId: tenant_id,
       error: err.message,
       stack: err.stack,

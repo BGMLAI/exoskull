@@ -9,17 +9,18 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Skill generation can take 10-30s
 
 export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
-    console.info("[Skills API] Generate request received");
+    logger.info("[Skills API] Generate request received");
 
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) return auth.response;
     const tenantId = auth.tenantId;
-    console.info("[Skills API] Auth OK, tenant:", tenantId);
+    logger.info("[Skills API] Auth OK, tenant:", tenantId);
 
     const body = await request.json();
     const { description, model } = body as {
@@ -44,7 +45,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       );
     }
 
-    console.info("[Skills API] Starting generation:", {
+    logger.info("[Skills API] Starting generation:", {
       description: description.trim().slice(0, 80),
       model: model || "auto",
     });
@@ -60,7 +61,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
     });
 
     if (!result.success || !result.skill) {
-      console.error("[Skills API] Generation failed:", {
+      logger.error("[Skills API] Generation failed:", {
         error: result.error,
         validationErrors: result.validationErrors,
       });
@@ -73,7 +74,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       );
     }
 
-    console.info("[Skills API] Generation OK, initiating approval");
+    logger.info("[Skills API] Generation OK, initiating approval");
 
     // Initiate approval flow
     const approvalResult = await initiateApproval(result.skill);
@@ -97,7 +98,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[Skills API] Generate error:", {
+    logger.error("[Skills API] Generate error:", {
       message: (error as Error).message,
       stack: (error as Error).stack,
     });

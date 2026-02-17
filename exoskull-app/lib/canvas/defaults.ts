@@ -7,6 +7,7 @@
 
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 interface DefaultWidget {
   widget_type: string;
   position_x: number;
@@ -154,7 +155,7 @@ export async function seedDefaultWidgets(tenantId: string): Promise<void> {
   if (error) {
     // Unique constraint violation = already seeded (race condition safe)
     if (error.code === "23505") return;
-    console.error("[Canvas] Failed to seed defaults:", {
+    logger.error("[Canvas] Failed to seed defaults:", {
       tenantId,
       error: error.message,
     });
@@ -186,7 +187,7 @@ export async function ensureEssentialWidgets(
   for (const row of rows) {
     const { error } = await supabase.from("exo_canvas_widgets").insert(row);
     if (error && error.code !== "23505") {
-      console.error("[Canvas] Failed to insert missing widget:", {
+      logger.error("[Canvas] Failed to insert missing widget:", {
         type: row.widget_type,
         error: error.message,
       });

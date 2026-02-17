@@ -98,7 +98,7 @@ export async function handleBirthMessage(
 
       // Complete birth in background (don't block response)
       completeBirth(tenantId, birthMatch[1]).catch((err) => {
-        console.error("[BirthFlow] completeBirth failed:", {
+        logger.error("[BirthFlow] completeBirth failed:", {
           tenantId,
           error: err instanceof Error ? err.message : err,
         });
@@ -117,7 +117,7 @@ export async function handleBirthMessage(
       channel,
     };
   } catch (error) {
-    console.error("[BirthFlow] handleBirthMessage failed:", {
+    logger.error("[BirthFlow] handleBirthMessage failed:", {
       tenantId,
       channel,
       error: error instanceof Error ? error.message : error,
@@ -160,7 +160,7 @@ export async function completeBirth(
   try {
     birthData = JSON.parse(birthDataJson);
   } catch {
-    console.error("[BirthFlow] Invalid birth JSON:", {
+    logger.error("[BirthFlow] Invalid birth JSON:", {
       tenantId,
       raw: birthDataJson.substring(0, 200),
     });
@@ -215,7 +215,7 @@ export async function completeBirth(
     .eq("id", tenantId);
 
   if (error) {
-    console.error("[BirthFlow] DB update failed:", {
+    logger.error("[BirthFlow] DB update failed:", {
       tenantId,
       error: error.message,
     });
@@ -229,7 +229,7 @@ export async function completeBirth(
       granted_via: "birth",
     });
   } catch (err) {
-    console.error("[BirthFlow] Default permission grant failed:", {
+    logger.error("[BirthFlow] Default permission grant failed:", {
       tenantId,
       error: err instanceof Error ? err.message : err,
     });
@@ -244,7 +244,7 @@ export async function completeBirth(
 
     if (seedErr) {
       // Fallback: use individual RPCs if seed RPC not yet available
-      console.warn(
+      logger.warn(
         "[BirthFlow] seed_value_hierarchy failed, using fallback:",
         seedErr.message,
       );
@@ -255,7 +255,7 @@ export async function completeBirth(
       });
     }
   } catch (err) {
-    console.error("[BirthFlow] Hierarchy seed failed:", {
+    logger.error("[BirthFlow] Hierarchy seed failed:", {
       tenantId,
       error: err instanceof Error ? err.message : err,
     });
@@ -408,7 +408,7 @@ export async function completeBirth(
           }
         }
       } catch (err) {
-        console.error("[BirthFlow] Discovered value insert failed:", {
+        logger.error("[BirthFlow] Discovered value insert failed:", {
           tenantId,
           value: v.name,
           error: err instanceof Error ? err.message : err,

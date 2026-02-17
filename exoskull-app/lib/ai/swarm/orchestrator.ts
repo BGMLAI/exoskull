@@ -71,7 +71,7 @@ export async function executeSwarm(
   const swarmStart = Date.now();
   const timeoutMs = definition.timeoutMs ?? 30_000;
 
-  console.info(
+  logger.info(
     `[Swarm:${definition.name}] Starting with ${definition.agents.length} agents`,
   );
 
@@ -105,7 +105,7 @@ export async function executeSwarm(
   const succeeded = agentResults.filter((r) => r.success);
   const failed = agentResults.filter((r) => !r.success);
 
-  console.info(
+  logger.info(
     `[Swarm:${definition.name}] Agents: ${succeeded.length} OK, ${failed.length} failed`,
   );
 
@@ -131,7 +131,7 @@ export async function executeSwarm(
       synthesis = synthResult.content;
       synthesisCost = synthResult.cost;
     } catch (error) {
-      console.error(`[Swarm:${definition.name}] Synthesis failed:`, error);
+      logger.error(`[Swarm:${definition.name}] Synthesis failed:`, error);
       // Fallback: concatenate agent outputs
       synthesis = succeeded
         .map((r) => `### ${r.name}\n${r.output}`)
@@ -143,7 +143,7 @@ export async function executeSwarm(
     agentResults.reduce((sum, r) => sum + r.cost, 0) + synthesisCost;
   const totalLatencyMs = Date.now() - swarmStart;
 
-  console.info(
+  logger.info(
     `[Swarm:${definition.name}] Done in ${totalLatencyMs}ms, cost: $${totalCost.toFixed(4)}`,
   );
 
@@ -197,7 +197,7 @@ async function executeAgent(
     };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error(`[Swarm] Agent ${agent.name} failed:`, errorMsg);
+    logger.error(`[Swarm] Agent ${agent.name} failed:`, errorMsg);
 
     return {
       name: agent.name,

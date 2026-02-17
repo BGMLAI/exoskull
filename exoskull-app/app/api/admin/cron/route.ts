@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin, getAdminSupabase } from "@/lib/admin/auth";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // Complete CRON definitions (all 26 jobs)
@@ -196,7 +197,7 @@ export const GET = withApiLog(async function GET() {
     return NextResponse.json({ crons });
   } catch (error) {
     if (error instanceof Response) return error;
-    console.error("[AdminCron] Error:", error);
+    logger.error("[AdminCron] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

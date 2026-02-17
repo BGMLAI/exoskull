@@ -8,6 +8,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/skills/[id]
@@ -55,7 +56,7 @@ export const GET = withApiLog(async function GET(
       recentExecutions: logs || [],
     });
   } catch (error) {
-    console.error("[Skills API] GET error:", error);
+    logger.error("[Skills API] GET error:", error);
     return NextResponse.json(
       { error: "Failed to get skill", details: (error as Error).message },
       { status: 500 },
@@ -109,7 +110,7 @@ export const PATCH = withApiLog(async function PATCH(
 
     return NextResponse.json({ success: true, skill });
   } catch (error) {
-    console.error("[Skills API] PATCH error:", error);
+    logger.error("[Skills API] PATCH error:", error);
     return NextResponse.json(
       { error: "Failed to update skill", details: (error as Error).message },
       { status: 500 },
@@ -148,7 +149,7 @@ export const DELETE = withApiLog(async function DELETE(
 
     return NextResponse.json({ success: true, archived: true });
   } catch (error) {
-    console.error("[Skills API] DELETE error:", error);
+    logger.error("[Skills API] DELETE error:", error);
     return NextResponse.json(
       { error: "Failed to archive skill", details: (error as Error).message },
       { status: 500 },

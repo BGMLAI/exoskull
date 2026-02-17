@@ -8,6 +8,7 @@
 
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // Supabase Client
 // ============================================================================
@@ -107,7 +108,7 @@ export async function getDailySummary(
       durationMs: Date.now() - startTime,
     };
   } catch (error) {
-    console.error("[Analytics] getDailySummary failed:", error);
+    logger.error("[Analytics] getDailySummary failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Query failed",
@@ -143,7 +144,7 @@ export async function getWeeklySummary(
       durationMs: Date.now() - startTime,
     };
   } catch (error) {
-    console.error("[Analytics] getWeeklySummary failed:", error);
+    logger.error("[Analytics] getWeeklySummary failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Query failed",
@@ -179,7 +180,7 @@ export async function getMonthlySummary(
       durationMs: Date.now() - startTime,
     };
   } catch (error) {
-    console.error("[Analytics] getMonthlySummary failed:", error);
+    logger.error("[Analytics] getMonthlySummary failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Query failed",
@@ -215,7 +216,7 @@ export async function getMessagesDailySummary(
       durationMs: Date.now() - startTime,
     };
   } catch (error) {
-    console.error("[Analytics] getMessagesDailySummary failed:", error);
+    logger.error("[Analytics] getMessagesDailySummary failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Query failed",
@@ -291,7 +292,7 @@ export async function getRealTimeStats(tenantId: string): Promise<
       durationMs: Date.now() - startTime,
     };
   } catch (error) {
-    console.error("[Analytics] getRealTimeStats failed:", error);
+    logger.error("[Analytics] getRealTimeStats failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Query failed",
@@ -378,7 +379,7 @@ export async function getRecentConversations(
       durationMs: Date.now() - startTime,
     };
   } catch (error) {
-    console.error("[Analytics] getRecentConversations failed:", error);
+    logger.error("[Analytics] getRecentConversations failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Query failed",
@@ -472,7 +473,7 @@ export async function getConversationInsights(
       durationMs: Date.now() - startTime,
     };
   } catch (error) {
-    console.error("[Analytics] getConversationInsights failed:", error);
+    logger.error("[Analytics] getConversationInsights failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Query failed",
@@ -585,7 +586,7 @@ export async function getPeriodComparison(
       durationMs: Date.now() - startTime,
     };
   } catch (error) {
-    console.error("[Analytics] getPeriodComparison failed:", error);
+    logger.error("[Analytics] getPeriodComparison failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Query failed",

@@ -249,7 +249,7 @@ export async function handleMaintenance(
     return { handled: true, cost_cents: 0 };
   } catch (error) {
     const err = error as Error;
-    console.error("[Petla:Maintenance] Failed:", {
+    logger.error("[Petla:Maintenance] Failed:", {
       tenantId: tenant_id,
       handler: item.handler,
       error: err.message,

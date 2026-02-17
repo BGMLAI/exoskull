@@ -15,6 +15,7 @@ import {
 } from "@/lib/iors/feedback";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const VALID_TYPES: FeedbackType[] = [
@@ -63,7 +64,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     return NextResponse.json({ id: result.id });
   } catch (error) {
-    console.error("[FeedbackAPI] POST error:", error);
+    logger.error("[FeedbackAPI] POST error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -84,7 +85,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
 
     return NextResponse.json({ summary, recent });
   } catch (error) {
-    console.error("[FeedbackAPI] GET error:", error);
+    logger.error("[FeedbackAPI] GET error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

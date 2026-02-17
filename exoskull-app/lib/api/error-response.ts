@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server";
 
+import { logger } from "@/lib/logger";
 interface ErrorResponseOptions {
   /** Prefix for server-side log (e.g. "[Gateway:Telegram]") */
   context: string;
@@ -36,7 +37,7 @@ export function safeErrorResponse(
     publicMessage = "Internal server error",
   } = options;
 
-  console.error(`${context} Error:`, {
+  logger.error(`${context} Error:`, {
     message: error instanceof Error ? error.message : String(error),
     stack: error instanceof Error ? error.stack : undefined,
   });

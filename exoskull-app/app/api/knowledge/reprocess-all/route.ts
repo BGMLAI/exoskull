@@ -20,6 +20,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { processDocument } from "@/lib/knowledge/document-processor";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes for bulk processing
 
@@ -61,7 +62,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         .eq("tenant_id", tenantId);
 
       if (deleteError) {
-        console.error("[ReprocessAll] Delete chunks failed:", deleteError);
+        logger.error("[ReprocessAll] Delete chunks failed:", deleteError);
       }
     }
 
@@ -126,7 +127,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       }
     }
 
-    console.log("[ReprocessAll] Complete:", {
+    logger.info("[ReprocessAll] Complete:", {
       tenantId,
       total: results.total,
       success: results.success,
@@ -135,7 +136,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     return NextResponse.json(results);
   } catch (error) {
-    console.error("[ReprocessAll] Error:", {
+    logger.error("[ReprocessAll] Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json({ error: "Failed to reprocess" }, { status: 500 });

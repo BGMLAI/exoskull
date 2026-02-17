@@ -8,6 +8,7 @@
 import crypto from "crypto";
 import type { ChannelAdapter, GatewayMessage } from "../types";
 
+import { logger } from "@/lib/logger";
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
 
@@ -100,7 +101,7 @@ export const slackAdapter: ChannelAdapter = {
     metadata?: Record<string, unknown>,
   ): Promise<void> {
     if (!SLACK_BOT_TOKEN) {
-      console.error("[Slack] SLACK_BOT_TOKEN not set");
+      logger.error("[Slack] SLACK_BOT_TOKEN not set");
       return;
     }
 
@@ -122,7 +123,7 @@ export const slackAdapter: ChannelAdapter = {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error("[Slack] chat.postMessage failed:", {
+      logger.error("[Slack] chat.postMessage failed:", {
         channel: channelId,
         status: response.status,
         error,
@@ -130,7 +131,7 @@ export const slackAdapter: ChannelAdapter = {
     } else {
       const result = await response.json();
       if (!result.ok) {
-        console.error("[Slack] API error:", result.error);
+        logger.error("[Slack] API error:", result.error);
       }
     }
   },

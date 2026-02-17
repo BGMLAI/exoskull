@@ -9,6 +9,7 @@
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { ensureFreshToken } from "@/lib/rigs/oauth";
 
+import { logger } from "@/lib/logger";
 const DRIVE_BASE = "https://www.googleapis.com/drive/v3";
 
 // ============================================================================
@@ -36,7 +37,7 @@ async function getValidToken(tenantId: string): Promise<string | null> {
         // ensureFreshToken handles refresh if needed and updates DB
         return await ensureFreshToken(connection);
       } catch (err) {
-        console.error(`[GoogleDrive] Token refresh failed for ${slug}:`, err);
+        logger.error(`[GoogleDrive] Token refresh failed for ${slug}:`, err);
         continue; // Try next slug
       }
     }

@@ -259,7 +259,7 @@ export async function createGeminiLiveSession(
             });
           }
         } catch (err) {
-          console.error("[GeminiLive] Message handler error:", {
+          logger.error("[GeminiLive] Message handler error:", {
             error: err instanceof Error ? err.message : err,
             tenantId: opts.tenantId,
           });
@@ -269,7 +269,7 @@ export async function createGeminiLiveSession(
         }
       },
       onerror: (e: any) => {
-        console.error("[GeminiLive] WebSocket error:", {
+        logger.error("[GeminiLive] WebSocket error:", {
           message: e?.message || e,
           tenantId: opts.tenantId,
         });
@@ -304,7 +304,7 @@ export async function createGeminiLiveSession(
           },
         } as any);
       } catch (err) {
-        console.error("[GeminiLive] sendAudio error:", {
+        logger.error("[GeminiLive] sendAudio error:", {
           error: err instanceof Error ? err.message : err,
         });
       }
@@ -316,7 +316,7 @@ export async function createGeminiLiveSession(
           turns: [{ role: "user", parts: [{ text }] }],
         } as any);
       } catch (err) {
-        console.error("[GeminiLive] sendText error:", {
+        logger.error("[GeminiLive] sendText error:", {
           error: err instanceof Error ? err.message : err,
         });
       }
@@ -328,7 +328,7 @@ export async function createGeminiLiveSession(
           audioStreamEnd: true,
         } as any);
       } catch (err) {
-        console.error("[GeminiLive] endAudioStream error:", {
+        logger.error("[GeminiLive] endAudioStream error:", {
           error: err instanceof Error ? err.message : err,
         });
       }
@@ -338,7 +338,7 @@ export async function createGeminiLiveSession(
       try {
         session.close();
       } catch (err) {
-        console.error("[GeminiLive] close error:", {
+        logger.error("[GeminiLive] close error:", {
           error: err instanceof Error ? err.message : err,
         });
       }
@@ -395,7 +395,7 @@ async function handleToolCalls(
         tenantId,
       });
     } catch (err) {
-      console.error("[GeminiLive] Tool execution error:", {
+      logger.error("[GeminiLive] Tool execution error:", {
         name,
         error: err instanceof Error ? err.message : err,
         tenantId,
@@ -415,7 +415,7 @@ async function handleToolCalls(
   try {
     session.sendToolResponse({ functionResponses });
   } catch (err) {
-    console.error("[GeminiLive] sendToolResponse error:", {
+    logger.error("[GeminiLive] sendToolResponse error:", {
       error: err instanceof Error ? err.message : err,
       tenantId,
     });

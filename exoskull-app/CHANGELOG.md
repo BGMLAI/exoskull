@@ -4,6 +4,23 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-18] Audit P2.2 + P2.4: Request Logging & Error Boundaries
+
+### P2.2 — withApiLog Expansion
+
+- Wrapped **170 API route handlers** with `withApiLog()` for structured request logging
+- Every request gets: request ID, method, path, status, duration, DB persistence for slow/failed
+- Coverage: **2.5% → ~89%** (CRON routes with `withCronGuard` left as-is)
+- Relaxed `RouteHandler` ctx type to `any` for dynamic route compatibility
+
+### P2.4 — Error & Loading Boundaries
+
+- Added `loading.tsx` for all **21** dashboard + admin sub-sections
+- Added `error.tsx` for **13** data-heavy sections (chat, conversations, knowledge, tasks, goals, settings, memory, skills, logs, users, data-pipeline, cron, insights)
+- Localized error recovery — section errors no longer blow up the entire dashboard
+
+---
+
 ## [2026-02-17] Phase 14: 3D Mind Map Workspace
 
 ### New Components

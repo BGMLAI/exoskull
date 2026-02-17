@@ -64,7 +64,7 @@ async function getHandler(request: NextRequest) {
     logger.info("[PostConversation] CRON completed:", response);
     return NextResponse.json(response);
   } catch (error) {
-    console.error("[PostConversation] CRON failed:", error);
+    logger.error("[PostConversation] CRON failed:", error);
     return NextResponse.json(
       {
         success: false,
@@ -124,7 +124,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       result,
     });
   } catch (error) {
-    console.error("[PostConversation] Manual trigger failed:", error);
+    logger.error("[PostConversation] Manual trigger failed:", error);
     return NextResponse.json(
       {
         success: false,

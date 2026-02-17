@@ -54,7 +54,7 @@ export async function autoInstallMods(tenantId: string): Promise<string[]> {
     .single();
 
   if (tenantError || !tenant) {
-    console.error("[ProactiveEngine] Failed to get tenant:", tenantError);
+    logger.error("[ProactiveEngine] Failed to get tenant:", tenantError);
     return [];
   }
 
@@ -92,7 +92,7 @@ export async function autoInstallMods(tenantId: string): Promise<string[]> {
     .in("slug", Array.from(modSlugs));
 
   if (modsError || !mods) {
-    console.error("[ProactiveEngine] Failed to get mods:", modsError);
+    logger.error("[ProactiveEngine] Failed to get mods:", modsError);
     return [];
   }
 
@@ -114,7 +114,7 @@ export async function autoInstallMods(tenantId: string): Promise<string[]> {
       );
 
     if (installError) {
-      console.error(
+      logger.error(
         `[ProactiveEngine] Failed to install ${mod.slug}:`,
         installError,
       );
@@ -193,7 +193,7 @@ export async function getInstalledMods(tenantId: string) {
     .eq("active", true);
 
   if (error) {
-    console.error("[ProactiveEngine] Failed to get installed mods:", error);
+    logger.error("[ProactiveEngine] Failed to get installed mods:", error);
     return [];
   }
 

@@ -10,6 +10,7 @@ import { getEmotionHistory } from "@/lib/emotion";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -36,7 +37,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       tenant_id: tenantId,
     });
   } catch (error) {
-    console.error("[EmotionHistory] API error:", error);
+    logger.error("[EmotionHistory] API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

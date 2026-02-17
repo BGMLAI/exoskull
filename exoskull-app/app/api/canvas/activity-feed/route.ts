@@ -9,6 +9,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(request: NextRequest) {
@@ -42,7 +43,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error("[ActivityFeed] Query failed:", {
+      logger.error("[ActivityFeed] Query failed:", {
         error: error.message,
         tenantId,
       });
@@ -54,7 +55,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
 
     return NextResponse.json(data || []);
   } catch (error) {
-    console.error("[ActivityFeed] Error:", error);
+    logger.error("[ActivityFeed] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

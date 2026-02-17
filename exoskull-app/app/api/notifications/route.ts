@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(request: NextRequest) {
@@ -41,7 +42,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error("[Notifications API] GET error:", error);
+      logger.error("[Notifications API] GET error:", error);
       return NextResponse.json(
         { error: "Failed to fetch notifications" },
         { status: 500 },
@@ -60,7 +61,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       unreadCount: count || 0,
     });
   } catch (error) {
-    console.error("[Notifications API] GET error:", {
+    logger.error("[Notifications API] GET error:", {
       error: error instanceof Error ? error.message : error,
       stack: error instanceof Error ? error.stack : undefined,
     });
@@ -89,7 +90,7 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
         .eq("is_read", false);
 
       if (error) {
-        console.error("[Notifications API] PATCH markAll error:", error);
+        logger.error("[Notifications API] PATCH markAll error:", error);
         return NextResponse.json(
           { error: "Failed to mark all as read" },
           { status: 500 },
@@ -103,7 +104,7 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
         .in("id", body.ids);
 
       if (error) {
-        console.error("[Notifications API] PATCH ids error:", error);
+        logger.error("[Notifications API] PATCH ids error:", error);
         return NextResponse.json(
           { error: "Failed to mark as read" },
           { status: 500 },
@@ -118,7 +119,7 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[Notifications API] PATCH error:", {
+    logger.error("[Notifications API] PATCH error:", {
       error: error instanceof Error ? error.message : error,
       stack: error instanceof Error ? error.stack : undefined,
     });

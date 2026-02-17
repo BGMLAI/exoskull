@@ -11,6 +11,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 
+import { logger } from "@/lib/logger";
 export type IntegrationType =
   | "gmail"
   | "outlook"
@@ -85,14 +86,14 @@ export async function recordHealthCheck(
     );
 
     if (rpcError) {
-      console.error("[IntegrationHealth] Failed to record health check:", {
+      logger.error("[IntegrationHealth] Failed to record health check:", {
         tenantId,
         integrationType,
         error: rpcError.message,
       });
     }
   } catch (error) {
-    console.error("[IntegrationHealth] recordHealthCheck error:", {
+    logger.error("[IntegrationHealth] recordHealthCheck error:", {
       tenantId,
       integrationType,
       error: error instanceof Error ? error.message : String(error),
@@ -122,14 +123,14 @@ export async function logIntegrationEvent(
     });
 
     if (error) {
-      console.error("[IntegrationHealth] Failed to log event:", {
+      logger.error("[IntegrationHealth] Failed to log event:", {
         tenantId,
         event: event.event_type,
         error: error.message,
       });
     }
   } catch (error) {
-    console.error("[IntegrationHealth] logIntegrationEvent error:", {
+    logger.error("[IntegrationHealth] logIntegrationEvent error:", {
       tenantId,
       event: event.event_type,
       error: error instanceof Error ? error.message : String(error),
@@ -154,7 +155,7 @@ export async function getIntegrationHealthSummary(
     );
 
     if (error) {
-      console.error("[IntegrationHealth] Failed to get health summary:", {
+      logger.error("[IntegrationHealth] Failed to get health summary:", {
         tenantId,
         error: error.message,
       });
@@ -163,7 +164,7 @@ export async function getIntegrationHealthSummary(
 
     return (data || []) as IntegrationHealth[];
   } catch (error) {
-    console.error("[IntegrationHealth] getIntegrationHealthSummary error:", {
+    logger.error("[IntegrationHealth] getIntegrationHealthSummary error:", {
       tenantId,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -192,7 +193,7 @@ export async function getRecentIntegrationEvents(
     );
 
     if (error) {
-      console.error("[IntegrationHealth] Failed to get recent events:", {
+      logger.error("[IntegrationHealth] Failed to get recent events:", {
         tenantId,
         integrationType,
         error: error.message,
@@ -202,7 +203,7 @@ export async function getRecentIntegrationEvents(
 
     return (data || []) as IntegrationEvent[];
   } catch (error) {
-    console.error("[IntegrationHealth] getRecentIntegrationEvents error:", {
+    logger.error("[IntegrationHealth] getRecentIntegrationEvents error:", {
       tenantId,
       integrationType,
       error: error instanceof Error ? error.message : String(error),
@@ -230,7 +231,7 @@ export async function isIntegrationHealthy(
     // Healthy if circuit closed and status is healthy/degraded (not down)
     return health.circuit_state === "closed" && health.status !== "down";
   } catch (error) {
-    console.error("[IntegrationHealth] isIntegrationHealthy error:", {
+    logger.error("[IntegrationHealth] isIntegrationHealthy error:", {
       tenantId,
       integrationType,
       error: error instanceof Error ? error.message : String(error),
@@ -872,7 +873,7 @@ export async function runAllHealthChecks(tenantId: string): Promise<void> {
       await checkDiscordHealth(tenantId);
     }
   } catch (error) {
-    console.error("[IntegrationHealth] runAllHealthChecks error:", {
+    logger.error("[IntegrationHealth] runAllHealthChecks error:", {
       tenantId,
       error: error instanceof Error ? error.message : String(error),
     });

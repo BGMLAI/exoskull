@@ -40,7 +40,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     if (signature && timestamp) {
       const isValid = verifyDiscordSignature(rawBody, signature, timestamp);
       if (!isValid) {
-        console.error("[Discord Route] Signature verification failed");
+        logger.error("[Discord Route] Signature verification failed");
         return NextResponse.json(
           { error: "Invalid signature" },
           { status: 401 },
@@ -83,7 +83,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[Discord Route] Error:", {
+    logger.error("[Discord Route] Error:", {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });

@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
 export type TenantAuthResult =
   | { ok: true; tenantId: string }
   | { ok: false; response: NextResponse };
@@ -40,7 +41,7 @@ export async function verifyTenantAuth(
       return { ok: true, tenantId: user.id };
     }
   } catch (error) {
-    console.error("[verifyTenantAuth] Cookie auth failed:", {
+    logger.error("[verifyTenantAuth] Cookie auth failed:", {
       error: error instanceof Error ? error.message : "Unknown error",
     });
   }
@@ -61,7 +62,7 @@ export async function verifyTenantAuth(
         return { ok: true, tenantId: user.id };
       }
     } catch (error) {
-      console.error("[verifyTenantAuth] Bearer token auth failed:", {
+      logger.error("[verifyTenantAuth] Bearer token auth failed:", {
         error: error instanceof Error ? error.message : "Unknown error",
       });
     }

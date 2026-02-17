@@ -48,7 +48,7 @@ async function handler(req: NextRequest) {
       .limit(BATCH_SIZE);
 
     if (fetchError) {
-      console.error("[VoiceCRON] Fetch error:", fetchError.message);
+      logger.error("[VoiceCRON] Fetch error:", fetchError.message);
       return NextResponse.json({ error: fetchError.message }, { status: 500 });
     }
 
@@ -77,7 +77,7 @@ async function handler(req: NextRequest) {
           .download(note.audio_path);
 
         if (downloadError || !audioData) {
-          console.error("[VoiceCRON] Download failed:", {
+          logger.error("[VoiceCRON] Download failed:", {
             noteId: note.id,
             path: note.audio_path,
             error: downloadError?.message,
@@ -114,7 +114,7 @@ async function handler(req: NextRequest) {
         });
         processed++;
       } catch (error) {
-        console.error("[VoiceCRON] Processing failed:", {
+        logger.error("[VoiceCRON] Processing failed:", {
           noteId: note.id,
           error: (error as Error).message,
         });
@@ -141,7 +141,7 @@ async function handler(req: NextRequest) {
       durationMs: Date.now() - startTime,
     });
   } catch (error) {
-    console.error("[VoiceCRON] Error:", error);
+    logger.error("[VoiceCRON] Error:", error);
     return NextResponse.json(
       {
         error: "Voice transcription CRON failed",

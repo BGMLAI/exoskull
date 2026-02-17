@@ -8,6 +8,7 @@
 import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const valueTools: ToolDefinition[] = [
   // =========================================================================
   // LIST VALUES
@@ -47,7 +48,7 @@ export const valueTools: ToolDefinition[] = [
         .order("priority", { ascending: false });
 
       if (error) {
-        console.error("[list_values] Failed:", {
+        logger.error("[list_values] Failed:", {
           error: error.message,
           tenantId,
         });
@@ -167,7 +168,7 @@ export const valueTools: ToolDefinition[] = [
         if (error.code === "23505") {
           return `Wartosc "${input.name}" juz istnieje.`;
         }
-        console.error("[create_value] Failed:", {
+        logger.error("[create_value] Failed:", {
           error: error.message,
           tenantId,
           name: input.name,
@@ -260,7 +261,7 @@ export const valueTools: ToolDefinition[] = [
         .eq("tenant_id", tenantId);
 
       if (error) {
-        console.error("[update_value] Failed:", {
+        logger.error("[update_value] Failed:", {
           error: error.message,
           tenantId,
           valueId: existing.id,
@@ -405,7 +406,7 @@ export const valueTools: ToolDefinition[] = [
         if (error.code === "23505") {
           return `Biegun "${input.slug}" juz istnieje.`;
         }
-        console.error("[create_area] Failed:", {
+        logger.error("[create_area] Failed:", {
           error: error.message,
           tenantId,
           slug: input.slug,
@@ -486,7 +487,7 @@ export const valueTools: ToolDefinition[] = [
         .single();
 
       if (error) {
-        console.error("[create_mission] Failed:", {
+        logger.error("[create_mission] Failed:", {
           error: error.message,
           tenantId,
           title: input.title,
@@ -609,7 +610,7 @@ export const valueTools: ToolDefinition[] = [
         .single();
 
       if (error) {
-        console.error("[create_challenge] Failed:", {
+        logger.error("[create_challenge] Failed:", {
           error: error.message,
           tenantId,
           title: input.title,
@@ -744,7 +745,7 @@ export const valueTools: ToolDefinition[] = [
         .single();
 
       if (error) {
-        console.error("[create_note_in_hierarchy] Failed:", {
+        logger.error("[create_note_in_hierarchy] Failed:", {
           error: error.message,
           tenantId,
         });
@@ -846,7 +847,7 @@ export const valueTools: ToolDefinition[] = [
         }
       } catch (rpcErr) {
         // RPC might not exist yet — fall back to old RPC or manual
-        console.warn("[get_value_hierarchy] Full RPC fallback:", rpcErr);
+        logger.warn("[get_value_hierarchy] Full RPC fallback:", rpcErr);
       }
 
       // Try old RPC
@@ -895,7 +896,7 @@ export const valueTools: ToolDefinition[] = [
           return result.trim();
         }
       } catch (rpcErr) {
-        console.warn("[get_value_hierarchy] Old RPC fallback:", rpcErr);
+        logger.warn("[get_value_hierarchy] Old RPC fallback:", rpcErr);
       }
 
       // Fallback: manual query
@@ -981,7 +982,7 @@ export const valueTools: ToolDefinition[] = [
           });
         }
       } catch (err) {
-        console.error("[seed_hierarchy] Failed:", {
+        logger.error("[seed_hierarchy] Failed:", {
           error: err instanceof Error ? err.message : err,
           tenantId,
         });

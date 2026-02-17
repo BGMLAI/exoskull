@@ -19,6 +19,7 @@
 import { getServiceSupabase } from "@/lib/supabase/service";
 import type { EmotionSignal, TauQuadrant } from "./types";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // QUADRANT CLASSIFICATION
 // ============================================================================
@@ -106,13 +107,13 @@ export async function logEmotionSignal(
     });
 
     if (error) {
-      console.error("[EmotionMatrix] Failed to log signal:", {
+      logger.error("[EmotionMatrix] Failed to log signal:", {
         tenantId,
         error: error.message,
       });
     }
   } catch (err) {
-    console.error("[EmotionMatrix] logEmotionSignal exception:", {
+    logger.error("[EmotionMatrix] logEmotionSignal exception:", {
       tenantId,
       error: err instanceof Error ? err.message : err,
     });

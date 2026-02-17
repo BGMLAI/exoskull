@@ -304,7 +304,7 @@ async function handler(req: NextRequest) {
       durationMs: Date.now() - startTime,
     });
   } catch (error) {
-    console.error("[LoopDaily] Error:", error);
+    logger.error("[LoopDaily] Error:", error);
     return NextResponse.json(
       {
         error: "Loop-daily processing failed",

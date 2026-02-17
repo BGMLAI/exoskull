@@ -33,7 +33,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     .in("subscription_status", ["active", "trial"]);
 
   if (tenantsErr) {
-    console.error("[MonthlySummary] Failed to fetch tenants:", {
+    logger.error("[MonthlySummary] Failed to fetch tenants:", {
       error: tenantsErr.message,
     });
     return NextResponse.json(
@@ -71,7 +71,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       errors.push(`${tenant.id}: ${msg}`);
-      console.error("[MonthlySummary] Failed to enqueue tenant:", {
+      logger.error("[MonthlySummary] Failed to enqueue tenant:", {
         tenantId: tenant.id,
         error: msg,
       });

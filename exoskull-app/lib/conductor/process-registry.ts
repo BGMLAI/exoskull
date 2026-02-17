@@ -7,6 +7,7 @@
 
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export type ProcessType =
   | "cron"
   | "conductor_work"
@@ -46,13 +47,13 @@ export async function registerProcess(
     });
 
     if (error) {
-      console.error("[ProcessRegistry] register failed:", error.message);
+      logger.error("[ProcessRegistry] register failed:", error.message);
       return null;
     }
 
     return data as string;
   } catch (err) {
-    console.error("[ProcessRegistry] register error:", err);
+    logger.error("[ProcessRegistry] register error:", err);
     return null;
   }
 }
@@ -76,7 +77,7 @@ export async function completeProcess(
       p_cost_cents: costCents,
     });
   } catch (err) {
-    console.error("[ProcessRegistry] complete error:", err);
+    logger.error("[ProcessRegistry] complete error:", err);
   }
 }
 
@@ -90,12 +91,12 @@ export async function expireStaleProcesses(): Promise<number> {
       "expire_stale_processes",
     );
     if (error) {
-      console.error("[ProcessRegistry] expire error:", error.message);
+      logger.error("[ProcessRegistry] expire error:", error.message);
       return 0;
     }
     return (data as number) || 0;
   } catch (err) {
-    console.error("[ProcessRegistry] expire error:", err);
+    logger.error("[ProcessRegistry] expire error:", err);
     return 0;
   }
 }
@@ -116,7 +117,7 @@ export async function countActiveProcesses(): Promise<ActiveProcessCounts> {
       "count_active_processes",
     );
     if (error) {
-      console.error("[ProcessRegistry] count error:", error.message);
+      logger.error("[ProcessRegistry] count error:", error.message);
       return fallback;
     }
     const row = Array.isArray(data) ? data[0] : data;
@@ -129,7 +130,7 @@ export async function countActiveProcesses(): Promise<ActiveProcessCounts> {
       event: row.event_active ?? 0,
     };
   } catch (err) {
-    console.error("[ProcessRegistry] count error:", err);
+    logger.error("[ProcessRegistry] count error:", err);
     return fallback;
   }
 }
@@ -156,13 +157,13 @@ export async function claimConductorWork(
     );
 
     if (error) {
-      console.error("[ProcessRegistry] claim error:", error.message);
+      logger.error("[ProcessRegistry] claim error:", error.message);
       return null;
     }
 
     return (data as string) || null;
   } catch (err) {
-    console.error("[ProcessRegistry] claim error:", err);
+    logger.error("[ProcessRegistry] claim error:", err);
     return null;
   }
 }

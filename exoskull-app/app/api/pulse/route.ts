@@ -74,7 +74,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       );
 
     if (error) {
-      console.error("[PULSE] Error fetching users:", error);
+      logger.error("[PULSE] Error fetching users:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
@@ -111,7 +111,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
         if (settled.status === "fulfilled") {
           results.push(settled.value);
         } else {
-          console.error("[PULSE] Batch user error:", {
+          logger.error("[PULSE] Batch user error:", {
             error:
               settled.reason instanceof Error
                 ? settled.reason.message
@@ -128,7 +128,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       duration_ms: Date.now() - startTime,
     });
   } catch (error) {
-    console.error("[PULSE] CRON error:", error);
+    logger.error("[PULSE] CRON error:", error);
     return NextResponse.json({ error: "Pulse check failed" }, { status: 500 });
   }
 });
@@ -185,7 +185,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       duration_ms: Date.now() - startTime,
     });
   } catch (error) {
-    console.error("[PULSE] POST error:", error);
+    logger.error("[PULSE] POST error:", error);
     return NextResponse.json({ error: "Pulse check failed" }, { status: 500 });
   }
 });
@@ -219,7 +219,7 @@ async function runPulseForUser(
       alerts.push(...checkAlerts);
       checksPerformed.push(check);
     } catch (err) {
-      console.error(`[PULSE] Check ${check} failed for ${userId}:`, err);
+      logger.error(`[PULSE] Check ${check} failed for ${userId}:`, err);
     }
   }
 

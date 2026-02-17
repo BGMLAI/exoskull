@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const VALID_DAYS = [7, 14, 30] as const;
@@ -39,7 +40,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     });
 
     if (error) {
-      console.error("[EmotionTrends] RPC error:", {
+      logger.error("[EmotionTrends] RPC error:", {
         error: error.message,
         tenantId,
       });
@@ -56,7 +57,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
 
     return NextResponse.json({ days, data: sorted, count: sorted.length });
   } catch (error) {
-    console.error("[EmotionTrends] Unexpected error:", error);
+    logger.error("[EmotionTrends] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

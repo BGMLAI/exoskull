@@ -285,7 +285,7 @@ export async function hasConnection(
       (c) => c.toolkit.toUpperCase() === toolkit.toUpperCase(),
     );
   } catch (err) {
-    console.error("[Composio:hasConnection:failed]", {
+    logger.error("[Composio:hasConnection:failed]", {
       tenantId,
       toolkit,
       error: err instanceof Error ? err.message : err,
@@ -485,7 +485,7 @@ export async function executeAction(
     const needsReconnect =
       (currentHealth?.consecutiveFailures ?? 0) >= 3 || is401;
 
-    console.error("[Composio:executeAction:failed]", {
+    logger.error("[Composio:executeAction:failed]", {
       toolSlug,
       tenantId,
       error: msg,
@@ -514,7 +514,7 @@ export async function disconnectAccount(
     );
     return true;
   } catch (err) {
-    console.error("[Composio:disconnectAccount:failed]", {
+    logger.error("[Composio:disconnectAccount:failed]", {
       connectionId,
       error: err instanceof Error ? err.message : err,
     });

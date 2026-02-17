@@ -20,6 +20,7 @@ import type {
 import { extractKnowledge } from "./knowledge-extractor";
 import { generateTasksFromEmail } from "./task-generator";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // MAIN ENTRY POINT
 // ============================================================================
@@ -55,7 +56,7 @@ export async function analyzeEmails(
   // Phase 1: Classify ALL in parallel
   const classifyPromises = (pending as AnalyzedEmail[]).map((email) =>
     classifyEmail(email).catch((err) => {
-      console.error("[EmailAnalyzer] Classification failed:", {
+      logger.error("[EmailAnalyzer] Classification failed:", {
         emailId: email.id,
         error: err instanceof Error ? err.message : err,
       });
@@ -146,7 +147,7 @@ export async function analyzeEmails(
             const chunks = await extractKnowledge(email, deepResult.key_facts);
             result.insightsGenerated += chunks;
           } catch (err) {
-            console.error("[EmailAnalyzer] Knowledge extraction failed:", err);
+            logger.error("[EmailAnalyzer] Knowledge extraction failed:", err);
           }
         }
 
@@ -159,11 +160,11 @@ export async function analyzeEmails(
             );
             result.tasksCreated += tasks;
           } catch (err) {
-            console.error("[EmailAnalyzer] Task generation failed:", err);
+            logger.error("[EmailAnalyzer] Task generation failed:", err);
           }
         }
       } catch (err) {
-        console.error("[EmailAnalyzer] Deep analysis failed:", {
+        logger.error("[EmailAnalyzer] Deep analysis failed:", {
           emailId: email.id,
           error: err instanceof Error ? err.message : err,
         });
@@ -395,7 +396,7 @@ async function updateSenderProfile(
   );
 
   if (error) {
-    console.error(
+    logger.error(
       "[EmailAnalyzer] Sender profile update failed:",
       error.message,
     );

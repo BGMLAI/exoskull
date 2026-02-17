@@ -62,7 +62,7 @@ export async function exchangeCodeForTokens(
 
   if (!response.ok) {
     const error = await response.text();
-    console.error("[OAuth] Token exchange failed:", error);
+    logger.error("[OAuth] Token exchange failed:", error);
     throw new Error(`Token exchange failed: ${response.status}`);
   }
 
@@ -91,7 +91,7 @@ export async function refreshAccessToken(
 
   if (!response.ok) {
     const error = await response.text();
-    console.error("[OAuth] Token refresh failed:", error);
+    logger.error("[OAuth] Token refresh failed:", error);
     throw new Error(`Token refresh failed: ${response.status}`);
   }
 
@@ -481,7 +481,7 @@ export async function ensureFreshToken(connection: {
       .eq("id", connection.id);
 
     if (error) {
-      console.error(
+      logger.error(
         `[OAuth] Failed to save refreshed token for ${connection.rig_slug}:`,
         error,
       );
@@ -489,7 +489,7 @@ export async function ensureFreshToken(connection: {
 
     return tokens.access_token;
   } catch (error) {
-    console.error(
+    logger.error(
       `[OAuth] Token refresh failed for ${connection.rig_slug}:`,
       error,
     );

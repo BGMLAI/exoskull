@@ -79,7 +79,7 @@ async function handler(req: NextRequest) {
         }
       } catch (error) {
         results.errors++;
-        console.error(
+        logger.error(
           `[OutboundMonitor] Error checking tenant ${tenant.id}:`,
           error,
         );
@@ -99,7 +99,7 @@ async function handler(req: NextRequest) {
       durationMs: duration,
     });
   } catch (error) {
-    console.error("[OutboundMonitor] CRON error:", error);
+    logger.error("[OutboundMonitor] CRON error:", error);
     return NextResponse.json(
       {
         error: "Outbound monitor failed",

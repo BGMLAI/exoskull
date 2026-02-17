@@ -12,6 +12,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const DEFAULT_DAYS = 7;
@@ -95,7 +96,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
         });
 
       if (insertError) {
-        console.error("[Oura Sync] Failed to upsert metrics:", {
+        logger.error("[Oura Sync] Failed to upsert metrics:", {
           error: insertError.message,
           tenantId: tenantIdValue,
           count: metrics.length,
@@ -142,7 +143,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
     const duration = Date.now() - startTime;
     const message = error instanceof Error ? error.message : "Unknown error";
 
-    console.error("[Oura Sync] Failed:", error);
+    logger.error("[Oura Sync] Failed:", error);
 
     await supabase
       .from("exo_rig_connections")

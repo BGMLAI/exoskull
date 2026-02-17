@@ -19,6 +19,7 @@ import {
 import { checkAndRefreshExpiring } from "@/lib/autonomy/token-refresh";
 import { dispatchReport } from "@/lib/reports/report-dispatcher";
 
+import { logger } from "@/lib/logger";
 async function handler(_req: NextRequest) {
   const supabase = await createClient();
 
@@ -28,7 +29,7 @@ async function handler(_req: NextRequest) {
   const tokensRefreshed = refreshResults.filter((r) => r.success).length;
   const refreshFailed = refreshResults.filter((r) => !r.success).length;
 
-  console.log("[IntegrationHealthCRON] Token refresh:", {
+  logger.info("[IntegrationHealthCRON] Token refresh:", {
     refreshed: tokensRefreshed,
     failed: refreshFailed,
   });
@@ -41,7 +42,7 @@ async function handler(_req: NextRequest) {
     .limit(1000);
 
   if (error) {
-    console.error(
+    logger.error(
       "[IntegrationHealthCRON] Failed to fetch tenants:",
       error.message,
     );
@@ -97,7 +98,7 @@ async function handler(_req: NextRequest) {
         alertSent,
       });
     } catch (error) {
-      console.error(
+      logger.error(
         `[IntegrationHealthCRON] Error checking tenant ${tenant.id}:`,
         {
           error: error instanceof Error ? error.message : String(error),

@@ -101,7 +101,7 @@ export async function createLead(
     .single();
 
   if (error) {
-    console.error("[LeadManager] Failed to create lead:", {
+    logger.error("[LeadManager] Failed to create lead:", {
       error: error.message,
       from,
       channel,
@@ -217,7 +217,7 @@ export async function handleLeadMessage(
       channel,
     };
   } catch (error) {
-    console.error("[LeadManager] handleLeadMessage failed:", {
+    logger.error("[LeadManager] handleLeadMessage failed:", {
       error: error instanceof Error ? error.message : error,
       leadId: lead.id,
     });
@@ -247,7 +247,7 @@ export async function convertLeadToTenant(
     .single();
 
   if (!lead) {
-    console.error("[LeadManager] Lead not found for conversion:", leadId);
+    logger.error("[LeadManager] Lead not found for conversion:", leadId);
     return;
   }
 

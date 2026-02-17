@@ -10,6 +10,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 /**
@@ -86,7 +87,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       recent_logs: recentLogs || [],
     });
   } catch (error) {
-    console.error("GET /api/schedule error:", error);
+    logger.error("GET /api/schedule error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",
@@ -165,7 +166,7 @@ export const PUT = withApiLog(async function PUT(req: NextRequest) {
 
     return NextResponse.json({ error: "No updates provided" }, { status: 400 });
   } catch (error) {
-    console.error("PUT /api/schedule error:", error);
+    logger.error("PUT /api/schedule error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",
@@ -258,7 +259,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       result,
     });
   } catch (error) {
-    console.error("POST /api/schedule error:", error);
+    logger.error("POST /api/schedule error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",

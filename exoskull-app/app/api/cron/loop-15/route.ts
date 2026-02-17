@@ -31,6 +31,7 @@ import {
   formatCoachingMessage,
 } from "@/lib/iors/coaching/decision-engine";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -200,7 +201,7 @@ async function handler(req: NextRequest) {
             breaker.recordFailure(
               aiErr instanceof Error ? aiErr.message : String(aiErr),
             );
-            console.error("[Loop15] AI evaluation failed:", {
+            logger.error("[Loop15] AI evaluation failed:", {
               tenantId: tenant.tenant_id,
               error: aiErr instanceof Error ? aiErr.message : aiErr,
               circuitState: breaker.getState().state,
@@ -243,7 +244,7 @@ async function handler(req: NextRequest) {
             }
           }
         } catch (coachErr) {
-          console.error("[Loop15] Coaching engine failed:", {
+          logger.error("[Loop15] Coaching engine failed:", {
             tenantId: tenant.tenant_id,
             error: coachErr instanceof Error ? coachErr.message : coachErr,
           });
@@ -275,7 +276,7 @@ async function handler(req: NextRequest) {
           });
         }
       } catch (evalErr) {
-        console.error("[Loop15] Tenant evaluation failed:", {
+        logger.error("[Loop15] Tenant evaluation failed:", {
           tenantId: tenant.tenant_id,
           error: evalErr instanceof Error ? evalErr.message : evalErr,
         });
@@ -311,7 +312,7 @@ async function handler(req: NextRequest) {
           );
         }
       } catch (ralphErr) {
-        console.error("[Loop15] Ralph cycle failed:", {
+        logger.error("[Loop15] Ralph cycle failed:", {
           error: ralphErr instanceof Error ? ralphErr.message : ralphErr,
         });
       }
@@ -333,7 +334,7 @@ async function handler(req: NextRequest) {
       durationMs: Date.now() - startTime,
     });
   } catch (error) {
-    console.error("[Loop15] Error:", error);
+    logger.error("[Loop15] Error:", error);
     return NextResponse.json(
       {
         error: "Loop-15 processing failed",

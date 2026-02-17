@@ -300,7 +300,7 @@ export async function callGeminiChatWithTools(
       });
     } catch (error) {
       const err = error as Error;
-      console.error("[GeminiChatProvider] API error:", {
+      logger.error("[GeminiChatProvider] API error:", {
         round,
         error: err.message,
         tenantId,
@@ -326,7 +326,7 @@ export async function callGeminiChatWithTools(
     const text = finalResponse.text || "";
     return { text, toolsUsed };
   } catch (finalError) {
-    console.error("[GeminiChatProvider] Final summary call failed:", {
+    logger.error("[GeminiChatProvider] Final summary call failed:", {
       error: finalError instanceof Error ? finalError.message : finalError,
       tenantId,
     });

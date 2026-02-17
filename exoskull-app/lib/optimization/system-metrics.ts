@@ -8,6 +8,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { SystemMetrics } from "../autonomy/types";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // MAIN EXPORT
 // ============================================================================
@@ -52,7 +53,7 @@ export async function collectSystemMetrics(
       learningEvents: learningResult,
     };
   } catch (error) {
-    console.error("[SystemMetrics] Collection failed:", {
+    logger.error("[SystemMetrics] Collection failed:", {
       error: error instanceof Error ? error.message : error,
       tenantId,
     });

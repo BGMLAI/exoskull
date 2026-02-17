@@ -2,10 +2,11 @@
 // NOTION CLIENT (Pages, Databases, Blocks)
 // =====================================================
 
-import { RigConnection } from '../types';
+import { RigConnection } from "../types";
 
-const NOTION_API = 'https://api.notion.com/v1';
-const NOTION_VERSION = '2022-06-28';
+import { logger } from "@/lib/logger";
+const NOTION_API = "https://api.notion.com/v1";
+const NOTION_VERSION = "2022-06-28";
 
 // =====================================================
 // TYPES
@@ -13,23 +14,27 @@ const NOTION_VERSION = '2022-06-28';
 
 export interface NotionPage {
   id: string;
-  object: 'page';
+  object: "page";
   created_time: string;
   last_edited_time: string;
   archived: boolean;
   url: string;
   parent: {
-    type: 'database_id' | 'page_id' | 'workspace';
+    type: "database_id" | "page_id" | "workspace";
     database_id?: string;
     page_id?: string;
   };
   properties: Record<string, NotionProperty>;
-  icon?: { type: 'emoji' | 'external'; emoji?: string; external?: { url: string } };
+  icon?: {
+    type: "emoji" | "external";
+    emoji?: string;
+    external?: { url: string };
+  };
 }
 
 export interface NotionDatabase {
   id: string;
-  object: 'database';
+  object: "database";
   created_time: string;
   last_edited_time: string;
   title: NotionRichText[];
@@ -42,7 +47,7 @@ export interface NotionDatabase {
 
 export interface NotionBlock {
   id: string;
-  object: 'block';
+  object: "block";
   type: string;
   created_time: string;
   last_edited_time: string;
@@ -53,7 +58,7 @@ export interface NotionBlock {
 }
 
 export interface NotionRichText {
-  type: 'text' | 'mention' | 'equation';
+  type: "text" | "mention" | "equation";
   text?: { content: string; link?: { url: string } };
   plain_text: string;
   href?: string;
@@ -92,15 +97,15 @@ export interface NotionPropertyConfig {
 
 export interface NotionUser {
   id: string;
-  object: 'user';
-  type: 'person' | 'bot';
+  object: "user";
+  type: "person" | "bot";
   name?: string;
   avatar_url?: string;
   person?: { email: string };
 }
 
 export interface NotionSearchResult {
-  object: 'list';
+  object: "list";
   results: (NotionPage | NotionDatabase)[];
   next_cursor: string | null;
   has_more: boolean;
@@ -119,23 +124,23 @@ export class NotionClient {
 
   private async fetch<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<T> {
     const url = `${NOTION_API}${endpoint}`;
 
     const response = await fetch(url, {
       ...options,
       headers: {
-        'Authorization': `Bearer ${this.accessToken}`,
-        'Content-Type': 'application/json',
-        'Notion-Version': NOTION_VERSION,
+        Authorization: `Bearer ${this.accessToken}`,
+        "Content-Type": "application/json",
+        "Notion-Version": NOTION_VERSION,
         ...options.headers,
       },
     });
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[NotionClient] API error:', {
+      logger.error("[NotionClient] API error:", {
         status: response.status,
         endpoint,
         error,
@@ -150,26 +155,29 @@ export class NotionClient {
   // SEARCH
   // =====================================================
 
-  async search(query: string, filter?: 'page' | 'database'): Promise<NotionSearchResult> {
+  async search(
+    query: string,
+    filter?: "page" | "database",
+  ): Promise<NotionSearchResult> {
     const body: Record<string, unknown> = { query };
 
     if (filter) {
-      body.filter = { value: filter, property: 'object' };
+      body.filter = { value: filter, property: "object" };
     }
 
-    return this.fetch('/search', {
-      method: 'POST',
+    return this.fetch("/search", {
+      method: "POST",
       body: JSON.stringify(body),
     });
   }
 
   async searchPages(query: string): Promise<NotionPage[]> {
-    const result = await this.search(query, 'page');
+    const result = await this.search(query, "page");
     return result.results as NotionPage[];
   }
 
   async searchDatabases(query: string): Promise<NotionDatabase[]> {
-    const result = await this.search(query, 'database');
+    const result = await this.search(query, "database");
     return result.results as NotionDatabase[];
   }
 
@@ -187,8 +195,8 @@ export class NotionClient {
     children?: unknown[];
     icon?: { emoji: string } | { external: { url: string } };
   }): Promise<NotionPage> {
-    return this.fetch('/pages', {
-      method: 'POST',
+    return this.fetch("/pages", {
+      method: "POST",
       body: JSON.stringify(params),
     });
   }
@@ -196,13 +204,13 @@ export class NotionClient {
   async updatePage(
     pageId: string,
     properties: Record<string, unknown>,
-    archived?: boolean
+    archived?: boolean,
   ): Promise<NotionPage> {
     const body: Record<string, unknown> = { properties };
     if (archived !== undefined) body.archived = archived;
 
     return this.fetch(`/pages/${pageId}`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify(body),
     });
   }
@@ -223,13 +231,17 @@ export class NotionClient {
     databaseId: string,
     params?: {
       filter?: Record<string, unknown>;
-      sorts?: { property: string; direction: 'ascending' | 'descending' }[];
+      sorts?: { property: string; direction: "ascending" | "descending" }[];
       start_cursor?: string;
       page_size?: number;
-    }
-  ): Promise<{ results: NotionPage[]; next_cursor: string | null; has_more: boolean }> {
+    },
+  ): Promise<{
+    results: NotionPage[];
+    next_cursor: string | null;
+    has_more: boolean;
+  }> {
     return this.fetch(`/databases/${databaseId}/query`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(params || {}),
     });
   }
@@ -260,11 +272,15 @@ export class NotionClient {
 
   async getBlockChildren(
     blockId: string,
-    startCursor?: string
-  ): Promise<{ results: NotionBlock[]; next_cursor: string | null; has_more: boolean }> {
+    startCursor?: string,
+  ): Promise<{
+    results: NotionBlock[];
+    next_cursor: string | null;
+    has_more: boolean;
+  }> {
     const params = new URLSearchParams();
-    if (startCursor) params.append('start_cursor', startCursor);
-    params.append('page_size', '100');
+    if (startCursor) params.append("start_cursor", startCursor);
+    params.append("page_size", "100");
 
     return this.fetch(`/blocks/${blockId}/children?${params.toString()}`);
   }
@@ -284,16 +300,16 @@ export class NotionClient {
 
   async appendBlocks(
     blockId: string,
-    children: unknown[]
+    children: unknown[],
   ): Promise<{ results: NotionBlock[] }> {
     return this.fetch(`/blocks/${blockId}/children`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify({ children }),
     });
   }
 
   async deleteBlock(blockId: string): Promise<NotionBlock> {
-    return this.fetch(`/blocks/${blockId}`, { method: 'DELETE' });
+    return this.fetch(`/blocks/${blockId}`, { method: "DELETE" });
   }
 
   // =====================================================
@@ -305,11 +321,11 @@ export class NotionClient {
   }
 
   async listUsers(): Promise<{ results: NotionUser[] }> {
-    return this.fetch('/users');
+    return this.fetch("/users");
   }
 
   async getMe(): Promise<NotionUser> {
-    return this.fetch('/users/me');
+    return this.fetch("/users/me");
   }
 
   // =====================================================
@@ -321,11 +337,11 @@ export class NotionClient {
    */
   getPageTitle(page: NotionPage): string {
     for (const prop of Object.values(page.properties)) {
-      if (prop.type === 'title' && prop.title) {
-        return prop.title.map((t) => t.plain_text).join('');
+      if (prop.type === "title" && prop.title) {
+        return prop.title.map((t) => t.plain_text).join("");
       }
     }
-    return 'Untitled';
+    return "Untitled";
   }
 
   /**
@@ -333,27 +349,27 @@ export class NotionClient {
    */
   getPropertyValue(prop: NotionProperty): string | number | boolean | null {
     switch (prop.type) {
-      case 'title':
-        return prop.title?.map((t) => t.plain_text).join('') || '';
-      case 'rich_text':
-        return prop.rich_text?.map((t) => t.plain_text).join('') || '';
-      case 'number':
+      case "title":
+        return prop.title?.map((t) => t.plain_text).join("") || "";
+      case "rich_text":
+        return prop.rich_text?.map((t) => t.plain_text).join("") || "";
+      case "number":
         return prop.number ?? null;
-      case 'select':
+      case "select":
         return prop.select?.name || null;
-      case 'multi_select':
-        return prop.multi_select?.map((s) => s.name).join(', ') || '';
-      case 'date':
+      case "multi_select":
+        return prop.multi_select?.map((s) => s.name).join(", ") || "";
+      case "date":
         return prop.date?.start || null;
-      case 'checkbox':
+      case "checkbox":
         return prop.checkbox ?? false;
-      case 'url':
+      case "url":
         return prop.url || null;
-      case 'email':
+      case "email":
         return prop.email || null;
-      case 'phone_number':
+      case "phone_number":
         return prop.phone_number || null;
-      case 'status':
+      case "status":
         return prop.status?.name || null;
       default:
         return null;
@@ -374,7 +390,7 @@ export class NotionClient {
       status?: string;
       dueDate?: string;
       priority?: string;
-    }
+    },
   ): Promise<NotionPage> {
     const properties: Record<string, unknown> = {
       // Most Notion task databases use "Name" or "Task" for title
@@ -400,7 +416,10 @@ export class NotionClient {
   /**
    * Mark a task as complete (assuming Status property exists)
    */
-  async completeTask(pageId: string, statusName: string = 'Done'): Promise<NotionPage> {
+  async completeTask(
+    pageId: string,
+    statusName: string = "Done",
+  ): Promise<NotionPage> {
     return this.updatePage(pageId, {
       Status: { status: { name: statusName } },
     });
@@ -413,12 +432,14 @@ export class NotionClient {
   async getDashboardData() {
     const [me, searchResult] = await Promise.all([
       this.getMe().catch(() => null),
-      this.search('', 'page').catch(() => ({ results: [] })),
+      this.search("", "page").catch(() => ({ results: [] })),
     ]);
 
     const recentPages = (searchResult.results as NotionPage[])
-      .sort((a, b) =>
-        new Date(b.last_edited_time).getTime() - new Date(a.last_edited_time).getTime()
+      .sort(
+        (a, b) =>
+          new Date(b.last_edited_time).getTime() -
+          new Date(a.last_edited_time).getTime(),
       )
       .slice(0, 10);
 
@@ -440,7 +461,9 @@ export class NotionClient {
 // FACTORY
 // =====================================================
 
-export function createNotionClient(connection: RigConnection): NotionClient | null {
+export function createNotionClient(
+  connection: RigConnection,
+): NotionClient | null {
   if (!connection.access_token) return null;
   return new NotionClient(connection.access_token);
 }

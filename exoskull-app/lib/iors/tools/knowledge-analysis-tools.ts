@@ -7,6 +7,7 @@
 
 import type { ToolDefinition } from "./shared";
 
+import { logger } from "@/lib/logger";
 export const knowledgeAnalysisTools: ToolDefinition[] = [
   {
     definition: {
@@ -96,7 +97,7 @@ export const knowledgeAnalysisTools: ToolDefinition[] = [
 
         return lines.join("\n");
       } catch (error) {
-        console.error("[analyze_knowledge] Failed:", {
+        logger.error("[analyze_knowledge] Failed:", {
           tenantId,
           error: (error as Error).message,
           stack: (error as Error).stack,

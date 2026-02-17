@@ -276,7 +276,7 @@ function createLocalStream(
 
         controller.close();
       } catch (error) {
-        console.error("[Chat Stream] Gateway processing error:", {
+        logger.error("[Chat Stream] Gateway processing error:", {
           error: error instanceof Error ? error.message : "Unknown error",
           tenantId,
           stack: error instanceof Error ? error.stack : undefined,

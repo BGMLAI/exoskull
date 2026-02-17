@@ -96,7 +96,7 @@ export function withCronGuard(
         });
       }
       // Cooldown expired → half-open, allow test run
-      console.info(`[CronGuard:${name}] Circuit HALF-OPEN — allowing test run`);
+      logger.info(`[CronGuard:${name}] Circuit HALF-OPEN — allowing test run`);
     }
 
     // 3. Dependency check

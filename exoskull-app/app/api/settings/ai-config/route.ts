@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -71,7 +72,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[AIConfigAPI] GET Error:", {
+    logger.error("[AIConfigAPI] GET Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(
@@ -169,7 +170,7 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
       .eq("id", tenantId);
 
     if (error) {
-      console.error("[AIConfigAPI] PATCH failed:", {
+      logger.error("[AIConfigAPI] PATCH failed:", {
         userId: tenantId,
         error: error.message,
       });
@@ -181,7 +182,7 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ aiConfig: updated });
   } catch (error) {
-    console.error("[AIConfigAPI] PATCH Error:", {
+    logger.error("[AIConfigAPI] PATCH Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(

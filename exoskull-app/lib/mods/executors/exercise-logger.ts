@@ -7,6 +7,7 @@
 import { IModExecutor, ModInsight, ModAction, ModSlug } from "../types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // Types
 // =====================================================
@@ -63,7 +64,7 @@ export class ExerciseLoggerExecutor implements IModExecutor {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("[ExerciseLogger] Fetch error:", error);
+        logger.error("[ExerciseLogger] Fetch error:", error);
         throw error;
       }
 
@@ -82,7 +83,7 @@ export class ExerciseLoggerExecutor implements IModExecutor {
         monthly: { entries: all, stats: this.calculateStats(all, 150) },
       };
     } catch (error) {
-      console.error("[ExerciseLogger] getData error:", error);
+      logger.error("[ExerciseLogger] getData error:", error);
       return {
         recent: [],
         weekly: { entries: [], stats: null },
@@ -154,7 +155,7 @@ export class ExerciseLoggerExecutor implements IModExecutor {
 
       return insights;
     } catch (error) {
-      console.error("[ExerciseLogger] getInsights error:", error);
+      logger.error("[ExerciseLogger] getInsights error:", error);
       return [
         {
           type: "warning",
@@ -231,7 +232,7 @@ export class ExerciseLoggerExecutor implements IModExecutor {
           return { success: false, error: `Unknown action: ${action}` };
       }
     } catch (error) {
-      console.error("[ExerciseLogger] executeAction error:", error);
+      logger.error("[ExerciseLogger] executeAction error:", error);
       return { success: false, error: (error as Error).message };
     }
   }

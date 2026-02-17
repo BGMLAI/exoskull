@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 let cachedStats: { data: any; timestamp: number } | null = null;
@@ -53,7 +54,7 @@ export const GET = withApiLog(async function GET() {
       headers: { "Cache-Control": "public, max-age=3600, s-maxage=3600" },
     });
   } catch (error) {
-    console.error("[PublicStats] Error:", {
+    logger.error("[PublicStats] Error:", {
       error: error instanceof Error ? error.message : String(error),
     });
     return NextResponse.json(

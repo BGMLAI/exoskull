@@ -119,7 +119,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
         // Cleanup audio files (async, don't wait)
         cleanupSessionAudio(session.id).catch((err) => {
-          console.error("[Twilio Status] Audio cleanup failed:", err);
+          logger.error("[Twilio Status] Audio cleanup failed:", err);
         });
 
         break;
@@ -149,7 +149,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[Twilio Status] Error:", error);
+    logger.error("[Twilio Status] Error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 });

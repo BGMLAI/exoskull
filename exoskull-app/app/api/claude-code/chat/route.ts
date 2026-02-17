@@ -10,6 +10,7 @@ import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 import { createClient } from "@supabase/supabase-js";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
@@ -86,7 +87,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     if (!vpsResponse.ok) {
       const errorText = await vpsResponse.text().catch(() => "VPS error");
-      console.error("[ClaudeCode] VPS returned error:", {
+      logger.error("[ClaudeCode] VPS returned error:", {
         status: vpsResponse.status,
         body: errorText.slice(0, 200),
       });
@@ -116,7 +117,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.error("[ClaudeCode] Chat error:", msg);
+    logger.error("[ClaudeCode] Chat error:", msg);
     return NextResponse.json(
       { error: "Failed to connect to agent" },
       { status: 500 },

@@ -7,6 +7,7 @@
 import { IModExecutor, ModInsight, ModAction, ModSlug } from "../types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // Types
 // =====================================================
@@ -49,7 +50,7 @@ export class JournalExecutor implements IModExecutor {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("[Journal] Fetch error:", error);
+        logger.error("[Journal] Fetch error:", error);
         throw error;
       }
 
@@ -64,7 +65,7 @@ export class JournalExecutor implements IModExecutor {
         monthly: { entries: all, stats: this.calculateStats(all) },
       };
     } catch (error) {
-      console.error("[Journal] getData error:", error);
+      logger.error("[Journal] getData error:", error);
       return { recent: [], monthly: { entries: [], stats: null } };
     }
   }
@@ -139,7 +140,7 @@ export class JournalExecutor implements IModExecutor {
 
       return insights;
     } catch (error) {
-      console.error("[Journal] getInsights error:", error);
+      logger.error("[Journal] getInsights error:", error);
       return [
         {
           type: "warning",
@@ -239,7 +240,7 @@ export class JournalExecutor implements IModExecutor {
           return { success: false, error: `Unknown action: ${action}` };
       }
     } catch (error) {
-      console.error("[Journal] executeAction error:", error);
+      logger.error("[Journal] executeAction error:", error);
       return { success: false, error: (error as Error).message };
     }
   }

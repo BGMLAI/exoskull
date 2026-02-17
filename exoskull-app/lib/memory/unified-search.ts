@@ -27,6 +27,7 @@ import type {
   MemorySourceType,
 } from "./types";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // DEFAULTS
 // ============================================================================
@@ -73,7 +74,7 @@ export async function unifiedSearch(
     try {
       queryEmbedding = await generateEmbedding(query);
     } catch (err) {
-      console.error(
+      logger.error(
         "[UnifiedSearch] Embedding generation failed, falling back to keyword-only:",
         {
           error: err instanceof Error ? err.message : err,
@@ -205,7 +206,7 @@ async function searchVectorStore(
       sourceId: r.sourceId,
     }));
   } catch (err) {
-    console.error("[UnifiedSearch:vectorStore] Error:", {
+    logger.error("[UnifiedSearch:vectorStore] Error:", {
       error: err instanceof Error ? err.message : err,
     });
     return [];
@@ -242,7 +243,7 @@ async function searchKeyword(
       metadata: r.metadata,
     }));
   } catch (err) {
-    console.error("[UnifiedSearch:keyword] Error:", {
+    logger.error("[UnifiedSearch:keyword] Error:", {
       error: err instanceof Error ? err.message : err,
     });
     return [];
@@ -336,7 +337,7 @@ async function searchNotes(
       }
     }
   } catch (err) {
-    console.error("[UnifiedSearch:notes] Error:", {
+    logger.error("[UnifiedSearch:notes] Error:", {
       error: err instanceof Error ? err.message : err,
     });
   }
@@ -370,7 +371,7 @@ async function searchGraphEntities(
       sourceId: `entity:${e.id}`,
     }));
   } catch (err) {
-    console.error("[UnifiedSearch:entities] Error:", {
+    logger.error("[UnifiedSearch:entities] Error:", {
       error: err instanceof Error ? err.message : err,
     });
     return [];

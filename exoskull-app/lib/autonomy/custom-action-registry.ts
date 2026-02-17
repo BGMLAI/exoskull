@@ -6,6 +6,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { getTasks, updateTask } from "@/lib/tasks/task-service";
 
+import { logger } from "@/lib/logger";
 export type CustomActionHandler = (
   tenantId: string,
   params: Record<string, unknown>,
@@ -220,7 +221,7 @@ export function buildCustomActionRegistry(
             data: { archivedCount, cutoffDays },
           };
         } catch (error) {
-          console.error("[CustomAction] archive_completed_tasks failed:", {
+          logger.error("[CustomAction] archive_completed_tasks failed:", {
             error: error instanceof Error ? error.message : String(error),
             tenantId,
           });

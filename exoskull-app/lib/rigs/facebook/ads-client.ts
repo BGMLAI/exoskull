@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 // =====================================================
 // FACEBOOK MARKETING API CLIENT
 // Docs: https://developers.facebook.com/docs/marketing-apis
@@ -141,7 +143,7 @@ export class FacebookAdsClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      console.error("[Facebook Ads] API error:", {
+      logger.error("[Facebook Ads] API error:", {
         endpoint,
         status: response.status,
         error: error.error?.message || JSON.stringify(error),

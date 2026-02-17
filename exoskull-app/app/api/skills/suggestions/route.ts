@@ -13,6 +13,7 @@ import { initiateApproval } from "@/lib/skills/approval/approval-gateway";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -26,7 +27,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
 
     return NextResponse.json({ suggestions });
   } catch (error) {
-    console.error("[Skills API] Suggestions GET error:", error);
+    logger.error("[Skills API] Suggestions GET error:", error);
     return NextResponse.json(
       { error: "Failed to load suggestions" },
       { status: 500 },
@@ -122,7 +123,7 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error) {
-    console.error("[Skills API] Suggestions PATCH error:", error);
+    logger.error("[Skills API] Suggestions PATCH error:", error);
     return NextResponse.json(
       {
         error: "Failed to process suggestion",

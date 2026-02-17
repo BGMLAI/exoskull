@@ -13,6 +13,7 @@ import { fetchOutlookEmails } from "./providers/outlook";
 import type { EmailAccount, RawEmail, SyncResult } from "./types";
 import { decryptImapPassword } from "./crypto";
 
+import { logger } from "@/lib/logger";
 /**
  * Sync all enabled email accounts for all tenants.
  * Returns array of per-account sync results.
@@ -78,7 +79,7 @@ export async function syncAllAccounts(
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.error("[EmailSync] Account sync failed:", {
+      logger.error("[EmailSync] Account sync failed:", {
         accountId: account.id,
         provider: account.provider,
         error: errMsg,
@@ -231,7 +232,7 @@ async function syncSingleAccount(account: EmailAccount): Promise<SyncResult> {
 
     if (insertErr) {
       errors++;
-      console.error("[EmailSync] Insert error:", {
+      logger.error("[EmailSync] Insert error:", {
         messageId: email.messageId,
         error: insertErr.message,
       });

@@ -12,6 +12,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
@@ -105,7 +106,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       lastUpdated: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("[EmailCanvasAPI] Error:", error);
+    logger.error("[EmailCanvasAPI] Error:", error);
     return NextResponse.json(
       { error: "Failed to fetch email data" },
       { status: 500 },

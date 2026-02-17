@@ -47,7 +47,7 @@ export const GET = withApiLog(async function GET(
 
     // Check if client ID is configured
     if (!config.clientId) {
-      console.error(`[OAuth] Missing client ID for ${slug}`);
+      logger.error(`[OAuth] Missing client ID for ${slug}`);
       return NextResponse.json(
         {
           error: `${slug} integration is not configured. Please add API credentials.`,
@@ -79,7 +79,7 @@ export const GET = withApiLog(async function GET(
       );
 
     if (stateError) {
-      console.error("[OAuth] Failed to store state:", stateError);
+      logger.error("[OAuth] Failed to store state:", stateError);
       return NextResponse.json(
         { error: "Failed to initiate OAuth flow" },
         { status: 500 },
@@ -98,7 +98,7 @@ export const GET = withApiLog(async function GET(
 
     return NextResponse.redirect(authUrl);
   } catch (error) {
-    console.error("[OAuth] Connect error:", error);
+    logger.error("[OAuth] Connect error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

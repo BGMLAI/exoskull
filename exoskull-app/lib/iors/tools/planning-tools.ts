@@ -14,6 +14,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { createTask } from "@/lib/async-tasks/queue";
 import { emitEvent } from "@/lib/iors/loop";
 
+import { logger } from "@/lib/logger";
 export const planningTools: ToolDefinition[] = [
   {
     definition: {
@@ -82,7 +83,7 @@ export const planningTools: ToolDefinition[] = [
       });
 
       if (planError) {
-        console.error("[PlanningTools] plan_action error:", {
+        logger.error("[PlanningTools] plan_action error:", {
           code: planError.code,
           message: planError.message,
           details: planError.details,
@@ -106,9 +107,7 @@ export const planningTools: ToolDefinition[] = [
         source: "plan_action",
         payload: { action_type: actionType, title, priority, scheduledFor },
         dedupKey: `plan:${tenantId}:${actionType}:${new Date().toISOString().slice(0, 13)}`,
-      }).catch((err) =>
-        console.error("[PlanningTools] emitEvent failed:", err),
-      );
+      }).catch((err) => logger.error("[PlanningTools] emitEvent failed:", err));
 
       return `Zaplanowano: "${title}". Wykonam za ${timeoutHours}h jeśli nie anulujesz.`;
     },
@@ -240,7 +239,7 @@ export const planningTools: ToolDefinition[] = [
       );
 
       if (delegateError) {
-        console.error("[PlanningTools] delegate error:", delegateError);
+        logger.error("[PlanningTools] delegate error:", delegateError);
         return `Nie udało się delegować zadania`;
       }
 
@@ -296,7 +295,7 @@ export const planningTools: ToolDefinition[] = [
 
         return `Myślę nad tym. Odpowiedź wyślę na ${replyChannel} gdy będzie gotowa.`;
       } catch (error) {
-        console.error("[PlanningTools] async_think error:", {
+        logger.error("[PlanningTools] async_think error:", {
           tenantId,
           error: error instanceof Error ? error.message : error,
         });

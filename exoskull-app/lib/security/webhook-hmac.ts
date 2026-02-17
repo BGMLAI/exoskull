@@ -7,6 +7,7 @@
 
 import crypto from "crypto";
 
+import { logger } from "@/lib/logger";
 /**
  * Verify Meta webhook signature (WhatsApp / Messenger).
  *
@@ -21,18 +22,18 @@ export function verifyMetaSignature(
   appSecret: string,
 ): boolean {
   if (!signatureHeader) {
-    console.error("[WebhookHMAC] Missing X-Hub-Signature-256 header");
+    logger.error("[WebhookHMAC] Missing X-Hub-Signature-256 header");
     return false;
   }
 
   if (!appSecret) {
-    console.error("[WebhookHMAC] META_APP_SECRET not configured");
+    logger.error("[WebhookHMAC] META_APP_SECRET not configured");
     return false;
   }
 
   const expectedPrefix = "sha256=";
   if (!signatureHeader.startsWith(expectedPrefix)) {
-    console.error("[WebhookHMAC] Invalid signature format:", {
+    logger.error("[WebhookHMAC] Invalid signature format:", {
       prefix: signatureHeader.substring(0, 10),
     });
     return false;
@@ -51,7 +52,7 @@ export function verifyMetaSignature(
       Buffer.from(computedHmac, "hex"),
     );
   } catch (error) {
-    console.error("[WebhookHMAC] Signature comparison failed:", {
+    logger.error("[WebhookHMAC] Signature comparison failed:", {
       error: (error as Error).message,
       receivedLength: receivedHex.length,
       expectedLength: computedHmac.length,

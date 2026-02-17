@@ -37,7 +37,7 @@ export async function canSendProactive(
     const count = (data as number) || 0;
     return count < 8; // Max 8 proactive per day (morning + evening + 6 ad-hoc)
   } catch (error) {
-    console.error("[OutboundTriggers] Rate limit check failed:", error);
+    logger.error("[OutboundTriggers] Rate limit check failed:", error);
     return false; // Fail closed — don't send if unsure
   }
 }
@@ -60,10 +60,7 @@ export async function logProactiveOutbound(
       channel,
     });
   } catch (error) {
-    console.error(
-      "[OutboundTriggers] Failed to log proactive outbound:",
-      error,
-    );
+    logger.error("[OutboundTriggers] Failed to log proactive outbound:", error);
   }
 }
 
@@ -138,7 +135,7 @@ export async function scheduleCrisisFollowUp(
       `[OutboundTriggers] Crisis follow-up scheduled: ${crisisType} (${severity}), ${interventionIds.length} interventions`,
     );
   } catch (error) {
-    console.error(
+    logger.error(
       "[OutboundTriggers] Failed to schedule crisis follow-up:",
       error,
     );
@@ -181,7 +178,7 @@ export async function detectInactivity(
       lastActivityAt: data[0].created_at,
     };
   } catch (error) {
-    console.error("[OutboundTriggers] Inactivity check failed:", error);
+    logger.error("[OutboundTriggers] Inactivity check failed:", error);
     return { inactive: false, lastActivityAt: null };
   }
 }
@@ -279,7 +276,7 @@ export async function detectEmotionTrend(
       avgValence: Math.round(avgValence * 100) / 100,
     };
   } catch (error) {
-    console.error("[OutboundTriggers] Emotion trend check failed:", error);
+    logger.error("[OutboundTriggers] Emotion trend check failed:", error);
     return { concerning: false, negativeCount: 0, avgValence: 0 };
   }
 }

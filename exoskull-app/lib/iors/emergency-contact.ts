@@ -76,7 +76,7 @@ export async function addEmergencyContact(
     .single();
 
   if (error) {
-    console.error("[EmergencyContact] Failed to create:", {
+    logger.error("[EmergencyContact] Failed to create:", {
       tenantId,
       error: error.message,
     });
@@ -205,7 +205,7 @@ export async function escalateToCrisisContact(
 
     return { escalated: sent, reason: sent ? "sms_sent" : "sms_failed" };
   } catch (error) {
-    console.error("[EmergencyContact] Crisis escalation failed:", {
+    logger.error("[EmergencyContact] Crisis escalation failed:", {
       tenantId,
       error: error instanceof Error ? error.message : error,
     });
@@ -254,7 +254,7 @@ async function sendSMS(to: string, body: string): Promise<boolean> {
   const fromNumber = process.env.TWILIO_PHONE_NUMBER;
 
   if (!accountSid || !authToken || !fromNumber) {
-    console.error("[EmergencyContact] Twilio credentials missing");
+    logger.error("[EmergencyContact] Twilio credentials missing");
     return false;
   }
 
@@ -270,7 +270,7 @@ async function sendSMS(to: string, body: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error("[EmergencyContact] SMS send failed:", {
+    logger.error("[EmergencyContact] SMS send failed:", {
       to,
       error: error instanceof Error ? error.message : error,
     });

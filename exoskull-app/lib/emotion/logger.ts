@@ -8,6 +8,7 @@
 import { createServiceClient } from "@/lib/supabase/service-client";
 import type { EmotionState, EmotionLogEntry } from "./types";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // LOG EMOTION
 // ============================================================================
@@ -59,14 +60,14 @@ export async function logEmotion(
     const { error } = await supabase.from("exo_emotion_log").insert(entry);
 
     if (error) {
-      console.error("[EmotionLogger] Failed to log emotion:", {
+      logger.error("[EmotionLogger] Failed to log emotion:", {
         error: error.message,
         tenantId,
         emotion: emotion.primary_emotion,
       });
     }
   } catch (error) {
-    console.error("[EmotionLogger] Unexpected error:", error);
+    logger.error("[EmotionLogger] Unexpected error:", error);
   }
 }
 
@@ -108,13 +109,13 @@ export async function getEmotionHistory(
     const { data, error } = await query;
 
     if (error) {
-      console.error("[EmotionLogger] Failed to fetch history:", error);
+      logger.error("[EmotionLogger] Failed to fetch history:", error);
       return [];
     }
 
     return (data as EmotionLogEntry[]) || [];
   } catch (error) {
-    console.error("[EmotionLogger] Unexpected error:", error);
+    logger.error("[EmotionLogger] Unexpected error:", error);
     return [];
   }
 }

@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 /**
  * Code Generation Response Parser
  * Phase 2: Parse AI response into structured file array
@@ -187,7 +189,7 @@ export function parseCodeResponse(raw: string): ParsedCodeOutput {
   }
 
   // Nothing parseable
-  console.warn(
+  logger.warn(
     "[ResponseParser] Could not parse AI response:",
     raw.slice(0, 200),
   );

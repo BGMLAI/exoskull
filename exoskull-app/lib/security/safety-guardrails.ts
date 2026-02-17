@@ -8,6 +8,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
+import { logger } from "@/lib/logger";
 // Safety guardrails to append to system prompts
 export const SAFETY_GUARDRAILS = `
 
@@ -185,7 +186,7 @@ export async function checkRateLimit(
       const { success } = await rl.limit(key);
       return success;
     } catch (error) {
-      console.error("[RateLimit] Upstash error, falling back to memory:", {
+      logger.error("[RateLimit] Upstash error, falling back to memory:", {
         error: (error as Error).message,
       });
       // Fall through to in-memory

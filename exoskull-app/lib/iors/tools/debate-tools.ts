@@ -9,6 +9,7 @@
 import { ToolDefinition } from "./shared";
 import { runDebate, DebateResult } from "@/lib/ai/agent-debate";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TOOL DEFINITIONS (ToolDefinition format for registry)
 // ============================================================================
@@ -61,7 +62,7 @@ export const debateTools: ToolDefinition[] = [
       }
 
       try {
-        console.info("[DebateTool] Starting debate:", {
+        logger.info("[DebateTool] Starting debate:", {
           tenantId,
           question: question.slice(0, 80),
           rounds: rounds ?? 2,
@@ -76,7 +77,7 @@ export const debateTools: ToolDefinition[] = [
 
         return formatDebateResult(result);
       } catch (error) {
-        console.error("[DebateTool] Debate failed:", {
+        logger.error("[DebateTool] Debate failed:", {
           error: error instanceof Error ? error.message : "Unknown",
           tenantId,
         });

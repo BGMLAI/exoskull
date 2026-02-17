@@ -7,6 +7,7 @@ import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(request: NextRequest) {
@@ -40,7 +41,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error("[Skills API] List error:", error);
+      logger.error("[Skills API] List error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
@@ -49,7 +50,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       count: data?.length || 0,
     });
   } catch (error) {
-    console.error("[Skills API] List error:", error);
+    logger.error("[Skills API] List error:", error);
     return NextResponse.json(
       { error: "Failed to list skills", details: (error as Error).message },
       { status: 500 },

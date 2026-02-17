@@ -28,6 +28,7 @@ import {
 } from "@/lib/storage/r2-client";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const DEFAULT_PART_SIZE = 100 * 1024 * 1024; // 100MB per part
@@ -86,7 +87,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         );
     }
   } catch (error) {
-    console.error("[MultipartUpload] Error:", error);
+    logger.error("[MultipartUpload] Error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal error" },
       { status: 500 },
@@ -303,7 +304,7 @@ async function handleComplete(
     .then(({ processDocument }) => processDocument(documentId, tenantId))
     .then(async (result) => {
       if (result.success) {
-        console.log(
+        logger.info(
           `[MultipartUpload] Processed ${doc.original_name}: ${result.chunks} chunks`,
         );
         await supabase
@@ -318,7 +319,7 @@ async function handleComplete(
           .eq("source_id", documentId)
           .eq("tenant_id", tenantId);
       } else {
-        console.error(`[MultipartUpload] Processing failed:`, result.error);
+        logger.error(`[MultipartUpload] Processing failed:`, result.error);
         await supabase
           .from("exo_ingestion_jobs")
           .update({

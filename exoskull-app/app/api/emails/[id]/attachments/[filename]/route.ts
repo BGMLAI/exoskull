@@ -11,6 +11,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { ensureFreshToken } from "@/lib/rigs/oauth";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -101,7 +102,7 @@ export const GET = withApiLog(async function GET(
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("[AttachmentDownload] Gmail API error:", {
+      logger.error("[AttachmentDownload] Gmail API error:", {
         status: response.status,
         error: errText.slice(0, 200),
       });
@@ -124,7 +125,7 @@ export const GET = withApiLog(async function GET(
       },
     });
   } catch (err) {
-    console.error("[AttachmentDownload] Error:", err);
+    logger.error("[AttachmentDownload] Error:", err);
     return NextResponse.json(
       {
         error:

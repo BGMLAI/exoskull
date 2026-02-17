@@ -281,7 +281,7 @@ export async function handleOptimization(
     return { handled: true, cost_cents: 0 };
   } catch (error) {
     const err = error as Error;
-    console.error("[Petla:Optimization] Failed:", {
+    logger.error("[Petla:Optimization] Failed:", {
       tenantId: tenant_id,
       error: err.message,
     });

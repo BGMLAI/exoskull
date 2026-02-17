@@ -13,6 +13,7 @@ import type { ToolDefinition } from "./shared";
 import { executeExtensionTool } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 interface DynamicToolRow {
   id: string;
   name: string;
@@ -74,7 +75,7 @@ export async function getDynamicToolsForTenant(
     });
     return tools;
   } catch (err) {
-    console.error("[DynamicTools] Failed to fetch dynamic tools:", {
+    logger.error("[DynamicTools] Failed to fetch dynamic tools:", {
       tenantId,
       error: err instanceof Error ? err.message : err,
     });

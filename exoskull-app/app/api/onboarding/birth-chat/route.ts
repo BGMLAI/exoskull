@@ -24,6 +24,7 @@ import { completeBirth } from "@/lib/iors/birth-flow";
 import { textToSpeech } from "@/lib/voice/elevenlabs-tts";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const POST = withApiLog(async function POST(request: NextRequest) {
@@ -49,7 +50,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
           const audioBuffer = await textToSpeech(BIRTH_FIRST_MESSAGE);
           audioBase64 = Buffer.from(audioBuffer).toString("base64");
         } catch (ttsError) {
-          console.error("[BirthChat] Greeting TTS error:", ttsError);
+          logger.error("[BirthChat] Greeting TTS error:", ttsError);
         }
       }
       return NextResponse.json({
@@ -93,7 +94,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       try {
         await completeBirth(tenantId, birthMatch[1]);
       } catch (err) {
-        console.error("[BirthChat] completeBirth failed:", {
+        logger.error("[BirthChat] completeBirth failed:", {
           userId: tenantId,
           error: err instanceof Error ? err.message : err,
         });
@@ -114,7 +115,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
         const audioBuffer = await textToSpeech(responseText);
         audioBase64 = Buffer.from(audioBuffer).toString("base64");
       } catch (ttsError) {
-        console.error("[BirthChat] TTS error:", ttsError);
+        logger.error("[BirthChat] TTS error:", ttsError);
         // Continue without audio — text response still valid
       }
     }
@@ -126,7 +127,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       audio: audioBase64,
     });
   } catch (error) {
-    console.error("[BirthChat] Error:", {
+    logger.error("[BirthChat] Error:", {
       error: error instanceof Error ? error.message : error,
       stack: error instanceof Error ? error.stack : undefined,
     });

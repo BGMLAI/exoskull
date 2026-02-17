@@ -37,7 +37,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
   const verifyToken = process.env.MESSENGER_WEBHOOK_VERIFY_TOKEN;
 
   if (!verifyToken) {
-    console.error("[Messenger] Webhook verify token not configured");
+    logger.error("[Messenger] Webhook verify token not configured");
     return NextResponse.json(
       { error: "Server not configured" },
       { status: 500 },
@@ -49,7 +49,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
     return new NextResponse(challenge, { status: 200 });
   }
 
-  console.error("[Messenger] Webhook verification failed:", {
+  logger.error("[Messenger] Webhook verification failed:", {
     mode,
     tokenMatch: token === verifyToken,
   });
@@ -87,7 +87,7 @@ async function resolveMessengerClient(
 
   if (error && error.code !== "PGRST116") {
     // PGRST116 = no rows found (expected for pages not in DB)
-    console.error("[Messenger] DB lookup error:", {
+    logger.error("[Messenger] DB lookup error:", {
       pageId,
       error: error.message,
     });
@@ -109,14 +109,14 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     // Verify X-Hub-Signature-256 (mandatory)
     const appSecret = process.env.META_APP_SECRET;
     if (!appSecret) {
-      console.error(
+      logger.error(
         "[Messenger] META_APP_SECRET not configured — rejecting request",
       );
       return NextResponse.json({ error: "Not configured" }, { status: 500 });
     }
     const signature = req.headers.get("x-hub-signature-256");
     if (!verifyMetaSignature(rawBody, signature, appSecret)) {
-      console.error("[Messenger] HMAC signature verification failed");
+      logger.error("[Messenger] HMAC signature verification failed");
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
@@ -156,7 +156,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       try {
         await client.sendTypingOn(senderPsid);
       } catch (error) {
-        console.error("[Messenger] Failed to send typing indicator:", {
+        logger.error("[Messenger] Failed to send typing indicator:", {
           error: error instanceof Error ? error.message : "Unknown error",
         });
       }
@@ -171,7 +171,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         const profile = await client.getProfile(senderPsid);
         userName = profile.first_name || "there";
       } catch (error) {
-        console.error("[Messenger] Failed to get profile:", {
+        logger.error("[Messenger] Failed to get profile:", {
           error: error instanceof Error ? error.message : "Unknown error",
           senderPsid,
         });
@@ -261,7 +261,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         responseLength: response.content.length,
       });
     } catch (error) {
-      console.error("[Messenger] AI routing failed:", {
+      logger.error("[Messenger] AI routing failed:", {
         error: error instanceof Error ? error.message : "Unknown error",
         senderPsid,
         pageId,
@@ -279,7 +279,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         try {
           await client.sendTextMessage(senderPsid, fallback);
         } catch (sendError) {
-          console.error("[Messenger] Fallback message failed:", {
+          logger.error("[Messenger] Fallback message failed:", {
             error:
               sendError instanceof Error ? sendError.message : "Unknown error",
           });
@@ -289,7 +289,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("[Messenger] Webhook processing error:", {
+    logger.error("[Messenger] Webhook processing error:", {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });

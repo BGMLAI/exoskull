@@ -33,7 +33,7 @@ export async function getActiveTenants(): Promise<ActiveTenant[]> {
     .not("phone", "is", null);
 
   if (error) {
-    console.error("[TenantUtils] Failed to fetch tenants:", error);
+    logger.error("[TenantUtils] Failed to fetch tenants:", error);
     return [];
   }
   return data || [];
@@ -129,7 +129,7 @@ export async function sendProactiveMessage(
 
     return { success: result.success, channel: result.channel };
   } catch (error) {
-    console.error(`[${source}] Failed to send proactive message:`, {
+    logger.error(`[${source}] Failed to send proactive message:`, {
       tenantId,
       error: error instanceof Error ? error.message : error,
     });

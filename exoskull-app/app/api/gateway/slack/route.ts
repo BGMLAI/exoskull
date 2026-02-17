@@ -44,7 +44,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     if (slackAdapter.verifyWebhook) {
       const isValid = await slackAdapter.verifyWebhook(req);
       if (!isValid) {
-        console.error("[Slack Route] Signature verification failed");
+        logger.error("[Slack Route] Signature verification failed");
         return NextResponse.json(
           { error: "Invalid signature" },
           { status: 401 },
@@ -98,7 +98,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
           toolsUsed: response.toolsUsed,
         });
       } catch (error) {
-        console.error("[Slack Route] Async processing error:", {
+        logger.error("[Slack Route] Async processing error:", {
           error: error instanceof Error ? error.message : "Unknown error",
           from: msg.from,
         });
@@ -108,12 +108,12 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     // Use waitUntil-like pattern: don't await, let it run in background
     // In Vercel serverless, the function stays alive until all promises resolve
     processAsync().catch((err) =>
-      console.error("[Slack Route] Background task failed:", err),
+      logger.error("[Slack Route] Background task failed:", err),
     );
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[Slack Route] Error:", {
+    logger.error("[Slack Route] Error:", {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });

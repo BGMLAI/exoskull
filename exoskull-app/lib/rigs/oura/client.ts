@@ -3,7 +3,7 @@
 // API v2: https://cloud.ouraring.com/v2/docs
 // =====================================================
 
-import { RigConnection, RigSyncResult } from '../types';
+import { RigConnection, RigSyncResult } from "../types";
 import type {
   OuraDailyActivity,
   OuraDailyReadiness,
@@ -14,8 +14,9 @@ import type {
   OuraSleepPeriod,
   OuraTag,
   OuraWorkout,
-} from './types';
+} from "./types";
 
+import { logger } from "@/lib/logger";
 export type {
   OuraDailyActivity,
   OuraDailyReadiness,
@@ -28,9 +29,9 @@ export type {
   OuraTag,
   OuraTimeSeries,
   OuraWorkout,
-} from './types';
+} from "./types";
 
-const OURA_API = 'https://api.ouraring.com/v2';
+const OURA_API = "https://api.ouraring.com/v2";
 
 // =====================================================
 // TYPES (imported from ./types)
@@ -47,21 +48,24 @@ export class OuraClient {
     this.accessToken = accessToken;
   }
 
-  private async fetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async fetch<T>(
+    endpoint: string,
+    options: RequestInit = {},
+  ): Promise<T> {
     const url = `${OURA_API}${endpoint}`;
 
     const response = await fetch(url, {
       ...options,
       headers: {
         Authorization: `Bearer ${this.accessToken}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...options.headers,
       },
     });
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[OuraClient] API error:', {
+      logger.error("[OuraClient] API error:", {
         status: response.status,
         endpoint,
         error,
@@ -77,7 +81,7 @@ export class OuraClient {
   // =====================================================
 
   async getPersonalInfo(): Promise<OuraPersonalInfo> {
-    return this.fetch('/usercollection/personal_info');
+    return this.fetch("/usercollection/personal_info");
   }
 
   // =====================================================
@@ -86,19 +90,19 @@ export class OuraClient {
 
   async getSleepPeriods(
     startDate: string,
-    endDate: string
+    endDate: string,
   ): Promise<{ data: OuraSleepPeriod[] }> {
     return this.fetch(
-      `/usercollection/sleep?start_date=${startDate}&end_date=${endDate}`
+      `/usercollection/sleep?start_date=${startDate}&end_date=${endDate}`,
     );
   }
 
   async getDailySleep(
     startDate: string,
-    endDate: string
+    endDate: string,
   ): Promise<{ data: OuraDailySleep[] }> {
     return this.fetch(
-      `/usercollection/daily_sleep?start_date=${startDate}&end_date=${endDate}`
+      `/usercollection/daily_sleep?start_date=${startDate}&end_date=${endDate}`,
     );
   }
 
@@ -108,13 +112,17 @@ export class OuraClient {
     yesterday.setDate(yesterday.getDate() - 1);
 
     const response = await this.getSleepPeriods(
-      yesterday.toISOString().split('T')[0],
-      today.toISOString().split('T')[0]
+      yesterday.toISOString().split("T")[0],
+      today.toISOString().split("T")[0],
     );
 
     // Get the most recent sleep period
-    const sleepPeriods = response.data.filter((s) => s.type === 'long_sleep' || s.type === 'sleep');
-    return sleepPeriods.length > 0 ? sleepPeriods[sleepPeriods.length - 1] : null;
+    const sleepPeriods = response.data.filter(
+      (s) => s.type === "long_sleep" || s.type === "sleep",
+    );
+    return sleepPeriods.length > 0
+      ? sleepPeriods[sleepPeriods.length - 1]
+      : null;
   }
 
   // =====================================================
@@ -123,15 +131,15 @@ export class OuraClient {
 
   async getDailyActivity(
     startDate: string,
-    endDate: string
+    endDate: string,
   ): Promise<{ data: OuraDailyActivity[] }> {
     return this.fetch(
-      `/usercollection/daily_activity?start_date=${startDate}&end_date=${endDate}`
+      `/usercollection/daily_activity?start_date=${startDate}&end_date=${endDate}`,
     );
   }
 
   async getTodayActivity(): Promise<OuraDailyActivity | null> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
     const response = await this.getDailyActivity(today, today);
     return response.data.length > 0 ? response.data[0] : null;
   }
@@ -142,15 +150,15 @@ export class OuraClient {
 
   async getDailyReadiness(
     startDate: string,
-    endDate: string
+    endDate: string,
   ): Promise<{ data: OuraDailyReadiness[] }> {
     return this.fetch(
-      `/usercollection/daily_readiness?start_date=${startDate}&end_date=${endDate}`
+      `/usercollection/daily_readiness?start_date=${startDate}&end_date=${endDate}`,
     );
   }
 
   async getTodayReadiness(): Promise<OuraDailyReadiness | null> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
     const response = await this.getDailyReadiness(today, today);
     return response.data.length > 0 ? response.data[0] : null;
   }
@@ -161,10 +169,10 @@ export class OuraClient {
 
   async getHeartRate(
     startDateTime: string,
-    endDateTime: string
+    endDateTime: string,
   ): Promise<{ data: OuraHeartRate[] }> {
     return this.fetch(
-      `/usercollection/heartrate?start_datetime=${startDateTime}&end_datetime=${endDateTime}`
+      `/usercollection/heartrate?start_datetime=${startDateTime}&end_datetime=${endDateTime}`,
     );
   }
 
@@ -175,14 +183,17 @@ export class OuraClient {
 
     const response = await this.getHeartRate(
       yesterday.toISOString(),
-      today.toISOString()
+      today.toISOString(),
     );
 
     // Get average resting heart rate
-    const restingHR = response.data.filter((hr) => hr.source === 'rest' || hr.source === 'sleep');
+    const restingHR = response.data.filter(
+      (hr) => hr.source === "rest" || hr.source === "sleep",
+    );
     if (restingHR.length === 0) return null;
 
-    const avg = restingHR.reduce((sum, hr) => sum + hr.bpm, 0) / restingHR.length;
+    const avg =
+      restingHR.reduce((sum, hr) => sum + hr.bpm, 0) / restingHR.length;
     return Math.round(avg);
   }
 
@@ -192,10 +203,10 @@ export class OuraClient {
 
   async getWorkouts(
     startDate: string,
-    endDate: string
+    endDate: string,
   ): Promise<{ data: OuraWorkout[] }> {
     return this.fetch(
-      `/usercollection/workout?start_date=${startDate}&end_date=${endDate}`
+      `/usercollection/workout?start_date=${startDate}&end_date=${endDate}`,
     );
   }
 
@@ -203,9 +214,12 @@ export class OuraClient {
   // TAGS
   // =====================================================
 
-  async getTags(startDate: string, endDate: string): Promise<{ data: OuraTag[] }> {
+  async getTags(
+    startDate: string,
+    endDate: string,
+  ): Promise<{ data: OuraTag[] }> {
     return this.fetch(
-      `/usercollection/tag?start_date=${startDate}&end_date=${endDate}`
+      `/usercollection/tag?start_date=${startDate}&end_date=${endDate}`,
     );
   }
 
@@ -218,27 +232,32 @@ export class OuraClient {
     const startDate = new Date(today);
     startDate.setDate(startDate.getDate() - days);
 
-    const startStr = startDate.toISOString().split('T')[0];
-    const endStr = today.toISOString().split('T')[0];
+    const startStr = startDate.toISOString().split("T")[0];
+    const endStr = today.toISOString().split("T")[0];
 
-    const [personalInfo, dailySleep, dailyActivity, dailyReadiness, heartRate, workouts] =
-      await Promise.all([
-        this.getPersonalInfo().catch(() => null),
-        this.getDailySleep(startStr, endStr).catch(() => ({ data: [] })),
-        this.getDailyActivity(startStr, endStr).catch(() => ({ data: [] })),
-        this.getDailyReadiness(startStr, endStr).catch(() => ({ data: [] })),
-        this.getHeartRate(
-          startDate.toISOString(),
-          today.toISOString()
-        ).catch(() => ({ data: [] })),
-        this.getWorkouts(startStr, endStr).catch(() => ({ data: [] })),
-      ]);
+    const [
+      personalInfo,
+      dailySleep,
+      dailyActivity,
+      dailyReadiness,
+      heartRate,
+      workouts,
+    ] = await Promise.all([
+      this.getPersonalInfo().catch(() => null),
+      this.getDailySleep(startStr, endStr).catch(() => ({ data: [] })),
+      this.getDailyActivity(startStr, endStr).catch(() => ({ data: [] })),
+      this.getDailyReadiness(startStr, endStr).catch(() => ({ data: [] })),
+      this.getHeartRate(startDate.toISOString(), today.toISOString()).catch(
+        () => ({ data: [] }),
+      ),
+      this.getWorkouts(startStr, endStr).catch(() => ({ data: [] })),
+    ]);
 
     // Get last night's sleep details
     const lastNight = await this.getLastNightSleep().catch(() => null);
 
     // Calculate today's values
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = today.toISOString().split("T")[0];
     const todaySleep = dailySleep.data.find((s) => s.day === todayStr);
     const todayActivity = dailyActivity.data.find((a) => a.day === todayStr);
     const todayReadiness = dailyReadiness.data.find((r) => r.day === todayStr);
@@ -247,7 +266,8 @@ export class OuraClient {
     const weeklyAverage =
       dailySleep.data.length > 0
         ? Math.round(
-            dailySleep.data.reduce((sum, s) => sum + s.score, 0) / dailySleep.data.length
+            dailySleep.data.reduce((sum, s) => sum + s.score, 0) /
+              dailySleep.data.length,
           )
         : 0;
 
@@ -327,25 +347,30 @@ export class OuraClient {
 
 export async function syncOuraData(
   connection: RigConnection,
-  days: number = 7
+  days: number = 7,
 ): Promise<RigSyncResult> {
   try {
     if (!connection.access_token) {
-      return { success: false, records_synced: 0, error: 'No access token' };
+      return { success: false, records_synced: 0, error: "No access token" };
     }
 
     const client = new OuraClient(connection.access_token);
     const data = await client.getDashboardData(days);
 
     // Count records
-    const sleepRecords = data.sleep.recentSleep.length + (data.sleep.lastNight ? 1 : 0);
+    const sleepRecords =
+      data.sleep.recentSleep.length + (data.sleep.lastNight ? 1 : 0);
     const activityRecords = data.activity.recentActivity.length;
     const readinessRecords = data.readiness.recentReadiness.length;
     const heartRateRecords = data.heartRate.recentHeartRate.length;
     const workoutRecords = data.workouts.length;
 
     const totalRecords =
-      sleepRecords + activityRecords + readinessRecords + heartRateRecords + workoutRecords;
+      sleepRecords +
+      activityRecords +
+      readinessRecords +
+      heartRateRecords +
+      workoutRecords;
 
     const endDate = new Date();
     const startDate = new Date();
@@ -360,11 +385,11 @@ export async function syncOuraData(
       },
     };
   } catch (error) {
-    console.error('[Oura] Sync error:', error);
+    logger.error("[Oura] Sync error:", error);
     return {
       success: false,
       records_synced: 0,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }

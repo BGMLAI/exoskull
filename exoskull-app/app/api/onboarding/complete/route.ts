@@ -14,7 +14,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) {
-      console.error("[Complete API] No user session");
+      logger.error("[Complete API] No user session");
       return NextResponse.json(
         { error: "Sesja wygasla. Zaloguj sie ponownie." },
         { status: 401 },
@@ -38,7 +38,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       .eq("id", tenantId);
 
     if (updateError) {
-      console.error("[Complete API] Error updating status:", {
+      logger.error("[Complete API] Error updating status:", {
         code: updateError.code,
         message: updateError.message,
         details: updateError.details,
@@ -103,7 +103,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     // Auto-install Mods based on user goals (fire-and-forget)
     autoInstallMods(tenantId).catch((err) =>
-      console.error("[Complete API] Auto-install mods error:", err),
+      logger.error("[Complete API] Auto-install mods error:", err),
     );
 
     return NextResponse.json({
@@ -111,7 +111,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       redirectTo: "/dashboard",
     });
   } catch (error) {
-    console.error("[Complete API] Unexpected error:", error);
+    logger.error("[Complete API] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

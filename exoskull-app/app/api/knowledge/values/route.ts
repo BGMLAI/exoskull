@@ -9,6 +9,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -33,7 +34,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       .order("priority", { ascending: false });
 
     if (error) {
-      console.error("[Values API] GET error:", error);
+      logger.error("[Values API] GET error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
@@ -60,7 +61,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
 
     return NextResponse.json({ values: data });
   } catch (error) {
-    console.error("[Values API] GET error:", error);
+    logger.error("[Values API] GET error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
@@ -124,13 +125,13 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
           { status: 409 },
         );
       }
-      console.error("[Values API] POST error:", error);
+      logger.error("[Values API] POST error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, value: data });
   } catch (error) {
-    console.error("[Values API] POST error:", error);
+    logger.error("[Values API] POST error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
@@ -177,13 +178,13 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[Values API] PATCH error:", error);
+      logger.error("[Values API] PATCH error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, value: data });
   } catch (error) {
-    console.error("[Values API] PATCH error:", error);
+    logger.error("[Values API] PATCH error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
@@ -230,13 +231,13 @@ export const DELETE = withApiLog(async function DELETE(request: NextRequest) {
       .eq("tenant_id", tenantId);
 
     if (error) {
-      console.error("[Values API] DELETE error:", error);
+      logger.error("[Values API] DELETE error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[Values API] DELETE error:", error);
+    logger.error("[Values API] DELETE error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },

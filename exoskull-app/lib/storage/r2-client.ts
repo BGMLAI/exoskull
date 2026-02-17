@@ -18,6 +18,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+import { logger } from "@/lib/logger";
 // Environment variables (set in .env.local and Vercel)
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || "";
@@ -173,7 +174,7 @@ export async function writeToBronze(
       bytesWritten: buffer.byteLength,
     };
   } catch (error) {
-    console.error("[R2] Failed to write to Bronze:", error);
+    logger.error("[R2] Failed to write to Bronze:", error);
     return {
       success: false,
       key,
@@ -211,7 +212,7 @@ export async function readFromBronze(
       data: Buffer.concat(chunks),
     };
   } catch (error) {
-    console.error("[R2] Failed to read from Bronze:", error);
+    logger.error("[R2] Failed to read from Bronze:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -256,7 +257,7 @@ export async function listBronzeFiles(params: {
 
     return { success: true, keys };
   } catch (error) {
-    console.error("[R2] Failed to list Bronze files:", error);
+    logger.error("[R2] Failed to list Bronze files:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -361,7 +362,7 @@ export async function getBronzeStats(tenantId?: string): Promise<{
 
     return stats;
   } catch (error) {
-    console.error("[R2] Failed to get stats:", error);
+    logger.error("[R2] Failed to get stats:", error);
     return stats;
   }
 }
@@ -430,7 +431,7 @@ export async function initiateMultipartUpload(
       },
     };
   } catch (error) {
-    console.error("[R2:multipart:init:failed]", error);
+    logger.error("[R2:multipart:init:failed]", error);
     return {
       success: false,
       error:
@@ -463,7 +464,7 @@ export async function getPresignedPartUrl(
 
     return { success: true, url };
   } catch (error) {
-    console.error("[R2:multipart:presign:failed]", { key, partNumber, error });
+    logger.error("[R2:multipart:presign:failed]", { key, partNumber, error });
     return {
       success: false,
       error:
@@ -546,7 +547,7 @@ export async function completeMultipartUpload(
 
     return { success: true };
   } catch (error) {
-    console.error("[R2:multipart:complete:failed]", { key, uploadId, error });
+    logger.error("[R2:multipart:complete:failed]", { key, uploadId, error });
     return {
       success: false,
       error:
@@ -574,7 +575,7 @@ export async function abortMultipartUpload(
     );
     return { success: true };
   } catch (error) {
-    console.error("[R2:multipart:abort:failed]", { key, uploadId, error });
+    logger.error("[R2:multipart:abort:failed]", { key, uploadId, error });
     return { success: false };
   }
 }

@@ -25,14 +25,14 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     // Verify shared secret (mandatory)
     const expectedSecret = process.env.SIGNAL_WEBHOOK_SECRET;
     if (!expectedSecret) {
-      console.error("[Signal Route] SIGNAL_WEBHOOK_SECRET not configured");
+      logger.error("[Signal Route] SIGNAL_WEBHOOK_SECRET not configured");
       return NextResponse.json({ error: "Not configured" }, { status: 500 });
     }
     const headerSecret =
       req.headers.get("x-signal-webhook-secret") ||
       req.headers.get("authorization")?.replace("Bearer ", "");
     if (headerSecret !== expectedSecret) {
-      console.error("[Signal Route] Invalid webhook secret");
+      logger.error("[Signal Route] Invalid webhook secret");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -65,7 +65,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[Signal Route] Error:", {
+    logger.error("[Signal Route] Error:", {
       error: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? error.stack : undefined,
     });

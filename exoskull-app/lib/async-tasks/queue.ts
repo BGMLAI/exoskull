@@ -70,7 +70,7 @@ export async function createTask(params: CreateTaskParams): Promise<string> {
     .single();
 
   if (error || !data) {
-    console.error("[AsyncQueue] Failed to create task:", {
+    logger.error("[AsyncQueue] Failed to create task:", {
       error: error?.message,
       tenantId: params.tenantId,
       channel: params.channel,
@@ -107,7 +107,7 @@ export async function claimNextTask(
   });
 
   if (error) {
-    console.error("[AsyncQueue] Failed to claim task:", {
+    logger.error("[AsyncQueue] Failed to claim task:", {
       error: error.message,
       workerId,
     });
@@ -156,7 +156,7 @@ export async function completeTask(
     .eq("id", taskId);
 
   if (error) {
-    console.error("[AsyncQueue] Failed to complete task:", {
+    logger.error("[AsyncQueue] Failed to complete task:", {
       taskId,
       error: error.message,
     });
@@ -200,7 +200,7 @@ export async function failTask(
     .eq("id", taskId);
 
   if (error) {
-    console.error("[AsyncQueue] Failed to update failed task:", {
+    logger.error("[AsyncQueue] Failed to update failed task:", {
       taskId,
       error: error.message,
     });
@@ -241,7 +241,7 @@ export async function failTask(
         );
       }
     } catch (dlError) {
-      console.error("[AsyncQueue] Failed to create dead letter:", {
+      logger.error("[AsyncQueue] Failed to create dead letter:", {
         taskId,
         error: dlError instanceof Error ? dlError.message : dlError,
       });
@@ -275,7 +275,7 @@ export async function releaseExpiredLocks(): Promise<number> {
     .select("id");
 
   if (error) {
-    console.error("[AsyncQueue] Failed to release expired locks:", {
+    logger.error("[AsyncQueue] Failed to release expired locks:", {
       error: error.message,
     });
     return 0;

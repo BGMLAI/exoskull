@@ -275,7 +275,7 @@ export async function getOrCreateSession(
     .single();
 
   if (error) {
-    console.error("[ConversationHandler] Failed to create session:", error);
+    logger.error("[ConversationHandler] Failed to create session:", error);
     throw new Error(`Failed to create session: ${error.message}`);
   }
 
@@ -329,7 +329,7 @@ export async function updateSession(
     .eq("id", sessionId);
 
   if (error) {
-    console.error("[ConversationHandler] Failed to update session:", error);
+    logger.error("[ConversationHandler] Failed to update session:", error);
   }
 
   // Append to unified thread (new cross-channel storage)
@@ -356,7 +356,7 @@ export async function updateSession(
         source_id: sessionId,
       });
     } catch (threadError) {
-      console.error(
+      logger.error(
         "[ConversationHandler] Failed to append to unified thread:",
         threadError,
       );
@@ -379,7 +379,7 @@ export async function endSession(sessionId: string): Promise<void> {
     .eq("id", sessionId);
 
   if (error) {
-    console.error("[ConversationHandler] Failed to end session:", error);
+    logger.error("[ConversationHandler] Failed to end session:", error);
   }
 
   logger.info("[ConversationHandler] Ended session:", sessionId);
@@ -469,7 +469,7 @@ export async function processUserMessage(
       buildDynamicContext(session.tenantId),
       analyzeEmotion(userMessage),
       getThreadContext(session.tenantId, 25).catch((err) => {
-        console.error("[ConversationHandler] Thread context failed:", err);
+        logger.error("[ConversationHandler] Thread context failed:", err);
         return [] as { role: "user" | "assistant"; content: string }[];
       }),
       getToolsForTenant(session.tenantId),
@@ -594,7 +594,7 @@ export async function processUserMessage(
         ),
       )
       .catch((err) => {
-        console.error(
+        logger.error(
           "[ConversationHandler] Crisis follow-up scheduling failed:",
           {
             error: err instanceof Error ? err.message : String(err),
@@ -613,7 +613,7 @@ export async function processUserMessage(
           ),
         )
         .catch((err) => {
-          console.error("[ConversationHandler] Emergency escalation failed:", {
+          logger.error("[ConversationHandler] Emergency escalation failed:", {
             error: err instanceof Error ? err.message : String(err),
             tenantId: session.tenantId,
           });
@@ -647,7 +647,7 @@ export async function processUserMessage(
       sessionId: session.id,
       personalityAdaptedTo: adaptive.mode,
     }).catch((err) => {
-      console.error("[ConversationHandler] Emotion logging failed:", {
+      logger.error("[ConversationHandler] Emotion logging failed:", {
         error: err instanceof Error ? err.message : String(err),
         tenantId: session.tenantId,
       });
@@ -662,13 +662,10 @@ export async function processUserMessage(
         options.recordingUrl,
         adaptive.mode,
       ).catch((err) => {
-        console.error(
-          "[ConversationHandler] Voice prosody enrichment failed:",
-          {
-            error: err instanceof Error ? err.message : String(err),
-            tenantId: session.tenantId,
-          },
-        );
+        logger.error("[ConversationHandler] Voice prosody enrichment failed:", {
+          error: err instanceof Error ? err.message : String(err),
+          tenantId: session.tenantId,
+        });
       });
     }
   }
@@ -814,7 +811,7 @@ export async function processUserMessage(
           status?: number;
           statusText?: string;
         };
-        console.error(
+        logger.error(
           "[ConversationHandler] Gemini failed, falling back to Anthropic:",
           {
             error: gemErr.message,
@@ -884,7 +881,7 @@ export async function processUserMessage(
       status?: number;
       error?: { type?: string; message?: string };
     };
-    console.error("[ConversationHandler] Claude API error:", {
+    logger.error("[ConversationHandler] Claude API error:", {
       status: err.status,
       type: err.error?.type,
       message: err.message,
@@ -947,7 +944,7 @@ export async function processUserMessage(
             emotion: emotionState,
           };
         } catch (openaiError) {
-          console.error("[ConversationHandler] OpenAI fallback also failed:", {
+          logger.error("[ConversationHandler] OpenAI fallback also failed:", {
             error:
               openaiError instanceof Error
                 ? openaiError.message
@@ -1006,7 +1003,7 @@ export async function processUserMessage(
         }
       }
     } catch (emergencyError) {
-      console.error(
+      logger.error(
         "[ConversationHandler] Emergency Gemini fallback also failed:",
         {
           error:
@@ -1139,7 +1136,7 @@ async function enrichWithVoiceProsody(
       pauses: voiceFeatures.pause_frequency,
     });
   } catch (error) {
-    console.error("[ConversationHandler] Voice enrichment failed:", {
+    logger.error("[ConversationHandler] Voice enrichment failed:", {
       error: error instanceof Error ? error.message : error,
     });
   }

@@ -22,6 +22,7 @@ import {
 } from "../types";
 import { calculateCost } from "../config";
 
+import { logger } from "@/lib/logger";
 // Map our ModelId to actual Gemini API model names
 const GEMINI_MODEL_MAP: Record<string, string> = {
   "gemini-3-flash": "gemini-3-flash-preview",
@@ -134,7 +135,7 @@ export class GeminiProvider implements IAIProvider {
 
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      console.error("[GeminiProvider] Chat failed:", {
+      logger.error("[GeminiProvider] Chat failed:", {
         error: errorMessage,
         model,
         tenantId: options.tenantId,

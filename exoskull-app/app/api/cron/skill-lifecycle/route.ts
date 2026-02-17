@@ -13,6 +13,7 @@ import {
   revokeUnhealthySkills,
 } from "@/lib/skills/registry/lifecycle-manager";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
@@ -40,7 +41,7 @@ async function handler(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("[CRON] skill-lifecycle error:", error);
+    logger.error("[CRON] skill-lifecycle error:", error);
     return NextResponse.json(
       {
         error: "Skill lifecycle cron failed",

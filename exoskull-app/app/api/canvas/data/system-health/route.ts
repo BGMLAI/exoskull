@@ -10,6 +10,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getSystemHealthSnapshot } from "@/lib/system/events";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -28,7 +29,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       timestamp: snapshot.timestamp,
     });
   } catch (error) {
-    console.error("[CanvasSystemHealth] Error:", error);
+    logger.error("[CanvasSystemHealth] Error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },

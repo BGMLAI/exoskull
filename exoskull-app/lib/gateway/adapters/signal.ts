@@ -103,12 +103,12 @@ export const signalAdapter: ChannelAdapter = {
 
   async sendResponse(to: string, text: string): Promise<void> {
     if (!SIGNAL_API_URL) {
-      console.error("[Signal] SIGNAL_API_URL not set, cannot send");
+      logger.error("[Signal] SIGNAL_API_URL not set, cannot send");
       return;
     }
 
     if (!SIGNAL_SENDER) {
-      console.error("[Signal] SIGNAL_SENDER_NUMBER not set, cannot send");
+      logger.error("[Signal] SIGNAL_SENDER_NUMBER not set, cannot send");
       return;
     }
 
@@ -125,14 +125,14 @@ export const signalAdapter: ChannelAdapter = {
 
       if (!response.ok) {
         const errorBody = await response.text();
-        console.error("[Signal] sendMessage failed:", {
+        logger.error("[Signal] sendMessage failed:", {
           to,
           status: response.status,
           error: errorBody,
         });
       }
     } catch (error) {
-      console.error("[Signal] sendMessage error:", {
+      logger.error("[Signal] sendMessage error:", {
         to,
         error: (error as Error).message,
       });

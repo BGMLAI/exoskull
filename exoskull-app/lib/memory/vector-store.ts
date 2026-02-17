@@ -21,6 +21,7 @@ import {
   type ChunkOptions,
 } from "./chunking-pipeline";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // CONFIG
 // ============================================================================
@@ -199,7 +200,7 @@ export async function storeWithEmbedding(
         .from("exo_vector_embeddings")
         .insert(batch);
       if (error) {
-        console.error("[VectorStore:storeWithEmbedding:batchFailed]", {
+        logger.error("[VectorStore:storeWithEmbedding:batchFailed]", {
           batch: i,
           error: error.message,
         });
@@ -282,7 +283,7 @@ export async function storeChunksWithEmbeddings(
         .from("exo_vector_embeddings")
         .insert(batch);
       if (error) {
-        console.error("[VectorStore:storeChunks:batchFailed]", {
+        logger.error("[VectorStore:storeChunks:batchFailed]", {
           batch: i,
           error: error.message,
         });
@@ -361,7 +362,7 @@ export async function hybridSearch(
     });
 
     if (error) {
-      console.warn("[VectorStore:hybridSearch:rpcFailed]", error.message);
+      logger.warn("[VectorStore:hybridSearch:rpcFailed]", error.message);
       // Fallback to legacy vector_search
       return fallbackVectorSearch(
         tenantId,
@@ -383,7 +384,7 @@ export async function hybridSearch(
       createdAt: r.created_at as string | undefined,
     }));
   } catch (err) {
-    console.error("[VectorStore:hybridSearch:error]", err);
+    logger.error("[VectorStore:hybridSearch:error]", err);
     return keywordSearch(tenantId, query, limit);
   }
 }
@@ -409,7 +410,7 @@ async function fallbackVectorSearch(
   });
 
   if (error) {
-    console.warn("[VectorStore:fallbackVectorSearch:failed]", error.message);
+    logger.warn("[VectorStore:fallbackVectorSearch:failed]", error.message);
     return keywordSearch(tenantId, query, limit);
   }
 
@@ -495,7 +496,7 @@ export async function deleteBySource(
     .eq("source_id", sourceId);
 
   if (error) {
-    console.error("[VectorStore:deleteBySource:error]", error.message);
+    logger.error("[VectorStore:deleteBySource:error]", error.message);
     return { deleted: 0 };
   }
 
@@ -518,7 +519,7 @@ export async function deleteByHashes(
     .in("content_hash", hashes);
 
   if (error) {
-    console.error("[VectorStore:deleteByHashes:error]", error.message);
+    logger.error("[VectorStore:deleteByHashes:error]", error.message);
     return { deleted: 0 };
   }
 

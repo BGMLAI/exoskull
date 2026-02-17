@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 // =====================================================
 // FACEBOOK COMMERCE / CATALOG API CLIENT
 // Docs: https://developers.facebook.com/docs/commerce-platform
@@ -122,7 +124,7 @@ export class FacebookCommerceClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      console.error("[Facebook Commerce] API error:", {
+      logger.error("[Facebook Commerce] API error:", {
         endpoint,
         status: response.status,
         error: error.error?.message || JSON.stringify(error),

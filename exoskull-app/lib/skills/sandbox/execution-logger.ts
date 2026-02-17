@@ -5,6 +5,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { SkillExecutionResult, SkillExecutionContext } from "../types";
 
+import { logger } from "@/lib/logger";
 function getServiceSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -39,7 +40,7 @@ export async function logExecution(
     });
   } catch (error) {
     // Don't throw on logging errors - execution should still succeed
-    console.error("[ExecutionLogger] Failed to log execution:", {
+    logger.error("[ExecutionLogger] Failed to log execution:", {
       error: (error as Error).message,
       skill_id: context.skill_id,
       method: context.method,

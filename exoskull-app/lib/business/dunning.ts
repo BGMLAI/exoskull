@@ -67,7 +67,7 @@ export async function processDunning(): Promise<DunningResult> {
       .limit(50);
 
     if (error) {
-      console.error("[Dunning] Query error:", { error: error.message });
+      logger.error("[Dunning] Query error:", { error: error.message });
       result.errors.push(error.message);
       return result;
     }
@@ -151,7 +151,7 @@ export async function processDunning(): Promise<DunningResult> {
         result.escalated++;
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        console.error("[Dunning] Processing error:", {
+        logger.error("[Dunning] Processing error:", {
           error: errMsg,
           attemptId: attempt.id,
           tenantId: attempt.tenant_id,
@@ -164,7 +164,7 @@ export async function processDunning(): Promise<DunningResult> {
     return result;
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
-    console.error("[Dunning] Fatal error:", { error: errMsg });
+    logger.error("[Dunning] Fatal error:", { error: errMsg });
     result.errors.push(errMsg);
     return result;
   }
@@ -251,7 +251,7 @@ export async function handlePaymentFailed(
       nextRetry: nextRetry.toISOString(),
     });
   } catch (error) {
-    console.error("[Dunning] handlePaymentFailed error:", {
+    logger.error("[Dunning] handlePaymentFailed error:", {
       error: error instanceof Error ? error.message : String(error),
       tenantId,
       invoiceId,
@@ -295,7 +295,7 @@ export async function handlePaymentRecovered(
 
     logger.info("[Dunning] Payment recovered:", { tenantId, invoiceId });
   } catch (error) {
-    console.error("[Dunning] handlePaymentRecovered error:", {
+    logger.error("[Dunning] handlePaymentRecovered error:", {
       error: error instanceof Error ? error.message : String(error),
       tenantId,
       invoiceId,
@@ -366,13 +366,13 @@ async function sendDunningNotification(
       });
 
       if (!response.ok) {
-        console.error("[Dunning] Email send failed:", {
+        logger.error("[Dunning] Email send failed:", {
           status: response.status,
           tenantId,
         });
       }
     } catch (error) {
-      console.error("[Dunning] Email error:", {
+      logger.error("[Dunning] Email error:", {
         error: error instanceof Error ? error.message : String(error),
         tenantId,
       });
@@ -406,7 +406,7 @@ async function sendDunningNotification(
         );
       }
     } catch (error) {
-      console.error("[Dunning] SMS error:", {
+      logger.error("[Dunning] SMS error:", {
         error: error instanceof Error ? error.message : String(error),
         tenantId,
       });

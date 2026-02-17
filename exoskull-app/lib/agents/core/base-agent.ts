@@ -208,7 +208,7 @@ export abstract class BaseAgent implements IAgent {
     try {
       await this.supabase.from("agent_executions").insert(log);
     } catch (err) {
-      console.error(`[${this.name}] Failed to log execution:`, err);
+      logger.error(`[${this.name}] Failed to log execution:`, err);
     }
   }
 

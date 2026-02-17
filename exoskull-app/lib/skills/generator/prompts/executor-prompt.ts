@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 // =====================================================
 // SKILL GENERATOR - System Prompt for AI Code Generation
 // =====================================================
@@ -108,7 +110,7 @@ class WaterTrackerExecutor {
         .order("logged_at", { ascending: false });
 
       if (error) {
-        console.error("[WaterTracker] getData error:", error);
+        logger.error("[WaterTracker] getData error:", error);
         return { entries: [], total_ml: 0, error: error.message };
       }
 
@@ -118,7 +120,7 @@ class WaterTrackerExecutor {
 
       return { entries: entries || [], total_ml, goal_ml: 2000 };
     } catch (error) {
-      console.error("[WaterTracker] getData error:", error);
+      logger.error("[WaterTracker] getData error:", error);
       return { entries: [], total_ml: 0, error: error.message };
     }
   }
@@ -147,7 +149,7 @@ class WaterTrackerExecutor {
 
       return insights;
     } catch (error) {
-      console.error("[WaterTracker] getInsights error:", error);
+      logger.error("[WaterTracker] getInsights error:", error);
       return [];
     }
   }
@@ -178,7 +180,7 @@ class WaterTrackerExecutor {
 
       return { success: false, error: "Unknown action: " + action };
     } catch (error) {
-      console.error("[WaterTracker] executeAction error:", error);
+      logger.error("[WaterTracker] executeAction error:", error);
       return { success: false, error: error.message };
     }
   }

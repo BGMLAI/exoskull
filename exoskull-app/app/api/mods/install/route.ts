@@ -6,6 +6,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { installMod } from "@/lib/builder/proactive-engine";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const POST = withApiLog(async function POST(request: NextRequest) {
@@ -31,7 +32,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, slug });
   } catch (error) {
-    console.error("[Mods Install] Error:", error);
+    logger.error("[Mods Install] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

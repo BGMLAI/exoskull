@@ -11,6 +11,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { createTask } from "@/lib/tasks/task-service";
 import { withApiLog } from "@/lib/api/request-logger";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 interface CreateTaskRequest {
@@ -51,7 +52,7 @@ export const POST = withApiLog(async function POST(
       .single();
 
     if (msgError || !message) {
-      console.error("[MessageToTask] Message not found:", {
+      logger.error("[MessageToTask] Message not found:", {
         messageId,
         error: msgError?.message,
       });
@@ -97,7 +98,7 @@ export const POST = withApiLog(async function POST(
     });
 
     if (!taskResult.id) {
-      console.error("[MessageToTask] Failed to create task:", {
+      logger.error("[MessageToTask] Failed to create task:", {
         error: taskResult.error,
         messageId,
       });
@@ -124,7 +125,7 @@ export const POST = withApiLog(async function POST(
       .eq("id", messageId);
 
     if (linkError) {
-      console.error("[MessageToTask] Failed to link task to message:", {
+      logger.error("[MessageToTask] Failed to link task to message:", {
         error: linkError.message,
         messageId,
         taskId: task.id,
@@ -146,7 +147,7 @@ export const POST = withApiLog(async function POST(
       message_id: messageId,
     });
   } catch (error) {
-    console.error("[MessageToTask] Error:", error);
+    logger.error("[MessageToTask] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

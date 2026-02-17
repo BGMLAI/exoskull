@@ -10,6 +10,7 @@ import {
   type UsageSummary,
 } from "./types";
 
+import { logger } from "@/lib/logger";
 function getServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -88,7 +89,7 @@ export async function checkRateLimit(
     .single();
 
   if (tenantError || !tenant) {
-    console.error("[RateLimiter] Tenant not found:", {
+    logger.error("[RateLimiter] Tenant not found:", {
       tenantId,
       error: tenantError?.message,
     });
@@ -185,7 +186,7 @@ export async function incrementUsage(
       p_amount: amount,
     });
   } catch (error) {
-    console.error("[RateLimiter] Failed to increment usage:", {
+    logger.error("[RateLimiter] Failed to increment usage:", {
       error: error instanceof Error ? error.message : String(error),
       tenantId,
       resource,

@@ -5,6 +5,7 @@
 import { RigConnection } from "@/lib/rigs/types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export type ToolProvider = "google" | "google-workspace" | "microsoft-365";
 
 const DEFAULT_PROVIDER_ORDER: ToolProvider[] = [
@@ -46,7 +47,7 @@ export async function getRigConnection(
     if (!data.access_token) return null;
     return data as RigConnection;
   } catch (error) {
-    console.error("[ToolRigs] Failed to load rig connection:", error);
+    logger.error("[ToolRigs] Failed to load rig connection:", error);
     return null;
   }
 }

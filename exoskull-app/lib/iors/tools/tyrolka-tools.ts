@@ -9,6 +9,7 @@
 import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 async function isQuestSystemEnabled(tenantId: string): Promise<boolean> {
   const supabase = getServiceSupabase();
   const { data } = await supabase
@@ -86,7 +87,7 @@ export const tyrolkaTools: ToolDefinition[] = [
         .single();
 
       if (error) {
-        console.error("[TyrolkaTools] create_op error:", error);
+        logger.error("[TyrolkaTools] create_op error:", error);
         return `Błąd: nie udało się stworzyć opa`;
       }
 
@@ -147,7 +148,7 @@ export const tyrolkaTools: ToolDefinition[] = [
         .single();
 
       if (error) {
-        console.error("[TyrolkaTools] create_quest error:", error);
+        logger.error("[TyrolkaTools] create_quest error:", error);
         return `Błąd: nie udało się stworzyć questa`;
       }
 
@@ -326,7 +327,7 @@ export const tyrolkaTools: ToolDefinition[] = [
         .single();
 
       if (error || !data) {
-        console.error("[TyrolkaTools] update_op_status error:", error);
+        logger.error("[TyrolkaTools] update_op_status error:", error);
         return `Błąd: nie znaleziono opa lub nie udało się zaktualizować`;
       }
 

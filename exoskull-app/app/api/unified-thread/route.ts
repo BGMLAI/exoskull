@@ -10,6 +10,7 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(request: NextRequest) {
@@ -62,7 +63,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     const { data: messages, error, count } = await query;
 
     if (error) {
-      console.error("[UnifiedThread API] Query error:", error);
+      logger.error("[UnifiedThread API] Query error:", error);
       return NextResponse.json(
         { error: "Failed to fetch messages" },
         { status: 500 },
@@ -102,7 +103,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       offset,
     });
   } catch (error) {
-    console.error("[UnifiedThread API] Error:", error);
+    logger.error("[UnifiedThread API] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

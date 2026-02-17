@@ -12,6 +12,7 @@ import { parsePersonalityFromDB } from "../personality";
 import type { IORSPersonality } from "../types";
 import { checkSelfModifyConsent, logSelfModification } from "./consent-gate";
 
+import { logger } from "@/lib/logger";
 /** Permission key mapping for personality parameters */
 const PERSONALITY_PERM_MAP: Record<string, string> = {
   formality: "style_formality",
@@ -162,7 +163,7 @@ export const personalityTools: ToolDefinition[] = [
           .eq("id", tenantId);
 
         if (error) {
-          console.error("[PersonalityTools] Failed to update:", {
+          logger.error("[PersonalityTools] Failed to update:", {
             tenantId,
             error: error.message,
           });

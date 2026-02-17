@@ -2,6 +2,7 @@
 // Bypasses PostgREST and RLS - use for system queries only
 import { createClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
 // Create admin client with service role (bypasses RLS)
 function getAdminClient() {
   return createClient(
@@ -46,7 +47,7 @@ export async function queryDatabase<T = any>(
     if (error) throw error;
     return (data as T[]) || [];
   } catch (error) {
-    console.error("Admin query error:", error);
+    logger.error("Admin query error:", error);
     throw error;
   }
 }

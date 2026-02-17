@@ -19,6 +19,7 @@ import {
   formatVPSResult,
 } from "@/lib/code-generation/vps-executor";
 
+import { logger } from "@/lib/logger";
 /** All code-gen tools need 55s (Vercel Hobby has 60s limit) */
 const CODE_GEN_TIMEOUT = 55_000;
 
@@ -85,7 +86,7 @@ This is different from the simple Canvas app builder (build_app) which only crea
         tenantId,
       };
 
-      console.log("[CodeGenTools] Generating full-stack app:", {
+      logger.info("[CodeGenTools] Generating full-stack app:", {
         tenantId,
         description: description.slice(0, 80),
         features: features.length,
@@ -95,7 +96,7 @@ This is different from the simple Canvas app builder (build_app) which only crea
       const result = await executeCodeGeneration(task);
 
       if (!result.success) {
-        console.error("[CodeGenTools] Generation failed:", {
+        logger.error("[CodeGenTools] Generation failed:", {
           tenantId,
           error: result.error,
           model: result.model,
@@ -139,7 +140,7 @@ This is different from the simple Canvas app builder (build_app) which only crea
             .from("exo_generated_files")
             .insert(fileRows);
           if (filesError) {
-            console.warn(
+            logger.warn(
               "[CodeGenTools] File insert warning:",
               filesError.message,
             );
@@ -164,7 +165,7 @@ This is different from the simple Canvas app builder (build_app) which only crea
 
         return response;
       } catch (dbError) {
-        console.error("[CodeGenTools] DB save failed:", {
+        logger.error("[CodeGenTools] DB save failed:", {
           tenantId,
           error: dbError instanceof Error ? dbError.message : String(dbError),
         });
@@ -216,7 +217,7 @@ Examples: "Add error handling to the login function", "Refactor the database que
       const filePath = input.file_path as string;
       const instruction = input.instruction as string;
 
-      console.log("[CodeGenTools] Modifying code:", {
+      logger.info("[CodeGenTools] Modifying code:", {
         tenantId,
         workspaceId,
         filePath,
@@ -290,7 +291,7 @@ Examples: "Add error handling to the login function", "Refactor the database que
           });
 
         if (insertError) {
-          console.error(
+          logger.error(
             "[CodeGenTools] Modify save failed:",
             insertError.message,
           );
@@ -306,7 +307,7 @@ Examples: "Add error handling to the login function", "Refactor the database que
 
         return result;
       } catch (error) {
-        console.error("[CodeGenTools] modify_code failed:", {
+        logger.error("[CodeGenTools] modify_code failed:", {
           tenantId,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -341,7 +342,7 @@ Examples: "Run tests for the habit tracker", "Test the API endpoints".`,
     ): Promise<string> => {
       const workspaceId = input.workspace_id as string;
 
-      console.log("[CodeGenTools] Running test analysis:", {
+      logger.info("[CodeGenTools] Running test analysis:", {
         tenantId,
         workspaceId,
       });
@@ -373,7 +374,7 @@ Examples: "Run tests for the habit tracker", "Test the API endpoints".`,
         // Try VPS execution first (real Docker sandbox)
         const vpsAvailable = await isVPSAvailable();
         if (vpsAvailable) {
-          console.log("[CodeGenTools] VPS available — running real tests");
+          logger.info("[CodeGenTools] VPS available — running real tests");
           const vpsFiles = Array.from(latestFiles.values()).map((f) => ({
             path: f.file_path,
             content: f.content,
@@ -396,7 +397,7 @@ Examples: "Run tests for the habit tracker", "Test the API endpoints".`,
         }
 
         // Fallback: AI-based analysis (no VPS)
-        console.log("[CodeGenTools] VPS not available — using AI analysis");
+        logger.info("[CodeGenTools] VPS not available — using AI analysis");
 
         const codeSummary = Array.from(latestFiles.values())
           .map(
@@ -444,7 +445,7 @@ ${codeSummary}`,
 
         return result;
       } catch (error) {
-        console.error("[CodeGenTools] run_tests failed:", {
+        logger.error("[CodeGenTools] run_tests failed:", {
           tenantId,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -484,7 +485,7 @@ Examples: "Deploy the habit tracker", "Push to production".`,
       const workspaceId = input.workspace_id as string;
       const platform = (input.platform as string) || "vercel";
 
-      console.log("[CodeGenTools] Deploying workspace:", {
+      logger.info("[CodeGenTools] Deploying workspace:", {
         tenantId,
         workspaceId,
         platform,
@@ -598,7 +599,7 @@ Examples: "Deploy the habit tracker", "Push to production".`,
 
             if (!deployRes.ok) {
               const errBody = await deployRes.text();
-              console.error("[CodeGenTools] Vercel deploy failed:", errBody);
+              logger.error("[CodeGenTools] Vercel deploy failed:", errBody);
               return `Vercel deployment failed: ${deployRes.status}. Sprobuj ponownie lub uzyj "manual".`;
             }
 
@@ -626,7 +627,7 @@ Examples: "Deploy the habit tracker", "Push to production".`,
 
             return result;
           } catch (deployError) {
-            console.error("[CodeGenTools] Vercel API error:", {
+            logger.error("[CodeGenTools] Vercel API error:", {
               error:
                 deployError instanceof Error
                   ? deployError.message
@@ -662,7 +663,7 @@ Examples: "Deploy the habit tracker", "Push to production".`,
 
         return result;
       } catch (error) {
-        console.error("[CodeGenTools] deploy_app failed:", {
+        logger.error("[CodeGenTools] deploy_app failed:", {
           tenantId,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -731,7 +732,7 @@ Requires VPS executor to be configured (VPS_EXECUTOR_URL).`,
         (input.additional_files as Array<{ path: string; content: string }>) ||
         [];
 
-      console.log("[CodeGenTools] execute_code:", {
+      logger.info("[CodeGenTools] execute_code:", {
         tenantId,
         filename,
         runtime,

@@ -109,7 +109,7 @@ async function handler(req: NextRequest) {
             }
           }
         } catch (error) {
-          console.error("[GoalProgress] Error processing goal:", {
+          logger.error("[GoalProgress] Error processing goal:", {
             goalId: goal.id,
             tenantId,
             error: error instanceof Error ? error.message : error,
@@ -140,7 +140,7 @@ async function handler(req: NextRequest) {
     });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error("[GoalProgress] Cron failed:", { error: errorMsg });
+    logger.error("[GoalProgress] Cron failed:", { error: errorMsg });
     return NextResponse.json(
       { status: "failed", error: errorMsg },
       { status: 500 },

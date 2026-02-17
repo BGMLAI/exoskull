@@ -17,6 +17,7 @@ import {
   executeAction,
 } from "@/lib/integrations/composio-adapter";
 
+import { logger } from "@/lib/logger";
 export const composioTools: ToolDefinition[] = [
   {
     definition: {
@@ -47,7 +48,7 @@ export const composioTools: ToolDefinition[] = [
         const { redirectUrl } = await initiateConnection(tenantId, toolkit);
         return `Otwórz ten link żeby połączyć ${name}:\n${redirectUrl}\n\nLink jest jednorazowy. Po połączeniu będę mógł korzystać z ${name} w Twoim imieniu.`;
       } catch (err) {
-        console.error("[ComposioTools] composio_connect error:", {
+        logger.error("[ComposioTools] composio_connect error:", {
           toolkit,
           tenantId,
           error: err instanceof Error ? err.message : err,
@@ -92,7 +93,7 @@ export const composioTools: ToolDefinition[] = [
         }
         return `Nie udało się odłączyć ${toolkit}. Spróbuj ponownie.`;
       } catch (err) {
-        console.error("[ComposioTools] composio_disconnect error:", {
+        logger.error("[ComposioTools] composio_disconnect error:", {
           toolkit,
           tenantId,
           error: err instanceof Error ? err.message : err,
@@ -126,7 +127,7 @@ export const composioTools: ToolDefinition[] = [
 
         return `Aplikacje SaaS (via Composio):\n${lines.join("\n")}\n\nPowiedz "połącz [nazwa]" żeby podłączyć nową aplikację.`;
       } catch (err) {
-        console.error("[ComposioTools] composio_list_apps error:", {
+        logger.error("[ComposioTools] composio_list_apps error:", {
           tenantId,
           error: err instanceof Error ? err.message : err,
         });
@@ -178,7 +179,7 @@ export const composioTools: ToolDefinition[] = [
 
         return `Nie udalo sie wykonac ${toolSlug}: ${result.error}`;
       } catch (err) {
-        console.error("[ComposioTools:composio_action:failed]", {
+        logger.error("[ComposioTools:composio_action:failed]", {
           toolSlug,
           tenantId,
           error: err instanceof Error ? err.message : err,

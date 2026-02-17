@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const SKETCHFAB_API = "https://api.sketchfab.com/v3";
@@ -46,11 +47,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     const res = await fetch(`${SKETCHFAB_API}/search?${sfParams}`, { headers });
 
     if (!res.ok) {
-      console.error(
-        "[SketchfabProxy] API error:",
-        res.status,
-        await res.text(),
-      );
+      logger.error("[SketchfabProxy] API error:", res.status, await res.text());
       return NextResponse.json(
         { error: "Sketchfab API error", status: res.status },
         { status: 502 },
@@ -92,7 +89,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       next: data.next || null,
     });
   } catch (error) {
-    console.error("[SketchfabProxy] Error:", error);
+    logger.error("[SketchfabProxy] Error:", error);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 });

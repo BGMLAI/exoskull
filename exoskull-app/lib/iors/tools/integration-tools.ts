@@ -8,6 +8,7 @@
 
 import type { ToolDefinition } from "./shared";
 
+import { logger } from "@/lib/logger";
 export const integrationTools: ToolDefinition[] = [
   {
     definition: {
@@ -46,7 +47,7 @@ export const integrationTools: ToolDefinition[] = [
         );
         return `Otwórz ten link żeby połączyć ${rigName}:\n${url}\n\nLink ważny 15 minut.`;
       } catch (err) {
-        console.error("[IntegrationTools] connect_rig error:", {
+        logger.error("[IntegrationTools] connect_rig error:", {
           rigSlug,
           error: err instanceof Error ? err.message : err,
         });

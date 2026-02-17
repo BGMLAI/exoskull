@@ -85,7 +85,7 @@ export async function executeTool(
 
     return result;
   } catch (error) {
-    console.error("[Tools] Execution error:", {
+    logger.error("[Tools] Execution error:", {
       tool: name,
       tenant_id: context.tenant_id,
       error: error instanceof Error ? error.message : error,

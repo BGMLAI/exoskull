@@ -12,6 +12,7 @@ import {
 } from "./supabase-proxy";
 import { IModExecutor } from "@/lib/mods/types";
 
+import { logger } from "@/lib/logger";
 const EXECUTION_TIMEOUT_MS = 5000;
 
 /**
@@ -103,7 +104,7 @@ export async function executeInSandbox(
     const executionTimeMs = Math.round(performance.now() - startTime);
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    console.error("[Sandbox] Execution error:", {
+    logger.error("[Sandbox] Execution error:", {
       error: errorMessage,
       skill_id: context.skill_id,
       method: context.method,
@@ -224,7 +225,7 @@ function buildExecutor(
 
     return executor as IModExecutor;
   } catch (error) {
-    console.error("[Sandbox] Failed to build executor:", error);
+    logger.error("[Sandbox] Failed to build executor:", error);
     return null;
   }
 }

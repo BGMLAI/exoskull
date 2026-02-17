@@ -28,7 +28,7 @@ export async function archiveUnusedSkills(
     });
 
     if (error) {
-      console.error("[LifecycleManager] Archive error:", error);
+      logger.error("[LifecycleManager] Archive error:", error);
       return { archivedCount: 0, error: error.message };
     }
 
@@ -42,7 +42,7 @@ export async function archiveUnusedSkills(
 
     return { archivedCount };
   } catch (error) {
-    console.error("[LifecycleManager] Error:", error);
+    logger.error("[LifecycleManager] Error:", error);
     return { archivedCount: 0, error: (error as Error).message };
   }
 }
@@ -62,7 +62,7 @@ export async function expireOldSuggestions(
     });
 
     if (error) {
-      console.error("[LifecycleManager] Expire suggestions error:", error);
+      logger.error("[LifecycleManager] Expire suggestions error:", error);
       return 0;
     }
 
@@ -76,7 +76,7 @@ export async function expireOldSuggestions(
 
     return expiredCount;
   } catch (error) {
-    console.error("[LifecycleManager] Expire suggestions error:", error);
+    logger.error("[LifecycleManager] Expire suggestions error:", error);
     return 0;
   }
 }
@@ -102,7 +102,7 @@ export async function revokeUnhealthySkills(
 
     return result;
   } catch (error) {
-    console.error("[LifecycleManager] Revoke unhealthy skills error:", error);
+    logger.error("[LifecycleManager] Revoke unhealthy skills error:", error);
     return { revokedCount: 0, skills: [] };
   }
 }
@@ -145,7 +145,7 @@ export async function getSkillStats(): Promise<{
       archived: archivedRes.count || 0,
     };
   } catch (error) {
-    console.error("[LifecycleManager] Stats error:", error);
+    logger.error("[LifecycleManager] Stats error:", error);
     return { total: 0, active: 0, pending: 0, archived: 0 };
   }
 }

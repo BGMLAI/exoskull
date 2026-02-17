@@ -13,6 +13,7 @@ import {
 } from "@/lib/tools";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // =====================================================
@@ -31,7 +32,7 @@ export const GET = withApiLog(async function GET() {
       count: tools.length,
     });
   } catch (error) {
-    console.error("[API/tools] GET error:", error);
+    logger.error("[API/tools] GET error:", error);
     return NextResponse.json(
       { success: false, error: "Failed to get tools" },
       { status: 500 },
@@ -80,7 +81,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       execution_time_ms: executionTime,
     });
   } catch (error) {
-    console.error("[API/tools] POST error:", {
+    logger.error("[API/tools] POST error:", {
       error: error instanceof Error ? error.message : error,
       duration_ms: Date.now() - startTime,
     });

@@ -9,6 +9,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { findTaskByTitle, createTask } from "@/lib/tasks/task-service";
 import type { AnalyzedEmail, ActionItem } from "./types";
 
+import { logger } from "@/lib/logger";
 /**
  * Generate tasks from email action items.
  * Returns number of tasks created.
@@ -56,7 +57,7 @@ export async function generateTasksFromEmail(
     });
 
     if (!taskResult.id) {
-      console.error("[TaskGenerator] Failed to create task:", {
+      logger.error("[TaskGenerator] Failed to create task:", {
         error: taskResult.error,
         item: item.text,
       });

@@ -12,6 +12,7 @@ import {
 import { createGoogleWorkspaceClient } from "../rigs/google-workspace/client";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // TOOL DEFINITION
 // =====================================================
@@ -229,7 +230,7 @@ export const calendarHandler: ToolHandler = async (
         return { success: false, error: `Unknown action: ${action}` };
     }
   } catch (error) {
-    console.error("[CalendarTool] Error:", {
+    logger.error("[CalendarTool] Error:", {
       action,
       tenant_id: context.tenant_id,
       error: error instanceof Error ? error.message : error,

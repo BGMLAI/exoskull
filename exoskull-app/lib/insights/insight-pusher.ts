@@ -15,6 +15,7 @@ import {
   type DispatchReportResult,
 } from "@/lib/reports/report-dispatcher";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -205,7 +206,7 @@ Rules:
     });
     return response.content.trim();
   } catch (error) {
-    console.error("[InsightPush] AI formatting failed, using raw fallback:", {
+    logger.error("[InsightPush] AI formatting failed, using raw fallback:", {
       tenantId,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -237,7 +238,7 @@ async function recordDeliveries(
     .upsert(rows, { onConflict: "tenant_id,source_table,source_id" });
 
   if (error) {
-    console.error("[InsightPush] Failed to record deliveries:", {
+    logger.error("[InsightPush] Failed to record deliveries:", {
       tenantId,
       error: error.message,
     });
@@ -310,7 +311,7 @@ export async function pushInsightsForTenant(
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.error("[InsightPush] Failed for tenant:", {
+    logger.error("[InsightPush] Failed for tenant:", {
       tenantId,
       error: msg,
     });

@@ -1,5 +1,6 @@
 import { getAdminSupabase } from "./auth";
 
+import { logger } from "@/lib/logger";
 type Severity = "info" | "warn" | "error" | "fatal";
 
 /**
@@ -22,7 +23,7 @@ export async function logAdminError(
       context: context || {},
     });
   } catch (err) {
-    console.error("[AdminLogger] Failed to log error:", err);
+    logger.error("[AdminLogger] Failed to log error:", err);
   }
 }
 
@@ -44,7 +45,7 @@ export async function logCronStart(cronName: string): Promise<string | null> {
 
     return data?.id || null;
   } catch (err) {
-    console.error("[AdminLogger] Failed to log cron start:", err);
+    logger.error("[AdminLogger] Failed to log cron start:", err);
     return null;
   }
 }
@@ -82,7 +83,7 @@ export async function logCronComplete(
       })
       .eq("id", runId);
   } catch (err) {
-    console.error("[AdminLogger] Failed to log cron complete:", err);
+    logger.error("[AdminLogger] Failed to log cron complete:", err);
   }
 }
 
@@ -131,7 +132,7 @@ export async function logCronFailed(
       stack,
     );
   } catch (err) {
-    console.error("[AdminLogger] Failed to log cron failure:", err);
+    logger.error("[AdminLogger] Failed to log cron failure:", err);
   }
 }
 

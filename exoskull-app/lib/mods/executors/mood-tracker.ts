@@ -5,6 +5,7 @@
 import { IModExecutor, ModInsight, ModAction, ModSlug } from "../types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // Types
 // =====================================================
@@ -83,7 +84,7 @@ export class MoodTrackerExecutor implements IModExecutor {
           .order("logged_at", { ascending: false });
 
       if (entriesError) {
-        console.error("[MoodTracker] Error fetching entries:", entriesError);
+        logger.error("[MoodTracker] Error fetching entries:", entriesError);
         throw entriesError;
       }
 
@@ -124,7 +125,7 @@ export class MoodTrackerExecutor implements IModExecutor {
         available_emotions: MOOD_EMOTIONS,
       };
     } catch (error) {
-      console.error("[MoodTracker] getData error:", error);
+      logger.error("[MoodTracker] getData error:", error);
       return {
         today: { entries: [], count: 0, average_mood: null },
         weekly: { entries: [], count: 0, stats: null },
@@ -238,7 +239,7 @@ export class MoodTrackerExecutor implements IModExecutor {
 
       return insights;
     } catch (error) {
-      console.error("[MoodTracker] getInsights error:", error);
+      logger.error("[MoodTracker] getInsights error:", error);
       return [
         {
           type: "warning",
@@ -291,7 +292,7 @@ export class MoodTrackerExecutor implements IModExecutor {
             .single();
 
           if (error) {
-            console.error("[MoodTracker] log_mood error:", error);
+            logger.error("[MoodTracker] log_mood error:", error);
             return { success: false, error: error.message };
           }
 
@@ -354,7 +355,7 @@ export class MoodTrackerExecutor implements IModExecutor {
           return { success: false, error: `Unknown action: ${action}` };
       }
     } catch (error) {
-      console.error("[MoodTracker] executeAction error:", error);
+      logger.error("[MoodTracker] executeAction error:", error);
       return {
         success: false,
         error: (error as Error).message,

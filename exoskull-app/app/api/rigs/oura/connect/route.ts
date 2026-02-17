@@ -5,6 +5,7 @@ import { buildAuthUrl, getOAuthConfig } from "@/lib/rigs/oauth";
 import { randomBytes } from "crypto";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const RIG_SLUG = "oura";
@@ -33,7 +34,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     }
 
     if (!config.clientId) {
-      console.error("[Oura OAuth] Missing client ID");
+      logger.error("[Oura OAuth] Missing client ID");
       return NextResponse.json(
         {
           error:
@@ -62,7 +63,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       );
 
     if (stateError) {
-      console.error("[Oura OAuth] Failed to store state:", stateError);
+      logger.error("[Oura OAuth] Failed to store state:", stateError);
       return NextResponse.json(
         { error: "Failed to initiate OAuth flow" },
         { status: 500 },
@@ -73,7 +74,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
 
     return NextResponse.redirect(authUrl);
   } catch (error) {
-    console.error("[Oura OAuth] Connect error:", error);
+    logger.error("[Oura OAuth] Connect error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

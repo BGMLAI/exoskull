@@ -5,26 +5,27 @@
  * (Like OpenClaw's MEMORY.md but stored in DB)
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
 export interface UserHighlight {
-  id: string
-  user_id: string
-  category: 'preference' | 'pattern' | 'goal' | 'insight' | 'relationship'
-  content: string
-  importance: number // 1-10
-  source: 'conversation' | 'analysis' | 'explicit'
-  created_at: string
-  updated_at: string
-  expires_at?: string
+  id: string;
+  user_id: string;
+  category: "preference" | "pattern" | "goal" | "insight" | "relationship";
+  content: string;
+  importance: number; // 1-10
+  source: "conversation" | "analysis" | "explicit";
+  created_at: string;
+  updated_at: string;
+  expires_at?: string;
 }
 
 export interface HighlightsSummary {
-  preferences: string[]
-  patterns: string[]
-  goals: string[]
-  insights: string[]
-  relationships: string[]
+  preferences: string[];
+  patterns: string[];
+  goals: string[];
+  insights: string[];
+  relationships: string[];
 }
 
 /**
@@ -33,23 +34,23 @@ export interface HighlightsSummary {
 export async function getUserHighlights(
   supabase: SupabaseClient,
   userId: string,
-  limit: number = 20
+  limit: number = 20,
 ): Promise<UserHighlight[]> {
   const { data, error } = await supabase
-    .from('user_memory_highlights')
-    .select('*')
-    .eq('user_id', userId)
-    .or('expires_at.is.null,expires_at.gt.now()')
-    .order('importance', { ascending: false })
-    .order('updated_at', { ascending: false })
-    .limit(limit)
+    .from("user_memory_highlights")
+    .select("*")
+    .eq("user_id", userId)
+    .or("expires_at.is.null,expires_at.gt.now()")
+    .order("importance", { ascending: false })
+    .order("updated_at", { ascending: false })
+    .limit(limit);
 
   if (error) {
-    console.error('[Highlights] Failed to fetch:', error)
-    return []
+    logger.error("[Highlights] Failed to fetch:", error);
+    return [];
   }
 
-  return data || []
+  return data || [];
 }
 
 /**
@@ -57,33 +58,36 @@ export async function getUserHighlights(
  */
 export function formatHighlightsForPrompt(highlights: UserHighlight[]): string {
   if (highlights.length === 0) {
-    return ''
+    return "";
   }
 
-  const grouped = highlights.reduce((acc, h) => {
-    if (!acc[h.category]) acc[h.category] = []
-    acc[h.category].push(h.content)
-    return acc
-  }, {} as Record<string, string[]>)
+  const grouped = highlights.reduce(
+    (acc, h) => {
+      if (!acc[h.category]) acc[h.category] = [];
+      acc[h.category].push(h.content);
+      return acc;
+    },
+    {} as Record<string, string[]>,
+  );
 
-  const sections: string[] = []
+  const sections: string[] = [];
 
   if (grouped.preference?.length) {
-    sections.push(`Preferencje: ${grouped.preference.slice(0, 5).join('; ')}`)
+    sections.push(`Preferencje: ${grouped.preference.slice(0, 5).join("; ")}`);
   }
   if (grouped.pattern?.length) {
-    sections.push(`Wzorce: ${grouped.pattern.slice(0, 3).join('; ')}`)
+    sections.push(`Wzorce: ${grouped.pattern.slice(0, 3).join("; ")}`);
   }
   if (grouped.goal?.length) {
-    sections.push(`Cele: ${grouped.goal.slice(0, 3).join('; ')}`)
+    sections.push(`Cele: ${grouped.goal.slice(0, 3).join("; ")}`);
   }
   if (grouped.insight?.length) {
-    sections.push(`Insights: ${grouped.insight.slice(0, 3).join('; ')}`)
+    sections.push(`Insights: ${grouped.insight.slice(0, 3).join("; ")}`);
   }
 
   return sections.length > 0
-    ? `### Pamiec o uzytkowniku\n${sections.join('\n')}`
-    : ''
+    ? `### Pamiec o uzytkowniku\n${sections.join("\n")}`
+    : "";
 }
 
 /**
@@ -92,23 +96,26 @@ export function formatHighlightsForPrompt(highlights: UserHighlight[]): string {
 export async function addHighlight(
   supabase: SupabaseClient,
   userId: string,
-  highlight: Omit<UserHighlight, 'id' | 'user_id' | 'created_at' | 'updated_at'>
+  highlight: Omit<
+    UserHighlight,
+    "id" | "user_id" | "created_at" | "updated_at"
+  >,
 ): Promise<UserHighlight | null> {
   const { data, error } = await supabase
-    .from('user_memory_highlights')
+    .from("user_memory_highlights")
     .insert({
       user_id: userId,
-      ...highlight
+      ...highlight,
     })
     .select()
-    .single()
+    .single();
 
   if (error) {
-    console.error('[Highlights] Failed to add:', error)
-    return null
+    logger.error("[Highlights] Failed to add:", error);
+    return null;
   }
 
-  return data
+  return data;
 }
 
 /**
@@ -116,24 +123,24 @@ export async function addHighlight(
  */
 export async function boostHighlight(
   supabase: SupabaseClient,
-  highlightId: string
+  highlightId: string,
 ): Promise<void> {
   // First get current importance
   const { data: current } = await supabase
-    .from('user_memory_highlights')
-    .select('importance')
-    .eq('id', highlightId)
-    .single()
+    .from("user_memory_highlights")
+    .select("importance")
+    .eq("id", highlightId)
+    .single();
 
-  const newImportance = Math.min(10, (current?.importance || 5) + 1)
+  const newImportance = Math.min(10, (current?.importance || 5) + 1);
 
   await supabase
-    .from('user_memory_highlights')
+    .from("user_memory_highlights")
     .update({
       importance: newImportance,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
     })
-    .eq('id', highlightId)
+    .eq("id", highlightId);
 }
 
 /**
@@ -141,26 +148,38 @@ export async function boostHighlight(
  */
 export function extractPotentialHighlights(
   conversation: string,
-  existingHighlights: string[]
-): Array<{ category: UserHighlight['category']; content: string; importance: number }> {
-  const potential: Array<{ category: UserHighlight['category']; content: string; importance: number }> = []
+  existingHighlights: string[],
+): Array<{
+  category: UserHighlight["category"];
+  content: string;
+  importance: number;
+}> {
+  const potential: Array<{
+    category: UserHighlight["category"];
+    content: string;
+    importance: number;
+  }> = [];
 
   // Pattern: "I prefer X" or "I like X"
   const preferencePatterns = [
     /(?:prefer|lubie|wole)\s+(.{5,50})/gi,
     /(?:always|zawsze)\s+(.{5,50})/gi,
-  ]
+  ];
 
   for (const pattern of preferencePatterns) {
-    const matches = conversation.matchAll(pattern)
+    const matches = conversation.matchAll(pattern);
     for (const match of matches) {
-      const content = match[1].trim()
-      if (!existingHighlights.some(h => h.toLowerCase().includes(content.toLowerCase()))) {
+      const content = match[1].trim();
+      if (
+        !existingHighlights.some((h) =>
+          h.toLowerCase().includes(content.toLowerCase()),
+        )
+      ) {
         potential.push({
-          category: 'preference',
+          category: "preference",
           content,
-          importance: 5
-        })
+          importance: 5,
+        });
       }
     }
   }
@@ -169,23 +188,27 @@ export function extractPotentialHighlights(
   const goalPatterns = [
     /(?:chce|want to|goal is|cel to)\s+(.{5,100})/gi,
     /(?:planuje|planning to)\s+(.{5,100})/gi,
-  ]
+  ];
 
   for (const pattern of goalPatterns) {
-    const matches = conversation.matchAll(pattern)
+    const matches = conversation.matchAll(pattern);
     for (const match of matches) {
-      const content = match[1].trim()
-      if (!existingHighlights.some(h => h.toLowerCase().includes(content.toLowerCase()))) {
+      const content = match[1].trim();
+      if (
+        !existingHighlights.some((h) =>
+          h.toLowerCase().includes(content.toLowerCase()),
+        )
+      ) {
         potential.push({
-          category: 'goal',
+          category: "goal",
           content,
-          importance: 7
-        })
+          importance: 7,
+        });
       }
     }
   }
 
-  return potential
+  return potential;
 }
 
 /**
@@ -218,4 +241,4 @@ CREATE POLICY "Users can view own highlights"
 CREATE POLICY "Users can manage own highlights"
   ON user_memory_highlights FOR ALL
   USING (auth.uid() = user_id);
-`
+`;

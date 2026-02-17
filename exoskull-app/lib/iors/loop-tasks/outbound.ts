@@ -149,7 +149,7 @@ export async function handleOutbound(
     return { handled: true, cost_cents: 0 };
   } catch (error) {
     const err = error as Error;
-    console.error("[Petla:Outbound] Failed:", {
+    logger.error("[Petla:Outbound] Failed:", {
       tenantId: tenant_id,
       error: err.message,
     });

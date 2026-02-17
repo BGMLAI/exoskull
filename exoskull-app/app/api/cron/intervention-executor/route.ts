@@ -41,7 +41,7 @@ async function handler(req: NextRequest) {
       durationMs: duration,
     });
   } catch (error) {
-    console.error("[InterventionExecutor] Cron error:", error);
+    logger.error("[InterventionExecutor] Cron error:", error);
     return NextResponse.json(
       {
         error: "Intervention executor failed",

@@ -151,7 +151,7 @@ export class SpawnerAgent extends BaseAgent {
           triggersToActivate.push(trigger);
         }
       } catch (error) {
-        console.error(
+        logger.error(
           `[Spawner] Error evaluating trigger ${trigger.name}:`,
           error,
         );

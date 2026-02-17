@@ -15,6 +15,7 @@ import {
 import type { AutonomyActionType, AutonomyDomain } from "@/lib/iors/types";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const VALID_ACTIONS: AutonomyActionType[] = [
@@ -47,7 +48,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
     const permissions = await listPermissions(tenantId);
     return NextResponse.json({ permissions });
   } catch (error) {
-    console.error("[AutonomyAPI] GET error:", error);
+    logger.error("[AutonomyAPI] GET error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -94,7 +95,7 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
     const permissions = await listPermissions(tenantId);
     return NextResponse.json({ permissions });
   } catch (error) {
-    console.error("[AutonomyAPI] PATCH error:", error);
+    logger.error("[AutonomyAPI] PATCH error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

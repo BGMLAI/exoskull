@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 // =====================================================
 // WHATSAPP CLOUD API CLIENT
 // Meta Graph API v18.0: https://developers.facebook.com/docs/whatsapp/cloud-api
@@ -147,7 +149,7 @@ export class WhatsAppClient {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error("[WhatsApp] API error:", {
+        logger.error("[WhatsApp] API error:", {
           endpoint,
           status: response.status,
           error: data.error?.message || JSON.stringify(data),
@@ -166,7 +168,7 @@ export class WhatsAppClient {
       ) {
         throw error;
       }
-      console.error("[WhatsApp] Request failed:", {
+      logger.error("[WhatsApp] Request failed:", {
         endpoint,
         error: error instanceof Error ? error.message : "Unknown error",
       });
@@ -544,7 +546,7 @@ export function extractIncomingMessage(payload: WhatsAppWebhookPayload): {
       raw: message,
     };
   } catch (error) {
-    console.error("[WhatsApp] Failed to extract message:", {
+    logger.error("[WhatsApp] Failed to extract message:", {
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return null;
@@ -567,7 +569,7 @@ export function getWhatsAppClient(): WhatsAppClient | null {
   const phoneNumberId = process.env.META_PHONE_NUMBER_ID;
 
   if (!token || !phoneNumberId) {
-    console.error("[WhatsApp] Missing env vars:", {
+    logger.error("[WhatsApp] Missing env vars:", {
       hasToken: !!token,
       hasPhoneNumberId: !!phoneNumberId,
     });

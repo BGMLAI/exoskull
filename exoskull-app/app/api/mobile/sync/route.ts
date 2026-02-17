@@ -12,6 +12,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@supabase/supabase-js";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 // Tables allowed for mobile sync (whitelist)
 const SYNCABLE_TABLES: Record<
   string,
@@ -97,7 +98,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       const { data, error, count } = await query;
 
       if (error) {
-        console.error(`[MobileSync] Error querying ${table}:`, error);
+        logger.error(`[MobileSync] Error querying ${table}:`, error);
         results[table] = { data: [], count: 0, hasMore: false };
         continue;
       }
@@ -122,7 +123,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       tables: results,
     });
   } catch (error) {
-    console.error("[MobileSync] Sync failed:", {
+    logger.error("[MobileSync] Sync failed:", {
       error: error instanceof Error ? error.message : error,
       userId: tenantId,
     });

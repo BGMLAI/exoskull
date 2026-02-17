@@ -3,9 +3,17 @@
 // https://docs.tavily.com/
 // =====================================================
 
-import { ExoTool, ToolHandler, ToolResult, stringParam, numberParam, arrayParam } from './types';
+import {
+  ExoTool,
+  ToolHandler,
+  ToolResult,
+  stringParam,
+  numberParam,
+  arrayParam,
+} from "./types";
 
-const TAVILY_API = 'https://api.tavily.com/search';
+import { logger } from "@/lib/logger";
+const TAVILY_API = "https://api.tavily.com/search";
 
 // =====================================================
 // TYPES
@@ -31,25 +39,32 @@ interface TavilyResponse {
 // =====================================================
 
 export const searchTool: ExoTool = {
-  name: 'web_search',
-  description: 'Search the web for current information using Tavily. Returns relevant results with summaries. Use for finding up-to-date information, news, documentation, or any web content.',
+  name: "web_search",
+  description:
+    "Search the web for current information using Tavily. Returns relevant results with summaries. Use for finding up-to-date information, news, documentation, or any web content.",
   parameters: {
-    type: 'object',
+    type: "object",
     properties: {
-      query: stringParam('Search query'),
-      max_results: numberParam('Maximum results to return (1-10)', { default: 5 }),
-      search_depth: stringParam('Search depth', {
-        enum: ['basic', 'advanced'],
-        default: 'basic',
+      query: stringParam("Search query"),
+      max_results: numberParam("Maximum results to return (1-10)", {
+        default: 5,
       }),
-      include_answer: stringParam('Include AI-generated answer summary', {
-        enum: ['true', 'false'],
-        default: 'true',
+      search_depth: stringParam("Search depth", {
+        enum: ["basic", "advanced"],
+        default: "basic",
       }),
-      include_domains: stringParam('Comma-separated list of domains to include'),
-      exclude_domains: stringParam('Comma-separated list of domains to exclude'),
+      include_answer: stringParam("Include AI-generated answer summary", {
+        enum: ["true", "false"],
+        default: "true",
+      }),
+      include_domains: stringParam(
+        "Comma-separated list of domains to include",
+      ),
+      exclude_domains: stringParam(
+        "Comma-separated list of domains to exclude",
+      ),
     },
-    required: ['query'],
+    required: ["query"],
   },
 };
 
@@ -57,18 +72,21 @@ export const searchTool: ExoTool = {
 // HANDLER
 // =====================================================
 
-export const searchHandler: ToolHandler = async (context, params): Promise<ToolResult> => {
+export const searchHandler: ToolHandler = async (
+  context,
+  params,
+): Promise<ToolResult> => {
   const {
     query,
     max_results = 5,
-    search_depth = 'basic',
-    include_answer = 'true',
+    search_depth = "basic",
+    include_answer = "true",
     include_domains,
     exclude_domains,
   } = params as {
     query: string;
     max_results?: number;
-    search_depth?: 'basic' | 'advanced';
+    search_depth?: "basic" | "advanced";
     include_answer?: string;
     include_domains?: string;
     exclude_domains?: string;
@@ -79,14 +97,15 @@ export const searchHandler: ToolHandler = async (context, params): Promise<ToolR
   if (!apiKey) {
     return {
       success: false,
-      error: 'Tavily API key not configured. Please set TAVILY_API_KEY environment variable.',
+      error:
+        "Tavily API key not configured. Please set TAVILY_API_KEY environment variable.",
     };
   }
 
   if (!query || query.trim().length === 0) {
     return {
       success: false,
-      error: 'Search query is required',
+      error: "Search query is required",
     };
   }
 
@@ -96,30 +115,34 @@ export const searchHandler: ToolHandler = async (context, params): Promise<ToolR
       query: query.trim(),
       max_results: Math.min(Math.max(1, max_results), 10),
       search_depth,
-      include_answer: include_answer === 'true',
+      include_answer: include_answer === "true",
       include_raw_content: false,
       include_images: false,
     };
 
     if (include_domains) {
-      requestBody.include_domains = include_domains.split(',').map((d) => d.trim());
+      requestBody.include_domains = include_domains
+        .split(",")
+        .map((d) => d.trim());
     }
 
     if (exclude_domains) {
-      requestBody.exclude_domains = exclude_domains.split(',').map((d) => d.trim());
+      requestBody.exclude_domains = exclude_domains
+        .split(",")
+        .map((d) => d.trim());
     }
 
     const response = await fetch(TAVILY_API, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[SearchTool] Tavily API error:', {
+      logger.error("[SearchTool] Tavily API error:", {
         status: response.status,
         error: errorText,
       });
@@ -148,13 +171,16 @@ export const searchHandler: ToolHandler = async (context, params): Promise<ToolR
       },
     };
   } catch (error) {
-    console.error('[SearchTool] Error:', {
+    logger.error("[SearchTool] Error:", {
       query,
       error: error instanceof Error ? error.message : error,
     });
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Search failed due to unknown error',
+      error:
+        error instanceof Error
+          ? error.message
+          : "Search failed due to unknown error",
     };
   }
 };

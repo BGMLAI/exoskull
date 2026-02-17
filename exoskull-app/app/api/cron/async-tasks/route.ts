@@ -120,7 +120,7 @@ async function deliverResult(task: AsyncTask, text: string): Promise<void> {
       textLength: text.length,
     });
   } catch (error) {
-    console.error("[AsyncCRON] Delivery failed:", {
+    logger.error("[AsyncCRON] Delivery failed:", {
       taskId: task.id,
       channel,
       replyTo: reply_to,
@@ -222,7 +222,7 @@ async function processTask(task: AsyncTask): Promise<void> {
     });
   } catch (error) {
     const err = error as Error;
-    console.error("[AsyncCRON] Task failed:", {
+    logger.error("[AsyncCRON] Task failed:", {
       taskId: task.id,
       error: err.message,
       stack: err.stack,
@@ -239,7 +239,7 @@ async function processTask(task: AsyncTask): Promise<void> {
           "Przepraszam, nie udalo sie przetworzyc Twojego zapytania. Sprobuj powtorzyc pytanie prosciej.",
         );
       } catch (deliveryErr) {
-        console.error("[AsyncCRON] Failed to deliver error message:", {
+        logger.error("[AsyncCRON] Failed to deliver error message:", {
           taskId: task.id,
           error: (deliveryErr as Error).message,
         });
@@ -288,7 +288,7 @@ async function handler(req: NextRequest) {
       durationMs: Date.now() - startTime,
     });
   } catch (error) {
-    console.error("[AsyncCRON] Error:", error);
+    logger.error("[AsyncCRON] Error:", error);
     return NextResponse.json(
       {
         error: "Async task processing failed",

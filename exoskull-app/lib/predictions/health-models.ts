@@ -7,6 +7,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // CONFIGURABLE THRESHOLDS
 // ============================================================================
@@ -100,7 +101,7 @@ export async function loadHealthData(
     .order("date", { ascending: true });
 
   if (goldError) {
-    console.error("[HealthModels] Gold query failed:", {
+    logger.error("[HealthModels] Gold query failed:", {
       tenantId,
       error: goldError.message,
     });
@@ -116,7 +117,7 @@ export async function loadHealthData(
     .order("sleep_start", { ascending: true });
 
   if (sleepError) {
-    console.error("[HealthModels] Sleep query failed:", {
+    logger.error("[HealthModels] Sleep query failed:", {
       tenantId,
       error: sleepError.message,
     });

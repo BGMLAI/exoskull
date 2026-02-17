@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -58,7 +59,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[LoopConfigAPI] GET Error:", {
+    logger.error("[LoopConfigAPI] GET Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(
@@ -114,7 +115,7 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
       .eq("tenant_id", tenantId);
 
     if (error) {
-      console.error("[LoopConfigAPI] PATCH failed:", {
+      logger.error("[LoopConfigAPI] PATCH failed:", {
         userId: tenantId,
         error: error.message,
       });
@@ -126,7 +127,7 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ updated: updatePayload });
   } catch (error) {
-    console.error("[LoopConfigAPI] PATCH Error:", {
+    logger.error("[LoopConfigAPI] PATCH Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(

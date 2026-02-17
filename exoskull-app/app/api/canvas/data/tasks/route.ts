@@ -9,6 +9,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getTaskStats } from "@/lib/tasks/task-service";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -26,7 +27,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       lastUpdated: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("[Canvas] Tasks data error:", error);
+    logger.error("[Canvas] Tasks data error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

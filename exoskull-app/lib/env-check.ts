@@ -45,7 +45,7 @@ export function validateEnv(): void {
   }
 
   if (missing.length > 0) {
-    console.error(
+    logger.error(
       `[EnvCheck] CRITICAL: Missing required env vars: ${missing.join(", ")}`,
     );
   }

@@ -16,6 +16,7 @@ import {
   findTaskByTitle,
 } from "@/lib/tasks/task-service";
 
+import { logger } from "@/lib/logger";
 export const taskTools: ToolDefinition[] = [
   {
     definition: {
@@ -48,7 +49,7 @@ export const taskTools: ToolDefinition[] = [
 
         return `Dodano zadanie: "${input.title}"`;
       } catch (error) {
-        console.error("[TaskTools] add_task error:", error);
+        logger.error("[TaskTools] add_task error:", error);
         return `Błąd: nie udało się dodać zadania`;
       }
     },
@@ -82,13 +83,13 @@ export const taskTools: ToolDefinition[] = [
         const result = await completeTask(task.id, tenantId);
 
         if (!result.success) {
-          console.error("[TaskTools] complete_task error:", result.error);
+          logger.error("[TaskTools] complete_task error:", result.error);
           return `Błąd: nie udało się ukończyć zadania`;
         }
 
         return `Ukończono zadanie: "${task.title}"`;
       } catch (error) {
-        console.error("[TaskTools] complete_task error:", error);
+        logger.error("[TaskTools] complete_task error:", error);
         return `Błąd: nie udało się ukończyć zadania`;
       }
     },
@@ -122,7 +123,7 @@ export const taskTools: ToolDefinition[] = [
         const taskList = tasks.map((t) => t.title).join(", ");
         return `Masz ${tasks.length} zadań: ${taskList}`;
       } catch (error) {
-        console.error("[TaskTools] list_tasks error:", error);
+        logger.error("[TaskTools] list_tasks error:", error);
         return "Błąd: nie udało się pobrać listy zadań";
       }
     },

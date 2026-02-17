@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 type ProviderName = "anthropic" | "openai" | "gemini";
@@ -108,7 +109,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       providers: result,
     });
   } catch (error) {
-    console.error("[AIProvidersAPI] GET Error:", {
+    logger.error("[AIProvidersAPI] GET Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(
@@ -204,7 +205,7 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
       .eq("id", tenantId);
 
     if (error) {
-      console.error("[AIProvidersAPI] PATCH failed:", {
+      logger.error("[AIProvidersAPI] PATCH failed:", {
         userId: tenantId,
         error: error.message,
       });
@@ -262,7 +263,7 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
       providers: result,
     });
   } catch (error) {
-    console.error("[AIProvidersAPI] PATCH Error:", {
+    logger.error("[AIProvidersAPI] PATCH Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(

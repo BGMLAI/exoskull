@@ -60,7 +60,7 @@ export async function checkCircuitBreaker(
         .eq("tenant_id", tenantId);
 
       if (revokeError) {
-        console.error("[CircuitBreaker] Revoke failed:", {
+        logger.error("[CircuitBreaker] Revoke failed:", {
           error: revokeError.message,
           skillId,
         });
@@ -75,7 +75,7 @@ export async function checkCircuitBreaker(
 
     return { tripped: false };
   } catch (error) {
-    console.error("[CircuitBreaker] Check failed:", {
+    logger.error("[CircuitBreaker] Check failed:", {
       error: error instanceof Error ? error.message : error,
       skillId,
     });
@@ -124,7 +124,7 @@ export async function revokeUnhealthySkills(
 
     return { revokedCount: revoked.length, skills: revoked };
   } catch (error) {
-    console.error("[CircuitBreaker] Batch sweep failed:", error);
+    logger.error("[CircuitBreaker] Batch sweep failed:", error);
     return { revokedCount: 0, skills: [] };
   }
 }

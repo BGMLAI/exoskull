@@ -61,7 +61,7 @@ export const memoryTools: ToolDefinition[] = [
 
         return summaryText;
       } catch (summaryError) {
-        console.error("[MemoryTools] get_daily_summary error:", summaryError);
+        logger.error("[MemoryTools] get_daily_summary error:", summaryError);
         return "Nie udało się pobrać podsumowania dnia.";
       }
     },
@@ -122,7 +122,7 @@ export const memoryTools: ToolDefinition[] = [
           try {
             newSummary = await createDailySummary(tenantId);
           } catch (createErr) {
-            console.error("[MemoryTools] createDailySummary failed:", {
+            logger.error("[MemoryTools] createDailySummary failed:", {
               tenantId,
               error: createErr instanceof Error ? createErr.message : createErr,
             });
@@ -152,7 +152,7 @@ export const memoryTools: ToolDefinition[] = [
           return `Usunąłem z podsumowania: "${original}". Notuję!`;
         }
       } catch (corrError) {
-        console.error("[MemoryTools] correct_daily_summary error:", corrError);
+        logger.error("[MemoryTools] correct_daily_summary error:", corrError);
         return "Nie udało się zapisać korekty. Spróbuj jeszcze raz.";
       }
     },
@@ -204,7 +204,7 @@ export const memoryTools: ToolDefinition[] = [
 
         return formatUnifiedResultsForResponse(results, query);
       } catch (searchError) {
-        console.error("[MemoryTools] search_memory error:", searchError);
+        logger.error("[MemoryTools] search_memory error:", searchError);
         return `Nie udało się przeszukać pamięci. Spróbuj jeszcze raz.`;
       }
     },

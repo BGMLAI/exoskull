@@ -15,6 +15,7 @@
 
 import { aiChat, AIMessage, AIResponse } from "@/lib/ai";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -184,7 +185,7 @@ export async function runDebate(options: DebateOptions): Promise<DebateResult> {
   const rounds: DebateRound[] = [];
   let totalCost = 0;
 
-  console.info("[AgentDebate] Starting debate:", {
+  logger.info("[AgentDebate] Starting debate:", {
     question: options.question.slice(0, 100),
     agents: agents.map((a) => a.name),
     maxRounds,
@@ -279,7 +280,7 @@ export async function runDebate(options: DebateOptions): Promise<DebateResult> {
     agentCount: agents.length,
   };
 
-  console.info("[AgentDebate] Debate complete:", {
+  logger.info("[AgentDebate] Debate complete:", {
     rounds: rounds.length,
     durationMs: result.totalDurationMs,
     cost: `$${totalCost.toFixed(4)}`,

@@ -98,7 +98,7 @@ export class MAPEKLoop {
     } catch (err) {
       success = false;
       error = err instanceof Error ? err.message : String(err);
-      console.error(`[MAPE-K] Cycle ${cycleId} failed:`, err);
+      logger.error(`[MAPE-K] Cycle ${cycleId} failed:`, err);
 
       // Set defaults for failed phases
       monitor = monitor! || getDefaultMonitorData();

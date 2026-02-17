@@ -22,6 +22,7 @@ import {
 } from "../types";
 import { calculateCost } from "../config";
 
+import { logger } from "@/lib/logger";
 const CODEX_MODEL = "codex-mini-latest";
 
 export class CodexProvider implements IAIProvider {
@@ -125,7 +126,7 @@ export class CodexProvider implements IAIProvider {
 
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      console.error("[CodexProvider] Chat failed:", {
+      logger.error("[CodexProvider] Chat failed:", {
         error: errorMessage,
         model,
         tenantId: options.tenantId,

@@ -11,6 +11,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { processDocument } from "@/lib/knowledge/document-processor";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 min for Pro plan
 
@@ -46,7 +47,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       .limit(limit);
 
     if (error) {
-      console.error("[Reprocess] Query failed:", error.message);
+      logger.error("[Reprocess] Query failed:", error.message);
       return NextResponse.json(
         { error: "Failed to query documents" },
         { status: 500 },
@@ -109,7 +110,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       results,
     });
   } catch (error) {
-    console.error("[Reprocess] Error:", error);
+    logger.error("[Reprocess] Error:", error);
     return NextResponse.json(
       { error: "Failed to reprocess documents" },
       { status: 500 },

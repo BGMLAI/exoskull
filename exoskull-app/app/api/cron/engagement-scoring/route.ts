@@ -34,7 +34,7 @@ async function handler(req: NextRequest) {
         await triggerReengagement(user.tenant_id);
         reengagementsTriggered++;
       } catch (error) {
-        console.error("[EngagementCron] Reengagement trigger error:", {
+        logger.error("[EngagementCron] Reengagement trigger error:", {
           error: error instanceof Error ? error.message : String(error),
           tenantId: user.tenant_id,
         });
@@ -61,7 +61,7 @@ async function handler(req: NextRequest) {
     });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error("[EngagementCron] Failed:", { error: errorMsg });
+    logger.error("[EngagementCron] Failed:", { error: errorMsg });
     return NextResponse.json(
       { status: "failed", error: errorMsg },
       { status: 500 },

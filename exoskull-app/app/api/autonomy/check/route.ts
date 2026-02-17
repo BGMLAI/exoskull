@@ -69,7 +69,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
     });
 
     if (error) {
-      console.error("[Autonomy Check] RPC error:", error);
+      logger.error("[Autonomy Check] RPC error:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
@@ -106,7 +106,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       reason: isGranted ? null : reason,
     });
   } catch (error) {
-    console.error("[Autonomy Check] error:", error);
+    logger.error("[Autonomy Check] error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
@@ -156,7 +156,7 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
     });
 
     if (error) {
-      console.error("[Autonomy Check] Record error RPC failed:", error);
+      logger.error("[Autonomy Check] Record error RPC failed:", error);
       return NextResponse.json({ error: "Database error" }, { status: 500 });
     }
 
@@ -166,7 +166,7 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[Autonomy Check] PATCH error:", error);
+    logger.error("[Autonomy Check] PATCH error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },

@@ -21,6 +21,7 @@ import type {
   ActivityClass,
 } from "./loop-types";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // EVENT BUS OPERATIONS
 // ============================================================================
@@ -40,7 +41,7 @@ export async function claimUrgentEvent(
   });
 
   if (error) {
-    console.error("[Petla] Failed to claim urgent event:", {
+    logger.error("[Petla] Failed to claim urgent event:", {
       error: error.message,
       workerId,
     });
@@ -106,7 +107,7 @@ export async function batchEnqueueEvents(
         enqueued++;
       }
     } catch (err) {
-      console.error("[Petla] Failed to enqueue event:", {
+      logger.error("[Petla] Failed to enqueue event:", {
         eventId: event.id,
         error: err instanceof Error ? err.message : err,
       });
@@ -147,7 +148,7 @@ export async function claimQueuedWork(
   });
 
   if (error) {
-    console.error("[Petla] Failed to claim work:", {
+    logger.error("[Petla] Failed to claim work:", {
       error: error.message,
       workerId,
       subLoops,
@@ -239,7 +240,7 @@ export async function getTenantsDueForEval(
   });
 
   if (error) {
-    console.error("[Petla] Failed to get tenants for eval:", {
+    logger.error("[Petla] Failed to get tenants for eval:", {
       error: error.message,
     });
     return [];
@@ -355,7 +356,7 @@ export async function updateTenantLoopState(
   });
 
   if (error) {
-    console.error("[Petla] Failed to update tenant loop state:", {
+    logger.error("[Petla] Failed to update tenant loop state:", {
       tenantId,
       error: error.message,
     });
@@ -385,7 +386,7 @@ export async function resetDailyBudgets(): Promise<number> {
     .select("tenant_id");
 
   if (error) {
-    console.error("[Petla] Failed to reset daily budgets:", {
+    logger.error("[Petla] Failed to reset daily budgets:", {
       error: error.message,
     });
     return 0;
@@ -446,7 +447,7 @@ export async function pruneOldEvents(daysOld = 7): Promise<number> {
     .select("id");
 
   if (error) {
-    console.error("[Petla] Failed to prune old events:", {
+    logger.error("[Petla] Failed to prune old events:", {
       error: error.message,
     });
     return 0;
@@ -489,7 +490,7 @@ export async function backfillMissingConfigs(): Promise<number> {
 
     if (!error) backfilled++;
     else if (error.code !== "23505") {
-      console.error("[Petla] Backfill failed for tenant:", {
+      logger.error("[Petla] Backfill failed for tenant:", {
         tenantId: tenant.id,
         error: error.message,
       });
@@ -516,7 +517,7 @@ export async function pruneOldWorkItems(daysOld = 7): Promise<number> {
     .select("id");
 
   if (error) {
-    console.error("[Petla] Failed to prune old work items:", {
+    logger.error("[Petla] Failed to prune old work items:", {
       error: error.message,
     });
     return 0;
@@ -554,7 +555,7 @@ export async function emitEvent(params: {
   });
 
   if (error) {
-    console.error("[Petla] Failed to emit event:", {
+    logger.error("[Petla] Failed to emit event:", {
       error: error.message,
       tenantId: params.tenantId,
       eventType: params.eventType,

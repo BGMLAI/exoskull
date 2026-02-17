@@ -9,6 +9,7 @@
 
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -76,7 +77,7 @@ export async function callUser(
     return { success: false, error: "No phone number configured for user" };
   }
 
-  console.info("[OutboundCaller:start]", {
+  logger.info("[OutboundCaller:start]", {
     tenantId: req.tenantId.slice(0, 8),
     reason: req.reason,
     priority: req.priority,
@@ -111,7 +112,7 @@ export async function callUser(
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("[OutboundCaller:failed]", {
+      logger.error("[OutboundCaller:failed]", {
         status: response.status,
         body: errText,
       });
@@ -132,14 +133,14 @@ export async function callUser(
       status: "initiated",
     });
 
-    console.info("[OutboundCaller:success]", {
+    logger.info("[OutboundCaller:success]", {
       tenantId: req.tenantId.slice(0, 8),
       callId: data.id,
     });
 
     return { success: true, callId: data.id };
   } catch (err) {
-    console.error("[OutboundCaller:error]", err);
+    logger.error("[OutboundCaller:error]", err);
     return {
       success: false,
       error: err instanceof Error ? err.message : "Unknown error",

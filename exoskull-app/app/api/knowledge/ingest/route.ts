@@ -23,6 +23,7 @@ import { storeChunksWithEmbeddings } from "@/lib/memory/vector-store";
 import { processContentForGraph } from "@/lib/memory/knowledge-graph";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ============================================================================
@@ -178,7 +179,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     // Start async processing (fire-and-forget)
     processIngestion(tenantId, job.id, body).catch((err) => {
-      console.error("[Ingest] Pipeline error:", err);
+      logger.error("[Ingest] Pipeline error:", err);
     });
 
     return NextResponse.json({
@@ -344,7 +345,7 @@ async function processIngestion(
           totalEntities += graphResult.entities;
           totalRelationships += graphResult.relationships;
         } catch (err) {
-          console.warn(
+          logger.warn(
             `[Ingest] Graph extraction failed for segment ${i}:`,
             err,
           );
@@ -369,7 +370,7 @@ async function processIngestion(
       step_label: "Ingestion complete",
     });
 
-    console.info("[Ingest] Pipeline completed:", {
+    logger.info("[Ingest] Pipeline completed:", {
       jobId,
       tenantId: tenantId.slice(0, 8),
       source: sourceName,
@@ -378,7 +379,7 @@ async function processIngestion(
     });
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : "Unknown error";
-    console.error("[Ingest] Pipeline failed:", { jobId, error: errMsg });
+    logger.error("[Ingest] Pipeline failed:", { jobId, error: errMsg });
 
     await updateJob({
       status: "failed",

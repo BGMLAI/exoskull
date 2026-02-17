@@ -92,7 +92,7 @@ async function checkOverdueTasks(
     );
     if (sent.success) result.messagesSent = 1;
   } catch (error) {
-    console.error("[Impulse] checkOverdueTasks error:", {
+    logger.error("[Impulse] checkOverdueTasks error:", {
       tenantId,
       error: error instanceof Error ? error.message : error,
     });
@@ -186,7 +186,7 @@ async function checkUndeliveredInsights(
     );
     if (sent.success) result.messagesSent = 1;
   } catch (error) {
-    console.error("[Impulse] checkUndeliveredInsights error:", {
+    logger.error("[Impulse] checkUndeliveredInsights error:", {
       tenantId,
       error: error instanceof Error ? error.message : error,
     });
@@ -224,7 +224,7 @@ async function checkGoalDeadlines(
       .gte("target_date", new Date().toISOString().split("T")[0]);
 
     if (error) {
-      console.error("[Impulse] Goal deadlines query failed:", {
+      logger.error("[Impulse] Goal deadlines query failed:", {
         tenantId,
         error: error.message,
       });
@@ -269,7 +269,7 @@ async function checkGoalDeadlines(
     );
     if (sent.success) result.messagesSent = 1;
   } catch (error) {
-    console.error("[Impulse] checkGoalDeadlines error:", {
+    logger.error("[Impulse] checkGoalDeadlines error:", {
       tenantId,
       error: error instanceof Error ? error.message : error,
     });
@@ -303,7 +303,7 @@ async function checkPendingInterventions(
       .limit(3);
 
     if (error) {
-      console.error("[Impulse] Pending interventions query failed:", {
+      logger.error("[Impulse] Pending interventions query failed:", {
         tenantId,
         error: error.message,
       });
@@ -342,14 +342,14 @@ async function checkPendingInterventions(
           })
           .eq("id", intervention.id);
       } catch (err) {
-        console.error("[Impulse] Failed to execute intervention:", {
+        logger.error("[Impulse] Failed to execute intervention:", {
           interventionId: intervention.id,
           error: err instanceof Error ? err.message : err,
         });
       }
     }
   } catch (error) {
-    console.error("[Impulse] checkPendingInterventions error:", {
+    logger.error("[Impulse] checkPendingInterventions error:", {
       tenantId,
       error: error instanceof Error ? error.message : error,
     });
@@ -380,7 +380,7 @@ async function checkStaleEmailSync(tenantId: string): Promise<ActionResult> {
       .lt("last_sync_at", twoHoursAgo);
 
     if (error) {
-      console.error("[Impulse] Stale email sync query failed:", {
+      logger.error("[Impulse] Stale email sync query failed:", {
         tenantId,
         error: error.message,
       });
@@ -400,7 +400,7 @@ async function checkStaleEmailSync(tenantId: string): Promise<ActionResult> {
       });
     }
   } catch (error) {
-    console.error("[Impulse] checkStaleEmailSync error:", {
+    logger.error("[Impulse] checkStaleEmailSync error:", {
       tenantId,
       error: error instanceof Error ? error.message : error,
     });
@@ -645,7 +645,7 @@ async function checkSystemDevelopment(
           });
 
           if (!appResult.success) {
-            console.error("[Impulse] App build failed:", {
+            logger.error("[Impulse] App build failed:", {
               tenantId,
               gapId: gap.id,
               error: appResult.error,
@@ -722,7 +722,7 @@ async function checkSystemDevelopment(
           }
 
           if (goalsCreated === 0) {
-            console.error("[Impulse] Goals creation failed:", { tenantId });
+            logger.error("[Impulse] Goals creation failed:", { tenantId });
             continue;
           }
 
@@ -742,7 +742,7 @@ async function checkSystemDevelopment(
           });
 
           if (!taskResult.id) {
-            console.error("[Impulse] Task creation failed:", {
+            logger.error("[Impulse] Task creation failed:", {
               tenantId,
               error: taskResult.error,
             });
@@ -777,7 +777,7 @@ async function checkSystemDevelopment(
         // One action per cycle per tenant
         break;
       } catch (err) {
-        console.error("[Impulse] Gap action failed:", {
+        logger.error("[Impulse] Gap action failed:", {
           tenantId,
           gapId: gap.id,
           error: err instanceof Error ? err.message : err,
@@ -785,7 +785,7 @@ async function checkSystemDevelopment(
       }
     }
   } catch (error) {
-    console.error("[Impulse] checkSystemDevelopment error:", {
+    logger.error("[Impulse] checkSystemDevelopment error:", {
       tenantId,
       error: error instanceof Error ? error.message : error,
     });
@@ -899,7 +899,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
         totals.totalMessagesSent += suggestResult.messagesSent;
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.error(`[Impulse] Error processing tenant ${tenant.id}:`, {
+        logger.error(`[Impulse] Error processing tenant ${tenant.id}:`, {
           error: msg,
         });
         totals.errors.push(`${tenant.id}: ${msg}`);
@@ -923,7 +923,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    console.error("[Impulse] CRON fatal error:", { error: msg });
+    logger.error("[Impulse] CRON fatal error:", { error: msg });
     return NextResponse.json(
       {
         error: "Impulse CRON failed",

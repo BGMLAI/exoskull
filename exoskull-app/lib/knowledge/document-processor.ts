@@ -58,7 +58,7 @@ export async function processDocument(
     .single();
 
   if (docError || !doc) {
-    console.error("[DocProcessor] Document not found:", {
+    logger.error("[DocProcessor] Document not found:", {
       documentId,
       docError,
     });
@@ -161,7 +161,7 @@ export async function processDocument(
     try {
       summary = await generateSummary(extractedText, doc.original_name);
     } catch (err) {
-      console.error("[DocProcessor] Summary generation failed:", err);
+      logger.error("[DocProcessor] Summary generation failed:", err);
       summary = extractedText.slice(0, 300) + "...";
     }
 
@@ -247,7 +247,7 @@ export async function processDocument(
         .insert(batch);
 
       if (insertError) {
-        console.error("[DocProcessor] Chunk insert failed:", {
+        logger.error("[DocProcessor] Chunk insert failed:", {
           batch: i,
           error: insertError.message,
         });
@@ -300,7 +300,7 @@ export async function processDocument(
           .insert(batch);
 
         if (vectorInsertError) {
-          console.error("[DocProcessor] Vector insert failed:", {
+          logger.error("[DocProcessor] Vector insert failed:", {
             batch: i,
             error: vectorInsertError.message,
           });
@@ -339,7 +339,7 @@ export async function processDocument(
           step_label: `${graphResult.entities} entities, ${graphResult.relationships} relationships`,
         });
       } catch (graphErr) {
-        console.warn("[DocProcessor] Graph extraction failed:", graphErr);
+        logger.warn("[DocProcessor] Graph extraction failed:", graphErr);
         await updateIngestionJob({
           step_label: "Graph extraction skipped (non-critical error)",
         });
@@ -371,7 +371,7 @@ export async function processDocument(
     return { success: true, chunks: textChunks.length };
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : "Unknown error";
-    console.error("[DocProcessor] Processing failed:", {
+    logger.error("[DocProcessor] Processing failed:", {
       documentId,
       error: errMsg,
     });
@@ -645,7 +645,7 @@ export async function searchDocuments(
     });
 
     if (error) {
-      console.error("[DocProcessor] Vector search RPC failed:", {
+      logger.error("[DocProcessor] Vector search RPC failed:", {
         tenantId,
         error: error.message,
       });
@@ -762,7 +762,7 @@ export async function searchDocuments(
       similarity: 0.5, // synthetic score for keyword match
     }));
   } catch (fallbackErr) {
-    console.error("[DocProcessor] Keyword fallback failed:", {
+    logger.error("[DocProcessor] Keyword fallback failed:", {
       tenantId,
       error: fallbackErr instanceof Error ? fallbackErr.message : fallbackErr,
     });

@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 /**
  * Video Generator
  *
@@ -201,7 +203,7 @@ function selectProvider(quality: VideoQuality): VideoProvider {
 export async function generateVideo(req: VideoRequest): Promise<VideoResult> {
   const provider = req.provider || selectProvider(req.quality || "standard");
 
-  console.info("[VideoGen:start]", {
+  logger.info("[VideoGen:start]", {
     provider,
     quality: req.quality,
     duration: req.durationSeconds,
@@ -220,7 +222,7 @@ export async function generateVideo(req: VideoRequest): Promise<VideoResult> {
   } catch (err) {
     // Fallback chain: kling → minimax
     if (provider === "kling") {
-      console.warn("[VideoGen:klingFailed:fallbackMinimax]", err);
+      logger.warn("[VideoGen:klingFailed:fallbackMinimax]", err);
       try {
         return await generateMinimax(req);
       } catch {

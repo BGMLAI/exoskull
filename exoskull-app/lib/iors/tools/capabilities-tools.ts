@@ -7,6 +7,7 @@
 
 import type { ToolDefinition } from "./shared";
 
+import { logger } from "@/lib/logger";
 export const capabilitiesTools: ToolDefinition[] = [
   // ── analyze_image ──────────────────────────────────────────────────────────
   {
@@ -52,7 +53,7 @@ export const capabilitiesTools: ToolDefinition[] = [
 
         return `[Analiza obrazu — ${result.model}, ${result.durationMs}ms, ~$${result.estimatedCost.toFixed(4)}]\n\n${result.text}`;
       } catch (error) {
-        console.error("[IORS:analyze_image] Failed:", {
+        logger.error("[IORS:analyze_image] Failed:", {
           error: error instanceof Error ? error.message : error,
           tenantId,
         });
@@ -95,7 +96,7 @@ export const capabilitiesTools: ToolDefinition[] = [
         const text = await extractTextFromImage(imageUrl, tenantId);
         return text || "Nie znaleziono tekstu w obrazie.";
       } catch (error) {
-        console.error("[IORS:extract_image_text] Failed:", {
+        logger.error("[IORS:extract_image_text] Failed:", {
           error: error instanceof Error ? error.message : error,
           tenantId,
         });
@@ -146,7 +147,7 @@ export const capabilitiesTools: ToolDefinition[] = [
         const result = await classifyText(text, categories, tenantId);
         return JSON.stringify(result, null, 2);
       } catch (error) {
-        console.error("[IORS:classify_text] Failed:", {
+        logger.error("[IORS:classify_text] Failed:", {
           error: error instanceof Error ? error.message : error,
           tenantId,
         });

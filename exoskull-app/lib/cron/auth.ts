@@ -7,6 +7,7 @@
 
 import { NextRequest } from "next/server";
 
+import { logger } from "@/lib/logger";
 /**
  * Verify CRON authorization.
  * Accepts: Authorization Bearer token OR x-cron-secret header.
@@ -16,7 +17,7 @@ import { NextRequest } from "next/server";
 export function verifyCronAuth(req: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
-    console.error(
+    logger.error(
       "[CronAuth] CRITICAL: CRON_SECRET env var not set — rejecting request",
     );
     return false;

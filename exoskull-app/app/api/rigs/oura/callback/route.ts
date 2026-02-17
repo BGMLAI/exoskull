@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { exchangeCodeForTokens, getOAuthConfig } from "@/lib/rigs/oauth";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const RIG_SLUG = "oura";
@@ -19,7 +20,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     const errorDescription = searchParams.get("error_description");
 
     if (error) {
-      console.error("[Oura OAuth] Error:", error, errorDescription);
+      logger.error("[Oura OAuth] Error:", error, errorDescription);
       return NextResponse.redirect(
         new URL(
           `/dashboard/mods/${RIG_SLUG}?error=${encodeURIComponent(
@@ -57,14 +58,14 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       .single();
 
     if (connError || !connection) {
-      console.error("[Oura OAuth] Connection not found:", connError);
+      logger.error("[Oura OAuth] Connection not found:", connError);
       return NextResponse.redirect(
         new URL(`/dashboard/mods/${RIG_SLUG}?error=invalid_state`, request.url),
       );
     }
 
     if (connection.metadata?.oauth_state !== state) {
-      console.error("[Oura OAuth] State mismatch");
+      logger.error("[Oura OAuth] State mismatch");
       return NextResponse.redirect(
         new URL(
           `/dashboard/mods/${RIG_SLUG}?error=state_mismatch`,
@@ -87,7 +88,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     try {
       tokens = await exchangeCodeForTokens(config, code);
     } catch (tokenError) {
-      console.error("[Oura OAuth] Token exchange failed:", tokenError);
+      logger.error("[Oura OAuth] Token exchange failed:", tokenError);
       return NextResponse.redirect(
         new URL(
           `/dashboard/mods/${RIG_SLUG}?error=token_exchange_failed`,
@@ -119,7 +120,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       .eq("id", connection.id);
 
     if (updateError) {
-      console.error("[Oura OAuth] Failed to save tokens:", updateError);
+      logger.error("[Oura OAuth] Failed to save tokens:", updateError);
       return NextResponse.redirect(
         new URL(`/dashboard/mods/${RIG_SLUG}?error=save_failed`, request.url),
       );
@@ -147,7 +148,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       new URL(`/dashboard/mods/${RIG_SLUG}?connected=true`, request.url),
     );
   } catch (error) {
-    console.error("[Oura OAuth] Callback error:", error);
+    logger.error("[Oura OAuth] Callback error:", error);
     return NextResponse.redirect(
       new URL(`/dashboard/mods/${RIG_SLUG}?error=internal_error`, request.url),
     );

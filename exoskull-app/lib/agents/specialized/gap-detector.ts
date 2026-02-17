@@ -493,7 +493,7 @@ export class GapDetectorAgent extends BaseAgent {
         });
         count++;
       } catch (error) {
-        console.error(
+        logger.error(
           `[GapDetector] Failed to create intervention for ${gap.area.slug}:`,
           error,
         );

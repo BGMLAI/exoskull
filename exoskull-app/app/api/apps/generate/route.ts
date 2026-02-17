@@ -7,6 +7,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { generateApp } from "@/lib/apps/generator/app-generator";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const POST = withApiLog(async function POST(request: NextRequest) {
@@ -40,7 +41,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     return NextResponse.json({ app: result.app }, { status: 201 });
   } catch (error) {
-    console.error("[AppGenerate] Error:", error);
+    logger.error("[AppGenerate] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

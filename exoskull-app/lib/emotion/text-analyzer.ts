@@ -16,6 +16,7 @@ import type {
   VoiceFeatures,
 } from "./types";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // CRISIS KEYWORD LISTS
 // ============================================================================
@@ -313,12 +314,12 @@ async function analyzeWithHuggingFace(
   } catch (error) {
     // AbortError = timeout — fall back to keyword analysis silently
     if (error instanceof Error && error.name === "AbortError") {
-      console.warn(
+      logger.warn(
         "[EmotionAnalyzer] HuggingFace timed out (1.5s), using keyword fallback",
       );
       return null;
     }
-    console.error("[EmotionAnalyzer] HuggingFace error:", error);
+    logger.error("[EmotionAnalyzer] HuggingFace error:", error);
     return null;
   }
 }

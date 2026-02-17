@@ -11,6 +11,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import OpenAI from "openai";
 import type { AnalyzedEmail, KeyFact } from "./types";
 
+import { logger } from "@/lib/logger";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY!;
 const EMBEDDING_MODEL = "text-embedding-3-small";
 
@@ -56,7 +57,7 @@ export async function extractKnowledge(
     .single();
 
   if (docError || !doc) {
-    console.error(
+    logger.error(
       "[KnowledgeExtractor] Failed to create document:",
       docError?.message,
     );
@@ -74,7 +75,7 @@ ${worthyFacts.map((f, i) => `${i + 1}. ${f.fact}`).join("\n")}`;
 
   // Generate embedding
   if (!OPENAI_API_KEY) {
-    console.error("[KnowledgeExtractor] Missing OPENAI_API_KEY");
+    logger.error("[KnowledgeExtractor] Missing OPENAI_API_KEY");
     return 0;
   }
 
@@ -100,7 +101,7 @@ ${worthyFacts.map((f, i) => `${i + 1}. ${f.fact}`).join("\n")}`;
       });
 
     if (chunkError) {
-      console.error(
+      logger.error(
         "[KnowledgeExtractor] Chunk insert failed:",
         chunkError.message,
       );
@@ -124,7 +125,7 @@ ${worthyFacts.map((f, i) => `${i + 1}. ${f.fact}`).join("\n")}`;
 
     return 1;
   } catch (err) {
-    console.error("[KnowledgeExtractor] Embedding generation failed:", {
+    logger.error("[KnowledgeExtractor] Embedding generation failed:", {
       error: err instanceof Error ? err.message : err,
     });
     return 0;

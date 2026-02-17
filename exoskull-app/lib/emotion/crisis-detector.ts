@@ -131,7 +131,7 @@ Respond ONLY with valid JSON:
     const cleaned = response.replace(/```json\n?|\n?```/g, "").trim();
     return JSON.parse(cleaned);
   } catch (error) {
-    console.error("[CrisisDetector] AI assessment failed:", error);
+    logger.error("[CrisisDetector] AI assessment failed:", error);
     return { is_crisis: false, type: null, severity: "medium", confidence: 0 };
   }
 }

@@ -12,6 +12,7 @@ import { executeInSandbox } from "../sandbox/restricted-function";
 import { logExecution } from "../sandbox/execution-logger";
 import { IModExecutor, ModInsight, ModAction } from "@/lib/mods/types";
 
+import { logger } from "@/lib/logger";
 // Cache: slug -> { skill, loadedAt }
 const skillCache = new Map<
   string,
@@ -65,13 +66,13 @@ export async function getActiveSkillsForTenant(
     });
 
     if (error) {
-      console.error("[DynamicRegistry] Failed to load active skills:", error);
+      logger.error("[DynamicRegistry] Failed to load active skills:", error);
       return [];
     }
 
     return (data || []) as GeneratedSkill[];
   } catch (error) {
-    console.error("[DynamicRegistry] Error:", error);
+    logger.error("[DynamicRegistry] Error:", error);
     return [];
   }
 }
@@ -132,7 +133,7 @@ async function loadSkill(
     skillCache.set(cacheKey, { skill, loadedAt: Date.now() });
     return skill;
   } catch (error) {
-    console.error("[DynamicRegistry] Failed to load skill:", {
+    logger.error("[DynamicRegistry] Failed to load skill:", {
       slug,
       tenantId,
       error,

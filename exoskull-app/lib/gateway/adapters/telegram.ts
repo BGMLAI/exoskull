@@ -104,7 +104,7 @@ export const telegramAdapter: ChannelAdapter = {
 
   async sendResponse(to: string, text: string): Promise<void> {
     if (!TELEGRAM_BOT_TOKEN) {
-      console.error("[Telegram] TELEGRAM_BOT_TOKEN not set");
+      logger.error("[Telegram] TELEGRAM_BOT_TOKEN not set");
       return;
     }
 
@@ -124,7 +124,7 @@ export const telegramAdapter: ChannelAdapter = {
 
       if (!response.ok) {
         const errorBody = await response.text();
-        console.error("[Telegram] sendMessage failed:", {
+        logger.error("[Telegram] sendMessage failed:", {
           chatId: to,
           status: response.status,
           error: errorBody,
@@ -155,9 +155,7 @@ export async function setupTelegramWebhook(
   webhookUrl: string,
 ): Promise<boolean> {
   if (!TELEGRAM_BOT_TOKEN) {
-    console.error(
-      "[Telegram] Cannot setup webhook: TELEGRAM_BOT_TOKEN not set",
-    );
+    logger.error("[Telegram] Cannot setup webhook: TELEGRAM_BOT_TOKEN not set");
     return false;
   }
 

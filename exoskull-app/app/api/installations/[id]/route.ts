@@ -3,6 +3,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/installations/[id] - Get single installation details
@@ -55,7 +56,7 @@ export const GET = withApiLog(async function GET(
       connection,
     });
   } catch (error) {
-    console.error("[Installations] Unexpected error:", error);
+    logger.error("[Installations] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -101,7 +102,7 @@ export const PATCH = withApiLog(async function PATCH(
       .single();
 
     if (error) {
-      console.error("[Installations] Update error:", error);
+      logger.error("[Installations] Update error:", error);
       return NextResponse.json(
         { error: "Failed to update installation" },
         { status: 500 },
@@ -113,7 +114,7 @@ export const PATCH = withApiLog(async function PATCH(
       installation,
     });
   } catch (error) {
-    console.error("[Installations] Unexpected error:", error);
+    logger.error("[Installations] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -157,7 +158,7 @@ export const DELETE = withApiLog(async function DELETE(
       .eq("tenant_id", tenantId);
 
     if (error) {
-      console.error("[Installations] Delete error:", error);
+      logger.error("[Installations] Delete error:", error);
       return NextResponse.json(
         { error: "Failed to uninstall" },
         { status: 500 },
@@ -179,7 +180,7 @@ export const DELETE = withApiLog(async function DELETE(
       message: `${installation.registry?.name} uninstalled`,
     });
   } catch (error) {
-    console.error("[Installations] Unexpected error:", error);
+    logger.error("[Installations] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

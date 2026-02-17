@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
+import { logger } from "@/lib/logger";
 export interface AdminUser {
   userId: string;
   role: "admin" | "super_admin";
@@ -49,7 +50,7 @@ export async function verifyAdmin(): Promise<AdminUser | null> {
       role: admin.role as "admin" | "super_admin",
     };
   } catch (error) {
-    console.error("[AdminAuth] Verification failed:", error);
+    logger.error("[AdminAuth] Verification failed:", error);
     return null;
   }
 }

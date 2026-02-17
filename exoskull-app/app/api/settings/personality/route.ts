@@ -11,6 +11,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { DEFAULT_PERSONALITY } from "@/lib/iors/types";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -29,7 +30,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[PersonalityAPI] GET failed:", {
+      logger.error("[PersonalityAPI] GET failed:", {
         userId: tenantId,
         error: error.message,
       });
@@ -47,7 +48,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       systemPromptOverride: t?.iors_system_prompt_override ?? null,
     });
   } catch (error) {
-    console.error("[PersonalityAPI] GET Error:", {
+    logger.error("[PersonalityAPI] GET Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(
@@ -190,7 +191,7 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
       .eq("id", tenantId);
 
     if (error) {
-      console.error("[PersonalityAPI] Update failed:", {
+      logger.error("[PersonalityAPI] Update failed:", {
         userId: tenantId,
         error: error.message,
       });
@@ -212,7 +213,7 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
         tenant?.iors_system_prompt_override,
     });
   } catch (error) {
-    console.error("[PersonalityAPI] Error:", {
+    logger.error("[PersonalityAPI] Error:", {
       error: error instanceof Error ? error.message : error,
     });
     return NextResponse.json(

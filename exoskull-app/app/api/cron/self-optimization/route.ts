@@ -69,7 +69,7 @@ async function handler(req: NextRequest) {
         } else {
           results.cyclesFailed++;
           if (cycleResult?.error) {
-            console.error(
+            logger.error(
               `[SelfOptimization] Cycle failed for tenant ${tenant.id}:`,
               cycleResult.error,
             );
@@ -78,7 +78,7 @@ async function handler(req: NextRequest) {
       } catch (error) {
         results.errors++;
         results.cyclesFailed++;
-        console.error(
+        logger.error(
           `[SelfOptimization] Error for tenant ${tenant.id}:`,
           error instanceof Error ? error.message : error,
         );
@@ -98,7 +98,7 @@ async function handler(req: NextRequest) {
       durationMs: duration,
     });
   } catch (error) {
-    console.error("[SelfOptimization] CRON error:", error);
+    logger.error("[SelfOptimization] CRON error:", error);
     return NextResponse.json(
       {
         error: "Self-optimization failed",

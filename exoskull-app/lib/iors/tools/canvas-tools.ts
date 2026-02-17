@@ -8,6 +8,7 @@
 import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 export const canvasTools: ToolDefinition[] = [
   {
     definition: {
@@ -90,7 +91,7 @@ export const canvasTools: ToolDefinition[] = [
             });
 
             if (error) {
-              console.error("[CanvasTools] Add failed:", {
+              logger.error("[CanvasTools] Add failed:", {
                 tenantId,
                 widgetType,
                 error: error.message,
@@ -170,7 +171,7 @@ export const canvasTools: ToolDefinition[] = [
             return `Nieznana akcja: ${action}. Uzyj: add, remove, show, hide.`;
         }
       } catch (error) {
-        console.error("[manage_canvas] Error:", {
+        logger.error("[manage_canvas] Error:", {
           action,
           widgetType,
           tenantId,

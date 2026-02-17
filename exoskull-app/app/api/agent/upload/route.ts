@@ -21,6 +21,7 @@ import {
 } from "@/lib/storage/r2-client";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // ---------------------------------------------------------------------------
@@ -190,7 +191,7 @@ async function handleGetUrl(
     const result = await getPresignedPutUrl(r2Key, mimeType, 3600);
     presignedUrl = result.url;
   } catch (error) {
-    console.error("[AgentUpload] R2 presigned URL failed:", error);
+    logger.error("[AgentUpload] R2 presigned URL failed:", error);
     return NextResponse.json(
       { error: "Failed to create upload URL" },
       { status: 500 },
@@ -215,7 +216,7 @@ async function handleGetUrl(
     .single();
 
   if (dbError) {
-    console.error("[AgentUpload] DB insert failed:", dbError);
+    logger.error("[AgentUpload] DB insert failed:", dbError);
     return NextResponse.json(
       { error: "Failed to create document record" },
       { status: 500 },
@@ -300,18 +301,18 @@ async function handleConfirm(
     .then(({ processDocument }) => processDocument(documentId, tenantId))
     .then((result) => {
       if (result.success) {
-        console.log(
+        logger.info(
           `[AgentUpload] Processed ${doc.original_name}: ${result.chunks} chunks`,
         );
       } else {
-        console.error(
+        logger.error(
           `[AgentUpload] Processing failed for ${doc.original_name}:`,
           result.error,
         );
       }
     })
     .catch((err) => {
-      console.error("[AgentUpload] Processing trigger failed:", err);
+      logger.error("[AgentUpload] Processing trigger failed:", err);
     });
 
   return NextResponse.json({
@@ -405,7 +406,7 @@ async function handleBatchStatus(
     .in("id", documentIds);
 
   if (docsError) {
-    console.error("[AgentUpload] Batch status failed:", docsError);
+    logger.error("[AgentUpload] Batch status failed:", docsError);
     return NextResponse.json(
       { error: "Failed to fetch document statuses" },
       { status: 500 },
@@ -456,7 +457,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         );
     }
   } catch (error) {
-    console.error("[AgentUpload] Error:", {
+    logger.error("[AgentUpload] Error:", {
       error: error instanceof Error ? error.message : error,
       userId: tenantId,
     });

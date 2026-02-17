@@ -18,6 +18,7 @@ import { ClaudeCodeAdapter } from "./adapters/claude-code";
 import { KimiCodeAdapter } from "./adapters/kimi-code";
 import { GPTo1CodeAdapter } from "./adapters/gpt-o1-code";
 
+import { logger } from "@/lib/logger";
 /**
  * Get executor instance for a model
  */
@@ -47,7 +48,7 @@ export async function executeCodeGeneration(
     // STEP 1: Route to best model
     const selectedModel = await routeCodeGeneration(task);
 
-    console.log("[CodeExecutor] Selected model:", selectedModel);
+    logger.info("[CodeExecutor] Selected model:", selectedModel);
 
     // STEP 2: Get executor
     const executor = getExecutor(selectedModel, task.tenantId);
@@ -57,35 +58,35 @@ export async function executeCodeGeneration(
 
     // STEP 4: Fallback if failed
     if (!result.success) {
-      console.warn(
+      logger.warn(
         `[CodeExecutor] ${selectedModel} failed, attempting fallback`,
       );
 
       // Fallback chain: Kimi/GPT-o1 → Claude Code
       if (selectedModel !== "claude-code") {
-        console.log("[CodeExecutor] Falling back to Claude Code");
+        logger.info("[CodeExecutor] Falling back to Claude Code");
         const fallbackExecutor = getExecutor("claude-code", task.tenantId);
         const fallbackResult = await fallbackExecutor.execute(task);
 
         if (fallbackResult.success) {
-          console.log("[CodeExecutor] Fallback succeeded");
+          logger.info("[CodeExecutor] Fallback succeeded");
           return fallbackResult;
         } else {
-          console.error("[CodeExecutor] Fallback also failed");
+          logger.error("[CodeExecutor] Fallback also failed");
           return fallbackResult;
         }
       } else {
         // Claude Code is primary - no fallback
-        console.error("[CodeExecutor] Claude Code failed (no fallback)");
+        logger.error("[CodeExecutor] Claude Code failed (no fallback)");
         return result;
       }
     }
 
-    console.log(`[CodeExecutor] Task completed in ${Date.now() - startTime}ms`);
+    logger.info(`[CodeExecutor] Task completed in ${Date.now() - startTime}ms`);
 
     return result;
   } catch (error) {
-    console.error("[CodeExecutor] Unexpected error:", error);
+    logger.error("[CodeExecutor] Unexpected error:", error);
 
     return {
       success: false,

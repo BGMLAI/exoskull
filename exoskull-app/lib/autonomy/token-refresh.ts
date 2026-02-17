@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { logIntegrationEvent } from "@/lib/autonomy/integration-health";
 import { dispatchReport } from "@/lib/reports/report-dispatcher";
 
+import { logger } from "@/lib/logger";
 export interface TokenRefreshResult {
   success: boolean;
   provider: "gmail" | "outlook";
@@ -44,7 +45,7 @@ async function refreshGmailToken(refreshToken: string): Promise<{
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error("[TokenRefresh] Gmail token refresh failed:", {
+      logger.error("[TokenRefresh] Gmail token refresh failed:", {
         status: response.status,
         error: errorData,
       });
@@ -57,7 +58,7 @@ async function refreshGmailToken(refreshToken: string): Promise<{
       expires_in: data.expires_in,
     };
   } catch (error) {
-    console.error("[TokenRefresh] Gmail token refresh error:", {
+    logger.error("[TokenRefresh] Gmail token refresh error:", {
       error: error instanceof Error ? error.message : String(error),
     });
     return null;
@@ -91,7 +92,7 @@ async function refreshOutlookToken(refreshToken: string): Promise<{
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error("[TokenRefresh] Outlook token refresh failed:", {
+      logger.error("[TokenRefresh] Outlook token refresh failed:", {
         status: response.status,
         error: errorData,
       });
@@ -104,7 +105,7 @@ async function refreshOutlookToken(refreshToken: string): Promise<{
       expires_in: data.expires_in,
     };
   } catch (error) {
-    console.error("[TokenRefresh] Outlook token refresh error:", {
+    logger.error("[TokenRefresh] Outlook token refresh error:", {
       error: error instanceof Error ? error.message : String(error),
     });
     return null;
@@ -172,7 +173,7 @@ export async function refreshAccountToken(
       .eq("id", accountId);
 
     if (error) {
-      console.error("[TokenRefresh] Failed to update database:", {
+      logger.error("[TokenRefresh] Failed to update database:", {
         accountId,
         error: error.message,
       });
@@ -202,7 +203,7 @@ export async function refreshAccountToken(
       duration_ms: durationMs,
     });
 
-    console.log("[TokenRefresh] Token refreshed successfully:", {
+    logger.info("[TokenRefresh] Token refreshed successfully:", {
       accountId,
       provider,
       expiresAt: newExpiresAt.toISOString(),
@@ -219,7 +220,7 @@ export async function refreshAccountToken(
     const durationMs = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
 
-    console.error("[TokenRefresh] Unexpected error:", {
+    logger.error("[TokenRefresh] Unexpected error:", {
       accountId,
       provider,
       error: errorMessage,
@@ -263,7 +264,7 @@ export async function checkAndRefreshExpiring(): Promise<TokenRefreshResult[]> {
       .not("refresh_token", "is", null);
 
     if (error) {
-      console.error(
+      logger.error(
         "[TokenRefresh] Failed to query expiring tokens:",
         error.message,
       );
@@ -271,11 +272,11 @@ export async function checkAndRefreshExpiring(): Promise<TokenRefreshResult[]> {
     }
 
     if (!accounts || accounts.length === 0) {
-      console.log("[TokenRefresh] No tokens expiring soon");
+      logger.info("[TokenRefresh] No tokens expiring soon");
       return [];
     }
 
-    console.log(
+    logger.info(
       `[TokenRefresh] Found ${accounts.length} tokens expiring soon, refreshing...`,
     );
 
@@ -296,13 +297,13 @@ export async function checkAndRefreshExpiring(): Promise<TokenRefreshResult[]> {
     const successCount = results.filter((r) => r.success).length;
     const failureCount = results.filter((r) => !r.success).length;
 
-    console.log(
+    logger.info(
       `[TokenRefresh] Refresh complete: ${successCount} success, ${failureCount} failures`,
     );
 
     return results;
   } catch (error) {
-    console.error("[TokenRefresh] checkAndRefreshExpiring error:", {
+    logger.error("[TokenRefresh] checkAndRefreshExpiring error:", {
       error: error instanceof Error ? error.message : String(error),
     });
     return [];
@@ -327,7 +328,7 @@ export async function getFreshAccessToken(
       .single();
 
     if (error || !account) {
-      console.error("[TokenRefresh] Account not found:", {
+      logger.error("[TokenRefresh] Account not found:", {
         accountId,
         error: error?.message,
       });
@@ -343,7 +344,7 @@ export async function getFreshAccessToken(
     }
 
     // Token expiring soon - refresh it
-    console.log("[TokenRefresh] Token expiring soon, refreshing...", {
+    logger.info("[TokenRefresh] Token expiring soon, refreshing...", {
       accountId,
       expiresAt: expiresAt.toISOString(),
     });
@@ -356,7 +357,7 @@ export async function getFreshAccessToken(
     );
 
     if (!result.success) {
-      console.error("[TokenRefresh] Refresh failed:", {
+      logger.error("[TokenRefresh] Refresh failed:", {
         accountId,
         error: result.error,
       });
@@ -365,7 +366,7 @@ export async function getFreshAccessToken(
 
     return result.newAccessToken!;
   } catch (error) {
-    console.error("[TokenRefresh] getFreshAccessToken error:", {
+    logger.error("[TokenRefresh] getFreshAccessToken error:", {
       accountId,
       error: error instanceof Error ? error.message : String(error),
     });

@@ -109,12 +109,12 @@ export const imessageAdapter: ChannelAdapter = {
 
   async sendResponse(to: string, text: string): Promise<void> {
     if (!BLUEBUBBLES_URL) {
-      console.error("[iMessage] BLUEBUBBLES_URL not set, cannot send");
+      logger.error("[iMessage] BLUEBUBBLES_URL not set, cannot send");
       return;
     }
 
     if (!BLUEBUBBLES_PASSWORD) {
-      console.error("[iMessage] BLUEBUBBLES_PASSWORD not set, cannot send");
+      logger.error("[iMessage] BLUEBUBBLES_PASSWORD not set, cannot send");
       return;
     }
 
@@ -134,14 +134,14 @@ export const imessageAdapter: ChannelAdapter = {
 
       if (!response.ok) {
         const errorBody = await response.text();
-        console.error("[iMessage] sendMessage failed:", {
+        logger.error("[iMessage] sendMessage failed:", {
           to,
           status: response.status,
           error: errorBody,
         });
       }
     } catch (error) {
-      console.error("[iMessage] sendMessage error:", {
+      logger.error("[iMessage] sendMessage error:", {
         to,
         error: (error as Error).message,
       });

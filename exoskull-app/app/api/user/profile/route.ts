@@ -39,7 +39,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       .single();
 
     if (profileError) {
-      console.error("[API:user/profile] Profile fetch error:", {
+      logger.error("[API:user/profile] Profile fetch error:", {
         error: profileError.message,
         userId: tenantId,
       });
@@ -48,7 +48,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
 
     return NextResponse.json({ profile });
   } catch (error) {
-    console.error("[API:user/profile] Unexpected error:", error);
+    logger.error("[API:user/profile] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
@@ -97,7 +97,7 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
       .single();
 
     if (updateError) {
-      console.error("[API:user/profile] Update error:", {
+      logger.error("[API:user/profile] Update error:", {
         error: updateError.message,
         userId: tenantId,
         updates: Object.keys(updates),
@@ -115,7 +115,7 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ profile });
   } catch (error) {
-    console.error("[API:user/profile] Unexpected error:", error);
+    logger.error("[API:user/profile] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

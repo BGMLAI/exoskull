@@ -17,6 +17,7 @@ import {
 } from "../prompts/code-gen-prompt";
 import { parseCodeResponse } from "../response-parser";
 
+import { logger } from "@/lib/logger";
 export class GPTo1CodeAdapter implements CodeExecutor {
   model = "gpt-o1-code" as const;
   capabilities = {
@@ -52,7 +53,7 @@ export class GPTo1CodeAdapter implements CodeExecutor {
       // o3-mini: no system role — merge into single user message
       const combined = `${buildCodeGenSystemPrompt()}\n\n---\n\n${buildCodeGenUserPrompt(task)}`;
 
-      console.log("[GPTo1Code] Generating:", {
+      logger.info("[GPTo1Code] Generating:", {
         tenantId: this.tenantId,
         desc: task.description.slice(0, 80),
       });
@@ -85,7 +86,7 @@ export class GPTo1CodeAdapter implements CodeExecutor {
         };
       }
 
-      console.log("[GPTo1Code] Generated:", {
+      logger.info("[GPTo1Code] Generated:", {
         files: parsed.files.length,
         tokens: response.usage?.completion_tokens,
         duration: Date.now() - startTime,
@@ -100,7 +101,7 @@ export class GPTo1CodeAdapter implements CodeExecutor {
         dependencies: parsed.dependencies,
       };
     } catch (error) {
-      console.error("[GPTo1Code] Failed:", {
+      logger.error("[GPTo1Code] Failed:", {
         error: error instanceof Error ? error.message : String(error),
       });
       return {

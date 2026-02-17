@@ -159,7 +159,7 @@ export async function notifyEmergencyContact(
 
     return { success: true, contactedName: contact.name };
   } catch (error) {
-    console.error("[EmergencyNotifier] Failed:", error);
+    logger.error("[EmergencyNotifier] Failed:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),

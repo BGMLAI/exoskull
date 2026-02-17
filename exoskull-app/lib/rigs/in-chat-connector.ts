@@ -56,7 +56,7 @@ export async function generateMagicConnectLink(
   );
 
   if (error) {
-    console.error("[InChatConnector] Failed to store magic token:", {
+    logger.error("[InChatConnector] Failed to store magic token:", {
       tenantId,
       rigSlug,
       error: error.message,

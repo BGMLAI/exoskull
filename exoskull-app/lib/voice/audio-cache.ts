@@ -185,13 +185,13 @@ export class AudioCache {
         });
 
       if (error) {
-        console.error(`Failed to upload audio for ${key}:`, error);
+        logger.error(`Failed to upload audio for ${key}:`, error);
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error(`Failed to upload audio for ${key}:`, error);
+      logger.error(`Failed to upload audio for ${key}:`, error);
       return false;
     }
   }

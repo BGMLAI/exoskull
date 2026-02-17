@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 /**
@@ -36,7 +37,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[Onboarding API] Error fetching status:", error);
+      logger.error("[Onboarding API] Error fetching status:", error);
       return NextResponse.json(
         { error: "Failed to fetch status" },
         { status: 500 },
@@ -59,7 +60,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       discoveryData: tenant?.discovery_data,
     });
   } catch (error) {
-    console.error("[Onboarding API] Unexpected error:", error);
+    logger.error("[Onboarding API] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

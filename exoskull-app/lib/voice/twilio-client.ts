@@ -403,7 +403,7 @@ export async function makeOutboundCall(options: OutboundCallOptions) {
       status: call.status,
     };
   } catch (error) {
-    console.error("[Twilio] Failed to initiate call:", error);
+    logger.error("[Twilio] Failed to initiate call:", error);
     throw error;
   }
 }

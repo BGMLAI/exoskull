@@ -77,16 +77,16 @@ export const skillGoalTools: ToolDefinition[] = [
         } else {
           // Generation failed — mark rejected so user can request again
           await updateSuggestionStatus(suggestionId, "rejected").catch((e) =>
-            console.error("[SkillGoalTools] Status rollback failed:", e),
+            logger.error("[SkillGoalTools] Status rollback failed:", e),
           );
           return `Nie udało się wygenerować skilla: ${result.error || "nieznany błąd"}. Spróbuję ponownie później.`;
         }
       } catch (error) {
         // Unexpected error — mark rejected to avoid stuck "accepted" state
         await updateSuggestionStatus(suggestionId, "rejected").catch((e) =>
-          console.error("[SkillGoalTools] Status rollback failed:", e),
+          logger.error("[SkillGoalTools] Status rollback failed:", e),
         );
-        console.error("[SkillGoalTools] accept_skill_suggestion error:", error);
+        logger.error("[SkillGoalTools] accept_skill_suggestion error:", error);
         return "Nie udało się zaakceptować sugestii. Spróbuj ponownie.";
       }
     },
@@ -118,10 +118,7 @@ export const skillGoalTools: ToolDefinition[] = [
         await updateSuggestionStatus(suggestionId, "rejected");
         return "Sugestia odrzucona. Nie będę więcej proponować tego skilla.";
       } catch (error) {
-        console.error(
-          "[SkillGoalTools] dismiss_skill_suggestion error:",
-          error,
-        );
+        logger.error("[SkillGoalTools] dismiss_skill_suggestion error:", error);
         return "Nie udało się odrzucić sugestii.";
       }
     },
@@ -172,7 +169,7 @@ export const skillGoalTools: ToolDefinition[] = [
           : "";
         return `Cel utworzony: "${goal.name}" (${goal.category}).${deadline} Będę śledzić Twój postęp i informować Cię regularnie.`;
       } catch (error) {
-        console.error("[SkillGoalTools] define_goal error:", error);
+        logger.error("[SkillGoalTools] define_goal error:", error);
         return "Nie udało się utworzyć celu. Spróbuj powiedzieć inaczej.";
       }
     },
@@ -229,7 +226,7 @@ export const skillGoalTools: ToolDefinition[] = [
               : "";
         return `Zapisano: ${input.value}.${progressText}${momentumText}`;
       } catch (error) {
-        console.error("[SkillGoalTools] log_goal_progress error:", error);
+        logger.error("[SkillGoalTools] log_goal_progress error:", error);
         return "Nie udało się zapisać postępu.";
       }
     },
@@ -250,7 +247,7 @@ export const skillGoalTools: ToolDefinition[] = [
       try {
         return await getGoalsForVoice(tenantId);
       } catch (error) {
-        console.error("[SkillGoalTools] check_goals error:", error);
+        logger.error("[SkillGoalTools] check_goals error:", error);
         return "Nie udało się pobrać celów.";
       }
     },

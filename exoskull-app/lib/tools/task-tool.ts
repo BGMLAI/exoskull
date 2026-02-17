@@ -11,6 +11,7 @@ import {
 } from "./types";
 import { TaskManagerExecutor } from "../mods/executors/task-manager";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // TOOL DEFINITION
 // =====================================================
@@ -174,7 +175,7 @@ export const taskHandler: ToolHandler = async (
         return { success: false, error: `Unknown action: ${action}` };
     }
   } catch (error) {
-    console.error("[TaskTool] Error:", {
+    logger.error("[TaskTool] Error:", {
       action,
       tenant_id: context.tenant_id,
       error: error instanceof Error ? error.message : error,

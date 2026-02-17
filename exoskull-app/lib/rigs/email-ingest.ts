@@ -10,6 +10,7 @@ import { GmailMessage } from "./google-workspace/client";
 import { OutlookMessage } from "./microsoft-365/client";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
@@ -143,7 +144,7 @@ export async function ingestGmailMessages(
 
       result.ingested++;
     } catch (error) {
-      console.error("[EmailIngest] Failed to ingest Gmail:", email.id, error);
+      logger.error("[EmailIngest] Failed to ingest Gmail:", email.id, error);
       result.errors++;
     }
   }
@@ -212,7 +213,7 @@ export async function ingestOutlookMessages(
 
       result.ingested++;
     } catch (error) {
-      console.error("[EmailIngest] Failed to ingest Outlook:", email.id, error);
+      logger.error("[EmailIngest] Failed to ingest Outlook:", email.id, error);
       result.errors++;
     }
   }

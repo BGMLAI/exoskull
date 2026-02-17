@@ -12,7 +12,7 @@ import { logger } from "@/lib/logger";
  *   if (!breaker.isAllowed()) return fallback();
  *   try { await action(); breaker.recordSuccess(); }
  *   catch (e) {
- *     console.error('[MyService] Failed:', { error: e.message, tenantId });
+ *     logger.error('[MyService] Failed:', { error: e.message, tenantId });
  *     breaker.recordFailure(e.message);
  *     throw e;
  *   }

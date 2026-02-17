@@ -154,7 +154,7 @@ export async function calculateDailyMetrics(): Promise<BusinessDailyMetrics> {
   );
 
   if (error) {
-    console.error("[BusinessMetrics] Failed to store daily metrics:", {
+    logger.error("[BusinessMetrics] Failed to store daily metrics:", {
       error: error.message,
       date: today,
     });

@@ -16,6 +16,7 @@ import { ModelRouter } from "@/lib/ai/model-router";
 import { getUserHighlights } from "@/lib/memory/highlights";
 import type { Task } from "@/lib/tasks/task-service";
 
+import { logger } from "@/lib/logger";
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -94,7 +95,7 @@ async function getConversationStats(
     .lte("started_at", until.toISOString());
 
   if (error) {
-    console.error("[SummaryGenerator] Conversations query failed:", {
+    logger.error("[SummaryGenerator] Conversations query failed:", {
       tenantId,
       error: error.message,
     });
@@ -128,7 +129,7 @@ async function getMessageStats(
     .lte("created_at", until.toISOString());
 
   if (error) {
-    console.error("[SummaryGenerator] Messages query failed:", {
+    logger.error("[SummaryGenerator] Messages query failed:", {
       tenantId,
       error: error.message,
     });
@@ -216,7 +217,7 @@ async function getTaskStatsForPeriod(
       ).length,
     };
   } catch (error) {
-    console.error("[SummaryGenerator] Tasks query failed:", {
+    logger.error("[SummaryGenerator] Tasks query failed:", {
       tenantId,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -259,7 +260,7 @@ async function extractTopics(
     });
     return response.content.trim();
   } catch (error) {
-    console.error("[SummaryGenerator] Topic extraction failed:", {
+    logger.error("[SummaryGenerator] Topic extraction failed:", {
       tenantId,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -293,7 +294,7 @@ async function generateInsight(
     });
     return response.content.trim();
   } catch (error) {
-    console.error("[SummaryGenerator] Insight generation failed:", {
+    logger.error("[SummaryGenerator] Insight generation failed:", {
       tenantId,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -437,7 +438,7 @@ export async function generateWeeklySummary(tenantId: string): Promise<string> {
     .single();
 
   if (tenantErr || !tenant) {
-    console.error("[SummaryGenerator] Tenant not found:", {
+    logger.error("[SummaryGenerator] Tenant not found:", {
       tenantId,
       error: tenantErr?.message,
     });
@@ -518,7 +519,7 @@ export async function generateMonthlySummary(
     .single();
 
   if (tenantErr || !tenant) {
-    console.error("[SummaryGenerator] Tenant not found:", {
+    logger.error("[SummaryGenerator] Tenant not found:", {
       tenantId,
       error: tenantErr?.message,
     });

@@ -3,6 +3,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // GET /api/registry/[slug] - Get single item details
@@ -78,7 +79,7 @@ export const GET = withApiLog(async function GET(
       },
     });
   } catch (error) {
-    console.error("[Registry] Unexpected error:", error);
+    logger.error("[Registry] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

@@ -16,6 +16,7 @@ import type {
   GapSkillMapping,
 } from "./types";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // GAP → SKILL MAPPING
 // =====================================================
@@ -193,7 +194,7 @@ export async function bridgeGapsToSuggestions(
 
     return suggestions;
   } catch (error) {
-    console.error("[GapBridge] Error:", {
+    logger.error("[GapBridge] Error:", {
       error: error instanceof Error ? error.message : error,
       tenant_id: context.tenant_id,
     });

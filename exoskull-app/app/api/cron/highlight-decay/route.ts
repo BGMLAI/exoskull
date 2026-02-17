@@ -48,7 +48,7 @@ async function getHandler(request: NextRequest) {
     logger.info("[HighlightDecay] Decay completed:", response);
     return NextResponse.json(response);
   } catch (error) {
-    console.error("[HighlightDecay] Decay failed:", error);
+    logger.error("[HighlightDecay] Decay failed:", error);
     return NextResponse.json(
       {
         success: false,

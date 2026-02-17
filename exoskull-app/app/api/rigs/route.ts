@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { RIG_DEFINITIONS } from "@/lib/rigs";
 import { withApiLog } from "@/lib/api/request-logger";
 
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 /**
@@ -24,7 +25,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       .eq("tenant_id", tenantId);
 
     if (error) {
-      console.error("[RigsAPI] Connections fetch error:", error);
+      logger.error("[RigsAPI] Connections fetch error:", error);
     }
 
     const connectionMap = new Map(
@@ -58,7 +59,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       connected: rigs.filter((r) => r.connected).length,
     });
   } catch (error) {
-    console.error("[RigsAPI] Error:", error);
+    logger.error("[RigsAPI] Error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

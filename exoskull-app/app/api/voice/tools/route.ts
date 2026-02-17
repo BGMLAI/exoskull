@@ -21,7 +21,7 @@ async function getTasks(tenantId: string) {
       count: filtered.length,
     };
   } catch (error) {
-    console.error("Error fetching tasks:", error);
+    logger.error("Error fetching tasks:", error);
     return {
       tasks: [],
       error: error instanceof Error ? error.message : "Unknown",
@@ -59,7 +59,7 @@ async function createTask(
       message: `Zadanie "${params.title}" zostało dodane`,
     };
   } catch (error) {
-    console.error("Error creating task:", error);
+    logger.error("Error creating task:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown",
@@ -83,7 +83,7 @@ async function completeTask(tenantId: string, taskId: string) {
       message: `Zadanie oznaczone jako wykonane`,
     };
   } catch (error) {
-    console.error("Error completing task:", error);
+    logger.error("Error completing task:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown",
@@ -182,7 +182,7 @@ async function createCheckin(
     .single();
 
   if (error) {
-    console.error("Error creating checkin:", error);
+    logger.error("Error creating checkin:", error);
     return { success: false, error: error.message };
   }
 
@@ -286,9 +286,9 @@ export const POST = withApiLog(async function POST(request: Request) {
     const tenantId = urlTenantId || payloadTenantId;
 
     if (!tenantId) {
-      console.error("[VoiceTools] No tenant_id found in URL or payload");
-      console.error("URL:", request.url);
-      console.error("Call:", JSON.stringify(call, null, 2));
+      logger.error("[VoiceTools] No tenant_id found in URL or payload");
+      logger.error("URL:", request.url);
+      logger.error("Call:", JSON.stringify(call, null, 2));
       return NextResponse.json({
         result: {
           error:
@@ -452,7 +452,7 @@ export const POST = withApiLog(async function POST(request: Request) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("[VoiceTools] Handler error:", error);
+    logger.error("[VoiceTools] Handler error:", error);
     return NextResponse.json(
       { result: { error: "Tool execution failed" } },
       { status: 500 },

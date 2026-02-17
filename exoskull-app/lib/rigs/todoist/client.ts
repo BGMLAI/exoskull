@@ -2,10 +2,11 @@
 // TODOIST CLIENT (Tasks, Projects, Labels)
 // =====================================================
 
-import { RigConnection } from '../types';
+import { RigConnection } from "../types";
 
-const TODOIST_API = 'https://api.todoist.com/rest/v2';
-const TODOIST_SYNC_API = 'https://api.todoist.com/sync/v9';
+import { logger } from "@/lib/logger";
+const TODOIST_API = "https://api.todoist.com/rest/v2";
+const TODOIST_SYNC_API = "https://api.todoist.com/sync/v9";
 
 // =====================================================
 // TYPES
@@ -29,7 +30,7 @@ export interface TodoistTask {
   creator_id: string;
   assignee_id: string | null;
   assigner_id: string | null;
-  duration: { amount: number; unit: 'minute' | 'day' } | null;
+  duration: { amount: number; unit: "minute" | "day" } | null;
 }
 
 export interface TodoistDue {
@@ -52,7 +53,7 @@ export interface TodoistProject {
   is_favorite: boolean;
   is_inbox_project: boolean;
   is_team_inbox: boolean;
-  view_style: 'list' | 'board';
+  view_style: "list" | "board";
   url: string;
 }
 
@@ -106,7 +107,7 @@ export interface CreateTaskParams {
   due_lang?: string;
   assignee_id?: string;
   duration?: number;
-  duration_unit?: 'minute' | 'day';
+  duration_unit?: "minute" | "day";
 }
 
 export interface UpdateTaskParams {
@@ -120,7 +121,7 @@ export interface UpdateTaskParams {
   due_lang?: string;
   assignee_id?: string;
   duration?: number;
-  duration_unit?: 'minute' | 'day';
+  duration_unit?: "minute" | "day";
 }
 
 // =====================================================
@@ -137,22 +138,22 @@ export class TodoistClient {
   private async fetch<T>(
     endpoint: string,
     options: RequestInit = {},
-    baseUrl: string = TODOIST_API
+    baseUrl: string = TODOIST_API,
   ): Promise<T> {
     const url = `${baseUrl}${endpoint}`;
 
     const response = await fetch(url, {
       ...options,
       headers: {
-        'Authorization': `Bearer ${this.accessToken}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.accessToken}`,
+        "Content-Type": "application/json",
         ...options.headers,
       },
     });
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('[TodoistClient] API error:', {
+      logger.error("[TodoistClient] API error:", {
         status: response.status,
         endpoint,
         error,
@@ -180,14 +181,16 @@ export class TodoistClient {
     ids?: string[];
   }): Promise<TodoistTask[]> {
     const searchParams = new URLSearchParams();
-    if (params?.project_id) searchParams.append('project_id', params.project_id);
-    if (params?.section_id) searchParams.append('section_id', params.section_id);
-    if (params?.label) searchParams.append('label', params.label);
-    if (params?.filter) searchParams.append('filter', params.filter);
-    if (params?.ids) searchParams.append('ids', params.ids.join(','));
+    if (params?.project_id)
+      searchParams.append("project_id", params.project_id);
+    if (params?.section_id)
+      searchParams.append("section_id", params.section_id);
+    if (params?.label) searchParams.append("label", params.label);
+    if (params?.filter) searchParams.append("filter", params.filter);
+    if (params?.ids) searchParams.append("ids", params.ids.join(","));
 
     const query = searchParams.toString();
-    return this.fetch(`/tasks${query ? `?${query}` : ''}`);
+    return this.fetch(`/tasks${query ? `?${query}` : ""}`);
   }
 
   async getTask(taskId: string): Promise<TodoistTask> {
@@ -195,29 +198,32 @@ export class TodoistClient {
   }
 
   async createTask(params: CreateTaskParams): Promise<TodoistTask> {
-    return this.fetch('/tasks', {
-      method: 'POST',
+    return this.fetch("/tasks", {
+      method: "POST",
       body: JSON.stringify(params),
     });
   }
 
-  async updateTask(taskId: string, params: UpdateTaskParams): Promise<TodoistTask> {
+  async updateTask(
+    taskId: string,
+    params: UpdateTaskParams,
+  ): Promise<TodoistTask> {
     return this.fetch(`/tasks/${taskId}`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(params),
     });
   }
 
   async completeTask(taskId: string): Promise<void> {
-    return this.fetch(`/tasks/${taskId}/close`, { method: 'POST' });
+    return this.fetch(`/tasks/${taskId}/close`, { method: "POST" });
   }
 
   async reopenTask(taskId: string): Promise<void> {
-    return this.fetch(`/tasks/${taskId}/reopen`, { method: 'POST' });
+    return this.fetch(`/tasks/${taskId}/reopen`, { method: "POST" });
   }
 
   async deleteTask(taskId: string): Promise<void> {
-    return this.fetch(`/tasks/${taskId}`, { method: 'DELETE' });
+    return this.fetch(`/tasks/${taskId}`, { method: "DELETE" });
   }
 
   // =====================================================
@@ -225,7 +231,7 @@ export class TodoistClient {
   // =====================================================
 
   async getProjects(): Promise<TodoistProject[]> {
-    return this.fetch('/projects');
+    return this.fetch("/projects");
   }
 
   async getProject(projectId: string): Promise<TodoistProject> {
@@ -237,26 +243,31 @@ export class TodoistClient {
     parent_id?: string;
     color?: string;
     is_favorite?: boolean;
-    view_style?: 'list' | 'board';
+    view_style?: "list" | "board";
   }): Promise<TodoistProject> {
-    return this.fetch('/projects', {
-      method: 'POST',
+    return this.fetch("/projects", {
+      method: "POST",
       body: JSON.stringify(params),
     });
   }
 
   async updateProject(
     projectId: string,
-    params: { name?: string; color?: string; is_favorite?: boolean; view_style?: 'list' | 'board' }
+    params: {
+      name?: string;
+      color?: string;
+      is_favorite?: boolean;
+      view_style?: "list" | "board";
+    },
   ): Promise<TodoistProject> {
     return this.fetch(`/projects/${projectId}`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(params),
     });
   }
 
   async deleteProject(projectId: string): Promise<void> {
-    return this.fetch(`/projects/${projectId}`, { method: 'DELETE' });
+    return this.fetch(`/projects/${projectId}`, { method: "DELETE" });
   }
 
   // =====================================================
@@ -264,7 +275,7 @@ export class TodoistClient {
   // =====================================================
 
   async getSections(projectId?: string): Promise<TodoistSection[]> {
-    const query = projectId ? `?project_id=${projectId}` : '';
+    const query = projectId ? `?project_id=${projectId}` : "";
     return this.fetch(`/sections${query}`);
   }
 
@@ -272,22 +283,29 @@ export class TodoistClient {
     return this.fetch(`/sections/${sectionId}`);
   }
 
-  async createSection(params: { name: string; project_id: string; order?: number }): Promise<TodoistSection> {
-    return this.fetch('/sections', {
-      method: 'POST',
+  async createSection(params: {
+    name: string;
+    project_id: string;
+    order?: number;
+  }): Promise<TodoistSection> {
+    return this.fetch("/sections", {
+      method: "POST",
       body: JSON.stringify(params),
     });
   }
 
-  async updateSection(sectionId: string, name: string): Promise<TodoistSection> {
+  async updateSection(
+    sectionId: string,
+    name: string,
+  ): Promise<TodoistSection> {
     return this.fetch(`/sections/${sectionId}`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ name }),
     });
   }
 
   async deleteSection(sectionId: string): Promise<void> {
-    return this.fetch(`/sections/${sectionId}`, { method: 'DELETE' });
+    return this.fetch(`/sections/${sectionId}`, { method: "DELETE" });
   }
 
   // =====================================================
@@ -295,7 +313,7 @@ export class TodoistClient {
   // =====================================================
 
   async getLabels(): Promise<TodoistLabel[]> {
-    return this.fetch('/labels');
+    return this.fetch("/labels");
   }
 
   async getLabel(labelId: string): Promise<TodoistLabel> {
@@ -308,34 +326,42 @@ export class TodoistClient {
     order?: number;
     is_favorite?: boolean;
   }): Promise<TodoistLabel> {
-    return this.fetch('/labels', {
-      method: 'POST',
+    return this.fetch("/labels", {
+      method: "POST",
       body: JSON.stringify(params),
     });
   }
 
   async updateLabel(
     labelId: string,
-    params: { name?: string; color?: string; order?: number; is_favorite?: boolean }
+    params: {
+      name?: string;
+      color?: string;
+      order?: number;
+      is_favorite?: boolean;
+    },
   ): Promise<TodoistLabel> {
     return this.fetch(`/labels/${labelId}`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(params),
     });
   }
 
   async deleteLabel(labelId: string): Promise<void> {
-    return this.fetch(`/labels/${labelId}`, { method: 'DELETE' });
+    return this.fetch(`/labels/${labelId}`, { method: "DELETE" });
   }
 
   // =====================================================
   // COMMENTS
   // =====================================================
 
-  async getComments(params: { task_id: string } | { project_id: string }): Promise<TodoistComment[]> {
+  async getComments(
+    params: { task_id: string } | { project_id: string },
+  ): Promise<TodoistComment[]> {
     const searchParams = new URLSearchParams();
-    if ('task_id' in params) searchParams.append('task_id', params.task_id);
-    if ('project_id' in params) searchParams.append('project_id', params.project_id);
+    if ("task_id" in params) searchParams.append("task_id", params.task_id);
+    if ("project_id" in params)
+      searchParams.append("project_id", params.project_id);
     return this.fetch(`/comments?${searchParams.toString()}`);
   }
 
@@ -348,21 +374,24 @@ export class TodoistClient {
     task_id?: string;
     project_id?: string;
   }): Promise<TodoistComment> {
-    return this.fetch('/comments', {
-      method: 'POST',
+    return this.fetch("/comments", {
+      method: "POST",
       body: JSON.stringify(params),
     });
   }
 
-  async updateComment(commentId: string, content: string): Promise<TodoistComment> {
+  async updateComment(
+    commentId: string,
+    content: string,
+  ): Promise<TodoistComment> {
     return this.fetch(`/comments/${commentId}`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ content }),
     });
   }
 
   async deleteComment(commentId: string): Promise<void> {
-    return this.fetch(`/comments/${commentId}`, { method: 'DELETE' });
+    return this.fetch(`/comments/${commentId}`, { method: "DELETE" });
   }
 
   // =====================================================
@@ -380,28 +409,28 @@ export class TodoistClient {
    * Get tasks due today
    */
   async getTodayTasks(): Promise<TodoistTask[]> {
-    return this.getTasks({ filter: 'today' });
+    return this.getTasks({ filter: "today" });
   }
 
   /**
    * Get overdue tasks
    */
   async getOverdueTasks(): Promise<TodoistTask[]> {
-    return this.getTasks({ filter: 'overdue' });
+    return this.getTasks({ filter: "overdue" });
   }
 
   /**
    * Get tasks for next 7 days
    */
   async getUpcomingTasks(): Promise<TodoistTask[]> {
-    return this.getTasks({ filter: '7 days' });
+    return this.getTasks({ filter: "7 days" });
   }
 
   /**
    * Get high priority tasks (priority 3 & 4)
    */
   async getHighPriorityTasks(): Promise<TodoistTask[]> {
-    return this.getTasks({ filter: 'p1 | p2' });
+    return this.getTasks({ filter: "p1 | p2" });
   }
 
   /**
@@ -435,7 +464,7 @@ export class TodoistClient {
       ignore_days: number[];
     };
   }> {
-    return this.fetch('/completed/get_stats', {}, TODOIST_SYNC_API);
+    return this.fetch("/completed/get_stats", {}, TODOIST_SYNC_API);
   }
 
   // =====================================================
@@ -443,13 +472,14 @@ export class TodoistClient {
   // =====================================================
 
   async getDashboardData() {
-    const [tasks, projects, labels, todayTasks, overdueTasks] = await Promise.all([
-      this.getTasks().catch(() => []),
-      this.getProjects().catch(() => []),
-      this.getLabels().catch(() => []),
-      this.getTodayTasks().catch(() => []),
-      this.getOverdueTasks().catch(() => []),
-    ]);
+    const [tasks, projects, labels, todayTasks, overdueTasks] =
+      await Promise.all([
+        this.getTasks().catch(() => []),
+        this.getProjects().catch(() => []),
+        this.getLabels().catch(() => []),
+        this.getTodayTasks().catch(() => []),
+        this.getOverdueTasks().catch(() => []),
+      ]);
 
     // Sort by priority (4 = urgent first)
     const sortedTasks = [...tasks].sort((a, b) => b.priority - a.priority);
@@ -502,7 +532,9 @@ export class TodoistClient {
 // FACTORY
 // =====================================================
 
-export function createTodoistClient(connection: RigConnection): TodoistClient | null {
+export function createTodoistClient(
+  connection: RigConnection,
+): TodoistClient | null {
   if (!connection.access_token) return null;
   return new TodoistClient(connection.access_token);
 }

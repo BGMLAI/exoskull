@@ -83,7 +83,7 @@ export const knowledgeTools: ToolDefinition[] = [
 
         return response;
       } catch (searchError) {
-        console.error("[KnowledgeTools] search_knowledge error:", searchError);
+        logger.error("[KnowledgeTools] search_knowledge error:", searchError);
         return "Nie udało się przeszukać dokumentów. Spróbuj jeszcze raz.";
       }
     },
@@ -127,7 +127,7 @@ export const knowledgeTools: ToolDefinition[] = [
 
         return `Nie udało się zaimportować strony: ${result.error}`;
       } catch (error) {
-        console.error("[KnowledgeTools] import_url error:", error);
+        logger.error("[KnowledgeTools] import_url error:", error);
         return "Nie udało się zaimportować strony. Sprawdź URL i spróbuj ponownie.";
       }
     },
@@ -161,7 +161,7 @@ export const knowledgeTools: ToolDefinition[] = [
           .limit(20);
 
         if (error) {
-          console.error("[KnowledgeTools] list_documents error:", error);
+          logger.error("[KnowledgeTools] list_documents error:", error);
           return "Nie udało się pobrać listy dokumentów.";
         }
 
@@ -194,7 +194,7 @@ export const knowledgeTools: ToolDefinition[] = [
 
         return response;
       } catch (err) {
-        console.error("[KnowledgeTools] list_documents error:", err);
+        logger.error("[KnowledgeTools] list_documents error:", err);
         return "Nie udało się pobrać listy dokumentów.";
       }
     },
@@ -276,7 +276,7 @@ export const knowledgeTools: ToolDefinition[] = [
 
         return `${header}${slice}${hasMore ? `\n\n...(dalsze ${text.length - offset - PAGE_SIZE} znaków — użyj offset: ${offset + PAGE_SIZE} aby kontynuować)` : ""}`;
       } catch (err) {
-        console.error("[KnowledgeTools] get_document_content error:", err);
+        logger.error("[KnowledgeTools] get_document_content error:", err);
         return "Nie udało się pobrać treści dokumentu.";
       }
     },

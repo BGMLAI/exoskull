@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
@@ -56,7 +57,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       lastEmotion: lastEmotion || null,
     });
   } catch (error) {
-    console.error("[Canvas] IORS profile error:", error);
+    logger.error("[Canvas] IORS profile error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

@@ -44,7 +44,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       .limit(1000);
 
     if (tenantError) {
-      console.error("[PredictionsCron] Failed to fetch tenants:", {
+      logger.error("[PredictionsCron] Failed to fetch tenants:", {
         error: tenantError.message,
       });
       return NextResponse.json(
@@ -86,7 +86,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         results.errors.push(`${tenantId}: ${msg}`);
-        console.error("[PredictionsCron] Error for tenant:", {
+        logger.error("[PredictionsCron] Error for tenant:", {
           tenantId,
           error: msg,
         });
@@ -107,7 +107,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
-    console.error("[PredictionsCron] Fatal error:", msg);
+    logger.error("[PredictionsCron] Fatal error:", msg);
 
     return NextResponse.json(
       {

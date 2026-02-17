@@ -35,13 +35,13 @@ export async function saveVersion(
     });
 
     if (error) {
-      console.error("[VersionManager] Failed to save version:", error);
+      logger.error("[VersionManager] Failed to save version:", error);
       return { success: false, error: error.message };
     }
 
     return { success: true };
   } catch (error) {
-    console.error("[VersionManager] Error saving version:", error);
+    logger.error("[VersionManager] Error saving version:", error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -59,13 +59,13 @@ export async function getVersions(skillId: string): Promise<SkillVersion[]> {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("[VersionManager] Failed to fetch versions:", error);
+      logger.error("[VersionManager] Failed to fetch versions:", error);
       return [];
     }
 
     return (data || []) as SkillVersion[];
   } catch (error) {
-    console.error("[VersionManager] Error fetching versions:", error);
+    logger.error("[VersionManager] Error fetching versions:", error);
     return [];
   }
 }
@@ -137,7 +137,7 @@ export async function rollbackToVersion(
 
     return { success: true };
   } catch (error) {
-    console.error("[VersionManager] Rollback error:", error);
+    logger.error("[VersionManager] Rollback error:", error);
     return { success: false, error: (error as Error).message };
   }
 }

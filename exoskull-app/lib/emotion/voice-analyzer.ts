@@ -57,7 +57,7 @@ export async function analyzeVoiceProsody(
 
     const audioResponse = await fetch(audioUrl, fetchOptions);
     if (!audioResponse.ok) {
-      console.error("[VoiceAnalyzer] Twilio download failed:", {
+      logger.error("[VoiceAnalyzer] Twilio download failed:", {
         status: audioResponse.status,
         url: audioUrl,
       });
@@ -80,7 +80,7 @@ export async function analyzeVoiceProsody(
     );
 
     if (!dgResponse.ok) {
-      console.error("[VoiceAnalyzer] Deepgram error:", {
+      logger.error("[VoiceAnalyzer] Deepgram error:", {
         status: dgResponse.status,
       });
       return null;
@@ -100,7 +100,7 @@ export async function analyzeVoiceProsody(
 
     return computeProsodyFromTimings(words, duration);
   } catch (error) {
-    console.error("[VoiceAnalyzer] Analysis failed:", {
+    logger.error("[VoiceAnalyzer] Analysis failed:", {
       error: error instanceof Error ? error.message : error,
       recordingUrl,
     });

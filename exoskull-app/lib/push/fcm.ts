@@ -8,6 +8,7 @@
 import { getServiceSupabase } from "@/lib/supabase/service";
 import type { PushNotification, PushResult, DeviceToken } from "./types";
 
+import { logger } from "@/lib/logger";
 let firebaseApp: any = null;
 let messaging: any = null;
 
@@ -23,7 +24,7 @@ async function getMessaging() {
     if (!firebaseApp) {
       const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
       if (!serviceAccount) {
-        console.warn(
+        logger.warn(
           "[FCM] FIREBASE_SERVICE_ACCOUNT_JSON not configured, push disabled",
         );
         return null;
@@ -40,7 +41,7 @@ async function getMessaging() {
     messaging = admin.messaging();
     return messaging;
   } catch (error) {
-    console.warn("[FCM] firebase-admin not available:", {
+    logger.warn("[FCM] firebase-admin not available:", {
       error: error instanceof Error ? error.message : error,
     });
     return null;
@@ -58,7 +59,7 @@ async function getDeviceTokens(tenantId: string): Promise<DeviceToken[]> {
     .eq("tenant_id", tenantId);
 
   if (error) {
-    console.error("[FCM] Failed to fetch device tokens:", error);
+    logger.error("[FCM] Failed to fetch device tokens:", error);
     return [];
   }
 
@@ -164,7 +165,7 @@ export async function pushNotifyTenant(
     await sendPushToTenant(tenantId, { title, body, data });
   } catch (error) {
     // Fire-and-forget — don't fail the caller
-    console.error("[FCM] pushNotifyTenant failed:", {
+    logger.error("[FCM] pushNotifyTenant failed:", {
       error: error instanceof Error ? error.message : error,
       tenantId,
     });

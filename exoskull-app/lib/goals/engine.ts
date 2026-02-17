@@ -21,6 +21,7 @@ import type {
   GoalCategory,
 } from "./types";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // DEFINE GOAL (AI-assisted)
 // =====================================================
@@ -61,7 +62,7 @@ export async function defineGoal(
   });
 
   if (!result.id) {
-    console.error("[GoalEngine] defineGoal failed:", {
+    logger.error("[GoalEngine] defineGoal failed:", {
       error: result.error,
       tenantId,
       input,
@@ -125,7 +126,7 @@ Return ONLY valid JSON, no markdown.`,
       description: parsed.description || input.description,
     };
   } catch (error) {
-    console.error("[GoalEngine] AI enrichment failed:", {
+    logger.error("[GoalEngine] AI enrichment failed:", {
       error: error instanceof Error ? error.message : error,
     });
     return input; // Return original if AI fails
@@ -197,7 +198,7 @@ export async function logProgress(
     .single();
 
   if (error) {
-    console.error("[GoalEngine] logProgress failed:", {
+    logger.error("[GoalEngine] logProgress failed:", {
       error: error.message,
       goalId,
       value,

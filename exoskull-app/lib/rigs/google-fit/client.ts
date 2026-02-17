@@ -4,6 +4,7 @@
 
 import { RigSyncResult } from "../types";
 
+import { logger } from "@/lib/logger";
 const GOOGLE_FIT_API = "https://www.googleapis.com/fitness/v1/users/me";
 
 interface DataPoint {
@@ -54,7 +55,7 @@ async function fetchWithRetry(
         `Google Fit API ${response.status}: ${errorText.slice(0, 200)}`,
       );
 
-      console.error(`[GoogleFit] ${context} attempt ${attempt + 1} failed:`, {
+      logger.error(`[GoogleFit] ${context} attempt ${attempt + 1} failed:`, {
         status: response.status,
         error: errorText.slice(0, 200),
       });
@@ -67,7 +68,7 @@ async function fetchWithRetry(
       // Retry on 429 (rate limit) and 5xx (server errors)
       if (attempt < MAX_RETRIES - 1) {
         const delay = RETRY_DELAYS[attempt] || 4000;
-        console.log(
+        logger.info(
           `[GoogleFit] ${context} retrying in ${delay}ms (attempt ${attempt + 2}/${MAX_RETRIES})`,
         );
         await sleep(delay);
@@ -80,7 +81,7 @@ async function fetchWithRetry(
         throw err;
       }
       lastError = err instanceof Error ? err : new Error(String(err));
-      console.error(`[GoogleFit] ${context} attempt ${attempt + 1} error:`, {
+      logger.error(`[GoogleFit] ${context} attempt ${attempt + 1} error:`, {
         error: lastError.message,
       });
       if (attempt < MAX_RETRIES - 1) {
@@ -283,7 +284,7 @@ export class GoogleFitClient {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         errors.push(`${label}: ${msg}`);
-        console.error(`[GoogleFit] getAllData.${label} failed:`, msg);
+        logger.error(`[GoogleFit] getAllData.${label} failed:`, msg);
         return null;
       }
     };
@@ -315,7 +316,7 @@ export class GoogleFitClient {
       )) || [];
 
     if (errors.length > 0) {
-      console.warn(
+      logger.warn(
         `[GoogleFit] getAllData completed with ${errors.length} errors:`,
         errors,
       );
@@ -363,7 +364,7 @@ export async function syncGoogleFitData(
         : {}),
     };
   } catch (error) {
-    console.error("[GoogleFit] Sync error:", {
+    logger.error("[GoogleFit] Sync error:", {
       error: error instanceof Error ? error.message : error,
       stack: error instanceof Error ? error.stack : undefined,
     });

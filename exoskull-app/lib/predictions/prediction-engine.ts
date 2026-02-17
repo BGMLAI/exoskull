@@ -81,7 +81,7 @@ export async function storePredictions(
   const { error } = await supabase.from("exo_predictions").insert(rows);
 
   if (error) {
-    console.error("[Predictions] Failed to store predictions:", {
+    logger.error("[Predictions] Failed to store predictions:", {
       tenantId: predictions[0].tenantId,
       error: error.message,
       count: predictions.length,
@@ -148,7 +148,7 @@ export async function createInterventionsFromPredictions(
       );
 
       if (error) {
-        console.error("[Predictions] Failed to create intervention:", {
+        logger.error("[Predictions] Failed to create intervention:", {
           tenantId: p.tenantId,
           metric: p.metric,
           error: error.message,
@@ -181,7 +181,7 @@ export async function createInterventionsFromPredictions(
           },
           dedupKey: `prediction:${p.tenantId}:${p.metric}:${new Date().toISOString().slice(0, 10)}`,
         }).catch((err) =>
-          console.error("[Predictions] emitEvent failed:", {
+          logger.error("[Predictions] emitEvent failed:", {
             tenantId: p.tenantId,
             error: err instanceof Error ? err.message : String(err),
           }),
@@ -191,7 +191,7 @@ export async function createInterventionsFromPredictions(
       created++;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("[Predictions] Intervention creation error:", {
+      logger.error("[Predictions] Intervention creation error:", {
         tenantId: p.tenantId,
         metric: p.metric,
         error: msg,

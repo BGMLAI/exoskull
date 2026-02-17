@@ -19,6 +19,7 @@ import {
 } from "../types";
 import { calculateCost, getModelConfig } from "../config";
 
+import { logger } from "@/lib/logger";
 // Map our model IDs to Anthropic's model names
 const MODEL_MAP: Record<string, string> = {
   "claude-3-5-haiku": "claude-3-5-haiku-20241022",
@@ -149,7 +150,7 @@ export class AnthropicProvider implements IAIProvider {
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
-      console.error("[AnthropicProvider] Chat failed:", {
+      logger.error("[AnthropicProvider] Chat failed:", {
         error: errorMessage,
         model,
         tenantId: options.tenantId,

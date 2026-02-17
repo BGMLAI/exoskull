@@ -22,7 +22,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
   try {
     const auth = await verifyTenantAuth(request);
     if (!auth.ok) {
-      console.error("[SaveProfile] No user session");
+      logger.error("[SaveProfile] No user session");
       return NextResponse.json(
         { error: "Sesja wygasla. Zaloguj sie ponownie." },
         { status: 401 },
@@ -91,7 +91,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       .eq("id", tenantId);
 
     if (updateError) {
-      console.error("[SaveProfile] Error updating tenant:", {
+      logger.error("[SaveProfile] Error updating tenant:", {
         code: updateError.code,
         message: updateError.message,
         details: updateError.details,
@@ -123,7 +123,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
         .upsert(loopRows, { onConflict: "tenant_id,slug" });
 
       if (loopsError) {
-        console.error("[SaveProfile] Error creating loops:", {
+        logger.error("[SaveProfile] Error creating loops:", {
           code: loopsError.code,
           message: loopsError.message,
           details: loopsError.details,
@@ -147,7 +147,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[SaveProfile] Unexpected error:", error);
+    logger.error("[SaveProfile] Unexpected error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

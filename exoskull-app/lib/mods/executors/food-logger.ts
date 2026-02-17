@@ -7,6 +7,7 @@
 import { IModExecutor, ModInsight, ModAction, ModSlug } from "../types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
+import { logger } from "@/lib/logger";
 // =====================================================
 // Types
 // =====================================================
@@ -55,7 +56,7 @@ export class FoodLoggerExecutor implements IModExecutor {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("[FoodLogger] Fetch error:", error);
+        logger.error("[FoodLogger] Fetch error:", error);
         throw error;
       }
 
@@ -80,7 +81,7 @@ export class FoodLoggerExecutor implements IModExecutor {
         weekly: { entries: all, stats: this.calculateStats(all) },
       };
     } catch (error) {
-      console.error("[FoodLogger] getData error:", error);
+      logger.error("[FoodLogger] getData error:", error);
       return {
         today: { entries: [], total_calories: 0, meals_logged: 0 },
         weekly: { entries: [], stats: null },
@@ -152,7 +153,7 @@ export class FoodLoggerExecutor implements IModExecutor {
 
       return insights;
     } catch (error) {
-      console.error("[FoodLogger] getInsights error:", error);
+      logger.error("[FoodLogger] getInsights error:", error);
       return [
         {
           type: "warning",
@@ -227,7 +228,7 @@ export class FoodLoggerExecutor implements IModExecutor {
           return { success: false, error: `Unknown action: ${action}` };
       }
     } catch (error) {
-      console.error("[FoodLogger] executeAction error:", error);
+      logger.error("[FoodLogger] executeAction error:", error);
       return { success: false, error: (error as Error).message };
     }
   }

@@ -233,7 +233,7 @@ export async function processDripSequences(): Promise<DripResult> {
     return result;
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
-    console.error("[DripEngine] Fatal error:", { error: errMsg });
+    logger.error("[DripEngine] Fatal error:", { error: errMsg });
     result.errors.push(errMsg);
     return result;
   }
@@ -317,7 +317,7 @@ async function sendDripMessage(
       });
 
       if (!response.ok) {
-        console.error("[DripEngine] Email failed:", {
+        logger.error("[DripEngine] Email failed:", {
           status: response.status,
           tenantId,
           template: step.templateId,
@@ -359,7 +359,7 @@ async function sendDripMessage(
 
     return false;
   } catch (error) {
-    console.error("[DripEngine] Send error:", {
+    logger.error("[DripEngine] Send error:", {
       error: error instanceof Error ? error.message : String(error),
       tenantId,
       template: step.templateId,

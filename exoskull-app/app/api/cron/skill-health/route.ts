@@ -25,7 +25,7 @@ async function handler(_request: NextRequest) {
     .is("archived_at", null);
 
   if (fetchError) {
-    console.error("[CRON] skill-health fetch error:", fetchError);
+    logger.error("[CRON] skill-health fetch error:", fetchError);
     return NextResponse.json(
       { error: "Failed to fetch skills", details: fetchError.message },
       { status: 500 },
@@ -129,7 +129,7 @@ async function handler(_request: NextRequest) {
         }
       }
     } catch (error) {
-      console.error(
+      logger.error(
         `[CRON] skill-health error on ${skill.slug}:`,
         (error as Error).message,
       );

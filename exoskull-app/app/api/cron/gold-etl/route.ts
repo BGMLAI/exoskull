@@ -67,7 +67,7 @@ async function postHandler(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[Gold ETL] Fatal error:", error);
+    logger.error("[Gold ETL] Fatal error:", error);
     return NextResponse.json(
       {
         status: "failed",

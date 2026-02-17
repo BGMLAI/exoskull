@@ -113,7 +113,7 @@ export async function createEscalationChain(
   );
 
   if (msgError) {
-    console.error(
+    logger.error(
       "[EscalationManager] Failed to create message intervention:",
       msgError,
     );
@@ -280,7 +280,7 @@ export async function hasUserResponded(
 
     return (data && data.length > 0) || false;
   } catch (error) {
-    console.error("[EscalationManager] Response check failed:", error);
+    logger.error("[EscalationManager] Response check failed:", error);
     return false; // Fail safe — assume no response, allow escalation
   }
 }
@@ -363,7 +363,7 @@ export async function processEscalations(): Promise<{
       }
     }
   } catch (error) {
-    console.error("[EscalationManager] processEscalations failed:", error);
+    logger.error("[EscalationManager] processEscalations failed:", error);
   }
 
   return { checked, escalated, cancelled };
@@ -411,6 +411,6 @@ async function cancelChainFrom(
       }
     }
   } catch (error) {
-    console.error("[EscalationManager] Failed to cancel chain:", error);
+    logger.error("[EscalationManager] Failed to cancel chain:", error);
   }
 }

@@ -10,6 +10,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { withApiLog } from "@/lib/api/request-logger";
+import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 /**
@@ -62,7 +63,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       if (!rpcError && rpcStats?.[0]) {
         stats = rpcStats[0];
       } else if (rpcError) {
-        console.warn(
+        logger.warn(
           "[GET /api/knowledge] RPC get_document_stats failed:",
           rpcError.message,
         );
@@ -85,7 +86,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
         }
       }
     } catch (rpcErr) {
-      console.warn("[GET /api/knowledge] RPC call threw:", rpcErr);
+      logger.warn("[GET /api/knowledge] RPC call threw:", rpcErr);
     }
 
     return NextResponse.json({
@@ -93,7 +94,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       stats,
     });
   } catch (error) {
-    console.error("GET /api/knowledge error:", error);
+    logger.error("GET /api/knowledge error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",
@@ -145,7 +146,7 @@ export const DELETE = withApiLog(async function DELETE(req: NextRequest) {
       .remove([document.storage_path]);
 
     if (storageError) {
-      console.error("Storage delete error:", storageError);
+      logger.error("Storage delete error:", storageError);
       // Continue anyway - might be already deleted
     }
 
@@ -168,7 +169,7 @@ export const DELETE = withApiLog(async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("DELETE /api/knowledge error:", error);
+    logger.error("DELETE /api/knowledge error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Unknown error",
