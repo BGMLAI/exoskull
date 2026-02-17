@@ -793,6 +793,130 @@ export function UnifiedStream({
                   break;
                 }
 
+                // ------------------------------------
+                // Multi-agent events (from VPS backend)
+                // ------------------------------------
+
+                case "delegation": {
+                  addEvent({
+                    id: `delegation-${Date.now()}`,
+                    timestamp: new Date(),
+                    data: {
+                      type: "agent_communication",
+                      agentName: "Orchestrator",
+                      targetName: data.to?.join(", "),
+                      content: `${data.strategy}: ${data.reasoning || ""}`,
+                    },
+                  });
+                  break;
+                }
+
+                case "agent_start": {
+                  addEvent({
+                    id: `agent-start-${data.agentId}-${Date.now()}`,
+                    timestamp: new Date(),
+                    data: {
+                      type: "agent_action",
+                      toolName: data.agentId,
+                      displayLabel: `${data.agentName}: ${data.task || ""}`,
+                      status: "running",
+                    },
+                  });
+                  break;
+                }
+
+                case "agent_delta": {
+                  // Stream agent text into the main AI message
+                  updateAIMessage(aiEventId, data.text);
+                  spatialAccumulated += data.text;
+                  updateSpatialMessage(aiEventId, spatialAccumulated, true);
+                  break;
+                }
+
+                case "agent_end": {
+                  // Update agent action to done
+                  const agentStartId = state.events.find(
+                    (e) =>
+                      e.data.type === "agent_action" &&
+                      e.data.toolName === data.agentId &&
+                      e.data.status === "running",
+                  )?.id;
+                  if (agentStartId) {
+                    updateAgentAction(
+                      agentStartId,
+                      data.status === "failed" ? "error" : "done",
+                      data.durationMs,
+                    );
+                  }
+                  break;
+                }
+
+                case "agent_handoff": {
+                  addEvent({
+                    id: `handoff-${Date.now()}`,
+                    timestamp: new Date(),
+                    data: {
+                      type: "agent_communication",
+                      agentName: data.from,
+                      targetName: data.to,
+                      content: `Przekazuję: ${data.context?.slice(0, 100) || ""}`,
+                    },
+                  });
+                  break;
+                }
+
+                case "mcp_tool_start": {
+                  useSceneStore.getState().startTool(data.tool);
+                  const mcpThinkingId = `thinking-${aiEventId}`;
+                  const mcpExisting = state.events.find(
+                    (e) => e.id === mcpThinkingId,
+                  );
+                  if (
+                    mcpExisting &&
+                    mcpExisting.data.type === "thinking_step"
+                  ) {
+                    const tools = [
+                      ...(mcpExisting.data.toolActions || []),
+                      {
+                        toolName: `${data.server}/${data.tool}`,
+                        displayLabel: `[${data.server}] ${data.tool}`,
+                        status: "running" as const,
+                      },
+                    ];
+                    updateThinkingTools(mcpThinkingId, tools);
+                  }
+                  break;
+                }
+
+                case "mcp_tool_end": {
+                  useSceneStore.getState().endTool();
+                  const mcpTeThinkingId = `thinking-${aiEventId}`;
+                  const mcpTeExisting = state.events.find(
+                    (e) => e.id === mcpTeThinkingId,
+                  );
+                  if (
+                    mcpTeExisting &&
+                    mcpTeExisting.data.type === "thinking_step"
+                  ) {
+                    const tools = (mcpTeExisting.data.toolActions || []).map(
+                      (t) =>
+                        t.toolName === `${data.server}/${data.tool}` &&
+                        t.status === "running"
+                          ? {
+                              ...t,
+                              status: (data.success === false
+                                ? "error"
+                                : "done") as "done" | "error",
+                              durationMs: data.durationMs,
+                              success: data.success !== false,
+                            }
+                          : t,
+                    );
+                    updateThinkingTools(mcpTeThinkingId, tools);
+                  }
+                  break;
+                }
+
                 case "error":
                   finalizeAIMessage(
                     aiEventId,

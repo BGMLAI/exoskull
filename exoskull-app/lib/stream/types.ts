@@ -434,6 +434,8 @@ export type SSEEventType =
   | "session"
   | "status"
   | "thinking_step"
+  | "thinking_token"
+  | "thinking_done"
   | "tool_start"
   | "tool_end"
   | "delta"
@@ -443,4 +445,12 @@ export type SSEEventType =
   | "media_content"
   | "tool_execution"
   | "ingestion_report"
-  | "cockpit_update";
+  | "cockpit_update"
+  // Multi-agent events (from VPS agent backend)
+  | "delegation"
+  | "agent_start"
+  | "agent_delta"
+  | "agent_end"
+  | "agent_handoff"
+  | "mcp_tool_start"
+  | "mcp_tool_end";
