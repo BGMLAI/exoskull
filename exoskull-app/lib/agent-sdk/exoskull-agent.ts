@@ -28,6 +28,7 @@ import { detectCrisis } from "@/lib/emotion/crisis-detector";
 import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
 import { logEmotion } from "@/lib/emotion/logger";
 import { getToolFilterForChannel } from "@/lib/iors/tools/channel-filters";
+import { getThreadContext } from "@/lib/unified-thread";
 import type { EmotionState } from "@/lib/emotion/types";
 import { logger } from "@/lib/logger";
 
@@ -238,11 +239,13 @@ export async function runExoSkullAgent(
   // ── Phase 1: Load everything in parallel ──
   const toolFilter = getToolFilterForChannel(req.channel, req.isAsync);
 
-  const [dynamicCtxResult, emotionState, filteredTools] = await Promise.all([
-    buildDynamicContext(req.tenantId),
-    analyzeEmotion(req.userMessage),
-    loadFilteredTools(req.tenantId, toolFilter),
-  ]);
+  const [dynamicCtxResult, emotionState, filteredTools, threadHistory] =
+    await Promise.all([
+      buildDynamicContext(req.tenantId),
+      analyzeEmotion(req.userMessage),
+      loadFilteredTools(req.tenantId, toolFilter),
+      getThreadContext(req.tenantId, 20),
+    ]);
 
   const contextMs = Date.now() - startMs;
   logger.info(
@@ -326,7 +329,22 @@ export async function runExoSkullAgent(
     const anthropicTools = toAnthropicTools(filteredTools);
 
     // Message history for multi-turn tool loop
+    // Thread history includes past messages; gateway already appended the
+    // current user message to the thread (gateway.ts:270), so drop it to
+    // avoid duplication — we add req.userMessage explicitly below.
+    const priorHistory: Anthropic.MessageParam[] =
+      threadHistory.length > 0
+        ? threadHistory.slice(
+            0,
+            // If last message is the current user msg, skip it
+            threadHistory[threadHistory.length - 1].role === "user"
+              ? threadHistory.length - 1
+              : threadHistory.length,
+          )
+        : [];
+
     const messages: Anthropic.MessageParam[] = [
+      ...priorHistory,
       { role: "user", content: req.userMessage },
     ];
 
