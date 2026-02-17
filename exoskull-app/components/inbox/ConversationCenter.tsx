@@ -17,7 +17,7 @@ import {
 } from "@/lib/voice/web-speech";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import type { UnifiedMessage } from "./InboxSidebar";
+import type { UnifiedMessage } from "./types";
 
 interface Message {
   id: string;

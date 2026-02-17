@@ -26,7 +26,7 @@ import {
   CheckCircle2,
   Loader2,
 } from "lucide-react";
-import type { UnifiedMessage } from "./InboxSidebar";
+import type { UnifiedMessage } from "./types";
 
 interface Project {
   id: string;

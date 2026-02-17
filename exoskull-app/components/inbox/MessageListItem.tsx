@@ -9,7 +9,7 @@ import {
   Instagram,
   Facebook,
 } from "lucide-react";
-import type { UnifiedMessage } from "./InboxSidebar";
+import type { UnifiedMessage } from "./types";
 
 interface MessageListItemProps {
   message: UnifiedMessage;
