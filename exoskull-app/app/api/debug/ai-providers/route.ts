@@ -6,13 +6,15 @@
  * Then tests Gemini with 5 tools to isolate tool-related issues.
  */
 import { NextResponse } from "next/server";
+import { verifyAdmin } from "@/lib/admin/auth";
 
 export const maxDuration = 55;
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const secret = url.searchParams.get("secret");
-  if (secret !== process.env.CRON_SECRET) {
+  const isAdmin = await verifyAdmin().catch(() => false);
+  if (secret !== process.env.CRON_SECRET && !isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -6,12 +6,14 @@
  * Returns JSON with success/error for each provider
  */
 import { NextRequest, NextResponse } from "next/server";
+import { verifyAdmin } from "@/lib/admin/auth";
 
 export const maxDuration = 55;
 
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret");
-  if (secret !== process.env.CRON_SECRET) {
+  const isAdmin = await verifyAdmin().catch(() => false);
+  if (secret !== process.env.CRON_SECRET && !isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

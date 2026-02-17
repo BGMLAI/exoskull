@@ -9,12 +9,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { analyzeEmotion } from "@/lib/emotion";
 import { detectCrisis } from "@/lib/emotion/crisis-detector";
 import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const { text, tenant_id } = await req.json();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
+
+    const { text } = await req.json();
 
     if (!text || typeof text !== "string") {
       return NextResponse.json(
@@ -51,7 +56,7 @@ export async function POST(req: NextRequest) {
         confidence: crisis.confidence,
       },
       adaptive_mode: adaptive.mode,
-      tenant_id: tenant_id || null,
+      tenant_id: tenantId,
     });
   } catch (error) {
     console.error("[EmotionAnalyze] API error:", error);

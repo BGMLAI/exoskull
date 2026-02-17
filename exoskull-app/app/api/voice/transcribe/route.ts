@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isHallucination } from "@/lib/voice/transcribe-voice-note";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
@@ -148,6 +149,9 @@ async function tryGroq(
 // ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+
     const formData = await req.formData();
     const audio = formData.get("audio") as File | null;
 
