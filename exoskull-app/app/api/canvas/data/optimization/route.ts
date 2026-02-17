@@ -184,7 +184,10 @@ export async function GET(req: NextRequest) {
       },
     };
 
-    return NextResponse.json(stats);
+    return NextResponse.json({
+      ...stats,
+      lastUpdated: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("[Canvas] Optimization data error:", error);
     return NextResponse.json(

@@ -10,6 +10,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DataFreshness } from "./DataFreshness";
 
 // ============================================================================
 // TYPES
@@ -148,15 +149,18 @@ export function SystemHealthWidget() {
             <HeartPulse className="h-5 w-5 text-rose-500" />
             Zdrowie systemu
           </span>
-          <button
-            onClick={() => fetchData(true)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            title="Odswiez"
-          >
-            <RefreshCw
-              className={cn("h-4 w-4", refreshing && "animate-spin")}
-            />
-          </button>
+          <div className="flex items-center gap-2">
+            <DataFreshness timestamp={health?.timestamp} />
+            <button
+              onClick={() => fetchData(true)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title="Odswiez"
+            >
+              <RefreshCw
+                className={cn("h-4 w-4", refreshing && "animate-spin")}
+              />
+            </button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 overflow-y-auto px-4 pb-4">

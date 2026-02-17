@@ -1,6 +1,7 @@
 "use client";
 
 import { Mail, AlertTriangle, Clock, ArrowUpRight } from "lucide-react";
+import { DataFreshness } from "./DataFreshness";
 
 export interface EmailWidgetData {
   summary: {
@@ -28,7 +29,13 @@ export interface EmailWidgetData {
   connectedAccounts: number;
 }
 
-export function EmailAnalyticsWidget({ data }: { data: EmailWidgetData }) {
+export function EmailAnalyticsWidget({
+  data,
+  lastUpdated,
+}: {
+  data: EmailWidgetData;
+  lastUpdated?: string | null;
+}) {
   const { summary, urgentEmails, overdueEmails } = data;
 
   return (
@@ -95,7 +102,10 @@ export function EmailAnalyticsWidget({ data }: { data: EmailWidgetData }) {
       {/* Footer */}
       <div className="mt-auto pt-1 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
         <span>Dzis: +{summary.todayReceived} emaili</span>
-        <span>{data.connectedAccounts} kont</span>
+        <span className="flex items-center gap-2">
+          <DataFreshness timestamp={lastUpdated} />
+          {data.connectedAccounts} kont
+        </span>
       </div>
     </div>
   );

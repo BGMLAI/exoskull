@@ -77,7 +77,10 @@ export async function GET(req: NextRequest) {
       predictions: predictions.length > 0 ? predictions : undefined,
     };
 
-    return NextResponse.json(summary);
+    return NextResponse.json({
+      ...summary,
+      lastUpdated: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("[Canvas] Health data error:", error);
     return NextResponse.json(

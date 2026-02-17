@@ -35,7 +35,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ analyses: analyses || [] });
+    return NextResponse.json({
+      analyses: analyses || [],
+      lastUpdated: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("[Canvas] Knowledge insights error:", error);
     return NextResponse.json(

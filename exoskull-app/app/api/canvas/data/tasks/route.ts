@@ -19,7 +19,11 @@ export async function GET(req: NextRequest) {
     // Count tasks by status via dual-read service
     const stats = await getTaskStats(tenantId);
 
-    return NextResponse.json({ stats, series: [] });
+    return NextResponse.json({
+      stats,
+      series: [],
+      lastUpdated: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("[Canvas] Tasks data error:", error);
     return NextResponse.json(

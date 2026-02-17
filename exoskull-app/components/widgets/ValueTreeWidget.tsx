@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { DataFreshness } from "./DataFreshness";
 
 // ============================================================================
 // TYPES
@@ -91,6 +92,7 @@ export function ValueTreeWidget() {
   const [values, setValues] = useState<ValueNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [expandedValues, setExpandedValues] = useState<Set<string>>(new Set());
   const [expandedLoops, setExpandedLoops] = useState<Set<string>>(new Set());
   const [expandedQuests, setExpandedQuests] = useState<Set<string>>(new Set());
@@ -105,6 +107,7 @@ export function ValueTreeWidget() {
       if (res.ok) {
         const data = await res.json();
         setValues(data.values || []);
+        setLastUpdated(data.lastUpdated || null);
       }
     } catch (err) {
       console.error("[ValueTree] Fetch error:", err);
@@ -207,6 +210,7 @@ export function ValueTreeWidget() {
             >
               <ExternalLink className="h-4 w-4" />
             </Link>
+            <DataFreshness timestamp={lastUpdated} />
             <button
               onClick={() => fetchData(true)}
               className="text-muted-foreground hover:text-foreground transition-colors"

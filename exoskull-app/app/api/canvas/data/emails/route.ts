@@ -7,21 +7,15 @@
 
 export const dynamic = "force-dynamic";
 
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const supabaseAuth = await createClient();
-    const {
-      data: { user },
-    } = await supabaseAuth.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const tenantId = user.id;
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
     const supabase = getServiceSupabase();
     const now = new Date();
     const todayStart = new Date(now);
@@ -107,6 +101,7 @@ export async function GET() {
       urgentEmails: extractData(urgentEmailsRes),
       overdueEmails: extractData(overdueEmailsRes),
       connectedAccounts: extractCount(accountsRes),
+      lastUpdated: new Date().toISOString(),
     });
   } catch (error) {
     console.error("[EmailCanvasAPI] Error:", error);

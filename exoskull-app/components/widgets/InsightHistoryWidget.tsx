@@ -12,6 +12,7 @@ import {
   ThumbsDown,
   MessageSquare,
 } from "lucide-react";
+import { DataFreshness } from "./DataFreshness";
 
 interface InsightItem {
   id: string;
@@ -23,10 +24,12 @@ interface InsightItem {
 
 interface InsightHistoryWidgetProps {
   insights: InsightItem[];
+  lastUpdated?: string | null;
 }
 
 export function InsightHistoryWidget({
   insights: initialInsights,
+  lastUpdated,
 }: InsightHistoryWidgetProps) {
   const [insights] = useState(initialInsights);
   const [rated, setRated] = useState<Set<string>>(new Set());
@@ -58,9 +61,12 @@ export function InsightHistoryWidget({
   return (
     <Card className="h-full overflow-auto">
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Lightbulb className="h-5 w-5" />
-          Historia insightow
+        <CardTitle className="text-lg flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <Lightbulb className="h-5 w-5" />
+            Historia insightow
+          </span>
+          <DataFreshness timestamp={lastUpdated} />
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">

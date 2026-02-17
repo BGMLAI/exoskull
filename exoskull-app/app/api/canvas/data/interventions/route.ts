@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       pending: pendingResult.data || [],
       needsFeedback: feedbackResult.data || [],
+      lastUpdated: new Date().toISOString(),
     });
   } catch (error) {
     console.error("[Canvas] Interventions data error:", error);

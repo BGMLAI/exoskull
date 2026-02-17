@@ -17,15 +17,18 @@ import type {
   PendingIntervention,
   CompletedIntervention,
 } from "@/lib/dashboard/types";
+import { DataFreshness } from "./DataFreshness";
 
 interface InterventionInboxWidgetProps {
   pending: PendingIntervention[];
   needsFeedback: CompletedIntervention[];
+  lastUpdated?: string | null;
 }
 
 export function InterventionInboxWidget({
   pending: initialPending,
   needsFeedback: initialFeedback,
+  lastUpdated,
 }: InterventionInboxWidgetProps) {
   const [pending, setPending] = useState(initialPending);
   const [needsFeedback, setNeedsFeedback] = useState(initialFeedback);
@@ -66,14 +69,17 @@ export function InterventionInboxWidget({
   return (
     <Card className="h-full overflow-auto">
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Inbox className="h-5 w-5" />
-          Interwencje
-          {pending.length > 0 && (
-            <Badge variant="destructive" className="ml-1 text-xs">
-              {pending.length}
-            </Badge>
-          )}
+        <CardTitle className="text-lg flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <Inbox className="h-5 w-5" />
+            Interwencje
+            {pending.length > 0 && (
+              <Badge variant="destructive" className="ml-1 text-xs">
+                {pending.length}
+              </Badge>
+            )}
+          </span>
+          <DataFreshness timestamp={lastUpdated} />
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">

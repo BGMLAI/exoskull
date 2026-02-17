@@ -1,19 +1,31 @@
-'use client'
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckSquare, Clock, AlertCircle, CheckCircle, Minus } from 'lucide-react'
-import { TaskStats, DataPoint } from '@/lib/dashboard/types'
-import Link from 'next/link'
-import { AreaChartWrapper } from '@/components/charts/AreaChartWrapper'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  CheckSquare,
+  Clock,
+  AlertCircle,
+  CheckCircle,
+  Minus,
+} from "lucide-react";
+import { TaskStats, DataPoint } from "@/lib/dashboard/types";
+import Link from "next/link";
+import { AreaChartWrapper } from "@/components/charts/AreaChartWrapper";
+import { DataFreshness } from "./DataFreshness";
 
 interface TasksWidgetProps {
-  stats: TaskStats
-  series?: DataPoint[]
-  lastUpdated?: string | null
-  loading?: boolean
+  stats: TaskStats;
+  series?: DataPoint[];
+  lastUpdated?: string | null;
+  loading?: boolean;
 }
 
-export function TasksWidget({ stats, series = [], lastUpdated, loading }: TasksWidgetProps) {
+export function TasksWidget({
+  stats,
+  series = [],
+  lastUpdated,
+  loading,
+}: TasksWidgetProps) {
   if (loading) {
     return (
       <Card>
@@ -30,14 +42,13 @@ export function TasksWidget({ stats, series = [], lastUpdated, loading }: TasksW
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
-  const completionRate = stats.total > 0
-    ? Math.round((stats.done / stats.total) * 100)
-    : 0
+  const completionRate =
+    stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
 
-  const hasSeries = series.some((point) => point.value > 0)
+  const hasSeries = series.some((point) => point.value > 0);
 
   return (
     <Card>
@@ -48,11 +59,7 @@ export function TasksWidget({ stats, series = [], lastUpdated, loading }: TasksW
             Zadania
           </CardTitle>
           <div className="flex items-center gap-3">
-            {lastUpdated && (
-              <span className="text-xs text-muted-foreground">
-                Aktualizacja: {formatTime(lastUpdated)}
-              </span>
-            )}
+            <DataFreshness timestamp={lastUpdated} />
             <Link
               href="/dashboard/tasks"
               className="text-sm font-normal text-muted-foreground hover:text-foreground"
@@ -107,10 +114,5 @@ export function TasksWidget({ stats, series = [], lastUpdated, loading }: TasksW
         )}
       </CardContent>
     </Card>
-  )
-}
-
-function formatTime(dateStr: string): string {
-  const date = new Date(dateStr)
-  return date.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })
+  );
 }

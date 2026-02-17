@@ -12,12 +12,14 @@ import {
 import Link from "next/link";
 import { HealthSummary } from "@/lib/dashboard/types";
 import { AreaChartWrapper } from "@/components/charts/AreaChartWrapper";
+import { DataFreshness } from "./DataFreshness";
 
 interface HealthWidgetProps {
   summary: HealthSummary;
+  lastUpdated?: string | null;
 }
 
-export function HealthWidget({ summary }: HealthWidgetProps) {
+export function HealthWidget({ summary, lastUpdated }: HealthWidgetProps) {
   const sleepHours = summary.sleepMinutes
     ? Math.floor(summary.sleepMinutes / 60)
     : null;
@@ -32,12 +34,15 @@ export function HealthWidget({ summary }: HealthWidgetProps) {
             <Heart className="h-5 w-5 text-red-500" />
             Zdrowie
           </span>
-          <Link
-            href="/dashboard/skills?tab=active"
-            className="text-sm font-normal text-muted-foreground hover:text-foreground"
-          >
-            Trackery zdrowia
-          </Link>
+          <div className="flex items-center gap-3">
+            <DataFreshness timestamp={lastUpdated} />
+            <Link
+              href="/dashboard/skills?tab=active"
+              className="text-sm font-normal text-muted-foreground hover:text-foreground"
+            >
+              Trackery zdrowia
+            </Link>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

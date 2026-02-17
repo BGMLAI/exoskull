@@ -66,43 +66,55 @@ interface CanvasGridProps {
 
 function CanvasHealthWidget() {
   const [data, setData] = useState<HealthSummary | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   useEffect(() => {
     fetch("/api/canvas/data/health")
       .then((r) => r.json())
-      .then(setData)
+      .then((d) => {
+        setLastUpdated(d.lastUpdated || null);
+        setData(d);
+      })
       .catch((e) => console.error("[CanvasHealth] Fetch error:", e));
   }, []);
   if (!data) return <WidgetSkeleton />;
-  return <HealthWidget summary={data} />;
+  return <HealthWidget summary={data} lastUpdated={lastUpdated} />;
 }
 
 function CanvasTasksWidget() {
   const [stats, setStats] = useState<TaskStats | null>(null);
   const [series, setSeries] = useState<DataPoint[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   useEffect(() => {
     fetch("/api/canvas/data/tasks")
       .then((r) => r.json())
       .then((d) => {
         setStats(d.stats);
         setSeries(d.series || []);
+        setLastUpdated(d.lastUpdated || null);
       })
       .catch((e) => console.error("[CanvasTasks] Fetch error:", e));
   }, []);
   if (!stats) return <WidgetSkeleton />;
-  return <TasksWidget stats={stats} series={series} />;
+  return (
+    <TasksWidget stats={stats} series={series} lastUpdated={lastUpdated} />
+  );
 }
 
 function CanvasCalendarWidget() {
   const [items, setItems] = useState<
     import("@/lib/dashboard/types").CalendarItem[]
   >([]);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   useEffect(() => {
     fetch("/api/canvas/data/calendar")
       .then((r) => r.json())
-      .then((d) => setItems(d.items || []))
+      .then((d) => {
+        setItems(d.items || []);
+        setLastUpdated(d.lastUpdated || null);
+      })
       .catch((e) => console.error("[CanvasCalendar] Fetch error:", e));
   }, []);
-  return <CalendarWidget items={items} />;
+  return <CalendarWidget items={items} lastUpdated={lastUpdated} />;
 }
 
 function CanvasConversationsWidget() {
@@ -139,43 +151,55 @@ function CanvasConversationsWidget() {
 
 function CanvasEmailWidget() {
   const [data, setData] = useState<EmailWidgetData | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   useEffect(() => {
     const load = () =>
       fetch("/api/canvas/data/emails")
         .then((r) => r.json())
-        .then(setData)
+        .then((d) => {
+          setLastUpdated(d.lastUpdated || null);
+          setData(d);
+        })
         .catch((e) => console.error("[CanvasEmail] Fetch error:", e));
     load();
     const interval = setInterval(load, 60_000);
     return () => clearInterval(interval);
   }, []);
   if (!data) return <WidgetSkeleton />;
-  return <EmailAnalyticsWidget data={data} />;
+  return <EmailAnalyticsWidget data={data} lastUpdated={lastUpdated} />;
 }
 
 function CanvasOptimizationWidget() {
   const [stats, setStats] = useState<OptimizationStats | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   useEffect(() => {
     const load = () =>
       fetch("/api/canvas/data/optimization")
         .then((r) => r.json())
-        .then(setStats)
+        .then((d) => {
+          setLastUpdated(d.lastUpdated || null);
+          setStats(d);
+        })
         .catch((e) => console.error("[CanvasOptimization] Fetch error:", e));
     load();
     const interval = setInterval(load, 60_000);
     return () => clearInterval(interval);
   }, []);
   if (!stats) return <WidgetSkeleton />;
-  return <OptimizationWidget stats={stats} />;
+  return <OptimizationWidget stats={stats} lastUpdated={lastUpdated} />;
 }
 
 function CanvasInterventionInboxWidget() {
   const [data, setData] = useState<InterventionInboxData | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   useEffect(() => {
     const load = () =>
       fetch("/api/canvas/data/interventions")
         .then((r) => r.json())
-        .then(setData)
+        .then((d) => {
+          setLastUpdated(d.lastUpdated || null);
+          setData(d);
+        })
         .catch((e) =>
           console.error("[CanvasInterventionInbox] Fetch error:", e),
         );
@@ -188,6 +212,7 @@ function CanvasInterventionInboxWidget() {
     <InterventionInboxWidget
       pending={data.pending}
       needsFeedback={data.needsFeedback}
+      lastUpdated={lastUpdated}
     />
   );
 }
@@ -219,16 +244,20 @@ function CanvasInsightHistoryWidget() {
       source_type: "intervention" | "highlight" | "learning" | "unknown";
     }>
   >([]);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     fetch("/api/canvas/data/insights")
       .then((r) => r.json())
-      .then((d) => setInsights(d.insights || []))
+      .then((d) => {
+        setInsights(d.insights || []);
+        setLastUpdated(d.lastUpdated || null);
+      })
       .catch((e) => console.error("[CanvasInsightHistory] Fetch error:", e))
       .finally(() => setLoaded(true));
   }, []);
   if (!loaded) return <WidgetSkeleton />;
-  return <InsightHistoryWidget insights={insights} />;
+  return <InsightHistoryWidget insights={insights} lastUpdated={lastUpdated} />;
 }
 
 // ============================================================================

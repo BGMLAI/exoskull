@@ -13,6 +13,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DataFreshness } from "./DataFreshness";
 
 // ============================================================================
 // TYPES
@@ -105,6 +106,7 @@ export function KnowledgeInsightsWidget() {
   const [analyses, setAnalyses] = useState<KnowledgeInsightEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const fetchData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -113,6 +115,7 @@ export function KnowledgeInsightsWidget() {
       if (res.ok) {
         const data = await res.json();
         setAnalyses(data.analyses || []);
+        setLastUpdated(data.lastUpdated || null);
       }
     } catch (err) {
       console.error("[KnowledgeInsights] Fetch error:", err);
@@ -167,15 +170,18 @@ export function KnowledgeInsightsWidget() {
             <Brain className="h-5 w-5 text-purple-500" />
             Analiza wiedzy
           </span>
-          <button
-            onClick={() => fetchData(true)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            title="Odswiez"
-          >
-            <RefreshCw
-              className={cn("h-4 w-4", refreshing && "animate-spin")}
-            />
-          </button>
+          <div className="flex items-center gap-2">
+            <DataFreshness timestamp={lastUpdated} />
+            <button
+              onClick={() => fetchData(true)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title="Odswiez"
+            >
+              <RefreshCw
+                className={cn("h-4 w-4", refreshing && "animate-spin")}
+              />
+            </button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">

@@ -99,7 +99,10 @@ export async function GET(req: NextRequest) {
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
     );
 
-    return NextResponse.json({ items: items.slice(0, 10) });
+    return NextResponse.json({
+      items: items.slice(0, 10),
+      lastUpdated: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("[Canvas] Calendar data error:", error);
     return NextResponse.json(

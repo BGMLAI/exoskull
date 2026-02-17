@@ -80,7 +80,10 @@ export async function GET(req: NextRequest) {
       }),
     );
 
-    return NextResponse.json({ insights });
+    return NextResponse.json({
+      insights,
+      lastUpdated: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("[Canvas] Insights data error:", error);
     return NextResponse.json(

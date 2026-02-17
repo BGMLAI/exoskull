@@ -5,6 +5,7 @@ import { MessageSquare, Clock, TrendingUp } from "lucide-react";
 import { ConversationStats, DataPoint } from "@/lib/dashboard/types";
 import Link from "next/link";
 import { AreaChartWrapper } from "@/components/charts/AreaChartWrapper";
+import { DataFreshness } from "./DataFreshness";
 
 interface ConversationsWidgetProps {
   stats: ConversationStats;
@@ -50,11 +51,7 @@ export function ConversationsWidget({
             Rozmowy
           </CardTitle>
           <div className="flex items-center gap-3">
-            {lastUpdated && (
-              <span className="text-xs text-muted-foreground">
-                Aktualizacja: {formatTime(lastUpdated)}
-              </span>
-            )}
+            <DataFreshness timestamp={lastUpdated} />
             <Link
               href="/dashboard/chat"
               className="text-sm font-normal text-muted-foreground hover:text-foreground"
@@ -94,12 +91,4 @@ export function ConversationsWidget({
       </CardContent>
     </Card>
   );
-}
-
-function formatTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleTimeString("pl-PL", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }

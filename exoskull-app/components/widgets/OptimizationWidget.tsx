@@ -14,12 +14,17 @@ import {
   Clock,
 } from "lucide-react";
 import type { OptimizationStats } from "@/lib/dashboard/types";
+import { DataFreshness } from "./DataFreshness";
 
 interface OptimizationWidgetProps {
   stats: OptimizationStats;
+  lastUpdated?: string | null;
 }
 
-export function OptimizationWidget({ stats }: OptimizationWidgetProps) {
+export function OptimizationWidget({
+  stats,
+  lastUpdated,
+}: OptimizationWidgetProps) {
   const {
     learningProgress,
     interventionSuccess,
@@ -40,9 +45,12 @@ export function OptimizationWidget({ stats }: OptimizationWidgetProps) {
   return (
     <Card className="h-full overflow-auto">
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <TrendingUp className="h-5 w-5" />
-          Optymalizacja IORS
+        <CardTitle className="text-lg flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Optymalizacja IORS
+          </span>
+          <DataFreshness timestamp={lastUpdated} />
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

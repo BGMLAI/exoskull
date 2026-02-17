@@ -117,7 +117,10 @@ export async function GET(request: NextRequest) {
             ),
           }));
 
-          return NextResponse.json({ values });
+          return NextResponse.json({
+            values,
+            lastUpdated: new Date().toISOString(),
+          });
         }
       } catch {
         // RPC not available yet — fall through to manual query
@@ -138,7 +141,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (!values || values.length === 0) {
-      return NextResponse.json({ values: [] });
+      return NextResponse.json({
+        values: [],
+        lastUpdated: new Date().toISOString(),
+      });
     }
 
     // Fetch loops + quest counts per value
@@ -368,7 +374,10 @@ export async function GET(request: NextRequest) {
       }),
     );
 
-    return NextResponse.json({ values: valuesWithLoops });
+    return NextResponse.json({
+      values: valuesWithLoops,
+      lastUpdated: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("[CanvasValues] Error:", error);
     return NextResponse.json(

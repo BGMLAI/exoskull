@@ -4,12 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, CheckSquare, Clock } from "lucide-react";
 import Link from "next/link";
 import { CalendarItem } from "@/lib/dashboard/types";
+import { DataFreshness } from "./DataFreshness";
 
 interface CalendarWidgetProps {
   items: CalendarItem[];
+  lastUpdated?: string | null;
 }
 
-export function CalendarWidget({ items }: CalendarWidgetProps) {
+export function CalendarWidget({ items, lastUpdated }: CalendarWidgetProps) {
   const upcomingItems = items.slice(0, 5);
 
   return (
@@ -20,12 +22,15 @@ export function CalendarWidget({ items }: CalendarWidgetProps) {
             <Calendar className="h-5 w-5" />
             Kalendarz
           </span>
-          <Link
-            href="/dashboard"
-            className="text-sm font-normal text-muted-foreground hover:text-foreground"
-          >
-            Widok canvas
-          </Link>
+          <div className="flex items-center gap-3">
+            <DataFreshness timestamp={lastUpdated} />
+            <Link
+              href="/dashboard"
+              className="text-sm font-normal text-muted-foreground hover:text-foreground"
+            >
+              Widok canvas
+            </Link>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
