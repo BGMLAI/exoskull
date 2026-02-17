@@ -42,11 +42,9 @@ export const GET = withApiLog(async function GET(
       .from("exo_tenant_mods")
       .select("*, mod:exo_mod_registry(*)")
       .eq("tenant_id", tenantId)
+      .eq("mod_slug", slug)
       .eq("active", true)
-      .single();
-
-    // Allow access even without installation for now (development)
-    // In production, you'd want to enforce installation check
+      .maybeSingle();
 
     // Check executor exists (static or dynamic)
     if (!(await hasModExecutor(slug as ModSlug, tenantId))) {

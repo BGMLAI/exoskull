@@ -63,10 +63,28 @@ export async function resolveTenant(
     email: "email",
     signal: "signal_phone",
     imessage: "imessage_address",
+    messenger: "messenger_psid",
   };
 
   const column = channelColumn[channel];
   if (column) {
+    // Messenger PSIDs are stored in metadata JSONB, not a top-level column
+    if (channel === "messenger") {
+      const { data } = await supabase
+        .from("exo_tenants")
+        .select("id, name")
+        .contains("metadata", { messenger_psid: from })
+        .single();
+
+      if (data) {
+        return {
+          tenantId: data.id,
+          name: data.name || senderName || "User",
+        };
+      }
+      return null;
+    }
+
     const { data } = await supabase
       .from("exo_tenants")
       .select("id, name")

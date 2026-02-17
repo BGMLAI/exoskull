@@ -6,6 +6,9 @@
  *
  * Supports multiple Facebook Pages: looks up page token from exo_meta_pages
  * table by incoming page_id, falls back to MESSENGER_PAGE_ACCESS_TOKEN env var.
+ *
+ * Uses the full AI gateway pipeline (handleInboundMessage) with all IORS tools,
+ * birth flow, async task classification, session tracking, and unified thread.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -16,7 +19,8 @@ import {
   extractMessagingEvent,
   type MessengerWebhookPayload,
 } from "@/lib/channels/messenger/client";
-import { aiChat } from "@/lib/ai";
+import { handleInboundMessage } from "@/lib/gateway/gateway";
+import type { GatewayMessage } from "@/lib/gateway/types";
 import { verifyMetaSignature } from "@/lib/security/webhook-hmac";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
@@ -164,7 +168,6 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 
     // Try to get user profile for personalization
     let userName = "there";
-    let language = "en";
 
     if (client) {
       try {
@@ -184,108 +187,61 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     if (!tenantId) {
       const { data: tenant } = await supabase
         .from("exo_tenants")
-        .select("id, display_name, language")
+        .select("id, display_name")
         .contains("metadata", { messenger_psid: senderPsid })
         .single();
 
       tenantId = tenant?.id || null;
       if (tenant?.display_name) userName = tenant.display_name;
-      if (tenant?.language) language = tenant.language;
     } else {
       // Load tenant details for known page owner
       const { data: tenant } = await supabase
         .from("exo_tenants")
-        .select("display_name, language")
+        .select("display_name")
         .eq("id", tenantId)
         .single();
 
       if (tenant?.display_name) userName = tenant.display_name;
-      if (tenant?.language) language = tenant.language;
     }
 
-    // Create conversation record
-    const { data: conversation } = await supabase
-      .from("exo_conversations")
-      .insert({
-        tenant_id: tenantId,
-        context: {
-          channel: "messenger",
-          page_id: pageId,
-          sender_psid: senderPsid,
-          sender_name: userName,
-          messenger_message_id: messageId,
-        },
-        message_count: 1,
-        user_messages: 1,
-        agent_messages: 0,
-      })
-      .select("id")
-      .single();
+    // Build GatewayMessage for full AI pipeline
+    const gatewayMsg: GatewayMessage = {
+      channel: "messenger",
+      tenantId: tenantId || "unknown",
+      from: senderPsid,
+      senderName: userName,
+      text,
+      metadata: {
+        page_id: pageId,
+        message_id: messageId,
+        sender_psid: senderPsid,
+      },
+    };
 
-    // Route to AI for response
-    try {
-      const systemPrompt =
-        language === "pl"
-          ? `Jestes ExoSkull - drugi mozg uzytkownika ${userName}. Odpowiadasz przez Messenger. Badz krotki, konkretny, pomocny. Uzywaj jezyka polskiego.`
-          : `You are ExoSkull - ${userName}'s second brain. You're replying via Messenger. Be brief, specific, helpful.`;
+    // Process through full AI pipeline (28 tools, birth flow, async classification)
+    const response = await handleInboundMessage(gatewayMsg);
 
-      const response = await aiChat(
-        [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: text },
-        ],
-        { taskCategory: "simple_response" },
-      );
-
-      // Send reply via Messenger
-      if (client) {
-        await client.sendTextMessage(senderPsid, response.content);
-
-        // Update conversation with agent response
-        if (conversation?.id) {
-          await supabase
-            .from("exo_conversations")
-            .update({
-              message_count: 2,
-              agent_messages: 1,
-              summary: `Messenger: ${text.substring(0, 100)}`,
-            })
-            .eq("id", conversation.id);
-        }
-      }
-
-      logger.info("[Messenger] Reply sent:", {
-        to: senderPsid,
-        pageId,
-        conversationId: conversation?.id,
-        responseLength: response.content.length,
-      });
-    } catch (error) {
-      logger.error("[Messenger] AI routing failed:", {
-        error: error instanceof Error ? error.message : "Unknown error",
-        senderPsid,
-        pageId,
-        tenantId,
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-
-      // Send fallback message
-      if (client) {
-        const fallback =
-          language === "pl"
-            ? "Przepraszam, mam teraz problem z przetwarzaniem. Sprobuj ponownie za chwile."
-            : "Sorry, I am having trouble processing right now. Please try again in a moment.";
-
-        try {
-          await client.sendTextMessage(senderPsid, fallback);
-        } catch (sendError) {
-          logger.error("[Messenger] Fallback message failed:", {
-            error:
-              sendError instanceof Error ? sendError.message : "Unknown error",
-          });
-        }
+    // Send reply via Messenger
+    if (client) {
+      try {
+        await client.sendTextMessage(senderPsid, response.text);
+      } catch (sendError) {
+        logger.error("[Messenger] Failed to send reply:", {
+          error:
+            sendError instanceof Error ? sendError.message : "Unknown error",
+          senderPsid,
+          pageId,
+        });
       }
     }
+
+    logger.info("[Messenger] Reply sent:", {
+      to: senderPsid,
+      pageId,
+      tenantId,
+      toolsUsed: response.toolsUsed,
+      responseLength: response.text.length,
+    });
 
     return NextResponse.json({ received: true });
   } catch (error) {
