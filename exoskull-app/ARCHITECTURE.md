@@ -178,11 +178,11 @@ z-50  → FloatingCallButton     (voice call, always accessible, bottom-right)
 
 ### Hooks
 
-| Hook              | Location                       | Purpose                                                                                              |
-| ----------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `useResizeHandle` | `lib/hooks/useResizeHandle.ts` | Custom drag-to-resize for cockpit columns (mousedown/move/up on document, RAF throttle)              |
-| `useCockpitKeys`  | `lib/hooks/useCockpitKeys.ts`  | Keyboard shortcuts: Escape (close preview), Ctrl+1-6 (toggle panels), Ctrl+[/] (resize wings)        |
-| `useOrbData`      | `lib/hooks/useOrbData.ts`      | Orb tree data (singleton). Mutations: addNode, removeNode, updateNode. Maps OrbNodeType→API endpoint |
+| Hook              | Location                       | Purpose                                                                                                                                                                            |
+| ----------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useResizeHandle` | `lib/hooks/useResizeHandle.ts` | Custom drag-to-resize for cockpit columns (mousedown/move/up on document, RAF throttle)                                                                                            |
+| `useCockpitKeys`  | `lib/hooks/useCockpitKeys.ts`  | Keyboard shortcuts: Escape (close preview), Ctrl+1-6 (toggle panels), Ctrl+[/] (resize wings)                                                                                      |
+| `useOrbData`      | `lib/hooks/useOrbData.ts`      | Orb tree data (singleton). Mutations: addNode, removeNode, updateNode (with fetchWithRetry). Maps OrbNodeType→API endpoint. 30min auto-refresh. Returns `lastRefreshed` timestamp. |
 
 ### Shared Utilities
 
@@ -298,7 +298,7 @@ Click item in any wing panel
 | `@react-three/fiber`          | ^8.17.0  | React renderer for Three.js                   |
 | `@react-three/drei`           | ^9.117.0 | R3F helpers (OrbitControls, Html, Line, etc.) |
 | `@react-three/postprocessing` | ^2.16.0  | Bloom, ChromaticAberration, Vignette          |
-| `@react-three/uikit`          | ^0.13.2  | 3D UI components for R3F                      |
+| ~~`@react-three/uikit`~~      | removed  | Was unused — removed in dep hygiene audit     |
 | `react-force-graph-3d`        | ^1.29.1  | Force-directed 3D graph (MindMap3D)           |
 | `arwes` + `@arwes/*`          | ^1.0.0   | Sci-fi UI framework (CSS variables only)      |
 | `zustand`                     | ^5.0.0   | State management                              |
@@ -358,9 +358,10 @@ All routes use `verifyTenantAuth` for authentication.
 - **Inline image generation**: NanoBanana / AI Studio Gemini integration in chat
 - **Quick action dispatch**: Bottom bar buttons dispatch commands to UnifiedStream input
 - **Real-time panel refresh**: WebSocket or polling for live data updates in wing panels
-- **Mind map persistence**: ~~Save node visual types, model URLs~~ — DONE (visual_type, model_url, thumbnail_url columns + API + UI wired). Expanded state not yet persisted.
+- **Mind map persistence**: ~~Save node visual types, model URLs~~ — DONE (visual_type, model_url, thumbnail_url columns + 5 PATCH routes + useOrbData read/write + MindMap3D callbacks). Expanded state not yet persisted.
 - **Sketchfab download + R2 cache**: Download glTF from Sketchfab, cache on Cloudflare R2 (API route placeholder exists)
 - **LOD for mind map**: Distant nodes → simple sphere, close → full detail. Max 200 visible nodes
 - **Web Worker for force simulation**: Offload physics to worker for better frame rate
-- **RichContentCard integration**: Wire into StreamEventRouter for inline rich media in chat
+- **RichContentCard integration**: ~~Wire into StreamEventRouter~~ — DONE (SearchResultsEvent + RichContentEvent in StreamEventRouter)
 - **Sound effects**: Arwes-style subtle bleeps on hover/click in mind map
+- **Data freshness UI**: DataFreshness component exists but not yet wired into dashboard panels

@@ -1,5 +1,50 @@
 # Session Log
 
+## [2026-02-18] Full Audit Roadmap Execution (P0 → P2)
+
+### Tasks
+
+- P2 Mind Map Persistence (5 PATCH routes + hook + MindMap3D callbacks): **SUCCESS**
+- P0 F3.1 VPS Circuit Breaker (3-state: closed/open/half_open): **SUCCESS**
+- P0 F3.5 Thread Race Fix (upsert ON CONFLICT): **SUCCESS**
+- P0 F3.2 Voice Auth (verified already migrated): **SUCCESS** (no-op)
+- P0 F3.3 Guardian Re-check (verified already in executor.ts): **SUCCESS** (no-op)
+- P1 Unified-thread Auth Migration (getUser → verifyTenantAuth): **SUCCESS**
+- P1 Voice Recording Guard (disabled prop + isSpeaking): **SUCCESS**
+- P1 Data Freshness (30min polling + lastRefreshed + DataFreshness component): **SUCCESS**
+- P2 N+1 Notes Fix (batch GROUP BY instead of per-entity COUNT): **SUCCESS**
+- P2 Action Whitelist (ALLOWED_ACTION_TYPES set, 14 valid types): **SUCCESS**
+- P2 Frontend Mutation Retry (fetchWithRetry utility, applied to useOrbData): **SUCCESS**
+- TypeScript: 0 errors throughout
+- Tests: 134/134 pass throughout
+
+### Commits
+
+| Commit                | Description                                            |
+| --------------------- | ------------------------------------------------------ |
+| `ebff047`             | feat: mind map persistence (11 files, +238 lines)      |
+| `3e6bc7f`             | fix: VPS circuit breaker + thread race fix             |
+| `6fcf8e2`             | feat: unified-thread auth, voice guard, data freshness |
+| `941c070`             | feat: N+1 fix, action whitelist, mutation retry        |
+| + 4 CHANGELOG commits | docs updates per sprint                                |
+
+### Key Decisions
+
+- VPS circuit breaker: fail-open (if check errors, allow request through), 3 failures → open, 30s cooldown
+- Thread upsert: ignoreDuplicates + fallback select (handles Supabase PostgREST edge case)
+- Guardian re-check: fail-open (guardian error → proceed with execution)
+- Action whitelist: reject + mark failed + remove from queue (not just ignore)
+- fetchWithRetry: 2 retries, linear backoff (1s, 2s), only on 500/502/503/504
+- DataFreshness component created but not yet wired into dashboard panels (available for future use)
+
+### Parallel Agent Execution
+
+- Sprint P0: 4 agents parallel (circuit breaker, voice auth, guardian, thread race)
+- Sprint P1: 3 agents parallel (unified-thread, voice guard, data freshness)
+- Sprint P2: 3 agents parallel (N+1 fix, action whitelist, mutation retry)
+
+---
+
 ## [2026-02-17] Claude Code Merge into Main Dashboard Chat
 
 ### Tasks
