@@ -2,7 +2,91 @@
 
 ## Overview
 
-ExoSkull's dashboard is a **hybrid 3D + 2D cockpit** built with React Three Fiber (R3F) on Next.js 14. The 3D scene (world orbs, synthwave grid, particles, bloom) serves as the background atmosphere. A pure HTML/CSS cockpit HUD overlay renders on top at z=10, providing FPV game-style panels (Star Citizen / Elite Dangerous). The backend (Agent SDK, Gateway, 63+ IORS tools) is unchanged — this is a frontend architecture.
+ExoSkull's dashboard has **two view modes** selectable via toggle:
+
+1. **Mind Map Workspace** (default) — NotebookLM-style three-panel layout with a 3D force-directed mind map (react-force-graph-3d), collapsible Sources + Studio panels, and a floating resizable chat. Sci-fi themed with Arwes CSS variables.
+
+2. **Classic Cockpit** — Hybrid 3D + 2D cockpit built with React Three Fiber (R3F). The 3D scene (world orbs, synthwave grid, particles, bloom) serves as background. HTML/CSS cockpit HUD overlay at z=10 provides FPV game-style panels (Star Citizen / Elite Dangerous).
+
+The backend (Agent SDK, Gateway, 63+ IORS tools) is shared between both views.
+
+## Mind Map Workspace (`viewMode: "mindmap"`)
+
+### Layout
+
+```
+┌─────────────┬──────────────────────┬──────────────┐
+│ Sources     │   MindMap3D          │ Studio       │
+│ (collapsible│   (force-graph-3d)   │ (collapsible)│
+│  280px)     │                      │  320px)      │
+│             │   ┌──────────────┐   │              │
+│ - search    │   │ floating     │   │ - summaries  │
+│ - upload    │   │ chat (resize)│   │ - notes      │
+│ - URL import│   └──────────────┘   │ - export     │
+└─────────────┴──────────────────────┴──────────────┘
+```
+
+### Components (`components/mindmap/`, `components/layout/`)
+
+| File                              | Purpose                                                                                                               |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `WorkspaceLayout.tsx`             | Three-panel layout with collapsible/resizable side panels, floating resizable chat (UnifiedStream) at bottom center   |
+| `SourcesPanel.tsx`                | Knowledge docs from `/api/knowledge` (`exo_user_documents`). Upload, URL import, search, status badges                |
+| `StudioPanel.tsx`                 | Three tabs: AI Summary (via `/api/chat/stream` SSE), Notes (textarea), Export (JSON/Markdown)                         |
+| `MindMap3D.tsx`                   | Force-directed 3D graph. Dynamic import of `react-force-graph-3d`. Custom `nodeThreeObject` dispatches to 4 renderers |
+| `NodeContextMenu.tsx`             | Right-click: expand/collapse, view details, change visual type (orb/image/model3d/card), attach 3D model              |
+| `NodeDetailPanel.tsx`             | Slide-in panel with status badge, description, progress bar, tags, color, depth                                       |
+| `ModelPicker.tsx`                 | Dialog with 3 tabs: Sketchfab search, file upload, URL. Grid thumbnails + confirm workflow                            |
+| `node-renderers/OrbRenderer.ts`   | THREE.Mesh sphere + glow halo + label sprite                                                                          |
+| `node-renderers/ImageRenderer.ts` | Billboard plane with texture + border frame                                                                           |
+| `node-renderers/ModelRenderer.ts` | GLTFLoader with LRU cache (max 50). Placeholder while loading                                                         |
+| `node-renderers/CardRenderer.ts`  | Canvas-rendered card with type badge, title, description, progress bar, tags                                          |
+
+### Mind Map Data Flow
+
+```
+useOrbData() fetches /api/canvas/data/values?deep=true
+  → OrbNode[] tree (values → loops → quests → missions → challenges → ops)
+  → graph-converter.ts converts tree → flat { nodes: MindMapNode[], links: MindMapLink[] }
+  → Only nodes in useMindMapStore.expandedNodes are included
+  → react-force-graph-3d renders with custom nodeThreeObject callback
+  → Click node: zoom camera + toggle expand + lazy load children
+  → Right-click: NodeContextMenu (change visual, attach model, expand, details)
+```
+
+### State: `useMindMapStore` (Zustand)
+
+| Field           | Type             | Purpose                           |
+| --------------- | ---------------- | --------------------------------- |
+| expandedNodes   | `Set<string>`    | Which nodes have visible children |
+| focusedNodeId   | `string \| null` | Camera target node                |
+| hoveredNodeId   | `string \| null` | Tooltip target                    |
+| viewMode        | `'3d' \| '2d'`   | Graph dimension toggle            |
+| filterQuery     | `string`         | Node search filter                |
+| selectedSources | `string[]`       | Active knowledge sources          |
+
+### Providers
+
+| File                | Purpose                                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `ArwesProvider.tsx` | CSS variables wrapper: `--arwes-cyan`, `--arwes-violet`, `--arwes-dark`, `--arwes-glow`. Wraps entire app inside ThemeProvider |
+
+### New API Routes
+
+| Route                | Purpose                                                                                                     |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `/api/models/search` | Proxy for Sketchfab API. Query params: `q`, `maxVertices`. Hides API key, filters downloadable + CC license |
+
+### Styles
+
+| File                   | Purpose                                                                                                                                                   |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `styles/mindmap.css`   | Node hover glow, tooltip, controls, expand animation, link particle glow                                                                                  |
+| `styles/workspace.css` | Panel frames, Arwes border glow animation (`arwes-border-glow`), resize handles, corner accents (`arwes-corners`), responsive (stack at 768px), scrollbar |
+
+---
+
+## Classic Cockpit (`viewMode: "classic"`)
 
 ## Layered Z-Index Architecture
 
@@ -61,10 +145,10 @@ z-50  → FloatingCallButton     (voice call, always accessible, bottom-right)
 
 ### Dashboard Overlays (`components/dashboard/`)
 
-| File                       | Purpose                                                                                                                       |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `CyberpunkDashboard.tsx`   | Top-level layout — composes 3D scene (z-0) + CockpitHUDShell (z-10) + ToolExecutionOverlay (z-30) + FloatingCallButton (z-50) |
-| `ToolExecutionOverlay.tsx` | Shows active tool name + elapsed time. Reads from `useSceneStore`.                                                            |
+| File                       | Purpose                                                                                                                                |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `CyberpunkDashboard.tsx`   | Top-level layout — routes to WorkspaceLayout (mindmap) or CyberpunkScene+CockpitHUDShell (classic) based on `useCockpitStore.viewMode` |
+| `ToolExecutionOverlay.tsx` | Shows active tool name + elapsed time. Reads from `useSceneStore`.                                                                     |
 
 ### Deprecated (kept for reference)
 
@@ -79,13 +163,14 @@ z-50  → FloatingCallButton     (voice call, always accessible, bottom-right)
 
 ### State Management
 
-| Store                 | Location                            | Purpose                                                                                                                                       |
-| --------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `useCockpitStore`     | `lib/stores/useCockpitStore.ts`     | Cockpit layout: wing widths (persisted), centerMode (chat/preview), previewTarget, sections, collapsedPanels, selectedWorldId, orbContextMenu |
-| `useSceneStore`       | `lib/stores/useSceneStore.ts`       | Bridges SSE tool events → 3D visual effects. SceneEffect types: idle, thinking, building, searching, executing.                               |
-| `useSpatialChatStore` | `lib/stores/useSpatialChatStore.ts` | @deprecated — was used by SpatialChat. CenterViewport uses UnifiedStream directly.                                                            |
-| `useInterfaceStore`   | `lib/stores/useInterfaceStore.ts`   | General UI state (existing, preserved)                                                                                                        |
-| `useStreamState`      | `lib/hooks/useStreamState.ts`       | Chat state reducer (existing, 14 action types)                                                                                                |
+| Store                 | Location                            | Purpose                                                                                                                          |
+| --------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `useCockpitStore`     | `lib/stores/useCockpitStore.ts`     | Layout: viewMode (`"mindmap"` \| `"classic"`), wing widths, centerMode, previewTarget, sections, collapsedPanels, orbContextMenu |
+| `useMindMapStore`     | `lib/stores/useMindMapStore.ts`     | Mind map: expandedNodes, focusedNodeId, hoveredNodeId, viewMode (3d/2d), filterQuery, selectedSources                            |
+| `useSceneStore`       | `lib/stores/useSceneStore.ts`       | Bridges SSE tool events → 3D visual effects. SceneEffect types: idle, thinking, building, searching, executing.                  |
+| `useSpatialChatStore` | `lib/stores/useSpatialChatStore.ts` | @deprecated — was used by SpatialChat. CenterViewport uses UnifiedStream directly.                                               |
+| `useInterfaceStore`   | `lib/stores/useInterfaceStore.ts`   | General UI state (existing, preserved)                                                                                           |
+| `useStreamState`      | `lib/hooks/useStreamState.ts`       | Chat state reducer (existing, 14 action types)                                                                                   |
 
 ### Hooks
 
@@ -202,6 +287,9 @@ Click item in any wing panel
 | `@react-three/fiber`          | ^8.17.0  | React renderer for Three.js                   |
 | `@react-three/drei`           | ^9.117.0 | R3F helpers (OrbitControls, Html, Line, etc.) |
 | `@react-three/postprocessing` | ^2.16.0  | Bloom, ChromaticAberration, Vignette          |
+| `@react-three/uikit`          | ^0.13.2  | 3D UI components for R3F                      |
+| `react-force-graph-3d`        | ^1.29.1  | Force-directed 3D graph (MindMap3D)           |
+| `arwes` + `@arwes/*`          | ^1.0.0   | Sci-fi UI framework (CSS variables only)      |
 | `zustand`                     | ^5.0.0   | State management                              |
 | `lucide-react`                | ^0.474.0 | Icon components                               |
 
@@ -210,21 +298,27 @@ Click item in any wing panel
 ```
 app/dashboard/page.tsx
   → CyberpunkDashboard (tenantId)
-    → CyberpunkScene (z-0)
-      → CyberpunkSceneInner
-        → SynthwaveGrid, Skybox, Particles, OrbitalScene, SceneEffects, ScenePostProcessing
-    → CockpitHUDShell (z-10)
-      → CockpitTopBar (clock, IORS status, active tool)
-      → LeftWing (Tasks, IORS, Email panels)
-      → ResizeHandle × 2
-      → CenterViewport
-        → UnifiedStream (chat, always mounted)
-        → PreviewPane (detail view, opacity toggle)
-      → RightWing (Calendar, Values, Knowledge panels)
-      → CockpitBottomBar (quick actions, gauges)
-      → ChannelOrbs (z-12, floating)
-    → ToolExecutionOverlay (z-30)
-    → FloatingCallButton (z-50)
+    → IF viewMode === "mindmap":
+      → WorkspaceLayout (tenantId)
+        → SourcesPanel (left, collapsible 280px)
+        → MindMap3D (center, force-directed 3D graph)
+          → NodeContextMenu (right-click overlay)
+          → NodeDetailPanel (slide-in detail)
+          → ModelPicker (3D model dialog)
+        → UnifiedStream (floating bottom, resizable 120-600px)
+        → StudioPanel (right, collapsible 320px)
+      → View toggle button ("Classic")
+      → FloatingCallButton (z-50)
+
+    → IF viewMode === "classic":
+      → CyberpunkScene (z-0)
+        → CyberpunkSceneInner
+          → SynthwaveGrid, Skybox, Particles, OrbitalScene, SceneEffects, ScenePostProcessing
+      → CockpitHUDShell (z-10)
+        → CockpitTopBar, LeftWing, CenterViewport (UnifiedStream + PreviewPane), RightWing, CockpitBottomBar, ChannelOrbs
+      → ToolExecutionOverlay (z-30)
+      → View toggle button ("Mind Map")
+      → FloatingCallButton (z-50)
 ```
 
 ## Knowledge API (Orb CRUD)
@@ -251,3 +345,9 @@ All routes use `verifyTenantAuth` for authentication.
 - **Inline image generation**: NanoBanana / AI Studio Gemini integration in chat
 - **Quick action dispatch**: Bottom bar buttons dispatch commands to UnifiedStream input
 - **Real-time panel refresh**: WebSocket or polling for live data updates in wing panels
+- **Mind map persistence**: Save node visual types, model URLs, expanded state to DB (`exo_values` columns added but API not yet updated)
+- **Sketchfab download + R2 cache**: Download glTF from Sketchfab, cache on Cloudflare R2 (API route placeholder exists)
+- **LOD for mind map**: Distant nodes → simple sphere, close → full detail. Max 200 visible nodes
+- **Web Worker for force simulation**: Offload physics to worker for better frame rate
+- **RichContentCard integration**: Wire into StreamEventRouter for inline rich media in chat
+- **Sound effects**: Arwes-style subtle bleeps on hover/click in mind map

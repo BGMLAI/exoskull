@@ -4,6 +4,56 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-17] Phase 14: 3D Mind Map Workspace
+
+### New Components
+
+- **MindMap3D**: Force-directed 3D graph (react-force-graph-3d) with custom node renderers (Orb, Image, Model3D, Card)
+- **WorkspaceLayout**: NotebookLM-style three-panel layout (Sources | MindMap3D | Studio) with collapsible/resizable panels and floating chat
+- **SourcesPanel**: Knowledge docs from `/api/knowledge` with upload + URL import, search, status badges
+- **StudioPanel**: AI summary via `/api/chat/stream` SSE, notes textarea, JSON/Markdown export
+- **NodeContextMenu**: Right-click menu — expand/collapse, change visual type, attach 3D model, view details
+- **NodeDetailPanel**: Slide-in panel with status, progress bar, tags, metadata
+- **ModelPicker**: Sketchfab search + file upload + URL input for 3D model attachment
+- **RichContentCard**: Polymorphic Gemini-style cards (Image, Article, Code, Model3D)
+- **SearchResults**: Perplexity-style grid with citation numbers and follow-up chips
+- **ArwesProvider**: Sci-fi CSS variables (`--arwes-cyan`, `--arwes-violet`, etc.) wired into root layout
+
+### New Infrastructure
+
+- **graph-converter.ts**: Converts OrbNode[] tree to flat `{nodes, links}` for react-force-graph-3d
+- **useMindMapStore**: Zustand store — expandedNodes, focusedNodeId, viewMode, filterQuery
+- **sketchfab.ts**: API client for Sketchfab model search + download URLs
+- **`/api/models/search`**: Proxy route for Sketchfab API (hides key, filters by vertex count + license)
+- **Node renderers**: 4 THREE.js renderers — OrbRenderer (sphere+glow), ImageRenderer (billboard sprite), ModelRenderer (GLTFLoader+cache), CardRenderer (canvas-rendered card)
+
+### Modified
+
+- **CyberpunkDashboard**: Conditional render — `viewMode === "mindmap"` shows WorkspaceLayout, `"classic"` shows CyberpunkScene + CockpitHUDShell
+- **useCockpitStore**: Added `ViewMode` type, `viewMode` state (default: `"mindmap"`), `setViewMode`, `toggleViewMode`
+- **orb-types.ts**: Extended OrbNode with `NodeVisualType`, `modelUrl`, `thumbnailUrl`, `sourceUrls`, `tags`
+- **app/layout.tsx**: Added ArwesProvider wrapper inside ThemeProvider
+- **globals.css**: Imports `mindmap.css` + `workspace.css`
+
+### New Styles
+
+- **mindmap.css**: Node hover glow, tooltip, controls, expand animation, link particle glow
+- **workspace.css**: Panel frame effects, Arwes border glow animation, resize handles, corner accents, responsive breakpoints, scrollbar styling
+
+### Packages Added
+
+- `arwes`, `@arwes/react`, `@arwes/animated`, `@arwes/frames`, `@arwes/text`, `@arwes/bgs`
+- `@react-three/uikit`
+
+### Verified
+
+- `npm run build` PASS
+- Dev server PASS (localhost:3001)
+- Puppeteer login + dashboard test: 3D graph renders (10 nodes, 7 links), all panels visible, chat functional
+- Vercel production deploy: READY (3 min build)
+
+---
+
 ## [2026-02-17] Phase 13: Cockpit HUD Redesign
 
 - **BottomPanelGrid**: NEW — 2x2 glass panels replacing wings/drawer layout
