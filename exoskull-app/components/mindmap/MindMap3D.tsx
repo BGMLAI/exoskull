@@ -5,6 +5,8 @@
  *
  * Renders OrbNode hierarchy as an interactive 3D graph.
  * Custom nodeThreeObject renders different visuals based on visualType.
+ *
+ * ALWAYS uses dark background for 3D visibility (orbs, glow, labels need dark bg).
  */
 
 import { useCallback, useMemo, useRef, useEffect, useState } from "react";
@@ -28,7 +30,7 @@ const ForceGraph3DComponent = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full flex items-center justify-center text-cyan-400/60 font-mono text-sm">
+      <div className="w-full h-full flex items-center justify-center bg-[#050510] text-cyan-400/60 font-mono text-sm">
         Inicjalizacja mapy mysli...
       </div>
     ),
@@ -40,18 +42,13 @@ interface MindMap3DProps {
   height?: number;
 }
 
+// 3D scene ALWAYS uses dark background — orbs, glow, and labels are designed for dark
+const SCENE_BG = "#050510";
+
 export function MindMap3D({ width, height }: MindMap3DProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fgRef = useRef<any>(null);
-  const [bgColor, setBgColor] = useState<string>("#050510");
 
-  useEffect(() => {
-    const style = getComputedStyle(document.documentElement);
-    const hsl = style.getPropertyValue("--background").trim();
-    if (hsl) {
-      setBgColor(`hsl(${hsl})`);
-    }
-  }, []);
   const { rootNodes, loadChildren, updateNode } = useOrbData();
   const {
     expandedNodes,
@@ -86,24 +83,87 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
     }
   }, [rootNodes, expandedNodes.size]);
 
+  // Add lights to the scene after graph initializes
+  useEffect(() => {
+    if (!fgRef.current) return;
+    const scene = fgRef.current.scene?.();
+    if (!scene) return;
+
+    // Check if we already added lights
+    if (scene.getObjectByName("__exo_ambient")) return;
+
+    // Ambient light for base visibility
+    const ambient =
+      new // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (require("three") as typeof import("three")).AmbientLight(0x404060, 0.5);
+    ambient.name = "__exo_ambient";
+    scene.add(ambient);
+
+    // Directional light for depth
+    const dir =
+      new // eslint-disable-next-line @typescript-eslint/no-require-imports
+      (require("three") as typeof import("three")).DirectionalLight(
+        0xffffff,
+        0.3,
+      );
+    dir.position.set(50, 100, 50);
+    dir.name = "__exo_dir";
+    scene.add(dir);
+  });
+
   // Convert tree to graph data
   const graphData = useMemo(() => {
-    return convertOrbTreeToGraph(rootNodes, expandedNodes);
+    const data = convertOrbTreeToGraph(rootNodes, expandedNodes);
+    // Debug: log graph data stats on mount
+    if (data.nodes.length > 0) {
+      console.log("[MindMap3D] Graph data:", {
+        nodes: data.nodes.length,
+        links: data.links.length,
+        sampleNode: {
+          id: data.nodes[0].id,
+          name: data.nodes[0].name,
+          color: data.nodes[0].color,
+          val: data.nodes[0].val,
+          type: data.nodes[0].type,
+          visualType: data.nodes[0].visualType,
+        },
+      });
+    }
+    return data;
   }, [rootNodes, expandedNodes]);
 
   // Create THREE.Object3D for each node based on its visualType
+  // Wrapped in try-catch — ALWAYS returns a valid Object3D (never undefined)
   const nodeThreeObject = useCallback((node: Record<string, unknown>) => {
-    const mapNode = node as unknown as MindMapNode;
-    switch (mapNode.visualType) {
-      case "image":
-        return createImageObject(mapNode);
-      case "model3d":
-        return createModelObject(mapNode);
-      case "card":
-        return createCardObject(mapNode);
-      case "orb":
-      default:
-        return createOrbObject(mapNode);
+    try {
+      const mapNode = node as unknown as MindMapNode;
+
+      switch (mapNode.visualType) {
+        case "image":
+          return createImageObject(mapNode);
+        case "model3d":
+          return createModelObject(mapNode);
+        case "card":
+          return createCardObject(mapNode);
+        case "orb":
+        default:
+          return createOrbObject(mapNode);
+      }
+    } catch (error) {
+      console.error("[MindMap3D] nodeThreeObject failed:", {
+        error: error instanceof Error ? error.message : error,
+        nodeId: node.id,
+        color: node.color,
+        val: node.val,
+      });
+      // Fallback: always return a visible sphere
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const THREE = require("three") as typeof import("three");
+      const geo = new THREE.SphereGeometry(1, 8, 8);
+      const mat = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.scale.setScalar(4);
+      return mesh;
     }
   }, []);
 
@@ -206,9 +266,9 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
           : link.target;
 
       if (source === focusedNodeId || target === focusedNodeId) {
-        return "rgba(0, 212, 255, 0.5)";
+        return "rgba(0, 212, 255, 0.8)";
       }
-      return (link.color as string) || "rgba(100, 130, 180, 0.5)";
+      return (link.color as string) || "rgba(100, 180, 255, 0.4)";
     },
     [focusedNodeId],
   );
@@ -220,7 +280,7 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
         graphData={graphData}
         width={width}
         height={height}
-        backgroundColor={bgColor}
+        backgroundColor={SCENE_BG}
         nodeThreeObject={nodeThreeObject}
         nodeThreeObjectExtend={false}
         onNodeClick={handleNodeClick}
@@ -229,10 +289,10 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
         linkColor={linkColor}
         dagMode="radialout"
         dagLevelDistance={60}
-        linkWidth={2.5}
-        linkOpacity={0.7}
+        linkWidth={2}
+        linkOpacity={0.6}
         linkDirectionalParticles={1}
-        linkDirectionalParticleWidth={1.5}
+        linkDirectionalParticleWidth={2}
         linkDirectionalParticleSpeed={0.004}
         linkDirectionalParticleColor={() => "#00d4ff"}
         warmupTicks={50}

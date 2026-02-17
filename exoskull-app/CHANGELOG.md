@@ -4,6 +4,28 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-18] Fix: 3D Model Loading — Sketchfab Download + File Upload
+
+### Sketchfab Download Proxy
+
+- Created `/api/models/[uid]/download` route that fetches actual GLB download URLs from Sketchfab API
+- ModelPicker now calls this proxy instead of passing non-loadable viewer HTML URLs to GLTFLoader
+- Handles format fallback (gltf → glb → any available), error codes, and missing API key
+
+### File Upload MIME Types
+
+- Added 3D model MIME types to upload whitelist: `model/gltf-binary`, `model/gltf+json`, `application/octet-stream`
+- Added extension-based fallback validation (`.glb`, `.gltf`, `.fbx`, `.obj`) for browsers that misreport MIME types
+- Upload response now includes `url` (public Supabase Storage URL) so ModelPicker can pass it to GLTFLoader
+
+### ModelPicker UX
+
+- Loading spinner + "Pobieranie..." state while fetching download URL from Sketchfab
+- Error messages displayed inline for both Sketchfab download and file upload failures
+- Upload tab shows spinner during upload, disabled file input while in progress
+
+---
+
 ## [2026-02-18] P2 Performance/Security: N+1 Fix, Action Whitelist, Retry
 
 ### Values API N+1 Fix
