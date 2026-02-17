@@ -4,6 +4,26 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-18] P0 Reliability: VPS Circuit Breaker + Thread Race Fix
+
+### F3.1 — VPS Circuit Breaker
+
+- Proper state machine: `closed` → `open` (after 3 failures) → `half_open` (after 30s) → `closed` (on probe success)
+- When open, VPS proxy is skipped entirely — no more 5s latency spike for all users during VPS outage
+- All state transitions logged for observability
+
+### F3.5 — Thread Creation Race Condition
+
+- Replaced check-then-insert with atomic `upsert(onConflict: "tenant_id", ignoreDuplicates: true)` + fallback select
+- Two concurrent messages for same tenant can no longer create duplicate threads
+
+### F3.2 + F3.3 — Already Resolved
+
+- Voice auth (voice/chat, voice/tts, settings/voice) — already migrated to `verifyTenantAuth()` in batch migration
+- Guardian re-check before execution — already present in `executor.ts:105-149`
+
+---
+
 ## [2026-02-18] P2 Mind Map Persistence: Visual Type, Model, Thumbnail
 
 ### DB Migration
