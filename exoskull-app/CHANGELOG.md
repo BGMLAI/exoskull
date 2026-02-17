@@ -4,6 +4,27 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-18] P2 Performance/Security: N+1 Fix, Action Whitelist, Retry
+
+### Values API N+1 Fix
+
+- Replaced per-entity notes count queries with batch `GROUP BY` aggregation
+- Large value trees now load with 1-2 queries instead of N+1
+
+### Autonomy Action Whitelist
+
+- `ALLOWED_ACTION_TYPES` set validates action types before `dispatchAction()`
+- Unknown/injected action types → rejected with `status: "failed"`, logged, removed from queue
+- 14 valid action types: send_sms, send_email, send_whatsapp, make_call, create_task, proactive_message, etc.
+
+### Frontend Mutation Retry
+
+- `fetchWithRetry` utility: auto-retry on 500/502/503/504 with linear backoff (1s, 2s)
+- Applied to useOrbData mutations (addNode, removeNode, updateNode)
+- Better resilience on transient server errors
+
+---
+
 ## [2026-02-18] P1 UX/Reliability: Auth, Voice Guard, Data Freshness
 
 ### Unified-Thread Auth Migration
