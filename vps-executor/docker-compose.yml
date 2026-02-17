@@ -10,6 +10,13 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp
+      - /root/projects:/root/projects
+      - /root/.claude:/root/.claude:ro
+      - /root/goals:/root/goals:ro
+      - /root/tools:/root/tools:ro
+      - /root/context:/root/context:ro
+      - /root/hardprompts:/root/hardprompts:ro
+      - /root/args:/root/args:ro
     environment:
       - VPS_EXECUTOR_SECRET=${VPS_EXECUTOR_SECRET}
       - PORT=3500

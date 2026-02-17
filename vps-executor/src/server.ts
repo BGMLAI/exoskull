@@ -14,6 +14,7 @@
 
 import express from "express";
 import { DockerRunner } from "./docker-runner";
+import { codeRouter } from "./routes/code";
 import { v4 as uuid } from "uuid";
 
 const app = express();
@@ -81,6 +82,9 @@ function authenticate(
 // ============================================================================
 // ROUTES
 // ============================================================================
+
+// Code API routes (file operations, bash, git, search)
+app.use("/api/code", authenticate, codeRouter);
 
 app.get("/health", (_req, res) => {
   res.json({

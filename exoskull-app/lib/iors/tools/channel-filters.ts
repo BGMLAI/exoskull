@@ -103,6 +103,15 @@ export const WEB_TOOL_NAMES = new Set([
   "autonomous_action",
   // Feedback
   "submit_feedback",
+  // Code Execution (VPS)
+  "code_read_file",
+  "code_write_file",
+  "code_edit_file",
+  "code_bash",
+  "code_glob",
+  "code_grep",
+  "code_git",
+  "code_tree",
 ]);
 
 // ============================================================================

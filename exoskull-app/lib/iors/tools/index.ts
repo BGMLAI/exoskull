@@ -63,6 +63,7 @@ import { googleDriveTools } from "./google-drive-tools";
 import { contentTools } from "./content-tools";
 import { strategyTools } from "./strategy-tools";
 import { outboundTools } from "./outbound-tools";
+import { codeExecutionTools } from "./code-execution-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -101,6 +102,8 @@ export const IORS_EXTENSION_TOOLS: ToolDefinition[] = [
   ...contentTools,
   ...strategyTools,
   ...outboundTools,
+  // Code execution tools (VPS file ops, bash, git)
+  ...codeExecutionTools,
 ];
 
 /**
