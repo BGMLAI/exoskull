@@ -1,5 +1,38 @@
 # Session Log
 
+## [2026-02-18] Wire Proactive Notifications — Gap Detection, Goals, Predictions
+
+### Tasks
+
+- Gap Detection → sendProactiveMessage after swarm analysis: **SUCCESS**
+- Goal Progress milestones → sendProactiveMessage at 25/50/75/100%: **SUCCESS**
+- Goal Progress off-track → scheduled_for 4h (was null/never): **SUCCESS**
+- Predictions → immediate SMS for high-confidence urgent: **SUCCESS**
+- Insight Push → confirmed already working (no fix needed): **SUCCESS**
+- Build verification: **SUCCESS**
+- Git push: **SUCCESS** (ad0de9f)
+
+### Notes
+
+- Audit revealed 70% of proactive systems were silently writing to DB
+- `sendProactiveMessage()` dispatches via: Telegram → WhatsApp → Slack → Discord → SMS → Email → web_chat
+- Also fires FCM push notification (fire-and-forget)
+- Rate limited: max 8 proactive messages per day per tenant
+- Quiet hours respected (23:00-07:00)
+- Predictions already had auto-approve for high severity (scheduled_for: now()) — the gap was missing direct SMS
+
+### Before/After
+
+| System             | Before                                    | After                        |
+| ------------------ | ----------------------------------------- | ---------------------------- |
+| Gap Detection      | Silent DB write                           | SMS with blind spots         |
+| Goal milestones    | TODO comment                              | SMS "Cel X: 50%!"            |
+| Off-track goals    | scheduled_for: null (never auto-approves) | 4h auto-approve              |
+| Urgent predictions | Intervention only (indirect)              | Immediate SMS + intervention |
+| Insight Push       | Already working                           | No change needed             |
+
+---
+
 ## [2026-02-18] Security: App Approval Gate + Skill Execution Timeout
 
 ### Tasks
