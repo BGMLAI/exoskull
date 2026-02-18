@@ -4,13 +4,14 @@ All notable changes to this project.
 
 ---
 
-## [2026-02-18] Wire Proactive Notifications — Gap Detection, Goals, Predictions
+## [2026-02-18] Wire Proactive Notifications — All 5 Systems Fixed
 
 ### Fixed
 
 - **`app/api/cron/gap-detection/route.ts`** — Gap Detection now sends SMS/preferred channel to user after swarm analysis completes with detected blind spots. Previously wrote silently to `learning_events` DB table — user never knew about gaps.
 - **`app/api/cron/goal-progress/route.ts`** — Milestone notifications (25/50/75/100%) now sent via `sendProactiveMessage()`. Previously had a TODO comment instead of actual code. Off-track interventions now set `scheduled_for` to 4 hours (was `null` — meaning they NEVER auto-approved).
 - **`app/api/cron/predictions/route.ts`** — High-confidence urgent health predictions (confidence >= 0.7, severity high/critical) now send immediate SMS to user. Previously only created interventions in the pipeline.
+- **`app/api/cron/guardian-values/route.ts`** — Value drift detection now sends direct SMS via `sendProactiveMessage()` instead of silent intervention-only write. Intervention `scheduled_for` changed from `null` (never auto-approves) to 6 hours.
 - **Insight Push** — Confirmed already working via `dispatchReport()` — no fix needed.
 
 ---

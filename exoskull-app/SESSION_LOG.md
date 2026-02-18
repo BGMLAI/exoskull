@@ -1,6 +1,6 @@
 # Session Log
 
-## [2026-02-18] Wire Proactive Notifications — Gap Detection, Goals, Predictions
+## [2026-02-18] Wire Proactive Notifications — All 5 Systems Fixed
 
 ### Tasks
 
@@ -9,8 +9,9 @@
 - Goal Progress off-track → scheduled_for 4h (was null/never): **SUCCESS**
 - Predictions → immediate SMS for high-confidence urgent: **SUCCESS**
 - Insight Push → confirmed already working (no fix needed): **SUCCESS**
+- Guardian Values → sendProactiveMessage for value drift + 6h auto-approve: **SUCCESS**
 - Build verification: **SUCCESS**
-- Git push: **SUCCESS** (ad0de9f)
+- Git push: **SUCCESS** (865c0e4)
 
 ### Notes
 
@@ -29,6 +30,7 @@
 | Goal milestones    | TODO comment                              | SMS "Cel X: 50%!"            |
 | Off-track goals    | scheduled_for: null (never auto-approves) | 4h auto-approve              |
 | Urgent predictions | Intervention only (indirect)              | Immediate SMS + intervention |
+| Guardian Values    | Silent intervention (scheduled_for: null) | SMS + 6h auto-approve        |
 | Insight Push       | Already working                           | No change needed             |
 
 ---
