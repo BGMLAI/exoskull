@@ -151,9 +151,17 @@ export interface MonitorData {
   currentMood: string | null;
   energyLevel: number | null;
 
-  // Calendar
+  // Calendar (real Google Calendar events when available)
   upcomingEvents24h: number;
   freeTimeBlocks: number;
+  calendarEvents?: Array<{ time: string; title: string; duration?: number }>;
+  nextMeetingInMinutes?: number | null;
+
+  // Google health metrics (from exo_health_metrics, synced by rig-sync CRON)
+  yesterdaySteps?: number | null;
+  yesterdaySleepMinutes?: number | null;
+  yesterdayCalories?: number | null;
+  lastHeartRate?: number | null;
 
   // Integrations
   connectedRigs: string[];

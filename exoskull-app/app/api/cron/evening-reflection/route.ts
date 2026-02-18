@@ -24,6 +24,8 @@ import {
   sendProactiveMessage,
 } from "@/lib/cron/tenant-utils";
 import { logger } from "@/lib/logger";
+import { ensureFreshToken } from "@/lib/rigs/oauth";
+import { createGoogleClient } from "@/lib/rigs/google/client";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -46,6 +48,11 @@ interface DaySnapshot {
   goalsActive: number;
   proactiveActions: number;
   emotionSummary: string | null;
+  // Google data
+  todaySteps: number | null;
+  todayCalories: number | null;
+  lastNightSleepMin: number | null;
+  calendarEventCount: number;
 }
 
 async function gatherDayData(tenantId: string): Promise<DaySnapshot> {
@@ -60,6 +67,8 @@ async function gatherDayData(tenantId: string): Promise<DaySnapshot> {
     goalsResult,
     proactiveResult,
     emotionResult,
+    healthResult,
+    calendarResult,
   ] = await Promise.allSettled([
     // Tasks completed today (via dual-read service)
     getTasks(tenantId, { status: "done", limit: 10 }),
@@ -98,6 +107,40 @@ async function gatherDayData(tenantId: string): Promise<DaySnapshot> {
       .gte("created_at", todayStart)
       .order("created_at", { ascending: false })
       .limit(5),
+
+    // Google health metrics (last 48h from exo_health_metrics)
+    supabase
+      .from("exo_health_metrics")
+      .select("metric_type, value, unit")
+      .eq("tenant_id", tenantId)
+      .eq("source", "google")
+      .gte(
+        "recorded_at",
+        new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+      )
+      .order("recorded_at", { ascending: false })
+      .limit(20),
+
+    // Google Calendar events today (graceful — returns null if no connection)
+    (async () => {
+      try {
+        const { data: conn } = await supabase
+          .from("exo_rig_connections")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .eq("rig_slug", "google")
+          .not("refresh_token", "is", null)
+          .maybeSingle();
+        if (!conn) return null;
+        const freshToken = await ensureFreshToken(conn);
+        if (freshToken !== conn.access_token) conn.access_token = freshToken;
+        const client = createGoogleClient(conn);
+        if (!client) return null;
+        return await client.calendar.getTodaysEvents().catch(() => null);
+      } catch {
+        return null;
+      }
+    })(),
   ]);
 
   // getTasks() returns Task[] directly, getActiveGoalCount() returns number
@@ -113,6 +156,23 @@ async function gatherDayData(tenantId: string): Promise<DaySnapshot> {
     proactiveResult.status === "fulfilled"
       ? proactiveResult.value.count || 0
       : 0;
+
+  // Process Google health metrics
+  const healthByType: Record<string, number> = {};
+  if (healthResult.status === "fulfilled" && healthResult.value.data) {
+    for (const m of healthResult.value.data) {
+      if (!healthByType[m.metric_type]) {
+        healthByType[m.metric_type] = m.value;
+      }
+    }
+  }
+
+  // Process calendar events
+  const calendarData =
+    calendarResult.status === "fulfilled" ? calendarResult.value : null;
+  const calendarEventCount = Array.isArray(calendarData)
+    ? calendarData.length
+    : 0;
 
   // Summarize emotions
   let emotionSummary: string | null = null;
@@ -138,6 +198,10 @@ async function gatherDayData(tenantId: string): Promise<DaySnapshot> {
     goalsActive: goalsCount,
     proactiveActions: proactiveCount,
     emotionSummary,
+    todaySteps: healthByType.steps ?? null,
+    todayCalories: healthByType.calories ?? null,
+    lastNightSleepMin: healthByType.sleep ?? null,
+    calendarEventCount,
   };
 }
 
@@ -166,6 +230,18 @@ async function formatReflectionMessage(
     snapshot.emotionSummary
       ? `Emotional tone: ${snapshot.emotionSummary}`
       : null,
+    snapshot.todaySteps != null
+      ? `Steps today: ${snapshot.todaySteps.toLocaleString()}`
+      : null,
+    snapshot.todayCalories != null
+      ? `Calories burned: ${Math.round(snapshot.todayCalories)} kcal`
+      : null,
+    snapshot.lastNightSleepMin != null
+      ? `Last night sleep: ${(snapshot.lastNightSleepMin / 60).toFixed(1)}h`
+      : null,
+    snapshot.calendarEventCount > 0
+      ? `Calendar events today: ${snapshot.calendarEventCount}`
+      : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -180,7 +256,8 @@ Rules:
 - Language: ${language} (match naturally, don't mix languages)
 - Keep it SHORT: 2-4 sentences max
 - Be warm and genuine, not corporate or robotic
-- If the day had activity, briefly acknowledge what they did
+- If the day had activity, briefly acknowledge what they did (tasks, steps, meetings)
+- If health data is available (steps, sleep, calories), weave it in naturally (e.g. "you walked a lot today")
 - If it was a quiet day, be gentle — no guilt, just check in
 - End with an open question inviting them to share how their day went
 - NO bullet points, NO emoji overload (1-2 max), NO headers

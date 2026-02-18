@@ -8,6 +8,8 @@ import { collectSystemMetrics } from "../optimization/system-metrics";
 import { logger } from "@/lib/logger";
 import { getTasks, getOverdueTasks } from "@/lib/tasks/task-service";
 import type { Task } from "@/lib/tasks/task-service";
+import { ensureFreshToken } from "@/lib/rigs/oauth";
+import { createGoogleClient } from "@/lib/rigs/google/client";
 
 /**
  * Collect monitor data for a tenant (M phase of MAPE-K).
@@ -36,6 +38,8 @@ export async function collectMonitorData(
     alertsResult,
     patternsResult,
     moodResult,
+    healthMetricsResult,
+    calendarEventsResult,
   ] = await Promise.all([
     // Conversations last 24h
     supabase
@@ -107,6 +111,40 @@ export async function collectMonitorData(
       .order("logged_at", { ascending: false })
       .limit(1)
       .single(),
+
+    // Google health metrics (last 48h from exo_health_metrics)
+    supabase
+      .from("exo_health_metrics")
+      .select("metric_type, value, unit, recorded_at")
+      .eq("tenant_id", tenantId)
+      .eq("source", "google")
+      .gte(
+        "recorded_at",
+        new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString(),
+      )
+      .order("recorded_at", { ascending: false })
+      .limit(20),
+
+    // Google Calendar events (graceful — returns null if no connection)
+    (async () => {
+      try {
+        const { data: conn } = await supabase
+          .from("exo_rig_connections")
+          .select("*")
+          .eq("tenant_id", tenantId)
+          .eq("rig_slug", "google")
+          .not("refresh_token", "is", null)
+          .maybeSingle();
+        if (!conn) return null;
+        const freshToken = await ensureFreshToken(conn);
+        if (freshToken !== conn.access_token) conn.access_token = freshToken;
+        const client = createGoogleClient(conn);
+        if (!client) return null;
+        return await client.calendar.getTodaysEvents().catch(() => null);
+      } catch {
+        return null;
+      }
+    })(),
   ]);
 
   // Derive task counts from service results (client-side filtering)
@@ -147,6 +185,53 @@ export async function collectMonitorData(
   // Determine HRV trend (simplified)
   const hrvTrend = calculateHrvTrend(sleepHoursLast7d);
 
+  // Process Google health metrics into individual values
+  const healthByType: Record<string, number> = {};
+  if (healthMetricsResult.data) {
+    for (const m of healthMetricsResult.data) {
+      if (!healthByType[m.metric_type]) {
+        healthByType[m.metric_type] = m.value;
+      }
+    }
+  }
+
+  // Process Google Calendar events
+  const calendarEvents: Array<{
+    time: string;
+    title: string;
+    duration?: number;
+  }> = [];
+  let nextMeetingInMinutes: number | null = null;
+  if (Array.isArray(calendarEventsResult)) {
+    for (const evt of calendarEventsResult) {
+      const startTime = evt.start?.dateTime || evt.start?.date || "";
+      calendarEvents.push({
+        time: startTime,
+        title: evt.summary || "Untitled",
+        duration:
+          evt.end?.dateTime && evt.start?.dateTime
+            ? Math.round(
+                (new Date(evt.end.dateTime).getTime() -
+                  new Date(evt.start.dateTime).getTime()) /
+                  60000,
+              )
+            : undefined,
+      });
+      // Calculate minutes until next meeting
+      if (evt.start?.dateTime) {
+        const minutesUntil = Math.round(
+          (new Date(evt.start.dateTime).getTime() - now.getTime()) / 60000,
+        );
+        if (
+          minutesUntil > 0 &&
+          (nextMeetingInMinutes === null || minutesUntil < nextMeetingInMinutes)
+        ) {
+          nextMeetingInMinutes = minutesUntil;
+        }
+      }
+    }
+  }
+
   // Collect system metrics (non-blocking)
   let systemMetrics;
   try {
@@ -169,6 +254,9 @@ export async function collectMonitorData(
     }
   }
 
+  // Use real calendar event count if available, otherwise fall back to task-based estimate
+  const eventCount = calendarEvents.length || upcomingTasksCount;
+
   return {
     conversationsLast24h: conversationsResult.count || 0,
     tasksCreated: tasksCreatedCount,
@@ -184,8 +272,14 @@ export async function collectMonitorData(
       moodResult.data?.emotions?.[0] ||
       (moodResult.data?.mood_value ? `${moodResult.data.mood_value}/10` : null),
     energyLevel: moodResult.data?.energy_level || null,
-    upcomingEvents24h: upcomingTasksCount,
-    freeTimeBlocks: Math.max(0, 8 - upcomingTasksCount),
+    upcomingEvents24h: eventCount,
+    freeTimeBlocks: Math.max(0, 8 - eventCount),
+    calendarEvents: calendarEvents.length > 0 ? calendarEvents : undefined,
+    nextMeetingInMinutes,
+    yesterdaySteps: healthByType.steps ?? null,
+    yesterdaySleepMinutes: healthByType.sleep ?? null,
+    yesterdayCalories: healthByType.calories ?? null,
+    lastHeartRate: healthByType.heart_rate ?? null,
     connectedRigs: rigsResult.data?.map((r) => r.rig_slug) || [],
     lastSyncTimes,
     systemMetrics,

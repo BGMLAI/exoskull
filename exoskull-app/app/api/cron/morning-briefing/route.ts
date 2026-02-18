@@ -24,6 +24,8 @@ import {
   sendProactiveMessage,
 } from "@/lib/cron/tenant-utils";
 import { canSendProactive } from "@/lib/autonomy/outbound-triggers";
+import { ensureFreshToken } from "@/lib/rigs/oauth";
+import { createGoogleClient } from "@/lib/rigs/google/client";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -73,42 +75,98 @@ async function handler(req: NextRequest) {
         // Gather morning data
         const supabase = getServiceSupabase();
 
-        const [tasksRes, goalsRes, insightsRes, overnightRes] =
-          await Promise.all([
-            // Active tasks
-            getTasks(tenant.id, { status: "pending", limit: 10 })
-              .then((tasks) => ({ data: tasks, error: null }))
-              .catch((e) => ({ data: null, error: e })),
+        const [
+          tasksRes,
+          goalsRes,
+          insightsRes,
+          overnightRes,
+          googleRes,
+          healthRes,
+        ] = await Promise.all([
+          // Active tasks
+          getTasks(tenant.id, { status: "pending", limit: 10 })
+            .then((tasks) => ({ data: tasks, error: null }))
+            .catch((e) => ({ data: null, error: e })),
 
-            // Active goals (via dual-read service)
-            getGoals(tenant.id, { is_active: true, limit: 5 })
-              .then((goals) => ({ data: goals, error: null }))
-              .catch((e) => ({ data: null, error: e })),
+          // Active goals (via dual-read service)
+          getGoals(tenant.id, { is_active: true, limit: 5 })
+            .then((goals) => ({ data: goals, error: null }))
+            .catch((e) => ({ data: null, error: e })),
 
-            // Undelivered insights
-            supabase
-              .from("exo_insight_deliveries")
-              .select("id")
-              .eq("tenant_id", tenant.id)
-              .is("delivered_at", null),
+          // Undelivered insights
+          supabase
+            .from("exo_insight_deliveries")
+            .select("id")
+            .eq("tenant_id", tenant.id)
+            .is("delivered_at", null),
 
-            // Overnight autonomous actions
-            supabase
-              .from("exo_proactive_log")
-              .select("trigger_type, channel, created_at")
-              .eq("tenant_id", tenant.id)
-              .gte(
-                "created_at",
-                new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-              )
-              .order("created_at", { ascending: false })
-              .limit(5),
-          ]);
+          // Overnight autonomous actions
+          supabase
+            .from("exo_proactive_log")
+            .select("trigger_type, channel, created_at")
+            .eq("tenant_id", tenant.id)
+            .gte(
+              "created_at",
+              new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
+            )
+            .order("created_at", { ascending: false })
+            .limit(5),
+
+          // Google Calendar + Gmail (graceful — returns null if no connection)
+          (async () => {
+            try {
+              const { data: conn } = await supabase
+                .from("exo_rig_connections")
+                .select("*")
+                .eq("tenant_id", tenant.id)
+                .eq("rig_slug", "google")
+                .not("refresh_token", "is", null)
+                .maybeSingle();
+              if (!conn) return null;
+              const freshToken = await ensureFreshToken(conn);
+              if (freshToken !== conn.access_token)
+                conn.access_token = freshToken;
+              const client = createGoogleClient(conn);
+              if (!client) return null;
+              const [events, gmail] = await Promise.all([
+                client.calendar.getTodaysEvents().catch(() => []),
+                client.gmail.getUnreadCount().catch(() => 0),
+              ]);
+              return { events, unreadEmails: gmail };
+            } catch {
+              return null;
+            }
+          })(),
+
+          // Yesterday's health metrics from DB (already synced by rig-sync CRON)
+          supabase
+            .from("exo_health_metrics")
+            .select("metric_type, value, unit")
+            .eq("tenant_id", tenant.id)
+            .eq("source", "google")
+            .gte(
+              "recorded_at",
+              new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+            )
+            .order("recorded_at", { ascending: false })
+            .limit(20),
+        ]);
 
         const tasks = tasksRes.data || [];
-        const goals = goalsRes.data || []; // getGoals wraps in { data, error } via .then()
+        const goals = goalsRes.data || [];
         const pendingInsights = insightsRes.data?.length || 0;
         const overnightActions = overnightRes.data || [];
+        const googleData = googleRes;
+        const healthMetrics = healthRes.data || [];
+
+        // Build health summary from metrics
+        const healthSummary: Record<string, { value: number; unit: string }> =
+          {};
+        for (const m of healthMetrics) {
+          if (!healthSummary[m.metric_type]) {
+            healthSummary[m.metric_type] = { value: m.value, unit: m.unit };
+          }
+        }
 
         // Format briefing with AI (Tier 1 — Gemini Flash)
         const contextData = JSON.stringify({
@@ -124,6 +182,18 @@ async function handler(req: NextRequest) {
           })),
           pending_insights: pendingInsights,
           overnight_actions: overnightActions.length,
+          calendar:
+            googleData?.events?.map((e: any) => ({
+              time: e.start?.dateTime || e.start?.date,
+              title: e.summary,
+            })) || [],
+          unread_emails: googleData?.unreadEmails || 0,
+          health: {
+            steps: healthSummary.steps?.value || null,
+            heart_rate: healthSummary.heart_rate?.value || null,
+            sleep_min: healthSummary.sleep?.value || null,
+            calories: healthSummary.calories?.value || null,
+          },
           language: tenant.language || "pl",
         });
 
@@ -131,7 +201,7 @@ async function handler(req: NextRequest) {
           messages: [
             {
               role: "system",
-              content: `You are IORS — the user's intelligent life assistant. Generate a concise morning briefing in ${tenant.language || "pl"} language. Be warm but direct. Use short sentences. Include priorities. Max 500 chars (SMS-friendly).`,
+              content: `You are IORS — the user's intelligent life assistant. Generate a concise morning briefing in ${tenant.language || "pl"} language. Be warm but direct. Use short sentences. Include: today's calendar, health summary (steps/sleep/HR if available), top priorities, unread emails count. Max 500 chars (SMS-friendly).`,
             },
             {
               role: "user",
