@@ -1,5 +1,25 @@
 # Session Log
 
+## [2026-02-18] Security: App Approval Gate + Skill Execution Timeout
+
+### Tasks
+
+- App approval gate (`app-generator.ts` → pending + SMS + activateApp): **SUCCESS**
+- Skill execution outer timeout (`dynamic-handler.ts` → 15s Promise.race): **SUCCESS**
+- Build verification: **SUCCESS**
+- Git push: **SUCCESS** (e52d481)
+
+### Notes
+
+- `restricted-function.ts` already had 5s sandbox timeout (V8 vm.runInContext) — no change needed there
+- Outer 15s timeout in `executeSkill()` covers DB queries + sandbox execution pipeline
+- Apps now require explicit user approval before table creation (was auto-approved)
+- SMS notification sent to tenant when app is generated (includes name, description, columns)
+- `activateApp()` exported — creates table via RPC, adds widget, sets status "approved"
+- Approval flow: user writes "zatwierdź aplikację [slug]" in chat or via SMS → AI calls activateApp()
+
+---
+
 ## [2026-02-18] MVP Phase 3: SMS Inbound Gateway
 
 ### Tasks

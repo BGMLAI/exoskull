@@ -4,6 +4,17 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-18] Security: App Approval Gate + Skill Execution Timeout
+
+### Fixed
+
+- **`lib/apps/generator/app-generator.ts`** — Generated apps no longer auto-approve. Apps are stored with `approval_status: "pending"` and `status: "pending_approval"`. Table and widget are NOT created until user explicitly approves. SMS notification sent to tenant about pending app. New `activateApp()` function creates the table via RPC, adds widget, and marks approved — called only after user consent.
+- **`lib/iors/tools/dynamic-handler.ts`** — `executeSkill()` now wrapped in 15s outer timeout (`Promise.race`) covering the full pipeline: DB query + sandbox execution. The sandbox already had a 5s inner timeout (`restricted-function.ts`); this outer timeout is a safety net for slow DB queries. Execution metrics (duration, success) logged for every skill invocation.
+- **`lib/apps/types.ts`** — Added `pending_approval?: boolean` to `AppGenerationResult`.
+- **`lib/apps/index.ts`** — Exported `activateApp` for use by approval flows.
+
+---
+
 ## [2026-02-18] SMS Inbound Gateway — Two-Way SMS Conversations (Phase 3)
 
 ### Added
