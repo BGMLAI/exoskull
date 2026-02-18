@@ -4,6 +4,30 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-18] SMS Inbound Gateway — Two-Way SMS Conversations (Phase 3)
+
+### Added
+
+- **`app/api/gateway/sms/route.ts`** — Twilio inbound SMS webhook. Receives SMS, validates Twilio signature, resolves tenant by phone (or auto-registers new users), routes through full AI pipeline (`handleInboundMessage` with 40+ IORS tools), sends AI response back via Twilio REST API. Completes the two-way SMS conversation loop.
+- **`scripts/fix-twilio-routing.ts`** — Updated to configure SMS webhook URL (`smsUrl`, `smsMethod`) alongside existing voice webhooks.
+
+### Configured
+
+- Twilio `+48732143210` SMS webhook → `https://exoskull.xyz/api/gateway/sms` (POST).
+
+---
+
+## [2026-02-18] Wire Google Data into Autonomous Loops (Phase 2)
+
+### Enhanced
+
+- **`app/api/cron/morning-briefing/route.ts`** — Now includes Google Calendar events, Gmail unread count, and health metrics (steps, sleep, calories, HR) in the AI-generated briefing.
+- **`lib/autonomy/mape-k-monitor.ts`** — MAPE-K Monitor now collects Google health metrics (last 48h) and Calendar events. Populates `calendarEvents`, `nextMeetingInMinutes`, `yesterdaySteps`, `yesterdaySleepMinutes`, `yesterdayCalories`, `lastHeartRate` in MonitorData.
+- **`lib/autonomy/types.ts`** — Extended `MonitorData` interface with Google Calendar and health metric fields.
+- **`app/api/cron/evening-reflection/route.ts`** — Evening reflection now incorporates today's steps, calories, last night's sleep, and calendar event count into the AI-generated reflection message.
+
+---
+
 ## [2026-02-18] Google Data Pipeline + Automated CRON Sync
 
 ### Added
