@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { getAlignmentGuardian } from "@/lib/autonomy/guardian";
 import { withCronGuard } from "@/lib/admin/cron-guard";
+import { sendProactiveMessage } from "@/lib/cron/tenant-utils";
 
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
@@ -40,17 +41,27 @@ async function handler(req: NextRequest) {
         driftsDetected++;
       }
 
-      // 2. Create reconfirmation intervention if needed
+      // 2. Create reconfirmation intervention + notify user directly
       if (driftResult.suggestReconfirmation) {
         const driftAreas = driftResult.areas.map((a) => a.area).join(", ");
+        const description = driftAreas
+          ? `Zauważyłem zmiany w Twoich wzorcach dotyczących: ${driftAreas}. Czy Twoje priorytety się zmieniły?`
+          : "Minęło trochę czasu od ostatniego sprawdzenia Twoich priorytetów. Czy coś się zmieniło?";
 
+        // Send direct SMS/notification — don't wait for intervention pipeline
+        await sendProactiveMessage(
+          tenant.id,
+          description,
+          "value_drift",
+          "guardian-values-cron",
+        );
+
+        // Also create intervention for follow-up (auto-approve after 6h)
         await supabase.rpc("propose_intervention", {
           p_tenant_id: tenant.id,
           p_type: "gap_detection",
-          p_title: "Sprawdzenie priorytetow",
-          p_description: driftAreas
-            ? `Zauwazylismy zmiany w Twoich wzorcach dotyczacych: ${driftAreas}. Czy Twoje priorytety sie zmienily?`
-            : "Minelo troche czasu od ostatniego sprawdzenia Twoich priorytetow. Czy cos sie zmienilo?",
+          p_title: "Sprawdzenie priorytetów",
+          p_description: description,
           p_action_payload: {
             action: "trigger_checkin",
             params: {
@@ -61,7 +72,9 @@ async function handler(req: NextRequest) {
           p_priority: "low",
           p_source_agent: "guardian-values-cron",
           p_requires_approval: true,
-          p_scheduled_for: null,
+          p_scheduled_for: new Date(
+            Date.now() + 6 * 60 * 60 * 1000,
+          ).toISOString(),
         });
 
         reconfirmationsCreated++;
