@@ -33,6 +33,11 @@ import { unifiedSearch } from "@/lib/memory/unified-search";
 import type { UnifiedSearchResult } from "@/lib/memory/types";
 import type { EmotionState } from "@/lib/emotion/types";
 import { logger } from "@/lib/logger";
+import { buildAppDetectionContext } from "@/lib/integrations/app-context-builder";
+import { listConnections } from "@/lib/integrations/composio-adapter";
+import { getServiceSupabase } from "@/lib/supabase/service";
+import { classify } from "@/lib/bgml/classifier";
+import { selectFramework } from "@/lib/bgml/framework-selector";
 
 // ============================================================================
 // TYPES
@@ -146,14 +151,28 @@ async function loadFilteredTools(
       await import("@/lib/iors/tools/dynamic-handler");
     const dynamicTools = await getDynamicToolsForTenant(tenantId);
     allTools = [...allTools, ...dynamicTools];
+    logger.info("[ExoSkullAgent] Loaded tools:", {
+      static: IORS_EXTENSION_TOOLS.length,
+      dynamic: dynamicTools.length,
+      total: allTools.length,
+      tenantId,
+    });
   } catch (error) {
-    logger.warn("[ExoSkullAgent] Failed to load dynamic tools:", {
-      error: error instanceof Error ? error.message : error,
+    logger.error("[ExoSkullAgent] Failed to load dynamic tools:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      tenantId,
     });
   }
 
   if (toolFilter) {
+    const before = allTools.length;
     allTools = allTools.filter((t) => toolFilter.has(t.definition.name));
+    logger.info("[ExoSkullAgent] Tool filtering:", {
+      before,
+      after: allTools.length,
+      filtered: before - allTools.length,
+    });
   }
 
   return allTools;
@@ -253,6 +272,8 @@ export async function runExoSkullAgent(
     filteredTools,
     threadHistory,
     memoryResults,
+    rigConnections,
+    composioConnections,
   ] = await Promise.all([
     buildDynamicContext(req.tenantId),
     analyzeEmotion(req.userMessage),
@@ -262,7 +283,7 @@ export async function runExoSkullAgent(
       tenantId: req.tenantId,
       query: req.userMessage,
       limit: 10,
-      minScore: 0.1,
+      minScore: 0.05,
     }).catch((err) => {
       logger.error("[ExoSkullAgent] Unified search failed (non-blocking):", {
         error: err instanceof Error ? err.message : String(err),
@@ -271,6 +292,31 @@ export async function runExoSkullAgent(
       });
       return [] as UnifiedSearchResult[];
     }),
+    // Rig connections for app autodetekcja
+    (async (): Promise<Array<{ rig_slug: string; sync_status: string }>> => {
+      try {
+        const r = await getServiceSupabase()
+          .from("exo_rig_connections")
+          .select("rig_slug, sync_status")
+          .eq("tenant_id", req.tenantId);
+        return (r.data || []) as Array<{
+          rig_slug: string;
+          sync_status: string;
+        }>;
+      } catch {
+        return [];
+      }
+    })(),
+    // Composio connections (5min cache)
+    listConnections(req.tenantId).catch(
+      () =>
+        [] as Array<{
+          id: string;
+          toolkit: string;
+          status: string;
+          createdAt: string;
+        }>,
+    ),
   ]);
 
   const contextMs = Date.now() - startMs;
@@ -314,7 +360,18 @@ export async function runExoSkullAgent(
             `[${i + 1}] (${r.type || "memory"}, score: ${r.score.toFixed(2)}) ${r.content.slice(0, 500)}`,
         )
         .join("\n");
+  } else {
+    memoryContext =
+      "\n\n## Memory\nBrak bezpośrednio pasujących wspomnień. Użyj narzędzia search_memory jeśli potrzebujesz więcej kontekstu.";
   }
+
+  // ── Phase 2c: App mention detection ──
+  const appDetection = buildAppDetectionContext(
+    req.tenantId,
+    req.userMessage,
+    rigConnections,
+    composioConnections,
+  );
 
   // ── Phase 3: Build system prompt ──
   const dynamicContext = dynamicCtxResult.context;
@@ -364,6 +421,34 @@ export async function runExoSkullAgent(
     }
     // Append relevant memory from unified search
     if (memoryContext) parts.push(memoryContext);
+    // Append app autodetekcja context (unconnected apps mentioned by user)
+    if (appDetection.contextFragment) parts.push(appDetection.contextFragment);
+
+    // ── BGML Framework Injection (for complex queries) ──
+    try {
+      const classification = classify(req.userMessage);
+      if (classification.complexity >= 3) {
+        const framework = await selectFramework(classification.domain);
+        if (framework) {
+          parts.push(
+            `\n## Reasoning Framework: ${framework.name}\n` +
+              `Domain: ${classification.domain} | Complexity: ${classification.complexity}/5\n\n` +
+              framework.prompt_template,
+          );
+          logger.info("[ExoSkullAgent] BGML framework injected:", {
+            framework: framework.slug,
+            domain: classification.domain,
+            complexity: classification.complexity,
+          });
+        }
+      }
+    } catch (bgmlErr) {
+      // BGML is optional — never break the main flow
+      logger.warn("[ExoSkullAgent] BGML framework injection failed:", {
+        error: bgmlErr instanceof Error ? bgmlErr.message : String(bgmlErr),
+      });
+    }
+
     systemPrompt = parts.join("\n\n");
   }
 
@@ -517,13 +602,21 @@ export async function runExoSkullAgent(
           "Przepraszam, odpowiedź zajęła zbyt długo. Spróbuj ponownie.";
       }
     } else {
-      logger.error("[ExoSkullAgent] API call failed:", { error: errMsg });
+      logger.error("[ExoSkullAgent] API call failed:", {
+        error: errMsg,
+        stack: error instanceof Error ? error.stack : undefined,
+        tenantId: req.tenantId,
+        model: config.model,
+        toolCount: filteredTools.length,
+        historyLength: threadHistory.length,
+      });
 
-      // ── Emergency Gemini fallback (no tools, just conversation) ──
+      // ── Emergency Gemini fallback (with conversation history) ──
       const geminiText = await emergencyGeminiFallback(
         req,
         systemPrompt,
         emotionState,
+        threadHistory,
       );
       if (geminiText) {
         finalText = geminiText;
@@ -580,11 +673,13 @@ export async function runExoSkullAgent(
 /**
  * Last-resort fallback when Anthropic API fails completely.
  * Uses Gemini Flash for a no-tools conversational response.
+ * Includes conversation history for context continuity.
  */
 async function emergencyGeminiFallback(
   req: AgentRequest,
   systemPrompt: string,
   _emotionState: EmotionState,
+  threadHistory?: Anthropic.MessageParam[],
 ): Promise<string | null> {
   try {
     const geminiKey = process.env.GOOGLE_AI_API_KEY;
@@ -599,14 +694,53 @@ async function emergencyGeminiFallback(
     const { GoogleGenAI } = await import("@google/genai");
     const emergencyAI = new GoogleGenAI({ apiKey: geminiKey });
 
+    // Build Gemini conversation history from thread
+    const geminiContents: Array<{
+      role: string;
+      parts: Array<{ text: string }>;
+    }> = [];
+    if (threadHistory && threadHistory.length > 0) {
+      // Include last 10 messages for context (Gemini has different limits)
+      const recentHistory = threadHistory.slice(-10);
+      for (const msg of recentHistory) {
+        const text =
+          typeof msg.content === "string"
+            ? msg.content
+            : Array.isArray(msg.content)
+              ? msg.content
+                  .filter(
+                    (b) =>
+                      "text" in b &&
+                      typeof (b as unknown as { text: unknown }).text ===
+                        "string",
+                  )
+                  .map((b) => (b as unknown as { text: string }).text)
+                  .join("\n")
+              : "";
+        if (text) {
+          geminiContents.push({
+            role: msg.role === "assistant" ? "model" : "user",
+            parts: [{ text }],
+          });
+        }
+      }
+    }
+
+    // If no history or history doesn't end with user message, add current
+    const lastRole =
+      geminiContents.length > 0
+        ? geminiContents[geminiContents.length - 1].role
+        : null;
+    if (lastRole !== "user") {
+      geminiContents.push({
+        role: "user",
+        parts: [{ text: req.userMessage }],
+      });
+    }
+
     const emergencyResponse = await emergencyAI.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: req.userMessage }],
-        },
-      ],
+      contents: geminiContents,
       config: {
         systemInstruction: systemPrompt.slice(0, 8000),
         temperature: 0.7,

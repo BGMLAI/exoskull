@@ -1,9 +1,9 @@
 # 🧠 EXOSKULL - Adaptive Life Operating System
 ## Your Second Brain. Built For You. By AI.
 
-**Version:** 6.0
+**Version:** 7.0
 **Created:** 2026-02-01
-**Updated:** 2026-02-17
+**Updated:** 2026-02-18
 **Status:** 🟡 Active Development — MVP Live (exoskull.xyz)
 
 ---
@@ -35,7 +35,7 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 
 ---
 
-## 📊 IMPLEMENTATION STATUS (as of 2026-02-12)
+## 📊 IMPLEMENTATION STATUS (as of 2026-02-18)
 
 | Component | Status | Details |
 |-----------|--------|---------|
@@ -44,20 +44,28 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 | **Data Lake** | ✅ Live | Bronze (R2 Parquet) → Silver (Postgres) → Gold (Materialized Views) |
 | **AI Router** | ✅ Live | Direct Anthropic Messages API with manual tool loop (replaced Agent SDK query()). Emergency Gemini fallback. 3 configs: WEB (10 turns, Sonnet), VOICE (6 turns, Haiku), ASYNC (15 turns, Sonnet) |
 | **Mod System** | ✅ Live | 5 mods: task-manager, mood, habit, sleep, activity |
-| **Rig System** | ✅ Live | 6 rigs: Oura, Google Fit, Google Workspace, MS 365, Notion, Todoist |
+| **Rig System** | ✅ Live | 6 rigs: Oura, Google Fit, Google Workspace, MS 365, Notion, Todoist. Google rig-sync CRON (every 30 min) |
 | **Knowledge** | ✅ Live | RAG pipeline (pgvector embeddings, cosine similarity search), web search (Tavily), URL import (Firecrawl v2), local file sync (exo-agent CLI) |
-| **Local Agent** | ✅ Live | Node.js CLI daemon: watches local folders → uploads to Knowledge Base via R2 presigned URLs (was Supabase Storage). Blacklist MIME (~130 types), skips 17 junk dirs |
-| **VPS Code Execution** | ✅ New | 8 IORS tools (read/write/edit/bash/glob/grep/git/tree) backed by VPS Code API with sandbox security |
-| **MCP Bridge** | ✅ New | 512-line cross-tool orchestration layer for IORS tools |
-| **Unified Memory** | ✅ New | Single `unifiedSearch()` entry point: vector store + keyword + notes + entity search, score normalization, entity boost |
+| **Local Agent** | ✅ Live | Node.js CLI daemon: watches local folders → uploads to Knowledge Base via R2 presigned URLs. Blacklist MIME (~130 types), skips 17 junk dirs |
+| **VPS Code Execution** | ✅ Live | 8 IORS tools (read/write/edit/bash/glob/grep/git/tree) backed by VPS Code API with sandbox security |
+| **MCP Bridge** | ✅ Live | 512-line cross-tool orchestration layer for IORS tools |
+| **Unified Memory** | ✅ Live | Single `unifiedSearch()` entry point: vector store + keyword + notes + entity search, score normalization, entity boost |
+| **Self-Modification** | ✅ New | Source engine → diff generator → kernel guard → PR pipeline → swarm coordinator. All diffs validated (no auth bypass, no data deletion, no env mutation) |
+| **Signal Triage** | ✅ New | 663-line engine classifies signals by urgency (critical/high/medium/low) and domain (health/productivity/financial/social/meta) |
+| **Strategy Engine** | ✅ New | 780-line goal strategy generator with AI-powered plan decomposition + progress tracking |
+| **Proactive Notifications** | ✅ Live | 5 systems: gap detection, goal milestones, predictions, guardian values, insight push. All deliver via SMS/preferred channel. Rate: 8 msgs/day, quiet hours 23:00-07:00 |
+| **SMS Gateway** | ✅ Live | Two-way SMS via Twilio (+48732143210). Inbound webhook + auto-registration + full 40+ IORS tool pipeline |
+| **Google Data Pipeline** | ✅ Live | Fit health metrics, Calendar events, Gmail → Supabase. 30-min CRON sync + standalone script |
 | **Admin Panel** | ✅ Live | 9 pages, self-optimization engine, CRON management |
-| **CRON System** | ✅ Live | 28 jobs: ETL, morning-briefing, evening-reflection, impulse (6 handlers), email-sync, email-analyze, MAPEK loop, and more |
+| **CRON System** | ✅ Live | 35 jobs: ETL, morning-briefing (with Google data), evening-reflection, impulse (6 handlers), email-sync, email-analyze, MAPEK loop, rig-sync, signal-triage, goal-progress, and more |
 | **Onboarding** | ✅ Live | Discovery interview (~60 topics), profile extraction, in-chat onboarding |
-| **Frontend** | ✅ Live | Cyberpunk cockpit HUD (BottomPanelGrid, CockpitActionBar, ReactionButtons), 3D orb scene, Polish landing page, login tabs, pricing, password reset |
-| **Auth** | ✅ Live | Supabase SSR, RLS, middleware guards |
+| **Frontend** | ✅ Live | Gemini theme, floating panels with dock, 3D mind map workspace, code chat components, WCAG 2.1 AA accessible. Cyberpunk cockpit HUD, 3D orb scene, Polish landing, login tabs, pricing |
+| **Auth** | ✅ Live | Supabase SSR, RLS, middleware guards. All 74 API routes on verifyTenantAuth |
 | **Outbound Calls** | ✅ Live | Call user + call third parties (delegate system) |
-| **Dynamic Skills** | ✅ Live | Full 6-stage pipeline: detector → generator → validator → sandbox → approval → registry. Dashboard UI, suggestions widget, circuit breaker |
-| **Goals System** | ✅ Live | AI-assisted goal extraction, auto-progress tracking, momentum/trajectory detection, voice tools (define_goal, log_goal_progress, check_goals), dashboard at /dashboard/goals |
+| **Dynamic Skills** | ✅ Live | Full 6-stage pipeline: detector → generator → validator → sandbox → approval → registry. App approval gate (pending + SMS + explicit consent). 15s skill execution timeout |
+| **Goals System** | ✅ Live | AI-assisted goal extraction, strategy engine, auto-progress tracking, momentum/trajectory detection, milestone notifications (25/50/75/100%), voice tools, dashboard |
+| **Observability** | ✅ Live | Structured logger (1222 calls migrated), withApiLog on 170 routes, request ID tracking, circuit breakers, data freshness indicators |
+| **Claude Code** | ✅ Live | Built-in coding agent in main chat (always-on, 25 turns), file change SSE events, code sidebar with file browser |
 | **Gap Detection** | ✅ Live | Weekly CRON (Sun 09:00), 7 life domains, skill suggestions, auto-expire 14d |
 | **Emotion Intel** | ✅ Live | Crisis detection (3-layer + fail-safe), 5 adaptive response modes, VAD model, text + voice fusion analyzer, prosody extraction (Deepgram), emotion trends dashboard. Phase 3: pitch/energy, facial analysis |
 | **Integrations** | ✅ Live | Google (40+ scopes), Facebook/Meta (Ads, Commerce, WhatsApp), Apple, Microsoft (Teams, SharePoint) |

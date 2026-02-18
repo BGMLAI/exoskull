@@ -112,7 +112,7 @@ export async function buildDynamicContext(
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
-  // ── ALL queries in parallel (14 queries, ~150-400ms) ──
+  // ── ALL queries in parallel (15 queries, ~150-400ms) ──
   const [
     tenantResult,
     taskResult,
@@ -128,6 +128,7 @@ export async function buildDynamicContext(
     highlightsResult,
     graphResult,
     recentNotesResult,
+    pendingInterventionsResult,
   ] = await Promise.allSettled([
     // 1. User profile + custom instructions + presets + AI config + prompt override
     supabase
@@ -208,6 +209,14 @@ export async function buildDynamicContext(
       .select("title, ai_summary, type, captured_at")
       .eq("tenant_id", tenantId)
       .order("captured_at", { ascending: false })
+      .limit(5),
+    // 15. Pending interventions awaiting user approval
+    supabase
+      .from("exo_interventions")
+      .select("id, intervention_type, title, description, priority, created_at")
+      .eq("tenant_id", tenantId)
+      .eq("status", "proposed")
+      .order("created_at", { ascending: false })
       .limit(5),
   ]);
 
@@ -508,6 +517,28 @@ export async function buildDynamicContext(
       context += `  ... i ${proactiveActions.length - 5} więcej akcji\n`;
     }
     context += `Gdy user pyta "co robiłeś?", "nad czym pracujesz?" — opisz te działania.\n`;
+  }
+
+  // Pending interventions awaiting user approval
+  const pendingInterventions =
+    pendingInterventionsResult.status === "fulfilled"
+      ? (pendingInterventionsResult.value.data as Array<{
+          id: string;
+          intervention_type: string;
+          title: string;
+          description: string | null;
+          priority: string;
+          created_at: string;
+        }> | null)
+      : null;
+  if (pendingInterventions && pendingInterventions.length > 0) {
+    context += `\n## OCZEKUJĄCE PROPOZYCJE SYSTEMU\n`;
+    context += `Masz ${pendingInterventions.length} propozycji czekających na akceptację użytkownika:\n`;
+    for (const p of pendingInterventions) {
+      context += `- [${p.priority}] ${p.title}: ${p.description?.slice(0, 100) || "brak opisu"} (ID: ${p.id})\n`;
+    }
+    context += `→ Gdy kontekst rozmowy jest odpowiedni, ZAPROPONUJ te akcje użytkownikowi naturalnie.\n`;
+    context += `→ Jeśli user się zgodzi, użyj narzędzia "approve_intervention" z ID interwencji.\n`;
   }
 
   // Extract system prompt override + AI config from tenant

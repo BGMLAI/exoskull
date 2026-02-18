@@ -42,8 +42,8 @@ import { ReactionButtons } from "./ReactionButtons";
  */
 
 const CHAT_MIN_H = 120;
-const CHAT_DEFAULT_H = 260;
-const CHAT_MAX_H = 500;
+const CHAT_DEFAULT_H = 420;
+const CHAT_MAX_H = 700;
 
 export function CockpitHUDShell() {
   useCockpitKeys();

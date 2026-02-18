@@ -130,11 +130,26 @@ export async function handleProactive(
     // 5. Dispatch via preferred channel
     const result = await dispatchReport(tenant_id, message, "insight");
 
-    // 6. Log to unified thread
+    // 6. Log to unified thread (use actual delivery channel, not hardcoded)
+    // Map dispatch channel to UnifiedChannel (dispatchReport returns string)
+    const CHANNEL_MAP: Record<
+      string,
+      import("@/lib/unified-thread").UnifiedChannel
+    > = {
+      sms: "sms",
+      whatsapp: "whatsapp",
+      email: "email",
+      web_chat: "web_chat",
+      voice: "voice",
+      telegram: "telegram",
+      slack: "slack",
+      discord: "discord",
+    };
+    const deliveredChannel = CHANNEL_MAP[result.channel || ""] || "web_chat";
     await appendMessage(tenant_id, {
       role: "assistant",
       content: message,
-      channel: "web_chat",
+      channel: deliveredChannel,
       direction: "outbound",
       source_type: "web_chat",
       metadata: {

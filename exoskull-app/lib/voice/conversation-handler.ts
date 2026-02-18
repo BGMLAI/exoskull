@@ -31,7 +31,10 @@ import {
   VOICE_AGENT_CONFIG,
 } from "@/lib/iors/agent-loop";
 
+import { unifiedSearch } from "@/lib/memory/unified-search";
 import { logger } from "@/lib/logger";
+import { buildAppDetectionContext } from "@/lib/integrations/app-context-builder";
+import { listConnections } from "@/lib/integrations/composio-adapter";
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -463,24 +466,91 @@ export async function processUserMessage(
   const isVoiceChannel = options?.channel === "voice";
   const preStartTime = Date.now();
 
-  // ── ALL CHANNELS: context, thread, emotion, tools — ALL PARALLEL ──
-  const [dynamicContextResult, emotionState, rawThreadMessages, toolsResult] =
-    await Promise.all([
-      buildDynamicContext(session.tenantId),
-      analyzeEmotion(userMessage),
-      getThreadContext(session.tenantId, 25).catch((err) => {
-        logger.error("[ConversationHandler] Thread context failed:", err);
-        return [] as { role: "user" | "assistant"; content: string }[];
-      }),
-      getToolsForTenant(session.tenantId),
-    ]);
+  // ── ALL CHANNELS: context, thread, emotion, tools, memory — ALL PARALLEL ──
+  const [
+    dynamicContextResult,
+    emotionState,
+    rawThreadMessages,
+    toolsResult,
+    memoryRecall,
+  ] = await Promise.all([
+    buildDynamicContext(session.tenantId),
+    analyzeEmotion(userMessage),
+    getThreadContext(session.tenantId, 25).catch((err) => {
+      logger.error("[ConversationHandler] Thread context failed:", err);
+      return [] as { role: "user" | "assistant"; content: string }[];
+    }),
+    getToolsForTenant(session.tenantId),
+    // Auto-recall relevant memories based on user's message
+    unifiedSearch({
+      tenantId: session.tenantId,
+      query: userMessage,
+      limit: 5,
+      weights: { vector: 0.6, keyword: 0.2, recency: 0.15, entity: 0.05 },
+      minScore: 0.3,
+    }).catch((err) => {
+      logger.error("[ConversationHandler] Memory recall failed:", err);
+      return [] as import("@/lib/memory/types").UnifiedSearchResult[];
+    }),
+  ]);
 
   logger.info(
     `[ConversationHandler] Context loaded in ${Date.now() - preStartTime}ms (channel: ${options?.channel || "web_chat"})`,
   );
 
   // Extract per-user config from dynamic context result
-  const dynamicContext = dynamicContextResult.context;
+  let dynamicContext = dynamicContextResult.context;
+
+  // Inject auto-recalled memories into context (if any matched)
+  if (memoryRecall.length > 0) {
+    const topMemories = memoryRecall.slice(0, 5).map((m) => {
+      const date = new Date(m.date).toLocaleDateString("pl-PL", {
+        day: "numeric",
+        month: "short",
+      });
+      return `- [${m.type}] ${date}: ${m.content.slice(0, 200)}`;
+    });
+    dynamicContext += `\n\n## PRZYPOMNIANE WSPOMNIENIA (auto-recall)\nTe wspomnienia pasują do obecnej wiadomości użytkownika:\n${topMemories.join("\n")}\n→ Użyj tych wspomnień naturalnie w odpowiedzi, jeśli są istotne. Nie mów "znalazłem w pamięci", po prostu PAMIĘTAJ.\n`;
+    logger.info("[ConversationHandler] Memory recall injected:", {
+      count: memoryRecall.length,
+      topScore: memoryRecall[0]?.score,
+      tenantId: session.tenantId,
+    });
+  }
+
+  // ── App autodetekcja: detect unconnected apps mentioned by user ──
+  let rigConns: Array<{ rig_slug: string; sync_status: string }> = [];
+  try {
+    const r = await getServiceSupabase()
+      .from("exo_rig_connections")
+      .select("rig_slug, sync_status")
+      .eq("tenant_id", session.tenantId);
+    rigConns = (r.data || []) as Array<{
+      rig_slug: string;
+      sync_status: string;
+    }>;
+  } catch {
+    // Non-blocking — continue without rig connections
+  }
+  const composioConns = await listConnections(session.tenantId).catch(
+    () =>
+      [] as Array<{
+        id: string;
+        toolkit: string;
+        status: string;
+        createdAt: string;
+      }>,
+  );
+  const appDetection = buildAppDetectionContext(
+    session.tenantId,
+    userMessage,
+    rigConns,
+    composioConns,
+  );
+  if (appDetection.contextFragment) {
+    dynamicContext += appDetection.contextFragment;
+  }
+
   const systemPromptOverride = dynamicContextResult.systemPromptOverride;
   const aiConfig = dynamicContextResult.aiConfig;
   const userTemperature = aiConfig?.temperature ?? 0.7;

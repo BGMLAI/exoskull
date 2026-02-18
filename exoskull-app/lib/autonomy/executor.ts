@@ -399,6 +399,7 @@ const ALLOWED_ACTION_TYPES = new Set([
   "goal_strategy",
   "execute_triage",
   "modify_source",
+  "build_app",
   "custom",
 ]);
 
@@ -437,6 +438,8 @@ async function dispatchAction(
       return await handleExecuteTriage(intervention);
     case "modify_source":
       return await handleModifySource(intervention);
+    case "build_app":
+      return await handleBuildApp(intervention);
     case "custom":
       return await handleCustomActionFromIntervention(intervention);
     default:
@@ -763,6 +766,42 @@ async function handleCustomActionFromIntervention(
       ? `Custom action "${actionName}" executed`
       : `Custom action "${actionName}" failed: ${result.error}`,
   };
+}
+
+async function handleBuildApp(
+  intervention: Intervention,
+): Promise<ExecutionResult> {
+  try {
+    const { generateApp } = await import("@/lib/apps/generator/app-generator");
+    const params =
+      (intervention.action_payload.params as Record<string, unknown>) || {};
+    const description =
+      (params.description as string) ||
+      intervention.description ||
+      intervention.title;
+
+    const result = await generateApp({
+      tenant_id: intervention.tenant_id,
+      description,
+      source: "iors_suggestion",
+    });
+
+    if (result.success) {
+      return {
+        success: true,
+        message: `App "${result.app?.name || description}" created (pending approval). ${result.pending_approval ? "User notified via SMS." : ""}`,
+      };
+    }
+    return {
+      success: false,
+      message: `App generation failed: ${result.error}`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Build app error: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
 }
 
 async function handleNotifyEmergencyContact(

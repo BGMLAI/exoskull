@@ -42,6 +42,9 @@ export const VOICE_TOOL_NAMES = new Set([
   // Email
   "search_emails",
   "email_summary",
+  // Integrations
+  "connect_rig",
+  "list_integrations",
 ]);
 
 // ============================================================================
@@ -126,6 +129,11 @@ export const WEB_TOOL_NAMES = new Set([
   "slack_read_channel",
   "notion_search",
   "notion_create_page",
+  // Integrations (app autodetekcja)
+  "connect_rig",
+  "composio_connect",
+  "list_integrations",
+  "composio_list_apps",
 ]);
 
 // ============================================================================

@@ -518,6 +518,18 @@ export class GapDetectorAgent extends BaseAgent {
           logger.info(
             `[GapDetector] Proposed build_app for severe gap: ${gap.area.slug}`,
           );
+
+          // Queue proactive SMS notification so user learns about it outside chat
+          await this.supabase.from("exo_petla_queue").insert({
+            tenant_id: tenantId,
+            handler: "proactive",
+            priority: 75,
+            params: {
+              message: `Zauważyłem lukę w obszarze "${gap.area.name}" (${gap.daysSinceActivity}+ dni bez aktywności). Proponuję zbudować prosty tracker. Napisz "tak" lub "ok", żebym go stworzył.`,
+            },
+            status: "queued",
+            scheduled_for: new Date().toISOString(),
+          });
         }
       } catch (error) {
         logger.error(

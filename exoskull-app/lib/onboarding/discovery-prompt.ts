@@ -102,11 +102,14 @@ Twoim celem jest go POZNAC. Nie robic onboardingu, nie zbierac danych - POZNAC j
 - Czy woli glos czy tekst?
 - Jak czesto chce kontaktu?
 
-### Urzadzenia i tracking
-- Czy ma smartwatch / Oura / inne wearable?
-- Czy trackuje juz cos? (sen, kroki, kalorie)
-- Jakie aplikacje uzywa do produktywnosci?
-- Z jakich uslug korzysta? (kalendarz, todoist, notion)
+### Urzadzenia, aplikacje i integracje (KLUCZOWE!)
+- Jakie aplikacje/serwisy uzywa NA CO DZIEN? (kalendarz, task manager, notatki, mail)
+- Z czego korzysta do pracy? (Slack, Teams, Notion, GitHub, Jira, Trello?)
+- Czy trackuje zdrowie? (Oura, Fitbit, Apple Watch, Google Fit, Strava?)
+- Jakie maile uzywa? (Gmail, Outlook?)
+- Czy sa appki ktore chcialby lepiej wykorzystac albo zastapic czyms prostszym?
+
+PAMIETAJ: Wymienione aplikacje → automatyczne podlaczenie integracji po onboardingu!
 
 ### Historia i doswiadczenia
 - Co juz probowal w kwestii self-improvement?
@@ -140,7 +143,7 @@ Przekaz wszystkie wyekstrahowane informacje jako JSON.
 - Jesli uzytkownik nie chce o czyms mowic - uszanuj to
 - Jesli wykryjesz sygnaly kryzysu psychicznego - delikatnie zaproponuj pomoc profesjonalna
 - Pamietaj: to poczatek relacji. Masz byc jak dobry przyjaciel, nie ankieter.
-`
+`;
 
 /**
  * Extraction prompt for post-conversation analysis
@@ -166,6 +169,7 @@ Zwroc JSON w formacie:
 
   "devices": ["oura", "apple_watch", "fitbit", etc.],
   "apps": ["todoist", "notion", "calendar", etc.],
+  "apps_mentioned": ["notion", "todoist", "gmail", "oura", etc.],
 
   "sleep_hours": liczba lub null,
   "wake_time": "HH:MM lub null",
@@ -191,10 +195,10 @@ WAZNE:
 - quotes - dosłowne cytaty ktore definiuja uzytkownika
 
 Transkrypt rozmowy:
-`
+`;
 
 export const DISCOVERY_FIRST_MESSAGE = `Cześć! Jestem IORS - Twój osobisty asystent.
 
 Zanim zaczniemy - chcę Cię poznać. Nie będę Ci zadawał listy pytań jak na przesłuchaniu. Po prostu porozmawiajmy.
 
-Opowiedz mi trochę o sobie. Kim jesteś? Co Cię tu sprowadziło?`
+Opowiedz mi trochę o sobie. Kim jesteś? Co Cię tu sprowadziło?`;

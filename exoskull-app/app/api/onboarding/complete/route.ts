@@ -2,6 +2,7 @@ import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { autoInstallMods } from "@/lib/builder/proactive-engine";
+import { getAppMapping } from "@/lib/integrations/app-detector";
 
 import { logger } from "@/lib/logger";
 import { withApiLog } from "@/lib/api/request-logger";
@@ -105,6 +106,33 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
     autoInstallMods(tenantId).catch((err) =>
       logger.error("[Complete API] Auto-install mods error:", err),
     );
+
+    // Queue proactive integration proposals for apps mentioned during discovery
+    try {
+      const appsFromDiscovery: string[] =
+        body.discoveryData?.apps_mentioned || body.discoveryData?.apps || [];
+      for (const appSlug of appsFromDiscovery) {
+        const mapping = getAppMapping(appSlug);
+        if (!mapping) continue;
+        await supabase.from("exo_petla_queue").insert({
+          tenant_id: tenantId,
+          handler: "proactive",
+          priority: 80,
+          params: {
+            message: `Podczas rozmowy wspomniałeś o ${mapping.displayName}. Mogę się z nią połączyć — wystarczy jedno kliknięcie. Chcesz?`,
+            app_slug: mapping.connectorSlug,
+            connector_type: mapping.connectorType,
+          },
+          status: "queued",
+          scheduled_for: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        });
+      }
+    } catch (e) {
+      logger.warn(
+        "[Complete API] Non-critical: app integration queueing failed:",
+        e,
+      );
+    }
 
     return NextResponse.json({
       success: true,

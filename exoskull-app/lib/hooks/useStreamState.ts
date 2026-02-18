@@ -141,27 +141,83 @@ function streamReducer(state: StreamState, action: StreamAction): StreamState {
     case "UPDATE_THINKING_STEPS":
       return {
         ...state,
-        events: state.events.map((e) =>
-          e.id === action.id && e.data.type === "thinking_step"
-            ? { ...e, data: { ...e.data, steps: action.steps } }
-            : e,
-        ),
+        events: state.events.map((e) => {
+          if (e.id !== action.id || e.data.type !== "thinking_step") return e;
+          const existing = (e.data as ThinkingStepData).steps;
+          const incoming = action.steps;
+          // Special: mark all steps as done
+          if (
+            incoming.length === 1 &&
+            incoming[0].label === "__all__" &&
+            incoming[0].status === "done"
+          ) {
+            return {
+              ...e,
+              data: {
+                ...e.data,
+                steps: existing.map((s) => ({ ...s, status: "done" as const })),
+                isComplete: true,
+              },
+            };
+          }
+          // Special: append detail to first step (thinking_token streaming)
+          if (incoming.length === 1 && incoming[0].label === "__append__") {
+            const merged = [...existing];
+            if (merged.length > 0) {
+              merged[0] = {
+                ...merged[0],
+                detail: (merged[0].detail || "") + (incoming[0].detail || ""),
+                status: "running",
+              };
+            } else {
+              merged.push({
+                label: incoming[0].label,
+                status: "running",
+                detail: incoming[0].detail,
+              });
+            }
+            return { ...e, data: { ...e.data, steps: merged } };
+          }
+          // Default: merge by label (update existing or add new)
+          const merged = [...existing];
+          for (const step of incoming) {
+            const idx = merged.findIndex((s) => s.label === step.label);
+            if (idx >= 0) {
+              merged[idx] = { ...merged[idx], ...step };
+            } else {
+              merged.push(step);
+            }
+          }
+          return { ...e, data: { ...e.data, steps: merged } };
+        }),
       };
 
     case "UPDATE_THINKING_TOOLS":
       return {
         ...state,
-        events: state.events.map((e) =>
-          e.id === action.id && e.data.type === "thinking_step"
-            ? {
-                ...e,
-                data: {
-                  ...e.data,
-                  toolActions: action.toolActions,
-                } as ThinkingStepData,
-              }
-            : e,
-        ),
+        events: state.events.map((e) => {
+          if (e.id !== action.id || e.data.type !== "thinking_step") return e;
+          const existing = (e.data as ThinkingStepData).toolActions || [];
+          const incoming = action.toolActions;
+          // Merge: update existing tool by name (first running match), or add new
+          const merged = [...existing];
+          for (const tool of incoming) {
+            const idx = merged.findIndex(
+              (t) => t.toolName === tool.toolName && t.status === "running",
+            );
+            if (idx >= 0 && tool.status !== "running") {
+              // Update existing running tool to done/error
+              merged[idx] = { ...merged[idx], ...tool };
+            } else if (tool.status === "running") {
+              // Add new running tool
+              merged.push(tool);
+            }
+          }
+          return {
+            ...e,
+            data: { ...e.data, toolActions: merged } as ThinkingStepData,
+          };
+        }),
       };
 
     case "UPDATE_FILE_UPLOAD":

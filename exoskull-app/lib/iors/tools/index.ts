@@ -57,6 +57,7 @@ import { strategyTools } from "./strategy-tools";
 import { outboundTools } from "./outbound-tools";
 import { codeExecutionTools } from "./code-execution-tools";
 import { mcpBridgeTools } from "./mcp-bridge-tools";
+import { agentFactoryTools } from "./agent-factory-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -99,6 +100,8 @@ export const IORS_EXTENSION_TOOLS = [
   ...codeExecutionTools,
   // MCP bridge tools (GitHub, Slack, Notion — direct API calls)
   ...mcpBridgeTools,
+  // Agent factory tools (create/spawn/list agents, recursive hierarchy)
+  ...agentFactoryTools,
 ];
 
 // Register tools and dynamic resolver in the shared registry so

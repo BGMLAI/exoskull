@@ -195,6 +195,127 @@ export const personalityTools: ToolDefinition[] = [
   },
 ];
 
+// ── select_personality tool ──
+// Allows switching IORS to any agent/personality from the vault
+
+const selectPersonalityTool: ToolDefinition = {
+  definition: {
+    name: "select_personality",
+    description:
+      "Przełącz IORS w tryb konkretnego mentora/terapeuty/eksperta z bazy osobowości. Szuka po slug lub nazwie w exo_agents.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        agent_slug_or_name: {
+          type: "string",
+          description:
+            "Slug lub nazwa agenta/osobowości (np. 'dr-amanda-foster-clinical-psychologist' lub 'Wealth Pilot')",
+        },
+        session_only: {
+          type: "boolean",
+          description:
+            "Tylko na czas sesji (true, default) vs permanentnie (false)",
+        },
+      },
+      required: ["agent_slug_or_name"],
+    },
+  },
+  execute: async (
+    input: Record<string, unknown>,
+    tenantId: string,
+  ): Promise<string> => {
+    const supabase = getServiceSupabase();
+    const ref = input.agent_slug_or_name as string;
+    const sessionOnly = (input.session_only as boolean) ?? true;
+
+    logger.info("[PersonalityTools] select_personality:", { ref, tenantId });
+
+    try {
+      // Search by slug first, then by name (ilike)
+      let agent;
+      const { data: bySlug } = await supabase
+        .from("exo_agents")
+        .select("id, name, slug, system_prompt, type, tier, personality_config")
+        .eq("slug", ref)
+        .eq("active", true)
+        .single();
+
+      if (bySlug) {
+        agent = bySlug;
+      } else {
+        const { data: byName } = await supabase
+          .from("exo_agents")
+          .select(
+            "id, name, slug, system_prompt, type, tier, personality_config",
+          )
+          .ilike("name", `%${ref}%`)
+          .eq("active", true)
+          .limit(1)
+          .single();
+
+        agent = byName;
+      }
+
+      if (!agent) {
+        return `Nie znaleziono osobowości "${ref}". Użyj list_agents aby znaleźć dostępne osobowości.`;
+      }
+
+      // Get greeting from personality_config
+      const config =
+        (agent.personality_config as Record<string, unknown>) || {};
+      const greeting = (config.greeting as string) || "";
+
+      if (sessionOnly) {
+        // Store as session override (not persisted to tenant)
+        return [
+          `Przełączono na: **${agent.name}**`,
+          `Typ: ${agent.type} | Tier: ${agent.tier}`,
+          greeting ? `\n${greeting}` : "",
+          `\n_System prompt aktywny na czas sesji. Użyj ponownie aby przełączyć się z powrotem._`,
+          `\n__SESSION_PERSONALITY_OVERRIDE__:${agent.id}`,
+        ]
+          .filter(Boolean)
+          .join("\n");
+      } else {
+        // Persist as tenant's default IORS personality override
+        const { error } = await supabase
+          .from("exo_tenants")
+          .update({
+            iors_personality: {
+              personality_override_agent_id: agent.id,
+              personality_override_name: agent.name,
+              personality_override_slug: agent.slug,
+            },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", tenantId);
+
+        if (error) {
+          return `Błąd zapisu: ${error.message}`;
+        }
+
+        return [
+          `Permanentnie przełączono na: **${agent.name}**`,
+          `Typ: ${agent.type} | Tier: ${agent.tier}`,
+          greeting ? `\n${greeting}` : "",
+          `\n_Aby przywrócić domyślną osobowość, użyj adjust_personality._`,
+        ]
+          .filter(Boolean)
+          .join("\n");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error("[PersonalityTools] select_personality error:", {
+        error: msg,
+      });
+      return `Błąd: ${msg}`;
+    }
+  },
+};
+
+// Add select_personality to the exported array
+personalityTools.push(selectPersonalityTool);
+
 /**
  * Clamp a value to 0-100 range, falling back to current value if undefined.
  */

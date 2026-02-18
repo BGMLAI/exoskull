@@ -223,10 +223,18 @@ export function UnifiedStream({
   }, []);
 
   useEffect(() => {
-    if (isNearBottomRef.current && scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: "smooth",
+    if (!scrollRef.current) return;
+    const last = state.events[state.events.length - 1];
+    if (!last) return;
+    // Auto-scroll for AI messages and thinking (not for history load)
+    const isAiEvent =
+      last.data.type === "ai_message" || last.data.type === "thinking_step";
+    if (isAiEvent || isNearBottomRef.current) {
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({
+          top: scrollRef.current!.scrollHeight,
+          behavior: "smooth",
+        });
       });
     }
   }, [state.events]);
@@ -485,6 +493,8 @@ export function UnifiedStream({
 
         let buffer = "";
         let spatialAccumulated = "";
+        // Track whether thinking event was created (avoids stale state.events.find)
+        let thinkingEventCreated = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -523,12 +533,9 @@ export function UnifiedStream({
 
                 // Phase 2: thinking/tool events
                 case "thinking_step": {
-                  // Find or create thinking event
+                  // Consolidate all thinking into ONE event per AI response
                   const thinkingId = `thinking-${aiEventId}`;
-                  const existing = state.events.find(
-                    (e) => e.id === thinkingId,
-                  );
-                  if (!existing) {
+                  if (!thinkingEventCreated) {
                     addEvent({
                       id: thinkingId,
                       timestamp: new Date(),
@@ -542,32 +549,20 @@ export function UnifiedStream({
                         ],
                       },
                     });
-                  } else if (existing.data.type === "thinking_step") {
-                    const steps = [...existing.data.steps];
-                    const idx = steps.findIndex((s) => s.label === data.step);
-                    if (idx >= 0) {
-                      steps[idx] = {
-                        ...steps[idx],
-                        status: data.status || "done",
-                      };
-                    } else {
-                      steps.push({
-                        label: data.step,
-                        status: data.status || "running",
-                      });
-                    }
-                    updateThinkingSteps(thinkingId, steps);
+                    thinkingEventCreated = true;
+                  } else {
+                    // Update existing — use updateThinkingSteps by ID (no stale find)
+                    updateThinkingSteps(thinkingId, [
+                      { label: data.step, status: data.status || "running" },
+                    ]);
                   }
                   break;
                 }
 
                 case "thinking_token": {
-                  // Stream thinking text (like Claude Code visible reasoning)
+                  // Stream thinking text — append to single thinking event
                   const ttThinkingId = `thinking-${aiEventId}`;
-                  const ttExisting = state.events.find(
-                    (e) => e.id === ttThinkingId,
-                  );
-                  if (!ttExisting) {
+                  if (!thinkingEventCreated) {
                     addEvent({
                       id: ttThinkingId,
                       timestamp: new Date(),
@@ -583,39 +578,27 @@ export function UnifiedStream({
                         startedAt: Date.now(),
                       },
                     });
-                  } else if (ttExisting.data.type === "thinking_step") {
-                    // Append to first step's detail (streaming)
-                    const steps = [...ttExisting.data.steps];
-                    if (steps.length > 0) {
-                      steps[0] = {
-                        ...steps[0],
-                        detail: (steps[0].detail || "") + (data.text || ""),
-                        status: "running",
-                      };
-                    } else {
-                      steps.push({
-                        label: "Rozumowanie...",
+                    thinkingEventCreated = true;
+                  } else {
+                    // Append to existing thinking detail via reducer (sentinel label)
+                    updateThinkingSteps(ttThinkingId, [
+                      {
+                        label: "__append__",
                         status: "running",
                         detail: data.text || "",
-                      });
-                    }
-                    updateThinkingSteps(ttThinkingId, steps);
+                      },
+                    ]);
                   }
                   break;
                 }
 
                 case "thinking_done": {
-                  // Mark thinking as complete
+                  // Mark thinking as complete — no stale find needed
                   const tdThinkingId = `thinking-${aiEventId}`;
-                  const tdExisting = state.events.find(
-                    (e) => e.id === tdThinkingId,
-                  );
-                  if (tdExisting && tdExisting.data.type === "thinking_step") {
-                    const steps = tdExisting.data.steps.map((s) => ({
-                      ...s,
-                      status: "done" as const,
-                    }));
-                    updateThinkingSteps(tdThinkingId, steps);
+                  if (thinkingEventCreated) {
+                    updateThinkingSteps(tdThinkingId, [
+                      { label: "__all__", status: "done" },
+                    ]);
                   }
                   break;
                 }
@@ -624,23 +607,9 @@ export function UnifiedStream({
                   // Notify 3D scene of tool execution
                   useSceneStore.getState().startTool(data.tool);
 
-                  // Fold tool into thinking event (grouped process view)
+                  // Fold tool into single thinking event
                   const tsThinkingId = `thinking-${aiEventId}`;
-                  const tsExisting = state.events.find(
-                    (e) => e.id === tsThinkingId,
-                  );
-                  if (tsExisting && tsExisting.data.type === "thinking_step") {
-                    const tools = [
-                      ...(tsExisting.data.toolActions || []),
-                      {
-                        toolName: data.tool,
-                        displayLabel: data.label || data.tool,
-                        status: "running" as const,
-                      },
-                    ];
-                    updateThinkingTools(tsThinkingId, tools);
-                  } else {
-                    // No thinking event yet — create one with this tool
+                  if (!thinkingEventCreated) {
                     addEvent({
                       id: tsThinkingId,
                       timestamp: new Date(),
@@ -656,6 +625,15 @@ export function UnifiedStream({
                         ],
                       },
                     });
+                    thinkingEventCreated = true;
+                  } else {
+                    updateThinkingTools(tsThinkingId, [
+                      {
+                        toolName: data.tool,
+                        displayLabel: data.label || data.tool,
+                        status: "running" as const,
+                      },
+                    ]);
                   }
                   break;
                 }
@@ -664,27 +642,21 @@ export function UnifiedStream({
                   // Notify 3D scene that tool finished
                   useSceneStore.getState().endTool();
 
-                  // Update tool in thinking event
+                  // Update tool status in thinking event
                   const teThinkingId = `thinking-${aiEventId}`;
-                  const teExisting = state.events.find(
-                    (e) => e.id === teThinkingId,
-                  );
-                  if (teExisting && teExisting.data.type === "thinking_step") {
-                    const tools = (teExisting.data.toolActions || []).map(
-                      (t) =>
-                        t.toolName === data.tool && t.status === "running"
-                          ? {
-                              ...t,
-                              status: (data.success === false
-                                ? "error"
-                                : "done") as "done" | "error",
-                              durationMs: data.durationMs,
-                              resultSummary: data.resultSummary,
-                              success: data.success !== false,
-                            }
-                          : t,
-                    );
-                    updateThinkingTools(teThinkingId, tools);
+                  if (thinkingEventCreated) {
+                    updateThinkingTools(teThinkingId, [
+                      {
+                        toolName: data.tool,
+                        displayLabel: data.label || data.tool,
+                        status: (data.success === false ? "error" : "done") as
+                          | "done"
+                          | "error",
+                        durationMs: data.durationMs,
+                        resultSummary: data.resultSummary,
+                        success: data.success !== false,
+                      },
+                    ]);
                   }
 
                   // Emit third_party_action for external service tools
@@ -879,22 +851,31 @@ export function UnifiedStream({
                 case "mcp_tool_start": {
                   useSceneStore.getState().startTool(data.tool);
                   const mcpThinkingId = `thinking-${aiEventId}`;
-                  const mcpExisting = state.events.find(
-                    (e) => e.id === mcpThinkingId,
-                  );
-                  if (
-                    mcpExisting &&
-                    mcpExisting.data.type === "thinking_step"
-                  ) {
-                    const tools = [
-                      ...(mcpExisting.data.toolActions || []),
+                  if (!thinkingEventCreated) {
+                    addEvent({
+                      id: mcpThinkingId,
+                      timestamp: new Date(),
+                      data: {
+                        type: "thinking_step",
+                        steps: [],
+                        toolActions: [
+                          {
+                            toolName: `${data.server}/${data.tool}`,
+                            displayLabel: `[${data.server}] ${data.tool}`,
+                            status: "running",
+                          },
+                        ],
+                      },
+                    });
+                    thinkingEventCreated = true;
+                  } else {
+                    updateThinkingTools(mcpThinkingId, [
                       {
                         toolName: `${data.server}/${data.tool}`,
                         displayLabel: `[${data.server}] ${data.tool}`,
                         status: "running" as const,
                       },
-                    ];
-                    updateThinkingTools(mcpThinkingId, tools);
+                    ]);
                   }
                   break;
                 }
@@ -902,28 +883,18 @@ export function UnifiedStream({
                 case "mcp_tool_end": {
                   useSceneStore.getState().endTool();
                   const mcpTeThinkingId = `thinking-${aiEventId}`;
-                  const mcpTeExisting = state.events.find(
-                    (e) => e.id === mcpTeThinkingId,
-                  );
-                  if (
-                    mcpTeExisting &&
-                    mcpTeExisting.data.type === "thinking_step"
-                  ) {
-                    const tools = (mcpTeExisting.data.toolActions || []).map(
-                      (t) =>
-                        t.toolName === `${data.server}/${data.tool}` &&
-                        t.status === "running"
-                          ? {
-                              ...t,
-                              status: (data.success === false
-                                ? "error"
-                                : "done") as "done" | "error",
-                              durationMs: data.durationMs,
-                              success: data.success !== false,
-                            }
-                          : t,
-                    );
-                    updateThinkingTools(mcpTeThinkingId, tools);
+                  if (thinkingEventCreated) {
+                    updateThinkingTools(mcpTeThinkingId, [
+                      {
+                        toolName: `${data.server}/${data.tool}`,
+                        displayLabel: `[${data.server}] ${data.tool}`,
+                        status: (data.success === false ? "error" : "done") as
+                          | "done"
+                          | "error",
+                        durationMs: data.durationMs,
+                        success: data.success !== false,
+                      },
+                    ]);
                   }
                   break;
                 }

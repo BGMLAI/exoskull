@@ -43,7 +43,7 @@ export function useDictation(
   const onFinalTranscriptRef = useRef(onFinalTranscript);
   const onErrorRef = useRef(onError);
 
-  const SILENCE_TIMEOUT_MS = 5000; // 5 seconds silence → auto-stop
+  const SILENCE_TIMEOUT_MS = 1500; // 1.5 seconds silence → auto-stop
   const MAX_RECORDING_MS = 120_000; // 2 min safety limit
 
   // Keep refs fresh to avoid stale closures

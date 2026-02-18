@@ -74,6 +74,110 @@ async function slackAPI(
   return data;
 }
 
+async function sentryAPI(
+  endpoint: string,
+  method = "GET",
+  body?: Record<string, unknown>,
+): Promise<unknown> {
+  const token = process.env.SENTRY_AUTH_TOKEN;
+  if (!token) throw new Error("SENTRY_AUTH_TOKEN not configured");
+
+  const region = process.env.SENTRY_REGION || "de.sentry.io";
+  const res = await fetch(`https://${region}/api/0${endpoint}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Sentry API ${res.status}: ${err.slice(0, 500)}`);
+  }
+  return res.json();
+}
+
+async function stripeAPI(
+  endpoint: string,
+  method = "GET",
+  params?: Record<string, string>,
+): Promise<unknown> {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error("STRIPE_SECRET_KEY not configured");
+
+  const url = new URL(`https://api.stripe.com/v1${endpoint}`);
+  let bodyStr: string | undefined;
+
+  if (method === "GET" && params) {
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  } else if (params) {
+    bodyStr = new URLSearchParams(params).toString();
+  }
+
+  const res = await fetch(url.toString(), {
+    method,
+    headers: {
+      Authorization: `Bearer ${key}`,
+      ...(bodyStr
+        ? { "Content-Type": "application/x-www-form-urlencoded" }
+        : {}),
+    },
+    ...(bodyStr ? { body: bodyStr } : {}),
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Stripe API ${res.status}: ${err.slice(0, 500)}`);
+  }
+  return res.json();
+}
+
+async function braveSearchAPI(query: string): Promise<unknown> {
+  const key = process.env.BRAVE_API_KEY;
+  if (!key) throw new Error("BRAVE_API_KEY not configured");
+
+  const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=10`;
+  const res = await fetch(url, {
+    headers: { "X-Subscription-Token": key, Accept: "application/json" },
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Brave Search ${res.status}: ${err.slice(0, 500)}`);
+  }
+  return res.json();
+}
+
+async function resendAPI(
+  endpoint: string,
+  method = "POST",
+  body?: Record<string, unknown>,
+): Promise<unknown> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error("RESEND_API_KEY not configured");
+
+  const res = await fetch(`https://api.resend.com${endpoint}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Resend API ${res.status}: ${err.slice(0, 500)}`);
+  }
+  return res.json();
+}
+
 async function notionAPI(
   endpoint: string,
   method = "GET",
@@ -507,6 +611,486 @@ The head branch must already be pushed to the remote.`,
         const msg = error instanceof Error ? error.message : String(error);
         logger.error("[MCPBridge] notion_create_page failed:", { error: msg });
         return `Notion error: ${msg}`;
+      }
+    },
+  },
+
+  // ---- sentry_list_issues ----
+  {
+    timeoutMs: 10_000,
+    definition: {
+      name: "sentry_list_issues",
+      description: `List recent issues from a Sentry project. Returns issue title, level, count, and link.`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          project: {
+            type: "string",
+            description: "Sentry project slug (e.g., 'exoskull-web')",
+          },
+          query: {
+            type: "string",
+            description: "Search query (e.g., 'is:unresolved level:error')",
+          },
+        },
+        required: ["project"],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const project = input.project as string;
+      const query = (input.query as string) || "is:unresolved";
+      const org = process.env.SENTRY_ORG || "bloom-found";
+      logger.info("[MCPBridge] sentry_list_issues:", { project, query });
+
+      try {
+        const issues = (await sentryAPI(
+          `/projects/${org}/${project}/issues/?query=${encodeURIComponent(query)}&limit=10`,
+        )) as Array<{
+          id: string;
+          title: string;
+          level: string;
+          count: string;
+          permalink: string;
+          firstSeen: string;
+        }>;
+
+        if (issues.length === 0) return "No issues found.";
+
+        return issues
+          .map(
+            (i) =>
+              `[${i.level.toUpperCase()}] ${i.title}\n  Count: ${i.count} | First: ${i.firstSeen}\n  ${i.permalink}`,
+          )
+          .join("\n\n");
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error("[MCPBridge] sentry_list_issues failed:", { error: msg });
+        return `Sentry error: ${msg}`;
+      }
+    },
+  },
+
+  // ---- stripe_list_payments ----
+  {
+    timeoutMs: 10_000,
+    definition: {
+      name: "stripe_list_payments",
+      description: `List recent Stripe payments/charges. Returns amount, status, customer, and date.`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          limit: {
+            type: "number",
+            description: "Number of payments to list (default: 10, max: 100)",
+          },
+          status: {
+            type: "string",
+            description: "Filter by status: succeeded, pending, failed",
+          },
+        },
+        required: [],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const limit = String(Math.min((input.limit as number) || 10, 100));
+      const params: Record<string, string> = { limit };
+      if (input.status) params.status = input.status as string;
+      logger.info("[MCPBridge] stripe_list_payments:", { limit });
+
+      try {
+        const result = (await stripeAPI("/charges", "GET", params)) as {
+          data: Array<{
+            id: string;
+            amount: number;
+            currency: string;
+            status: string;
+            description: string | null;
+            created: number;
+          }>;
+        };
+
+        if (result.data.length === 0) return "No payments found.";
+
+        return result.data
+          .map((c) => {
+            const amount = (c.amount / 100).toFixed(2);
+            const date = new Date(c.created * 1000).toISOString().split("T")[0];
+            return `${c.id}: ${amount} ${c.currency.toUpperCase()} [${c.status}]\n  ${c.description || "(no description)"} | ${date}`;
+          })
+          .join("\n\n");
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error("[MCPBridge] stripe_list_payments failed:", {
+          error: msg,
+        });
+        return `Stripe error: ${msg}`;
+      }
+    },
+  },
+
+  // ---- brave_search ----
+  {
+    timeoutMs: 10_000,
+    definition: {
+      name: "brave_search",
+      description: `Search the web using Brave Search API. Returns titles, URLs, and descriptions.`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          query: {
+            type: "string",
+            description: "Search query",
+          },
+        },
+        required: ["query"],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const query = input.query as string;
+      logger.info("[MCPBridge] brave_search:", { query });
+
+      try {
+        const result = (await braveSearchAPI(query)) as {
+          web?: {
+            results: Array<{
+              title: string;
+              url: string;
+              description: string;
+            }>;
+          };
+        };
+
+        const results = result.web?.results || [];
+        if (results.length === 0) return `No results for: ${query}`;
+
+        return results
+          .slice(0, 10)
+          .map(
+            (r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.description}`,
+          )
+          .join("\n\n");
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error("[MCPBridge] brave_search failed:", { error: msg });
+        return `Brave Search error: ${msg}`;
+      }
+    },
+  },
+
+  // ---- resend_send_email ----
+  {
+    timeoutMs: 10_000,
+    definition: {
+      name: "resend_send_email",
+      description: `Send an email via Resend API. Requires verified sender domain.`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          to: {
+            type: "string",
+            description: "Recipient email address",
+          },
+          subject: {
+            type: "string",
+            description: "Email subject",
+          },
+          html: {
+            type: "string",
+            description: "Email body (HTML)",
+          },
+          from: {
+            type: "string",
+            description:
+              "Sender email (default: noreply@exoskull.app if verified)",
+          },
+        },
+        required: ["to", "subject", "html"],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const to = input.to as string;
+      const subject = input.subject as string;
+      const html = input.html as string;
+      const from = (input.from as string) || "ExoSkull <noreply@exoskull.app>";
+      logger.info("[MCPBridge] resend_send_email:", { to, subject });
+
+      try {
+        const result = (await resendAPI("/emails", "POST", {
+          from,
+          to: [to],
+          subject,
+          html,
+        })) as { id: string };
+
+        return `Email sent to ${to} (ID: ${result.id})`;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error("[MCPBridge] resend_send_email failed:", { error: msg });
+        return `Resend error: ${msg}`;
+      }
+    },
+  },
+
+  // ---- discord_send_message ----
+  {
+    timeoutMs: 10_000,
+    definition: {
+      name: "discord_send_message",
+      description: `Send a message to a Discord channel via webhook or bot token.`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          channel_id: {
+            type: "string",
+            description: "Discord channel ID",
+          },
+          content: {
+            type: "string",
+            description: "Message content",
+          },
+        },
+        required: ["channel_id", "content"],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const channelId = input.channel_id as string;
+      const content = input.content as string;
+      const token = process.env.DISCORD_BOT_TOKEN;
+      if (!token) return "DISCORD_BOT_TOKEN not configured.";
+      logger.info("[MCPBridge] discord_send_message:", { channelId });
+
+      try {
+        const res = await fetch(
+          `https://discord.com/api/v10/channels/${channelId}/messages`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bot ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ content }),
+            signal: AbortSignal.timeout(10_000),
+          },
+        );
+
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(`Discord ${res.status}: ${err.slice(0, 300)}`);
+        }
+
+        const msg = (await res.json()) as { id: string };
+        return `Message sent (ID: ${msg.id})`;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error("[MCPBridge] discord_send_message failed:", {
+          error: msg,
+        });
+        return `Discord error: ${msg}`;
+      }
+    },
+  },
+
+  // ---- elevenlabs_tts ----
+  {
+    timeoutMs: 30_000,
+    definition: {
+      name: "elevenlabs_tts",
+      description: `Generate speech from text using ElevenLabs TTS API. Returns audio URL (base64 in practice).`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          text: {
+            type: "string",
+            description: "Text to synthesize (max 5000 chars)",
+          },
+          voice_id: {
+            type: "string",
+            description:
+              "ElevenLabs voice ID (default: Rachel - 21m00Tcm4TlvDq8ikWAM)",
+          },
+        },
+        required: ["text"],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const text = (input.text as string).slice(0, 5000);
+      const voiceId = (input.voice_id as string) || "21m00Tcm4TlvDq8ikWAM";
+      const key = process.env.ELEVENLABS_API_KEY;
+      if (!key) return "ELEVENLABS_API_KEY not configured.";
+      logger.info("[MCPBridge] elevenlabs_tts:", {
+        voiceId,
+        textLen: text.length,
+      });
+
+      try {
+        const res = await fetch(
+          `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+          {
+            method: "POST",
+            headers: {
+              "xi-api-key": key,
+              "Content-Type": "application/json",
+              Accept: "audio/mpeg",
+            },
+            body: JSON.stringify({
+              text,
+              model_id: "eleven_multilingual_v2",
+            }),
+            signal: AbortSignal.timeout(30_000),
+          },
+        );
+
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(`ElevenLabs ${res.status}: ${err.slice(0, 300)}`);
+        }
+
+        const audioBytes = await res.arrayBuffer();
+        const sizeMB = (audioBytes.byteLength / 1024 / 1024).toFixed(2);
+        return `TTS generated: ${sizeMB} MB audio (voice: ${voiceId}). Audio binary available — use with audio playback tool.`;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error("[MCPBridge] elevenlabs_tts failed:", { error: msg });
+        return `ElevenLabs error: ${msg}`;
+      }
+    },
+  },
+
+  // ---- cloudflare_r2_list ----
+  {
+    timeoutMs: 10_000,
+    definition: {
+      name: "cloudflare_r2_list",
+      description: `List objects in a Cloudflare R2 bucket. Returns keys, sizes, and last modified dates.`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          bucket: {
+            type: "string",
+            description: "R2 bucket name (default: exoskull)",
+          },
+          prefix: {
+            type: "string",
+            description: "Key prefix filter (e.g., 'tenant-123/bronze/')",
+          },
+          limit: {
+            type: "number",
+            description: "Max objects to list (default: 20)",
+          },
+        },
+        required: [],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const bucket = (input.bucket as string) || "exoskull";
+      const prefix = (input.prefix as string) || "";
+      const limit = (input.limit as number) || 20;
+      const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+      const token = process.env.CLOUDFLARE_API_TOKEN;
+      if (!accountId || !token)
+        return "CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN not configured.";
+      logger.info("[MCPBridge] cloudflare_r2_list:", { bucket, prefix });
+
+      try {
+        const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${bucket}/objects?prefix=${encodeURIComponent(prefix)}&limit=${limit}`;
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(10_000),
+        });
+
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(`R2 ${res.status}: ${err.slice(0, 300)}`);
+        }
+
+        const data = (await res.json()) as {
+          result: Array<{
+            key: string;
+            size: number;
+            last_modified: string;
+          }>;
+        };
+
+        if (!data.result || data.result.length === 0)
+          return `No objects in ${bucket}/${prefix}`;
+
+        return data.result
+          .map((o) => {
+            const sizeMB = (o.size / 1024 / 1024).toFixed(2);
+            return `${o.key} (${sizeMB} MB) — ${o.last_modified}`;
+          })
+          .join("\n");
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error("[MCPBridge] cloudflare_r2_list failed:", { error: msg });
+        return `R2 error: ${msg}`;
+      }
+    },
+  },
+
+  // ---- stripe_create_invoice ----
+  {
+    timeoutMs: 15_000,
+    definition: {
+      name: "stripe_create_invoice",
+      description: `Create a draft invoice in Stripe for a customer.`,
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          customer_id: {
+            type: "string",
+            description: "Stripe customer ID (cus_...)",
+          },
+          description: {
+            type: "string",
+            description: "Invoice description",
+          },
+          amount: {
+            type: "number",
+            description: "Amount in cents (e.g., 5000 = $50.00)",
+          },
+          currency: {
+            type: "string",
+            description: "Currency code (default: usd)",
+          },
+        },
+        required: ["customer_id", "amount"],
+      },
+    },
+    execute: async (input: Record<string, unknown>): Promise<string> => {
+      const customerId = input.customer_id as string;
+      const amount = input.amount as number;
+      const currency = (input.currency as string) || "usd";
+      const description = (input.description as string) || "ExoSkull Invoice";
+      logger.info("[MCPBridge] stripe_create_invoice:", {
+        customerId,
+        amount,
+      });
+
+      try {
+        // Create invoice
+        const invoice = (await stripeAPI("/invoices", "POST", {
+          customer: customerId,
+          description,
+          currency,
+        })) as { id: string; hosted_invoice_url: string | null };
+
+        // Add line item
+        await stripeAPI("/invoiceitems", "POST", {
+          customer: customerId,
+          invoice: invoice.id,
+          amount: String(amount),
+          currency,
+          description,
+        });
+
+        return `Invoice created: ${invoice.id}\n${invoice.hosted_invoice_url || "(draft — finalize to get URL)"}`;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error("[MCPBridge] stripe_create_invoice failed:", {
+          error: msg,
+        });
+        return `Stripe error: ${msg}`;
       }
     },
   },

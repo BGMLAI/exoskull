@@ -4,6 +4,390 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-18] Feature: Self-Modification Engine with Kernel Protection
+
+### What
+ExoSkull can now modify its own source code autonomously with safety guardrails. Multi-agent swarm generates diffs, a kernel guard validates them before apply, and all changes go through a PR pipeline for audit trail.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **Strategy engine** | `lib/goals/strategy-engine.ts` — 780-line goal strategy generator with AI-powered plan decomposition |
+| **Strategy store** | `lib/goals/strategy-store.ts` — CRUD + progress tracking for strategies |
+| **Signal triage** | `lib/signals/triage-engine.ts` — 663-line engine classifies incoming signals by urgency/domain |
+| **Source engine** | `lib/self-modification/source-engine.ts` — Reads/analyzes codebase for modification candidates |
+| **Diff generator** | `lib/self-modification/diff-generator.ts` — Generates safe code diffs |
+| **Kernel guard** | `lib/self-modification/kernel-guard.ts` — Validates diffs against safety rules (no auth bypass, no data deletion, no env mutation) |
+| **PR pipeline** | `lib/self-modification/pr-pipeline.ts` — Creates audit trail for all self-modifications |
+| **Swarm coordinator** | `lib/self-modification/swarm-coordinator.ts` — Multi-agent orchestration for complex modifications |
+| **Signal triage CRON** | `app/api/cron/signal-triage/route.ts` — Automated signal classification |
+| **Goal progress CRON** | Enhanced with strategy engine integration |
+| **Ralph tools** | New tools for self-modification via chat |
+| **DB migrations** | `self_modification_log` + `goal_strategies` + `signal_triage` tables |
+
+### Files Changed (19) — +3,705/-32 lines
+
+---
+
+## [2026-02-18] Feature: Wire Proactive Notifications — All 5 Systems Fixed
+
+### What
+Audit revealed 70% of proactive systems were silently writing to DB without notifying users. Fixed all 5 notification systems to actually reach users via SMS/preferred channel.
+
+### Changes
+| System | Before | After |
+|--------|--------|-------|
+| **Gap Detection** | Silent DB write | SMS with detected blind spots |
+| **Goal Milestones** | TODO comment | SMS at 25/50/75/100% |
+| **Off-track Goals** | `scheduled_for: null` (never auto-approves) | 4h auto-approve |
+| **Urgent Predictions** | Intervention only | Immediate SMS + intervention |
+| **Guardian Values** | Silent intervention | SMS + 6h auto-approve |
+| **Insight Push** | Already working | No change needed |
+
+### Files Changed (4)
+- `app/api/cron/gap-detection/route.ts` — `sendProactiveMessage()` after swarm
+- `app/api/cron/goal-progress/route.ts` — SMS at milestones + 4h auto-approve
+- `app/api/cron/predictions/route.ts` — Immediate SMS for high-confidence urgent
+- `app/api/cron/guardian-values/route.ts` — SMS + 6h auto-approve
+
+---
+
+## [2026-02-18] Fix: App Approval Gate + Skill Execution Timeout
+
+### What
+Security hardening: generated apps no longer auto-approve (require user consent), skill execution wrapped in 15s outer timeout.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **App approval gate** | Apps stored as `pending` → SMS to tenant → `activateApp()` only after user consent |
+| **Skill timeout** | 15s `Promise.race` outer timeout covering full pipeline (DB query + sandbox) |
+| **Execution metrics** | Duration + success logged for every skill invocation |
+
+### Files Changed (4)
+- `lib/apps/generator/app-generator.ts` — Pending + SMS + `activateApp()`
+- `lib/iors/tools/dynamic-handler.ts` — 15s outer timeout
+- `lib/apps/types.ts`, `lib/apps/index.ts` — Type + export updates
+
+---
+
+## [2026-02-18] Feature: SMS Inbound Gateway — Two-Way SMS (Phase 3)
+
+### What
+Complete two-way SMS conversation loop. Users can text ExoSkull and get AI responses with full 40+ IORS tool access.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **Inbound webhook** | `app/api/gateway/sms/route.ts` — Twilio signature validation, tenant resolution (auto-register new users), full AI pipeline |
+| **Response** | Via Twilio REST API (not TwiML), truncated at 1500 chars |
+| **Twilio config** | `+48732143210` SMS webhook → `https://exoskull.xyz/api/gateway/sms` |
+
+### Files Changed (2) — +199 lines
+
+---
+
+## [2026-02-18] Feature: Wire Google Data into Autonomous Loops (Phase 2)
+
+### What
+Morning briefing, evening reflection, and MAPE-K monitor now use real Google data (Calendar, Gmail, Fit health metrics).
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **Morning briefing** | Includes Calendar events, Gmail unread count, health metrics (steps, sleep, calories, HR) |
+| **MAPE-K Monitor** | Collects Google health (last 48h) + Calendar events |
+| **Evening reflection** | Today's steps, calories, last night's sleep, calendar count |
+| **Graceful fallback** | No Google rig → returns null, no crashes |
+
+### Files Changed (4) — +286/-37 lines
+
+---
+
+## [2026-02-18] Feature: Google Data Pipeline + Automated Rig-Sync CRON
+
+### What
+Google Fit, Calendar, Gmail data synced to Supabase every 30 minutes via CRON. Standalone sync script for manual runs.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **Sync script** | `scripts/google-sync-direct.mjs` — Standalone Google sync (bypasses Next.js) |
+| **Rig-sync CRON** | `app/api/cron/rig-sync/route.ts` — Every 30 min, syncs all Google connections |
+| **DB migration** | `sync_log_columns.sql` — connection_id, success, error, duration_ms, metadata |
+| **Google Fitness API** | Enabled in GCP Console, 21 metrics synced (Feb 11-17) |
+
+### Files Changed (9) — +853 lines
+
+---
+
+## [2026-02-18] Fix: Chat Emergency Fallback, Missing Message, Audio Issues
+
+### What
+Three small but critical fixes: emergency Gemini fallback URL, missing autonomy executor message, TTS audio hook.
+
+### Files Changed (4) — +11/-6 lines
+
+---
+
+## [2026-02-18] Feature: Last Mile Delivery — Wire Components into Working Pipeline
+
+### What
+Connected existing but unwired components: gap detector agent, report dispatcher, skill approval gateway, SMS status webhook, HomeChat streaming improvements.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **Gap detector** | `lib/agents/specialized/gap-detector.ts` wired to gap detection CRON |
+| **Report dispatcher** | `lib/reports/report-dispatcher.ts` enhanced with multiple delivery channels |
+| **Approval gateway** | `lib/skills/approval/approval-gateway.ts` for skill approval flows |
+| **SMS status** | `app/api/twilio/sms-status/route.ts` — Twilio delivery status webhook |
+| **HomeChat** | Enhanced streaming with better UX |
+| **Tenant utils** | `lib/cron/tenant-utils.ts` shared tenant fetching for CRONs |
+| **DB migration** | `proactive_log_delivery.sql` |
+
+### Files Changed (13) — +453/-30 lines
+
+---
+
+## [2026-02-17] Fix: WCAG 2.1 AA Accessibility Audit
+
+### What
+Full accessibility audit: landmarks, ARIA labels, keyboard navigation, contrast ratios, skip-to-content, focus management across all pages.
+
+### Files Changed (17) — +1,096/-260 lines
+- All layouts (admin, dashboard, onboarding) — landmark roles
+- Landing page — full ARIA audit
+- Login/reset forms — label associations, aria-describedby
+- 3D scene — aria-hidden, reduced motion support
+- `globals.css` — focus-visible styles, sr-only utilities
+- Package additions: `@axe-core/react`, `axe-core`
+
+---
+
+## [2026-02-17] Fix: 3D Model Loading — Sketchfab Download + File Upload MIME
+
+### What
+Sketchfab models now loadable via server-side download proxy. File upload expanded with 3D MIME types.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **Sketchfab proxy** | `/api/models/[uid]/download` — fetches actual GLB URL from Sketchfab API |
+| **Upload MIME** | Added `model/gltf-binary`, `model/gltf+json`, extension fallback (.glb/.gltf/.fbx/.obj) |
+| **ModelPicker UX** | Loading spinner, inline error messages |
+
+### Files Changed (3) — +214/-41 lines
+
+---
+
+## [2026-02-17] Fix: Mindmap Rendering — MeshBasicMaterial + Error Handling
+
+### What
+Mindmap 3D rendering fixes: switched to MeshBasicMaterial (no lighting dependency), dark background, error boundaries for all node renderers.
+
+### Files Changed (6) — +449/-274 lines
+- `MindMap3D.tsx` — Dark bg, error handling
+- 4 node renderers (Card, Image, Model, Orb) — MeshBasicMaterial, error boundaries
+
+---
+
+## [2026-02-17] Fix: Usability Audit — Mindmap Tree, Theme, Dock, Tasks
+
+### What
+Multiple UX fixes: mindmap tree layout, theme switcher integration, floating panel dock, tasks API improvement.
+
+### Files Changed (14) — +226/-73 lines
+
+---
+
+## [2026-02-17] Feature: UI/UX Rebuild — Gemini Theme, Floating Panels, Code Chat
+
+### What
+Major UI overhaul: Gemini-inspired theme system, floating panel manager with dock, code execution chat components, auth page polish, privacy/terms redesign.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **Floating panels** | `FloatingPanel.tsx` + `FloatingPanelManager.tsx` + `PanelDock.tsx` — draggable glass panels with dock |
+| **Theme system** | `ThemeProvider.tsx` + `ThemeSwitcher.tsx` + `useThemeStore.ts` — multi-theme support |
+| **Layout modes** | `LayoutModeSwitch.tsx` + `MindmapLayout.tsx` + `QuickInput.tsx` |
+| **Code chat** | `CodeBlock.tsx`, `DiffViewer.tsx`, `FileChange.tsx`, `TerminalOutput.tsx` — rich code rendering in chat |
+| **Auth polish** | Login form with gradient bg, enhanced password UX |
+| **Privacy/Terms** | Full legal page redesign with collapsible sections |
+| **HomeChat** | Enhanced with code rendering, tool activity indicators |
+| **Agent SDK** | Extended with code execution config |
+
+### Files Changed (33) — +3,641/-840 lines
+
+---
+
+## [2026-02-17] Feature: 3D Mind Map Workspace — NotebookLM-Style Three-Panel Layout
+
+### What
+New workspace view with force-directed 3D mind map, sources panel, and AI studio panel. Based on NotebookLM interaction pattern.
+
+### Files Changed
+- `components/mindmap/` — MindMap3D, NodeContextMenu, NodeDetailPanel, ModelPicker
+- `components/workspace/` — WorkspaceLayout, SourcesPanel, StudioPanel
+- `app/dashboard/mindmap/page.tsx` — New route
+
+---
+
+## [2026-02-17] Feature: Multi-Agent VPS Proxy + SSE Event Handlers
+
+### What
+Extended VPS executor with multi-agent proxy capabilities and SSE event handlers for real-time agent backend communication.
+
+---
+
+## [2026-02-17] Feature: Claude Code Merge into Main Dashboard Chat
+
+### What
+Built-in coding agent merged into main chat. Always-on coding mode (25 turns, 120s), file change SSE events, code sidebar with file browser.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **Always-on coding** | Removed `isCodingIntent` regex — all web messages get coding config |
+| **File change SSE** | `code_write_file`/`code_edit_file` emit `__SSE__file_change` directives |
+| **Code sidebar** | `CodeSidebar.tsx` — toggleable 480px panel, auto-opens on file changes |
+| **Tool activity** | Animated wrench badge during tool execution in HomeChat |
+
+### Files Changed (7)
+- `lib/agent-sdk/exoskull-agent.ts`, `lib/iors/tools/code-execution-tools.ts`
+- `components/dashboard/HomeChat.tsx`, `components/stream/UnifiedStream.tsx`
+- `lib/stores/useCockpitStore.ts`, `components/dashboard/CodeSidebar.tsx`
+- `components/dashboard/CyberpunkDashboard.tsx`
+
+---
+
+## [2026-02-17] Feature: P2 Mind Map Persistence — Visual Type, Model, Thumbnail
+
+### What
+Mind map visual customizations now persist to DB. 5 PATCH routes, useOrbData mapping, MindMap3D callbacks.
+
+### Changes
+- DB migration: `visual_type`, `model_url`, `thumbnail_url`, `source_urls`, `tags` on all 5 knowledge tables
+- All 5 PATCH endpoints accept visual fields
+- `useOrbData` maps visual fields through full hierarchy
+- `MindMap3D` `handleChangeVisual` + `handleModelSelect` now persist (were no-op stubs)
+
+---
+
+## [2026-02-17] Fix: P0 Reliability — VPS Circuit Breaker + Thread Race Condition
+
+### What
+Two critical reliability fixes: proper circuit breaker for VPS proxy, atomic thread upsert.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **Circuit breaker** | `closed` → `open` (3 failures) → `half_open` (30s) → `closed` (probe success). Fail-open on check error. |
+| **Thread race** | Atomic `upsert(onConflict, ignoreDuplicates)` + fallback select |
+
+---
+
+## [2026-02-17] Feature: P1 UX/Reliability — Auth, Voice Guard, Data Freshness
+
+### What
+Three reliability improvements: unified-thread auth migration, voice recording guard, data freshness indicators.
+
+### Changes
+| Feature | Detail |
+|---------|--------|
+| **Auth migration** | `getUser()` → `verifyTenantAuth()` for mobile conversation history |
+| **Voice guard** | Mic disabled while AI speaking (prevents audio loopback) |
+| **Data freshness** | 30-min auto-refresh, `DataFreshness` component with manual refresh |
+
+---
+
+## [2026-02-17] Feature: P2 Performance/Security — N+1 Fix, Action Whitelist, Mutation Retry
+
+### What
+Performance: batch GROUP BY replaces per-entity notes count (N+1 → 1-2 queries). Security: action type whitelist (14 types). UX: auto-retry on transient errors.
+
+### Files Changed (4) — +181/-70 lines
+
+---
+
+## [2026-02-17] Refactor: Structured Logger Migration — 1222 console.* → Logger (367 files)
+
+### What
+Migrated all 1222 `console.log/warn/error` calls across 367 files to structured logger with context and log levels.
+
+---
+
+## [2026-02-17] Feature: Structured API Request Logging + withApiLog (170 routes)
+
+### What
+Request ID tracking across all API requests. `withApiLog` wrapper applied to 170 routes. Loading/error boundaries added.
+
+---
+
+## [2026-02-17] Fix: SSE Streaming — res.on("close") + STT Timeout + Race Guard
+
+### What
+Three streaming fixes: SSE cleanup uses `res.on("close")` (was `req.on("close")`), STT 30s timeout protection, stream race condition guard.
+
+---
+
+## [2026-02-17] Chore: Code Cleanup — 12 Dead Endpoints + 35 Circular Deps + 14 Barrel Files
+
+### What
+Deleted 12 dead API endpoints, resolved 35 circular dependencies, cleaned unused exports from 14 barrel files (-307 lines).
+
+---
+
+## [2026-02-17] Refactor: Auth Migration — 74 API Routes to verifyTenantAuth
+
+### What
+Migrated all 74 API routes from legacy auth patterns to `verifyTenantAuth()` for consistent tenant isolation.
+
+---
+
+## [2026-02-17] Security: A4 Layer 2+3 — Unprotected Routes + Circuit Breaker + Voice Auth
+
+### What
+Added auth to 4 high-risk unprotected API routes (Layer 2). Circuit breaker, voice auth migration, guardian safety checks (Layer 3).
+
+---
+
+## [2026-02-17] Chore: Static Analysis Cleanup + CRON Optimization
+
+### What
+Dead code removal, dependency fixes. CRON `loop-daily` optimized from ~35s to ~15s.
+
+---
+
+## [2026-02-17] Fix: 19 Audit Findings (F1-F7, B1-B6, UX P1-P2)
+
+### What
+Resolved 19 findings from comprehensive audit across frontend, backend, and UX categories.
+
+---
+
+## [2026-02-17] Test: Add Test Infrastructure — 6 New Suites + Fix 2 Pre-Existing Failures
+
+### What
+Added test infrastructure with 6 new test suites. Fixed 2 pre-existing test failures.
+
+---
+
+## [2026-02-17] Feature: Data Freshness Indicators for All Canvas Widgets
+
+### What
+All canvas widgets now show when data was last refreshed with manual refresh button.
+
+---
+
+## [2026-02-17] Feature: Add Claude Code Integration — Built-in Coding Agent
+
+### What
+Claude Code available as built-in coding agent at `/dashboard/claude-code` route.
+
+---
+
 ## [2026-02-17] Feature: Cockpit HUD Redesign + IORS Tools Expansion + Backlog UI/UX
 
 ### What

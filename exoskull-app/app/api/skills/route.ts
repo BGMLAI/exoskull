@@ -24,12 +24,15 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     const supabase = getServiceSupabase();
     const status = request.nextUrl.searchParams.get("status") || "approved";
 
+    // Include both tenant-owned skills AND system-global skills
+    const SYSTEM_TENANT_ID = "00000000-0000-0000-0000-000000000000";
+
     const query = supabase
       .from("exo_generated_skills")
       .select(
-        "id, slug, name, description, version, tier, risk_level, capabilities, approval_status, usage_count, last_used_at, created_at, updated_at, archived_at",
+        "id, slug, name, description, version, tier, risk_level, capabilities, approval_status, usage_count, last_used_at, created_at, updated_at, archived_at, tenant_id",
       )
-      .eq("tenant_id", tenantId)
+      .in("tenant_id", [tenantId, SYSTEM_TENANT_ID])
       .is("archived_at", null)
       .order("created_at", { ascending: false });
 
