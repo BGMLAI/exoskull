@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { withCronGuard } from "@/lib/admin/cron-guard";
+import { sendProactiveMessage } from "@/lib/cron/tenant-utils";
 import { logger } from "@/lib/logger";
 import {
   runPredictions,
@@ -83,6 +84,24 @@ async function handler(request: NextRequest): Promise<NextResponse> {
         const interventionsCreated =
           await createInterventionsFromPredictions(predictions);
         results.interventions_created += interventionsCreated;
+
+        // Send immediate SMS for high-confidence urgent predictions
+        const urgent = predictions.filter(
+          (p) =>
+            p.confidence >= 0.7 &&
+            (p.severity === "high" || p.severity === "critical"),
+        );
+        if (urgent.length > 0) {
+          const messages = urgent
+            .map((p) => p.message_pl || p.message_en || p.metric)
+            .join("\n");
+          await sendProactiveMessage(
+            tenantId,
+            `Predykcja zdrowotna:\n${messages}\n\nChcesz omówić plan działania?`,
+            "health_prediction",
+            "predictions-cron",
+          );
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         results.errors.push(`${tenantId}: ${msg}`);

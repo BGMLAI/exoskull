@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { detectGaps } from "@/lib/agents/specialized/gap-detector";
+import { sendProactiveMessage } from "@/lib/cron/tenant-utils";
 import { logger } from "@/lib/logger";
 import {
   executeSwarm,
@@ -113,6 +114,28 @@ async function handler(req: NextRequest) {
             },
             agent_id: "swarm:gap_detection",
           });
+
+          // Notify user about detected gaps via SMS/preferred channel
+          if (swarmResult.synthesis) {
+            const synthesisText =
+              typeof swarmResult.synthesis === "string"
+                ? swarmResult.synthesis
+                : JSON.stringify(swarmResult.synthesis);
+            const gapMessage = [
+              "Tygodniowa analiza: wykryłem obszary wymagające uwagi.",
+              "",
+              synthesisText.slice(0, 1200),
+              "",
+              "Chcesz omówić szczegóły?",
+            ].join("\n");
+
+            await sendProactiveMessage(
+              tenant.id,
+              gapMessage,
+              "gap_detection",
+              "gap-detection-cron",
+            );
+          }
 
           swarmResults++;
         } catch (swarmError) {

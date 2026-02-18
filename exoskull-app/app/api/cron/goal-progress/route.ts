@@ -9,6 +9,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { withCronGuard } from "@/lib/admin/cron-guard";
 import { logProgress, detectMomentum } from "@/lib/goals/engine";
 import { getTasks } from "@/lib/tasks/task-service";
+import { sendProactiveMessage } from "@/lib/cron/tenant-utils";
 import type { UserGoal, MeasurableProxy } from "@/lib/goals/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -70,14 +71,20 @@ async function handler(req: NextRequest) {
 
           checkpointsCreated++;
 
-          // Milestone detection (25%, 50%, 75%, 100%)
+          // Milestone detection (25%, 50%, 75%, 100%) → notify user
           const pct = checkpoint.progress_percent ?? 0;
           if (pct > 0) {
             const milestones = [25, 50, 75, 100];
             for (const m of milestones) {
               if (pct >= m && pct < m + 5) {
                 milestonesHit++;
-                // Could send SMS here in the future
+                const emoji = m === 100 ? "!!!" : m >= 75 ? "!!" : "!";
+                await sendProactiveMessage(
+                  tenantId,
+                  `Cel "${goal.name}": ${m}% ukończone${emoji} ${m === 100 ? "Gratulacje, cel osiągnięty!" : "Tak trzymaj!"}`,
+                  "goal_milestone",
+                  "goal-progress-cron",
+                );
               }
             }
           }
@@ -101,7 +108,9 @@ async function handler(req: NextRequest) {
                 p_priority: "medium",
                 p_source_agent: "goal-progress-cron",
                 p_requires_approval: true,
-                p_scheduled_for: null,
+                p_scheduled_for: new Date(
+                  Date.now() + 4 * 60 * 60 * 1000,
+                ).toISOString(), // auto-approve after 4h
               });
               interventionsProposed++;
             } catch {
