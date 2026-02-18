@@ -1,5 +1,38 @@
 # Session Log
 
+## [2026-02-18] MVP Phase 0+1: Fundamentals + Google Data Pipeline
+
+### Tasks
+
+- Phase 0 `.env.local` (152 vars, all `op://`): **SUCCESS**
+- Phase 0 `npm run build` (39 pages, 170+ routes): **SUCCESS**
+- Phase 0 `vitest` (134/134): **SUCCESS**
+- Phase 0 `vercel.json` CRONs (35): **SUCCESS**
+- Phase 0 1Password Development vault (49 items): **SUCCESS**
+- Phase 1 Google OAuth redirect URI: **SUCCESS**
+- Phase 1 Token refresh: **SUCCESS**
+- Phase 1 Calendar API: **SUCCESS** (1 event returned)
+- Phase 1 Fitness API enable + test: **SUCCESS** (7 days data)
+- Phase 1 `scripts/google-sync-direct.mjs`: **SUCCESS** (21 metrics → DB)
+- Phase 1 `app/api/cron/rig-sync/route.ts`: **SUCCESS** (build OK)
+- Phase 1 `vercel.json` CRON entry: **SUCCESS**
+- Phase 1 Build verification: **SUCCESS**
+
+### Retries
+
+- Inline tsx script (ESM/CJS fail) → standalone .mjs: 1 retry → SUCCESS
+- `supabase db push` unavailable → migration SQL file created
+- Sync log insert on missing `connection_id` → inserted with existing columns: 1 retry → SUCCESS
+
+### Open Items
+
+- [ ] Push migration `20260218100001_sync_log_columns.sql` to Supabase
+- [ ] Deploy to Vercel to activate `rig-sync` CRON
+- [ ] Phase 2: Proactive Memory (Ralph + Google data patterns, morning briefing)
+- [ ] Phase 3: SMS inbound, Ralph auto-generates apps, proactive reminders
+
+---
+
 ## [2026-02-18] Full Audit Roadmap Execution (P0 → P2)
 
 ### Tasks

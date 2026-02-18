@@ -173,6 +173,10 @@
     {
       "path": "/api/cron/conductor",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/rig-sync",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

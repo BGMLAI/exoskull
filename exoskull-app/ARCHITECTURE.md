@@ -348,6 +348,58 @@ app/dashboard/page.tsx
 DELETE: values/loops/quests/ops use query params; missions/challenges use request body.
 All routes use `verifyTenantAuth` for authentication.
 
+## Google Data Pipeline (Rig Sync)
+
+### Architecture
+
+```
+Google APIs ──→ ExoSkull ──→ Supabase
+  Calendar        rig-sync     exo_health_metrics
+  Fit (Health)    CRON (30m)   unified_thread (emails)
+  Gmail                        exo_rig_sync_log
+  Drive/Tasks
+  YouTube
+  Contacts/Photos
+```
+
+### Key Files
+
+| File                                  | Purpose                                                               |
+| ------------------------------------- | --------------------------------------------------------------------- |
+| `lib/rigs/oauth.ts`                   | OAuth config, `ensureFreshToken()`, token refresh                     |
+| `lib/rigs/google/client.ts`           | Unified Google client (Fit + Workspace + YouTube + Contacts + Photos) |
+| `lib/rigs/google-fit/client.ts`       | Google Fit REST client (steps, HR, calories, sleep, distance)         |
+| `lib/rigs/google-workspace/client.ts` | Gmail, Calendar, Drive, Tasks client                                  |
+| `app/api/rigs/[slug]/sync/route.ts`   | Manual sync trigger (requires Supabase session auth)                  |
+| `app/api/cron/rig-sync/route.ts`      | Automated CRON sync every 30 min (all active Google connections)      |
+| `scripts/google-sync-direct.mjs`      | Standalone sync script (Supabase REST + Google APIs, no Next.js)      |
+
+### Data Flow
+
+1. **CRON** (`/api/cron/rig-sync`, every 30 min) queries `exo_rig_connections` for active `google` rigs
+2. `ensureFreshToken()` refreshes OAuth token if expiring within 5 min
+3. `GoogleClient.getDashboardData()` fetches all data sources via `Promise.all`
+4. Health metrics (steps, HR, calories, sleep) → `exo_health_metrics` (upsert on `tenant_id,metric_type,recorded_at,source`)
+5. Gmail messages → `ingestGmailMessages()` → unified email thread
+6. Connection status + sync log updated
+
+### Tables
+
+| Table                       | Purpose                                                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `exo_rig_connections`       | OAuth tokens, sync status, per-tenant per-rig                                                                 |
+| `exo_health_metrics`        | Health data (steps, HR, calories, sleep, distance). Unique on `(tenant_id, metric_type, recorded_at, source)` |
+| `exo_rig_sync_log`          | Sync history (records synced, errors, duration)                                                               |
+| `gold_daily_health_summary` | Materialized view: daily aggregates (90 days)                                                                 |
+
+### Google Cloud Project
+
+- Project ID: `exoskull` (number: `726955961070`)
+- OAuth redirect: `https://exoskull-app.vercel.app/api/rigs/google/callback`
+- Scopes: Gmail (read+send), Calendar (read+events), Fit (activity, sleep, HR, body, location), Drive, Docs, Sheets, Tasks, Contacts, YouTube, Photos
+
+---
+
 ## Future Work (Not Yet Implemented)
 
 - **Database-driven worlds**: `exo_world_positions` + `exo_world_moons` tables (currently demo hardcoded data)

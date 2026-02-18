@@ -4,6 +4,23 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-18] Google Data Pipeline + Automated CRON Sync
+
+### Added
+
+- **`scripts/google-sync-direct.mjs`** — Standalone Google sync script (Fit + Calendar + Gmail → Supabase). Bypasses Next.js API routes, uses Supabase REST + Google APIs directly. Run: `op run --env-file=.env.local -- node scripts/google-sync-direct.mjs`
+- **`app/api/cron/rig-sync/route.ts`** — CRON endpoint for automated Google rig sync every 30 min. Syncs all active Google connections: refreshes tokens, fetches Fit health metrics + Calendar + Gmail, upserts to `exo_health_metrics`, ingests emails to unified thread.
+- **`vercel.json`** — Added `rig-sync` CRON entry (`*/30 * * * *`).
+- **`supabase/migrations/20260218100001_sync_log_columns.sql`** — Migration adds missing columns (`connection_id`, `success`, `error`, `duration_ms`, `metadata`) to `exo_rig_sync_log`.
+
+### Fixed
+
+- Google OAuth token refreshed (expired since Feb 5).
+- Google Fitness API enabled in GCP Console (project `726955961070`).
+- 21 health metrics synced to `exo_health_metrics` (steps, HR, calories, distance — Feb 11-17).
+
+---
+
 ## [2026-02-18] Fix: 3D Model Loading — Sketchfab Download + File Upload
 
 ### Sketchfab Download Proxy
