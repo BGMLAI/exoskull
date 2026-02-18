@@ -189,4 +189,57 @@ export const ralphTools: ToolDefinition[] = [
       );
     },
   },
+  {
+    definition: {
+      name: "trigger_source_evolution",
+      description:
+        "Zleć modyfikację kodu źródłowego systemu — napraw buga, dodaj feature, zoptymalizuj. " +
+        "System wygeneruje diff, przetestuje w sandboxie i stworzy PR na GitHubie. " +
+        "Użyj do: 'napraw buga w X', 'dodaj feature Y do kodu', 'zoptymalizuj komponent Z'",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          description: {
+            type: "string",
+            description:
+              "Co zmienić i dlaczego (np. 'napraw błąd parsowania daty w goal-progress', 'dodaj obsługę WhatsApp w outbound')",
+          },
+          target_files: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Ścieżki plików do modyfikacji (opcjonalne, system sam wykryje jeśli puste)",
+          },
+        },
+        required: ["description"],
+      },
+    },
+    execute: async (
+      input: Record<string, unknown>,
+      tenantId: string,
+    ): Promise<string> => {
+      try {
+        const { modifySource } =
+          await import("@/lib/self-modification/source-engine");
+        const result = await modifySource(tenantId, {
+          description: input.description as string,
+          targetFiles: (input.target_files as string[]) || [],
+          triggeredBy: "user_request",
+        });
+
+        if (result.success) {
+          return (
+            `Modyfikacja źródła: PR #${result.prNumber} utworzony.\n` +
+            `URL: ${result.prUrl}\n` +
+            `Poziom ryzyka: ${result.riskLevel}\n` +
+            `Testy: ${result.testsPassed ? "PASS" : "nie uruchomione/FAIL"}`
+          );
+        }
+
+        return `Modyfikacja zablokowana: ${result.blockedReason || result.error || "nieznany błąd"}`;
+      } catch (error) {
+        return `Błąd modyfikacji źródła: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
+  },
 ];

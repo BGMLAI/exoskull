@@ -396,6 +396,9 @@ const ALLOWED_ACTION_TYPES = new Set([
   "run_automation",
   "automation_trigger",
   "notify_emergency_contact",
+  "goal_strategy",
+  "execute_triage",
+  "modify_source",
   "custom",
 ]);
 
@@ -428,6 +431,12 @@ async function dispatchAction(
       return await handleRunAutomationFromIntervention(intervention);
     case "notify_emergency_contact":
       return await handleNotifyEmergencyContact(intervention);
+    case "goal_strategy":
+      return await handleGoalStrategy(intervention);
+    case "execute_triage":
+      return await handleExecuteTriage(intervention);
+    case "modify_source":
+      return await handleModifySource(intervention);
     case "custom":
       return await handleCustomActionFromIntervention(intervention);
     default:
@@ -789,6 +798,186 @@ async function handleNotifyEmergencyContact(
       ? `Kontakt awaryjny powiadomiony: ${result.contactedName}`
       : `Nie udało się: ${result.error}`,
   };
+}
+
+// ============================================================================
+// GOAL STRATEGY + SIGNAL TRIAGE HANDLERS
+// ============================================================================
+
+async function handleGoalStrategy(
+  intervention: Intervention,
+): Promise<ExecutionResult> {
+  const params = intervention.action_payload.params as {
+    goalId?: string;
+    phase?: string;
+  };
+
+  if (!params?.goalId) {
+    return { success: false, message: "Missing goalId in action_payload" };
+  }
+
+  try {
+    const { getActiveStrategy } = await import("@/lib/goals/strategy-store");
+    const { generateGoalStrategy, executeNextStep, reviewGoalStrategy } =
+      await import("@/lib/goals/strategy-engine");
+
+    const existingStrategy = await getActiveStrategy(params.goalId);
+    const phase = params.phase || "auto";
+
+    if (phase === "auto") {
+      if (!existingStrategy) {
+        // No strategy → generate
+        await generateGoalStrategy(intervention.tenant_id, params.goalId);
+        return {
+          success: true,
+          message: "Strategia wygenerowana i wysłana do zatwierdzenia",
+        };
+      }
+
+      // Has strategy → review and execute or regenerate
+      const review = await reviewGoalStrategy(
+        intervention.tenant_id,
+        params.goalId,
+      );
+      if (review.needsNewPlan) {
+        await generateGoalStrategy(intervention.tenant_id, params.goalId);
+        return {
+          success: true,
+          message: `Strategia zregenerowana: ${review.reason}`,
+        };
+      }
+      if (review.nextStep) {
+        const result = await executeNextStep(
+          intervention.tenant_id,
+          params.goalId,
+        );
+        return {
+          success: result.executed,
+          message: result.executed
+            ? `Krok wykonany: ${result.step?.title}`
+            : "Brak kroków do wykonania",
+        };
+      }
+      return { success: true, message: "Strategia aktualna, brak akcji" };
+    }
+
+    if (phase === "generate") {
+      await generateGoalStrategy(intervention.tenant_id, params.goalId);
+      return { success: true, message: "Strategia wygenerowana" };
+    }
+
+    if (phase === "execute") {
+      const result = await executeNextStep(
+        intervention.tenant_id,
+        params.goalId,
+      );
+      return {
+        success: result.executed,
+        message: result.executed
+          ? `Krok wykonany: ${result.step?.title}`
+          : "Brak kroków do wykonania",
+      };
+    }
+
+    if (phase === "regenerate") {
+      await generateGoalStrategy(intervention.tenant_id, params.goalId);
+      return { success: true, message: "Strategia zregenerowana" };
+    }
+
+    return { success: false, message: `Unknown phase: ${phase}` };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.error("[Executor] Goal strategy failed:", {
+      interventionId: intervention.id,
+      goalId: params.goalId,
+      error: errorMsg,
+    });
+    return { success: false, message: `Goal strategy error: ${errorMsg}` };
+  }
+}
+
+async function handleExecuteTriage(
+  intervention: Intervention,
+): Promise<ExecutionResult> {
+  const params = intervention.action_payload.params as {
+    triageId?: string;
+  };
+
+  if (!params?.triageId) {
+    return { success: false, message: "Missing triageId in action_payload" };
+  }
+
+  try {
+    const { executeTriageAction } = await import("@/lib/signals/triage-engine");
+    const result = await executeTriageAction(params.triageId);
+    return {
+      success: result.success,
+      message: result.result || "Triage action completed",
+    };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    return { success: false, message: `Triage execution error: ${errorMsg}` };
+  }
+}
+
+// ============================================================================
+// SOURCE MODIFICATION HANDLER
+// ============================================================================
+
+async function handleModifySource(
+  intervention: Intervention,
+): Promise<ExecutionResult> {
+  const params = intervention.action_payload.params as {
+    description?: string;
+    targetFiles?: string[];
+    context?: string;
+  };
+
+  const description =
+    params?.description ||
+    (intervention.action_payload.description as string) ||
+    intervention.title;
+
+  if (!description) {
+    return {
+      success: false,
+      message: "Missing description for source modification",
+    };
+  }
+
+  try {
+    const { modifySource } =
+      await import("@/lib/self-modification/source-engine");
+    const result = await modifySource(intervention.tenant_id, {
+      description,
+      targetFiles: params?.targetFiles || [],
+      context: params?.context,
+      triggeredBy: "user_request",
+    });
+
+    if (result.success) {
+      return {
+        success: true,
+        message: `PR #${result.prNumber} created: ${result.prUrl} (risk: ${result.riskLevel})`,
+      };
+    }
+
+    return {
+      success: false,
+      message:
+        result.blockedReason || result.error || "Source modification failed",
+    };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.error("[Executor] Source modification failed:", {
+      interventionId: intervention.id,
+      error: errorMsg,
+    });
+    return {
+      success: false,
+      message: `Source modification error: ${errorMsg}`,
+    };
+  }
 }
 
 // ============================================================================

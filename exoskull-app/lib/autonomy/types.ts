@@ -280,6 +280,7 @@ export type ActionType =
   | "log_health"
   | "trigger_checkin"
   | "run_automation"
+  | "modify_source"
   | "custom";
 
 export interface ActionDefinition {

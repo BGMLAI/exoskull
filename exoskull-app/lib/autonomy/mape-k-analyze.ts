@@ -152,7 +152,7 @@ export async function analyzeMonitorData(
   try {
     const { data: atRiskGoals } = await supabase
       .from("exo_user_goals")
-      .select("title, trajectory, wellbeing_weight, category")
+      .select("id, title, trajectory, wellbeing_weight, category")
       .eq("tenant_id", tenantId)
       .eq("status", "active")
       .in("trajectory", ["off_track", "at_risk"]);
@@ -169,6 +169,7 @@ export async function analyzeMonitorData(
               : "low",
           description: `Goal "${goal.title}" is ${goal.trajectory === "off_track" ? "off track" : "at risk"}`,
           data: {
+            goalId: (goal as Record<string, unknown>).id,
             goalTitle: goal.title,
             trajectory: goal.trajectory,
             category: goal.category,
@@ -300,18 +301,22 @@ export function planInterventionForIssue(
     case "missed_goal":
       return {
         type: "goal_nudge",
-        title: `Goal needs attention: ${issue.data?.goalTitle || "unknown"}`,
+        title: `Goal strategy needed: ${issue.data?.goalTitle || "unknown"}`,
         description: issue.description,
         actionPayload: {
-          action: "trigger_checkin",
+          action: "goal_strategy",
           params: {
-            checkinType: "goal_review",
-            message: `Your goal "${issue.data?.goalTitle}" seems to be falling behind. Want to review it?`,
+            goalId: issue.data?.goalId,
+            goalTitle: issue.data?.goalTitle,
+            trajectory: issue.data?.trajectory,
+            category: issue.data?.category,
+            phase: "auto", // auto-detect: generate, execute, or regenerate
           },
         },
         priority: issue.severity === "high" ? "high" : "medium",
-        requiresApproval: false, // Low-risk: check-in trigger — Guardian check still applies
-        reasoning: "Goal off-track or at-risk — user may benefit from review",
+        requiresApproval: false, // Strategy engine handles user approval internally
+        reasoning:
+          "Goal off-track — generating/executing realization strategy instead of just nudging",
       };
 
     case "productivity_drop":

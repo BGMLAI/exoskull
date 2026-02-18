@@ -10,6 +10,12 @@ import { withCronGuard } from "@/lib/admin/cron-guard";
 import { logProgress, detectMomentum } from "@/lib/goals/engine";
 import { getTasks } from "@/lib/tasks/task-service";
 import { sendProactiveMessage } from "@/lib/cron/tenant-utils";
+import {
+  reviewGoalStrategy,
+  generateGoalStrategy,
+  executeNextStep,
+} from "@/lib/goals/strategy-engine";
+import { getActiveStrategy } from "@/lib/goals/strategy-store";
 import type { UserGoal, MeasurableProxy } from "@/lib/goals/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -89,32 +95,66 @@ async function handler(req: NextRequest) {
             }
           }
 
-          // Off-track detection → MAPE-K intervention
-          if (checkpoint.trajectory === "off_track") {
+          // Off-track detection → Strategy Engine (realize the goal, don't just nudge)
+          if (
+            checkpoint.trajectory === "off_track" ||
+            checkpoint.trajectory === "at_risk"
+          ) {
             try {
-              await supabase.rpc("propose_intervention", {
-                p_tenant_id: tenantId,
-                p_type: "gap_detection",
-                p_title: `Cel zagrożony: ${goal.name}`,
-                p_description: `Cel "${goal.name}" wymaga uwagi. Postęp: ${Math.round(pct)}%. Trend: ${checkpoint.momentum}.`,
-                p_action_payload: {
-                  action: "trigger_checkin",
-                  params: {
-                    checkinType: "goal_review",
-                    goalId: goal.id,
-                    goalName: goal.name,
-                  },
+              const existingStrategy = await getActiveStrategy(goal.id);
+
+              if (existingStrategy) {
+                // Has active strategy → review and execute next step
+                const review = await reviewGoalStrategy(tenantId, goal.id);
+                if (review.needsNewPlan) {
+                  await generateGoalStrategy(tenantId, goal.id);
+                  interventionsProposed++;
+                } else if (review.nextStep) {
+                  await executeNextStep(tenantId, goal.id);
+                  interventionsProposed++;
+                }
+              } else {
+                // No strategy → generate one
+                await generateGoalStrategy(tenantId, goal.id);
+                interventionsProposed++;
+              }
+            } catch (strategyError) {
+              // Fallback to old intervention if strategy engine fails
+              logger.warn(
+                "[GoalProgress] Strategy engine failed, falling back:",
+                {
+                  goalId: goal.id,
+                  error:
+                    strategyError instanceof Error
+                      ? strategyError.message
+                      : strategyError,
                 },
-                p_priority: "medium",
-                p_source_agent: "goal-progress-cron",
-                p_requires_approval: true,
-                p_scheduled_for: new Date(
-                  Date.now() + 4 * 60 * 60 * 1000,
-                ).toISOString(), // auto-approve after 4h
-              });
-              interventionsProposed++;
-            } catch {
-              // Non-blocking
+              );
+              try {
+                await supabase.rpc("propose_intervention", {
+                  p_tenant_id: tenantId,
+                  p_type: "gap_detection",
+                  p_title: `Cel zagrożony: ${goal.name}`,
+                  p_description: `Cel "${goal.name}" wymaga uwagi. Postęp: ${Math.round(pct)}%. Trend: ${checkpoint.momentum}.`,
+                  p_action_payload: {
+                    action: "goal_strategy",
+                    params: {
+                      goalId: goal.id,
+                      goalTitle: goal.name,
+                      phase: "generate",
+                    },
+                  },
+                  p_priority: "medium",
+                  p_source_agent: "goal-progress-cron",
+                  p_requires_approval: true,
+                  p_scheduled_for: new Date(
+                    Date.now() + 4 * 60 * 60 * 1000,
+                  ).toISOString(),
+                });
+                interventionsProposed++;
+              } catch {
+                // Non-blocking
+              }
             }
           }
         } catch (error) {

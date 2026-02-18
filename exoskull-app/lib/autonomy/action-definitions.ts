@@ -86,6 +86,16 @@ export const ACTION_DEFINITIONS: Record<ActionType, ActionDefinition> = {
     category: "other",
     riskLevel: "high",
   },
+  modify_source: {
+    type: "modify_source",
+    name: "Modify Source Code",
+    description:
+      "Request a source code modification via self-modification engine",
+    requiredParams: ["description"],
+    optionalParams: ["targetFiles", "context"],
+    category: "other",
+    riskLevel: "high",
+  },
   custom: {
     type: "custom",
     name: "Custom Action",

@@ -37,6 +37,14 @@ import {
   suggestSelfBuildActions,
   executeSelfBuild,
 } from "@/lib/system/self-builder";
+import {
+  modifySource,
+  type SourceModRequest,
+} from "@/lib/self-modification/source-engine";
+import {
+  coordinateSourceSwarm,
+  isComplexModification,
+} from "@/lib/self-modification/swarm-coordinator";
 
 // ============================================================================
 // TYPES
@@ -98,6 +106,7 @@ interface RalphAction {
     | "heal_integration"
     | "generate_content"
     | "lateral_experiment"
+    | "evolve_source"
     | "none";
   description: string;
   params: Record<string, unknown>;
@@ -627,7 +636,7 @@ ${obs.gotchaContext.goalsManifest ? `## GOTCHA Goals (available workflows)\n${ob
 
 ## Response Format (STRICT JSON)
 {
-  "type": "build_app" | "fix_tool" | "optimize" | "register_tool" | "heal_integration" | "generate_content" | "lateral_experiment" | "none",
+  "type": "build_app" | "fix_tool" | "optimize" | "register_tool" | "heal_integration" | "generate_content" | "lateral_experiment" | "evolve_source" | "none",
   "description": "what and why",
   "params": { ... action-specific parameters ... }
 }
@@ -639,6 +648,7 @@ For "register_tool": params = { "name": "...", "description": "...", "handler_ty
 For "heal_integration": params = { "integration_name": "...", "issue": "...", "strategy": "reconnect|re_auth|retry" }
 For "generate_content": params = { "content_type": "document|presentation|post|email", "description": "...", "target_channel": "..." }
 For "lateral_experiment": params = { "hypothesis": "what you're testing", "method": "random_combo|reverse|cross_domain|po_technique" }
+For "evolve_source": params = { "description": "what source change to make and why", "targetFiles": ["relative/path/to/file.ts"], "context": "additional context" }
 For "none": params = {}
 
 Return ONLY JSON.`;
@@ -1084,6 +1094,52 @@ async function build(
       };
     }
 
+    case "evolve_source": {
+      const sourceRequest: SourceModRequest = {
+        description:
+          (action.params.description as string) || action.description,
+        targetFiles: (action.params.targetFiles as string[]) || [],
+        context: (action.params.context as string) || undefined,
+        triggeredBy: "ralph_loop",
+      };
+
+      // Route complex modifications through Agent Swarm
+      if (isComplexModification(sourceRequest)) {
+        try {
+          const swarmResult = await coordinateSourceSwarm(
+            tenantId,
+            sourceRequest,
+          );
+          const result = await modifySource(tenantId, {
+            ...sourceRequest,
+            swarmResult,
+          });
+          return {
+            success: result.success,
+            result: result.success
+              ? `PR created: ${result.prUrl} (risk: ${result.riskLevel})`
+              : undefined,
+            error: result.blockedReason || result.error,
+          };
+        } catch (swarmErr) {
+          // Fall back to direct modification if swarm fails
+          logger.warn("[RalphLoop] Swarm failed for evolve_source, direct:", {
+            error:
+              swarmErr instanceof Error ? swarmErr.message : String(swarmErr),
+          });
+        }
+      }
+
+      const result = await modifySource(tenantId, sourceRequest);
+      return {
+        success: result.success,
+        result: result.success
+          ? `PR created: ${result.prUrl} (risk: ${result.riskLevel})`
+          : undefined,
+        error: result.blockedReason || result.error,
+      };
+    }
+
     default:
       return { success: false, error: "Unknown action type" };
   }
@@ -1130,6 +1186,7 @@ const EVOLUTION_LABELS: Record<string, string> = {
   heal_integration: "Naprawiono integrację",
   generate_content: "Wygenerowano treść",
   lateral_experiment: "Eksperyment lateralny",
+  evolve_source: "Ewolucja kodu źródłowego",
 };
 
 async function notifyUser(
