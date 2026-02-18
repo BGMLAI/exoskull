@@ -26,6 +26,8 @@ const PHONE_NUMBERS_TO_FIX = [
 // Nowe webhooki (produkcja)
 const NEW_VOICE_URL = "https://exoskull.xyz/api/twilio/voice";
 const NEW_STATUS_CALLBACK = "https://exoskull.xyz/api/twilio/status";
+const NEW_SMS_URL = "https://exoskull.xyz/api/gateway/sms";
+const NEW_SMS_STATUS_CALLBACK = "https://exoskull.xyz/api/twilio/sms-status";
 
 async function main() {
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
@@ -61,11 +63,16 @@ async function main() {
           voiceMethod: "POST",
           statusCallback: NEW_STATUS_CALLBACK,
           statusCallbackMethod: "POST",
+          smsUrl: NEW_SMS_URL,
+          smsMethod: "POST",
+          smsFallbackUrl: "",
+          smsFallbackMethod: "POST",
         });
 
         console.log(`   ✅ Zaktualizowano!`);
         console.log(`   → Voice URL: ${NEW_VOICE_URL}`);
         console.log(`   → Status CB: ${NEW_STATUS_CALLBACK}`);
+        console.log(`   → SMS URL:   ${NEW_SMS_URL}`);
         console.log();
       }
     }
