@@ -304,9 +304,15 @@ async function executeComposite(
   return results.join("\n\n");
 }
 
+/** Outer timeout for the full skill execution pipeline (DB + sandbox) */
+const SKILL_EXEC_TIMEOUT_MS = 15_000;
+
 /**
  * skill_exec: Execute an approved generated skill in the restricted sandbox.
  * handler_config: { skill_id: string }
+ *
+ * Outer 15s timeout wraps DB queries + sandbox execution.
+ * The sandbox itself has an inner 5s timeout (restricted-function.ts).
  */
 async function executeSkill(
   input: Record<string, unknown>,
@@ -316,68 +322,99 @@ async function executeSkill(
   const skillId = config.skill_id as string;
   if (!skillId) return "Error: brak skill_id w konfiguracji toola";
 
+  const startTime = Date.now();
+
+  const resultPromise = executeSkillInner(input, tenantId, skillId);
+  const timeoutPromise = new Promise<string>((_, reject) =>
+    setTimeout(
+      () =>
+        reject(
+          new Error(
+            `Skill execution timed out after ${SKILL_EXEC_TIMEOUT_MS}ms`,
+          ),
+        ),
+      SKILL_EXEC_TIMEOUT_MS,
+    ),
+  );
+
   try {
-    const supabase = getServiceSupabase();
-
-    // Fetch approved skill with code
-    const { data: skill, error } = await supabase
-      .from("exo_generated_skills")
-      .select("id, name, executor_code, tenant_id, approval_status")
-      .eq("id", skillId)
-      .eq("tenant_id", tenantId)
-      .eq("approval_status", "approved")
-      .single();
-
-    if (error || !skill) {
-      return "Error: skill nie znaleziony lub nie zatwierdzony.";
-    }
-
-    if (!skill.executor_code) {
-      return "Error: skill nie ma kodu do wykonania.";
-    }
-
-    // Build execution context
-    const action = (input.action as string) || "getData";
-    const params = (input.params as Record<string, unknown>) || {};
-
-    const context: SkillExecutionContext = {
-      skill_id: skillId,
-      tenant_id: tenantId,
-      method:
-        action === "getData" || action === "getInsights"
-          ? action
-          : "executeAction",
-      args:
-        action === "getData" || action === "getInsights"
-          ? []
-          : [action, params],
-    };
-
-    // Execute in restricted sandbox
-    const result = await executeInSandbox(context, skill.executor_code);
-
-    if (!result.success) {
-      logger.error("[DynamicTools] Skill execution failed:", {
-        skillId,
-        tenantId,
-        error: result.error,
-        executionTimeMs: result.executionTimeMs,
-      });
-      return `Error: ${result.error}`;
-    }
-
-    // Format result for AI consumption
-    const output = result.result;
-    if (typeof output === "string") return output;
-    if (output === undefined || output === null)
-      return "Skill wykonany pomyślnie (brak wyniku).";
-    return JSON.stringify(output, null, 2).slice(0, 4000);
+    const result = await Promise.race([resultPromise, timeoutPromise]);
+    logger.info("[DynamicTools] Skill executed:", {
+      skillId,
+      tenantId,
+      durationMs: Date.now() - startTime,
+      success: true,
+    });
+    return result;
   } catch (err) {
+    const durationMs = Date.now() - startTime;
     logger.error("[DynamicTools] Skill exec error:", {
       skillId,
       tenantId,
+      durationMs,
       error: err instanceof Error ? err.message : String(err),
     });
     return `Error: ${err instanceof Error ? err.message : String(err)}`;
   }
+}
+
+/** Inner skill execution logic (called within timeout wrapper) */
+async function executeSkillInner(
+  input: Record<string, unknown>,
+  tenantId: string,
+  skillId: string,
+): Promise<string> {
+  const supabase = getServiceSupabase();
+
+  // Fetch approved skill with code
+  const { data: skill, error } = await supabase
+    .from("exo_generated_skills")
+    .select("id, name, executor_code, tenant_id, approval_status")
+    .eq("id", skillId)
+    .eq("tenant_id", tenantId)
+    .eq("approval_status", "approved")
+    .single();
+
+  if (error || !skill) {
+    return "Error: skill nie znaleziony lub nie zatwierdzony.";
+  }
+
+  if (!skill.executor_code) {
+    return "Error: skill nie ma kodu do wykonania.";
+  }
+
+  // Build execution context
+  const action = (input.action as string) || "getData";
+  const params = (input.params as Record<string, unknown>) || {};
+
+  const context: SkillExecutionContext = {
+    skill_id: skillId,
+    tenant_id: tenantId,
+    method:
+      action === "getData" || action === "getInsights"
+        ? action
+        : "executeAction",
+    args:
+      action === "getData" || action === "getInsights" ? [] : [action, params],
+  };
+
+  // Execute in restricted sandbox (has its own inner 5s timeout)
+  const result = await executeInSandbox(context, skill.executor_code);
+
+  if (!result.success) {
+    logger.error("[DynamicTools] Skill execution failed:", {
+      skillId,
+      tenantId,
+      error: result.error,
+      executionTimeMs: result.executionTimeMs,
+    });
+    return `Error: ${result.error}`;
+  }
+
+  // Format result for AI consumption
+  const output = result.result;
+  if (typeof output === "string") return output;
+  if (output === undefined || output === null)
+    return "Skill wykonany pomyślnie (brak wyniku).";
+  return JSON.stringify(output, null, 2).slice(0, 4000);
 }

@@ -1,6 +1,6 @@
 // =====================================================
 // APP GENERATOR — Orchestrates app creation pipeline
-// AI spec generation → validation → table creation → registration
+// AI spec generation → validation → approval → table creation → registration
 // =====================================================
 
 import { aiChat } from "@/lib/ai";
@@ -18,7 +18,8 @@ const MAX_RETRIES = 3;
 
 /**
  * Generate a new app from a natural language description.
- * Pipeline: AI spec → validate → create table → store in registry → add widget
+ * Pipeline: AI spec → validate → store as PENDING → notify user → await approval
+ * Table + widget are created only after user approves via activateApp().
  */
 export async function generateApp(
   request: AppGenerationRequest,
@@ -63,30 +64,10 @@ export async function generateApp(
         spec.table_name = `exo_app_${spec.slug.replace(/-/g, "_")}`;
       }
 
-      // Step 4: Create the data table via RPC
-      const { data: tableResult, error: tableError } = await supabase.rpc(
-        "create_app_table",
-        {
-          p_table_name: spec.table_name,
-          p_columns: spec.columns,
-          p_tenant_id: tenant_id,
-        },
-      );
-
-      if (tableError || !tableResult?.success) {
-        const errMsg =
-          tableError?.message ||
-          tableResult?.error ||
-          "Unknown table creation error";
-        lastError = `Table creation failed: ${errMsg}`;
-        logger.error("[AppGenerator] Table creation failed:", { errMsg, spec });
-        continue;
-      }
-
-      // Step 5: Build the schema SQL for reference
+      // Step 4: Build the schema SQL for reference (table NOT created yet)
       const schemaSql = buildSchemaSql(spec);
 
-      // Step 6: Store in app registry
+      // Step 5: Store in app registry as PENDING (no table or widget yet)
       const { data: app, error: insertError } = await supabase
         .from("exo_generated_apps")
         .insert({
@@ -94,7 +75,7 @@ export async function generateApp(
           slug: spec.slug,
           name: spec.name,
           description: spec.description,
-          status: "active",
+          status: "pending_approval",
           table_name: spec.table_name,
           columns: spec.columns,
           indexes: spec.indexes,
@@ -103,9 +84,8 @@ export async function generateApp(
           generation_prompt: description,
           generated_by: "auto-routed",
           schema_sql: schemaSql,
-          risk_level: "low", // All apps use RLS, read/write own data only
-          approval_status: "approved", // Auto-approve for now (RLS protects)
-          approved_at: new Date().toISOString(),
+          risk_level: "low",
+          approval_status: "pending",
         })
         .select()
         .single();
@@ -118,14 +98,14 @@ export async function generateApp(
         };
       }
 
-      // Step 7: Add widget to canvas
-      await addAppWidget(supabase, tenant_id, spec);
+      // Step 6: Send SMS notification to tenant about pending app
+      await sendAppApprovalNotification(supabase, tenant_id, spec);
 
       logger.info(
-        `[AppGenerator] App created: ${spec.slug} (attempt ${attempt})`,
+        `[AppGenerator] App spec stored as PENDING: ${spec.slug} (attempt ${attempt})`,
       );
 
-      return { success: true, app };
+      return { success: true, app, pending_approval: true };
     } catch (error) {
       lastError = (error as Error).message;
       logger.error(`[AppGenerator] Attempt ${attempt} failed:`, error);
@@ -301,6 +281,160 @@ CREATE TABLE ${spec.table_name} (
   updated_at TIMESTAMPTZ DEFAULT now(),
 ${cols}
 );`;
+}
+
+/**
+ * Activate a pending app: create data table + widget + mark approved.
+ * Called after user explicitly approves via chat or SMS.
+ */
+export async function activateApp(
+  appId: string,
+  tenantId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = getServiceSupabase();
+
+  // Fetch pending app
+  const { data: app, error: fetchError } = await supabase
+    .from("exo_generated_apps")
+    .select("*")
+    .eq("id", appId)
+    .eq("tenant_id", tenantId)
+    .eq("approval_status", "pending")
+    .single();
+
+  if (fetchError || !app) {
+    return { success: false, error: "App not found or already approved" };
+  }
+
+  // Create the data table via RPC
+  const { data: tableResult, error: tableError } = await supabase.rpc(
+    "create_app_table",
+    {
+      p_table_name: app.table_name,
+      p_columns: app.columns,
+      p_tenant_id: tenantId,
+    },
+  );
+
+  if (tableError || !tableResult?.success) {
+    const errMsg =
+      tableError?.message ||
+      tableResult?.error ||
+      "Unknown table creation error";
+    logger.error("[AppGenerator] activateApp table creation failed:", {
+      errMsg,
+      appId,
+    });
+    return { success: false, error: `Table creation failed: ${errMsg}` };
+  }
+
+  // Update app status to approved + active
+  await supabase
+    .from("exo_generated_apps")
+    .update({
+      status: "active",
+      approval_status: "approved",
+      approved_at: new Date().toISOString(),
+      approved_by: "user",
+    })
+    .eq("id", appId);
+
+  // Add widget to canvas
+  const spec: AppSpec = {
+    slug: app.slug,
+    name: app.name,
+    description: app.description || "",
+    table_name: app.table_name,
+    columns: app.columns,
+    indexes: app.indexes || [],
+    ui_config: app.ui_config,
+    widget_size: app.widget_size || { w: 4, h: 3 },
+  };
+  await addAppWidget(supabase, tenantId, spec);
+
+  logger.info(`[AppGenerator] App activated: ${app.slug} (${appId})`);
+  return { success: true };
+}
+
+/**
+ * Send SMS notification to tenant about a pending app awaiting approval.
+ */
+async function sendAppApprovalNotification(
+  supabase: ReturnType<typeof getServiceSupabase>,
+  tenantId: string,
+  spec: AppSpec,
+): Promise<void> {
+  try {
+    // Get tenant phone number
+    const { data: tenant } = await supabase
+      .from("exo_tenants")
+      .select("phone, name")
+      .eq("id", tenantId)
+      .single();
+
+    if (!tenant?.phone) {
+      logger.info(
+        "[AppGenerator] No phone for tenant, skipping SMS notification",
+      );
+      return;
+    }
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+
+    if (!accountSid || !authToken || !fromNumber) {
+      logger.warn(
+        "[AppGenerator] Missing Twilio credentials for app approval SMS",
+      );
+      return;
+    }
+
+    const body = [
+      `ExoSkull wygenerował nową aplikację:`,
+      `"${spec.name}" — ${spec.description}`,
+      ``,
+      `Kolumny: ${spec.columns.map((c) => c.name).join(", ")}`,
+      ``,
+      `Aby zatwierdzić, napisz: "zatwierdź aplikację ${spec.slug}"`,
+      `Aby odrzucić, napisz: "odrzuć aplikację ${spec.slug}"`,
+    ].join("\n");
+
+    const params = new URLSearchParams({
+      To: tenant.phone,
+      From: fromNumber,
+      Body: body.length > 1500 ? body.substring(0, 1497) + "..." : body,
+    });
+
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            "Basic " +
+            Buffer.from(`${accountSid}:${authToken}`).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params.toString(),
+      },
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      logger.error("[AppGenerator] SMS notification failed:", {
+        status: response.status,
+        body: errorBody,
+      });
+    } else {
+      logger.info(
+        `[AppGenerator] Approval SMS sent to ${tenant.phone} for app: ${spec.slug}`,
+      );
+    }
+  } catch (error) {
+    // Non-fatal — app is still pending, user can approve via chat
+    logger.error("[AppGenerator] Failed to send approval SMS:", error);
+  }
 }
 
 /**

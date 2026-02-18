@@ -178,6 +178,8 @@ export interface AppGenerationResult {
   success: boolean;
   app?: GeneratedApp;
   error?: string;
+  /** True when app is created but awaiting user approval before table creation */
+  pending_approval?: boolean;
 }
 
 /** AI-generated app specification (intermediate format) */

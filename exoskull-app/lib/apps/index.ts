@@ -1,5 +1,5 @@
 // App Builder — Public API
-export { generateApp } from "./generator/app-generator";
+export { generateApp, activateApp } from "./generator/app-generator";
 export type {
   GeneratedApp,
   AppGenerationRequest,
