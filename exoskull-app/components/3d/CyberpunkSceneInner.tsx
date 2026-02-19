@@ -10,6 +10,7 @@ import { Particles } from "./Particles";
 import { ScenePostProcessing } from "./ScenePostProcessing";
 import { SceneEffects } from "./SceneEffects";
 import { OrbitalScene } from "./OrbitalScene";
+import { CockpitModel3D } from "./CockpitModel3D";
 import { useCockpitStore } from "@/lib/stores/useCockpitStore";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 
@@ -143,6 +144,9 @@ function SceneContent() {
           }
         }}
       />
+
+      {/* Cockpit 3D model (selected skin) */}
+      <CockpitModel3D />
 
       {/* IORS activity effects (bloom pulse, activity ring) */}
       <SceneEffects />

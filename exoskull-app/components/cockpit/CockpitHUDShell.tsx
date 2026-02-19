@@ -9,35 +9,23 @@ import { BottomPanelGrid } from "./BottomPanelGrid";
 import { CenterViewport } from "./CenterViewport";
 import { ChannelOrbs } from "./ChannelOrbs";
 import { ReactionButtons } from "./ReactionButtons";
+import { CockpitZoneSlot } from "./CockpitZoneSlot";
 
 /**
  * CockpitHUDShell — Master overlay layout for the cockpit HUD.
  *
- * NEW LAYOUT (per user mockup):
- * ┌──────────────────────────────────────────────────────┐
- * │ [reactions]    3D SCENE (full bg)        [channels]  │
- * │  ❌ ✅ 😆     orbs, grid, skybox        📷🟢📞@    │
- * │                                                      │
- * │         ┌── message from iors ──┐                    │
- * │                    ┌── my message ──┐                │
- * │         ┌── message from iors ──┐                    │
- * │                                                      │
- * │ ┌──────────┬──────────┐  ┌──────────┬──────────┐    │
- * │ │ iors     │kalendarz │  │ plan     │ moje     │    │
- * │ │ activity │ /teraz   │  │          │ taski    │    │
- * │ └──────────┴──────────┘  └──────────┴──────────┘    │
- * │ ┌──────┬──────────┬───────────┬──────────┬──────┐   │
- * │ │delete│ proces   │  [input]  │ wiedza/  │zacho-│   │
- * │ │      │ iors     │           │ kontekst │ waj  │   │
- * │ └──────┴──────────┴───────────┴──────────┴──────┘   │
- * └──────────────────────────────────────────────────────┘
+ * Zones:
+ *   top-left:     ReactionButtons (default) or pinned widget
+ *   top-right:    ChannelOrbs (default) or pinned widget
+ *   center:       Chat/Tree/Preview (CenterViewport)
+ *   bottom-left:  HUD panel pair or pinned widget
+ *   bottom-right: HUD panel pair or pinned widget
+ *   left-wing:    Optional expandable pinned widget
+ *   right-wing:   Optional expandable pinned widget
+ *   actions:      CockpitActionBar (fixed)
  *
- * - 3D scene = full viewport background (no wings)
+ * - 3D scene = full viewport background
  * - Chat = floating bubbles over center
- * - Bottom panels = 2x2 glass panels
- * - Action bar = 5-cell bar at very bottom
- * - Top-right: channel icons
- * - Top-left: reaction/action buttons
  * - Tab toggles HUD minimize (full 3D mode)
  */
 
@@ -49,6 +37,29 @@ export function CockpitHUDShell() {
   useCockpitKeys();
   const hudMinimized = useCockpitStore((s) => s.hudMinimized);
   const toggleHud = useCockpitStore((s) => s.toggleHudMinimized);
+  const zoneWidgets = useCockpitStore((s) => s.zoneWidgets);
+
+  const hasLeftWing = zoneWidgets.some((z) => z.zoneId === "left-wing");
+  const hasRightWing = zoneWidgets.some((z) => z.zoneId === "right-wing");
+  const hasTopLeft = zoneWidgets.some((z) => z.zoneId === "top-left");
+  const hasTopRight = zoneWidgets.some((z) => z.zoneId === "top-right");
+
+  // Load zone widgets from backend on mount
+  useEffect(() => {
+    fetch("/api/settings/cockpit")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.zone_widgets?.length) {
+          useCockpitStore.getState().setZoneWidgets(data.zone_widgets);
+        }
+        if (data?.cockpit_style) {
+          useCockpitStore.getState().setCockpitStyle(data.cockpit_style);
+        }
+      })
+      .catch((err) =>
+        console.error("[CockpitHUDShell] Settings load failed:", err),
+      );
+  }, []);
 
   // Chat area height (draggable)
   const [chatH, setChatH] = useState(CHAT_DEFAULT_H);
@@ -100,14 +111,84 @@ export function CockpitHUDShell() {
         <CockpitTopBar />
       </div>
 
-      {/* ── Top-Left: Reaction buttons ── */}
-      <ReactionButtons />
+      {/* ── Top-Left: Reaction buttons or pinned widget ── */}
+      {hasTopLeft ? (
+        <div
+          className="cockpit-zone cockpit-zone--top-left"
+          style={{
+            pointerEvents: "auto",
+            position: "fixed",
+            top: 64,
+            left: 16,
+            width: 200,
+            zIndex: 10,
+          }}
+        >
+          <CockpitZoneSlot zoneId="top-left" />
+        </div>
+      ) : (
+        <ReactionButtons />
+      )}
 
-      {/* ── Top-Right: Channel orbs ── */}
-      <ChannelOrbs />
+      {/* ── Top-Right: Channel orbs or pinned widget ── */}
+      {hasTopRight ? (
+        <div
+          className="cockpit-zone cockpit-zone--top-right"
+          style={{
+            pointerEvents: "auto",
+            position: "fixed",
+            top: 64,
+            right: 16,
+            width: 200,
+            zIndex: 10,
+          }}
+        >
+          <CockpitZoneSlot zoneId="top-right" />
+        </div>
+      ) : (
+        <ChannelOrbs />
+      )}
 
       {!hudMinimized && (
         <>
+          {/* ── Left Wing: Optional pinned widget ── */}
+          {hasLeftWing && (
+            <div
+              className="cockpit-zone cockpit-zone--left-wing"
+              style={{
+                pointerEvents: "auto",
+                position: "fixed",
+                left: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: 220,
+                maxHeight: "60vh",
+                zIndex: 10,
+              }}
+            >
+              <CockpitZoneSlot zoneId="left-wing" />
+            </div>
+          )}
+
+          {/* ── Right Wing: Optional pinned widget ── */}
+          {hasRightWing && (
+            <div
+              className="cockpit-zone cockpit-zone--right-wing"
+              style={{
+                pointerEvents: "auto",
+                position: "fixed",
+                right: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: 220,
+                maxHeight: "60vh",
+                zIndex: 10,
+              }}
+            >
+              <CockpitZoneSlot zoneId="right-wing" />
+            </div>
+          )}
+
           {/* ── Center: Floating chat area ── */}
           <section
             aria-label="Czat z IORS"

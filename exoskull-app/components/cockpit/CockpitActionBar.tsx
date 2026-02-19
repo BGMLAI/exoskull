@@ -17,6 +17,7 @@ import { useCockpitStore } from "@/lib/stores/useCockpitStore";
  */
 export function CockpitActionBar() {
   const openPreview = useCockpitStore((s) => s.openPreview);
+  const sendFromActionBar = useCockpitStore((s) => s.sendFromActionBar);
 
   const [gaugeData, setGaugeData] = useState({
     health: 0,
@@ -63,34 +64,9 @@ export function CockpitActionBar() {
 
   const handleSubmit = useCallback(() => {
     if (!inputValue.trim()) return;
-    // Dispatch to chat — find the chat input and inject the message
-    const chatInput = document.querySelector(
-      'textarea[data-chat-input="true"], input[data-chat-input="true"]',
-    ) as HTMLTextAreaElement | HTMLInputElement | null;
-    if (chatInput) {
-      const nativeInputValueSetter =
-        Object.getOwnPropertyDescriptor(
-          window.HTMLInputElement.prototype,
-          "value",
-        )?.set ||
-        Object.getOwnPropertyDescriptor(
-          window.HTMLTextAreaElement.prototype,
-          "value",
-        )?.set;
-      if (nativeInputValueSetter) {
-        nativeInputValueSetter.call(chatInput, inputValue);
-        chatInput.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-      // Trigger submit
-      const form = chatInput.closest("form");
-      if (form) {
-        form.dispatchEvent(
-          new Event("submit", { bubbles: true, cancelable: true }),
-        );
-      }
-    }
+    sendFromActionBar(inputValue.trim());
     setInputValue("");
-  }, [inputValue]);
+  }, [inputValue, sendFromActionBar]);
 
   return (
     <div className="hud-action-bar">

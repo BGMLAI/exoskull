@@ -15,8 +15,7 @@ export const metadata: Metadata = {
 /**
  * Dashboard Layout — Minimal wrapper
  *
- * The old layout had sidebar, mobile nav, etc.
- * New paradigm: DualInterface handles everything.
+ * Chat-first cockpit paradigm: CyberpunkDashboard renders 3D scene + CockpitHUDShell.
  * Layout only does auth check and provides error boundary.
  */
 export default async function DashboardLayout({

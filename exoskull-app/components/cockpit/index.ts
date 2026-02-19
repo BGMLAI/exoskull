@@ -13,3 +13,6 @@ export { ChannelOrbs } from "./ChannelOrbs";
 export { PreviewPane } from "./PreviewPane";
 export { OrbFormDialog } from "./OrbFormDialog";
 export { OrbDeleteConfirm } from "./OrbDeleteConfirm";
+export { CockpitSelector } from "./CockpitSelector";
+export { CockpitZoneSlot } from "./CockpitZoneSlot";
+export { ZoneWidgetPicker } from "./ZoneWidgetPicker";

@@ -2,82 +2,99 @@
 
 import { useCockpitStore } from "@/lib/stores/useCockpitStore";
 import { HUDPanel } from "./HUDPanel";
+import { CockpitZoneSlot } from "./CockpitZoneSlot";
 import type { DataItem } from "@/lib/cockpit/normalize-response";
 import type { PreviewTarget } from "@/lib/stores/useCockpitStore";
 import { relativeTime } from "@/lib/cockpit/utils";
 
 /**
- * BottomPanelGrid — 2x2 floating panel grid at the bottom of the cockpit.
+ * BottomPanelGrid — 2x2 panel grid at the bottom of the cockpit.
  *
- * Layout (per mockup):
+ * Each slot can either render a default HUD panel (data from API)
+ * or a user-pinned widget from the CockpitZoneSlot system.
+ *
+ * Layout:
  * ┌──────────┬──────────┐  ┌──────────┬──────────┐
- * │ Taski    │Kalendarz │  │Kalendarz │ Moje     │
- * │ IORS     │ /teraz   │  │ /plan    │ taski    │
+ * │bottom-   │bottom-   │  │bottom-   │bottom-   │
+ * │left (1)  │left (2)  │  │right (1) │right (2) │
  * └──────────┴──────────┘  └──────────┴──────────┘
- *
- * Left group: IORS tasks + Calendar Now
- * Right group: Values/Plan + My Tasks (knowledge)
  */
 export function BottomPanelGrid() {
   const sections = useCockpitStore((s) => s.sections);
+  const zoneWidgets = useCockpitStore((s) => s.zoneWidgets);
   const isVisible = (id: string) =>
     sections.find((s) => s.id === id)?.visible !== false;
+
+  const hasBottomLeft = zoneWidgets.some((z) => z.zoneId === "bottom-left");
+  const hasBottomRight = zoneWidgets.some((z) => z.zoneId === "bottom-right");
 
   return (
     <div className="hud-bottom-panels">
       {/* Left group */}
       <div className="hud-panel-group">
-        {isVisible("activity") && (
-          <HUDPanel
-            panelId="activity"
-            title="IORS"
-            accentColor="#8b5cf6"
-            endpoint="/api/canvas/activity-feed?limit=8"
-            toPreview={activityToPreview}
-            renderItem={renderActivityItem}
-            maxItems={6}
-            className="hud-panel-glass"
-          />
-        )}
-        {isVisible("calendar") && (
-          <HUDPanel
-            panelId="calendar"
-            title="Teraz"
-            accentColor="#f59e0b"
-            endpoint="/api/canvas/data/calendar"
-            toPreview={calendarToPreview}
-            renderItem={renderCalendarItem}
-            maxItems={5}
-            className="hud-panel-glass"
-          />
+        {hasBottomLeft ? (
+          <CockpitZoneSlot zoneId="bottom-left" />
+        ) : (
+          <>
+            {isVisible("activity") && (
+              <HUDPanel
+                panelId="activity"
+                title="IORS"
+                accentColor="#8b5cf6"
+                endpoint="/api/canvas/activity-feed?limit=8"
+                toPreview={activityToPreview}
+                renderItem={renderActivityItem}
+                maxItems={6}
+                className="hud-panel-glass"
+              />
+            )}
+            {isVisible("calendar") && (
+              <HUDPanel
+                panelId="calendar"
+                title="Teraz"
+                accentColor="#f59e0b"
+                endpoint="/api/canvas/data/calendar"
+                toPreview={calendarToPreview}
+                renderItem={renderCalendarItem}
+                maxItems={5}
+                className="hud-panel-glass"
+              />
+            )}
+          </>
         )}
       </div>
 
       {/* Right group */}
       <div className="hud-panel-group">
-        {isVisible("stats") && (
-          <HUDPanel
-            panelId="values"
-            title="Plan"
-            accentColor="#f59e0b"
-            endpoint="/api/canvas/data/values?deep=true"
-            toPreview={valueToPreview}
-            renderItem={renderValueItem}
-            maxItems={5}
-            className="hud-panel-glass"
-          />
-        )}
-        {isVisible("tasks") && (
-          <HUDPanel
-            panelId="tasks"
-            title="Zadania"
-            accentColor="#3b82f6"
-            endpoint="/api/canvas/data/tasks"
-            toPreview={taskToPreview}
-            renderItem={renderTaskItem}
-            maxItems={6}
-            className="hud-panel-glass"
-          />
+        {hasBottomRight ? (
+          <CockpitZoneSlot zoneId="bottom-right" />
+        ) : (
+          <>
+            {isVisible("stats") && (
+              <HUDPanel
+                panelId="values"
+                title="Plan"
+                accentColor="#f59e0b"
+                endpoint="/api/canvas/data/values?deep=true"
+                toPreview={valueToPreview}
+                renderItem={renderValueItem}
+                maxItems={5}
+                className="hud-panel-glass"
+              />
+            )}
+            {isVisible("tasks") && (
+              <HUDPanel
+                panelId="tasks"
+                title="Zadania"
+                accentColor="#3b82f6"
+                endpoint="/api/canvas/data/tasks"
+                toPreview={taskToPreview}
+                renderItem={renderTaskItem}
+                maxItems={6}
+                className="hud-panel-glass"
+              />
+            )}
+          </>
         )}
       </div>
     </div>

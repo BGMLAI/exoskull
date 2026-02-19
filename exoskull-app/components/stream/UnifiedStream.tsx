@@ -945,6 +945,22 @@ export function UnifiedStream({
   );
 
   // ---------------------------------------------------------------------------
+  // Consume messages from CockpitActionBar (store-based coupling)
+  // ---------------------------------------------------------------------------
+
+  const pendingActionBarMessage = useCockpitStore(
+    (s) => s.pendingActionBarMessage,
+  );
+  const clearActionBarMessage = useCockpitStore((s) => s.clearActionBarMessage);
+
+  useEffect(() => {
+    if (pendingActionBarMessage) {
+      sendMessage(pendingActionBarMessage, "text");
+      clearActionBarMessage();
+    }
+  }, [pendingActionBarMessage, clearActionBarMessage, sendMessage]);
+
+  // ---------------------------------------------------------------------------
   // File upload via presigned URL
   // ---------------------------------------------------------------------------
 

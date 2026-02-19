@@ -48,6 +48,7 @@ import { MyDataSection } from "./MyDataSection";
 import { SystemPromptSection } from "./SystemPromptSection";
 import { SectionErrorBoundary } from "./SectionErrorBoundary";
 import { VoiceSettingsSection } from "./VoiceSettingsSection";
+import { CockpitSelector } from "@/components/cockpit/CockpitSelector";
 
 interface PersonalityFormState {
   name: string;
@@ -409,6 +410,22 @@ export default function SettingsPage() {
       <SectionErrorBoundary sectionName="Glos i komunikacja">
         <VoiceSettingsSection />
       </SectionErrorBoundary>
+
+      {/* Cockpit Skin Selector */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Kokpit 3D
+          </CardTitle>
+          <CardDescription>
+            Wybierz styl kokpitu — ramka 3D wokol interfejsu
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CockpitSelector />
+        </CardContent>
+      </Card>
 
       <SectionErrorBoundary sectionName="Instrukcje">
         <InstructionsSection />

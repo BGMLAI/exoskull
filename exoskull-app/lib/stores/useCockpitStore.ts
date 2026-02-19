@@ -18,6 +18,30 @@ export interface PreviewTarget {
 /** Dashboard view mode */
 export type ViewMode = "classic" | "mindmap";
 
+/** Cockpit skin style */
+export type CockpitStyle =
+  | "none"
+  | "scifi-spaceship"
+  | "cyberpunk-terminal"
+  | "minimalist-command"
+  | "steampunk-control"
+  | "military-hud";
+
+/** Cockpit zone ID for widget pinning */
+export type CockpitZone =
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-right"
+  | "left-wing"
+  | "right-wing";
+
+/** Widget pinned to a cockpit zone */
+export interface ZoneWidget {
+  zoneId: CockpitZone;
+  widgetType: string;
+}
+
 interface CockpitState {
   /** Currently selected world (clicked orb) */
   selectedWorldId: string | null;
@@ -50,6 +74,12 @@ interface CockpitState {
   codeSidebarOpen: boolean;
   /** Last file changed via SSE (triggers sidebar auto-open + highlight) */
   lastChangedFile: string | null;
+  /** Pending message from CockpitActionBar to inject into chat */
+  pendingActionBarMessage: string | null;
+  /** Selected cockpit 3D skin */
+  cockpitStyle: CockpitStyle;
+  /** Widget-to-zone pinning layout */
+  zoneWidgets: ZoneWidget[];
 
   // Actions
   selectWorld: (id: string | null) => void;
@@ -81,6 +111,18 @@ interface CockpitState {
   toggleCodeSidebar: () => void;
   /** Called when a file_change SSE event arrives — opens sidebar + highlights file */
   notifyFileChange: (filePath: string) => void;
+  /** Send a message from action bar → consumed by UnifiedStream */
+  sendFromActionBar: (text: string) => void;
+  /** Clear the pending action bar message (called by UnifiedStream after consuming) */
+  clearActionBarMessage: () => void;
+  /** Set cockpit 3D skin */
+  setCockpitStyle: (style: CockpitStyle) => void;
+  /** Set widget for a cockpit zone */
+  setZoneWidget: (zoneId: CockpitZone, widgetType: string) => void;
+  /** Remove widget from a cockpit zone */
+  removeZoneWidget: (zoneId: CockpitZone) => void;
+  /** Set all zone widgets (for loading from persistence) */
+  setZoneWidgets: (widgets: ZoneWidget[]) => void;
 }
 
 const DEFAULT_SECTIONS: CockpitSection[] = [
@@ -120,9 +162,12 @@ export const useCockpitStore = create<CockpitState>((set) => ({
   collapsedPanels: new Set<string>(),
   hudMinimized: false,
   orbContextMenu: null,
-  viewMode: "mindmap",
+  viewMode: "classic",
   codeSidebarOpen: false,
   lastChangedFile: null,
+  pendingActionBarMessage: null,
+  cockpitStyle: "none",
+  zoneWidgets: [],
 
   selectWorld: (id) => set({ selectedWorldId: id }),
 
@@ -224,4 +269,24 @@ export const useCockpitStore = create<CockpitState>((set) => ({
     set((s) => ({ codeSidebarOpen: !s.codeSidebarOpen })),
   notifyFileChange: (filePath) =>
     set({ codeSidebarOpen: true, lastChangedFile: filePath }),
+
+  sendFromActionBar: (text) => set({ pendingActionBarMessage: text }),
+  clearActionBarMessage: () => set({ pendingActionBarMessage: null }),
+
+  setCockpitStyle: (style) => set({ cockpitStyle: style }),
+
+  setZoneWidget: (zoneId, widgetType) =>
+    set((s) => ({
+      zoneWidgets: [
+        ...s.zoneWidgets.filter((z) => z.zoneId !== zoneId),
+        { zoneId, widgetType },
+      ],
+    })),
+
+  removeZoneWidget: (zoneId) =>
+    set((s) => ({
+      zoneWidgets: s.zoneWidgets.filter((z) => z.zoneId !== zoneId),
+    })),
+
+  setZoneWidgets: (widgets) => set({ zoneWidgets: widgets }),
 }));

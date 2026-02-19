@@ -4,6 +4,38 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-19] Chat-First Cockpit Redesign (3 Phases)
+
+### Phase 1: Strip & Stabilize
+
+- **CyberpunkDashboard** — Removed mindmap toggle and LayoutModeSwitch from default view. Single view: 3D scene + CockpitHUDShell + chat. Mindmap accessible via `/mindmap` slash command.
+- **CockpitActionBar** — Replaced fragile DOM query (`data-chat-input` + native setter hack) with store-based `sendFromActionBar()`. UnifiedStream now consumes pending messages via `useCockpitStore`.
+- **Deleted SpatialChat.tsx** — Deprecated 3D spatial chat component (148 lines removed).
+- **Deleted DualInterface** — 7 unused components removed (ConsciousnessStream, DualInterface, ForgeView, FractalPattern, SplitHandle, TreeGraph, WorldsGraph — 4611 lines removed).
+
+### Phase 2: Cockpit Skin Selector
+
+- **CockpitModel3D** — 5 procedural cockpit styles built from Three.js primitives (no external GLB files): Sci-Fi Spaceship, Cyberpunk Terminal, Minimalist Command, Steampunk Control, Military HUD.
+- **CockpitSelector** — Settings UI with 6 options (5 skins + "none"). Persists to localStorage and backend (`/api/settings/cockpit`).
+- **API route** (`/api/settings/cockpit`) — GET/PUT for cockpit_style and zone_widgets in `exo_tenants.metadata`.
+- **CyberpunkSceneInner** — Renders `<CockpitModel3D />` inside the R3F scene based on selected skin.
+
+### Phase 3: Widget Pinning Inside Cockpit
+
+- **CockpitHUDShell** — 6 configurable zones: top-left, top-right, bottom-left, bottom-right, left-wing, right-wing. Each zone shows default content (ReactionButtons, ChannelOrbs, HUD panels) or a user-pinned widget.
+- **CockpitZoneSlot** — Zone slot component with add/remove buttons, lazy-loads 10 widget types (Health, Tasks, Calendar, ActivityFeed, IORSStatus, QuickActions, KnowledgeInsights, ValueTree, SystemHealth, ProcessMonitor).
+- **ZoneWidgetPicker** — Dialog for selecting which widget to pin to a zone, categorized by type.
+- **BottomPanelGrid** — Now supports bottom-left/bottom-right zone overrides via pinned widgets.
+- **useCockpitStore** — Added `CockpitStyle`, `CockpitZone`, `ZoneWidget` types and all zone management actions.
+- **Settings page** — CockpitSelector section added for cockpit skin selection.
+
+### Cleanup
+
+- Net: -4917 lines deleted, +281 lines added across 20 files.
+- Dashboard sub-pages (goals, tasks, knowledge, etc.) remain as routes but are no longer navigable from cockpit UI — accessible via chat slash commands.
+
+---
+
 ## [2026-02-18] Wire Proactive Notifications — All 5 Systems Fixed
 
 ### Fixed
