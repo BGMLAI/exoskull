@@ -307,7 +307,7 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
         graphData={graphData}
         width={width}
         height={height}
-        backgroundColor={SCENE_BG}
+        backgroundColor={getSceneBg()}
         nodeThreeObject={nodeThreeObject}
         nodeThreeObjectExtend={false}
         onNodeClick={handleNodeClick}
