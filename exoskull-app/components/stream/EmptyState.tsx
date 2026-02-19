@@ -1,5 +1,8 @@
 "use client";
 
+import { useAppStore } from "@/lib/stores/useAppStore";
+import { OnboardingBanner } from "@/components/conversation/OnboardingBanner";
+
 interface EmptyStateProps {
   onQuickAction: (text: string) => void;
 }
@@ -14,9 +17,22 @@ const QUICK_ACTIONS = [
 ];
 
 export function EmptyState({ onQuickAction }: EmptyStateProps) {
+  const onboardingComplete = useAppStore((s) => s.onboardingComplete);
+
   return (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-center max-w-md">
+    <div className="flex flex-col items-center justify-center h-full">
+      {/* Onboarding banner for new users */}
+      {!onboardingComplete && (
+        <OnboardingBanner
+          onStartDiscovery={() =>
+            onQuickAction(
+              "Czesc! Opowiedz mi o sobie — kim jestes i czym sie zajmujesz?",
+            )
+          }
+        />
+      )}
+
+      <div className="text-center max-w-md mt-8">
         <h2 className="text-xl font-semibold text-muted-foreground mb-2">
           Czesc! Jestem IORS.
         </h2>

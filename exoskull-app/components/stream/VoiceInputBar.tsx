@@ -25,6 +25,7 @@ import {
   Cpu,
 } from "lucide-react";
 import { useDictation } from "@/lib/hooks/useDictation";
+import { ChannelSelector } from "@/components/conversation/ChannelSelector";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -459,6 +460,9 @@ export function VoiceInputBar({
       {/* Input bar */}
       <div className="p-3">
         <div className="flex items-end gap-2">
+          {/* Channel selector */}
+          <ChannelSelector />
+
           {/* File upload */}
           {onFileUpload && (
             <button

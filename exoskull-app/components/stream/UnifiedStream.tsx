@@ -9,9 +9,7 @@ import { ThreadBranch, ThreadSidebar } from "./ThreadBranch";
 import { Loader2, X, Reply, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useSceneStore } from "@/lib/stores/useSceneStore";
-import { useSpatialChatStore } from "@/lib/stores/useSpatialChatStore";
-import { useCockpitStore } from "@/lib/stores/useCockpitStore";
+import { useAppStore } from "@/lib/stores/useAppStore";
 import type {
   StreamEvent,
   AIMessageData,
@@ -85,9 +83,6 @@ export function UnifiedStream({
     setActiveThread,
   } = useStreamState();
 
-  const pushSpatialMessage = useSpatialChatStore((s) => s.pushMessage);
-  const updateSpatialMessage = useSpatialChatStore((s) => s.updateMessage);
-
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -99,7 +94,7 @@ export function UnifiedStream({
   // TTS (Text-to-Speech) — reads AI responses aloud
   // ---------------------------------------------------------------------------
 
-  const [ttsEnabledInternal, setTtsEnabledInternal] = useState(false);
+  const [ttsEnabledInternal, setTtsEnabledInternal] = useState(true);
   const ttsEnabled = ttsEnabledProp ?? ttsEnabledInternal;
   const [isSpeaking, setIsSpeaking] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -429,14 +424,6 @@ export function UnifiedStream({
       };
       addEvent(userEvent);
 
-      // Push to spatial chat store (3D bubbles)
-      pushSpatialMessage({
-        id: userEvent.id,
-        role: "user",
-        content: text.trim(),
-        timestamp: new Date(),
-      });
-
       // 2. Add empty AI message event
       const aiEventId = `ai-${Date.now()}`;
       const aiEvent: StreamEvent = {
@@ -449,15 +436,7 @@ export function UnifiedStream({
         } as AIMessageData,
       };
       addEvent(aiEvent);
-      pushSpatialMessage({
-        id: aiEventId,
-        role: "ai",
-        content: "",
-        timestamp: new Date(),
-        isStreaming: true,
-      });
       setLoading(true);
-      useSceneStore.getState().setEffect("thinking");
 
       try {
         const res = await fetch("/api/chat/stream", {
@@ -492,7 +471,6 @@ export function UnifiedStream({
         if (!reader) throw new Error("No response body");
 
         let buffer = "";
-        let spatialAccumulated = "";
         // Track whether thinking event was created (avoids stale state.events.find)
         let thinkingEventCreated = false;
 
@@ -520,14 +498,10 @@ export function UnifiedStream({
 
                 case "delta":
                   updateAIMessage(aiEventId, data.text);
-                  spatialAccumulated += data.text;
-                  updateSpatialMessage(aiEventId, spatialAccumulated, true);
                   break;
 
                 case "done":
                   finalizeAIMessage(aiEventId, data.fullText, data.toolsUsed);
-                  updateSpatialMessage(aiEventId, data.fullText, false);
-                  useSceneStore.getState().setEffect("idle");
                   speakText(data.fullText);
                   break;
 
@@ -604,9 +578,6 @@ export function UnifiedStream({
                 }
 
                 case "tool_start": {
-                  // Notify 3D scene of tool execution
-                  useSceneStore.getState().startTool(data.tool);
-
                   // Fold tool into single thinking event
                   const tsThinkingId = `thinking-${aiEventId}`;
                   if (!thinkingEventCreated) {
@@ -639,9 +610,6 @@ export function UnifiedStream({
                 }
 
                 case "tool_end": {
-                  // Notify 3D scene that tool finished
-                  useSceneStore.getState().endTool();
-
                   // Update tool status in thinking event
                   const teThinkingId = `thinking-${aiEventId}`;
                   if (thinkingEventCreated) {
@@ -678,8 +646,8 @@ export function UnifiedStream({
                 }
 
                 case "file_change": {
-                  // Notify cockpit store → opens code sidebar + highlights file
-                  useCockpitStore.getState().notifyFileChange(data.filePath);
+                  // Notify app store → opens code sidebar + highlights file
+                  useAppStore.getState().notifyFileChange(data.filePath);
                   break;
                 }
 
@@ -765,14 +733,7 @@ export function UnifiedStream({
                 }
 
                 case "cockpit_update": {
-                  const cmd = data as { action: string; panel_id: string };
-                  const cockpitStore = useCockpitStore.getState();
-                  if (cmd.action === "show_panel")
-                    cockpitStore.showSection(cmd.panel_id);
-                  if (cmd.action === "hide_panel")
-                    cockpitStore.hideSection(cmd.panel_id);
-                  if (cmd.action === "expand_panel")
-                    cockpitStore.toggleSection(cmd.panel_id);
+                  // Legacy cockpit event — ignored in new UI
                   break;
                 }
 
@@ -811,8 +772,6 @@ export function UnifiedStream({
                 case "agent_delta": {
                   // Stream agent text into the main AI message
                   updateAIMessage(aiEventId, data.text);
-                  spatialAccumulated += data.text;
-                  updateSpatialMessage(aiEventId, spatialAccumulated, true);
                   break;
                 }
 
@@ -849,7 +808,6 @@ export function UnifiedStream({
                 }
 
                 case "mcp_tool_start": {
-                  useSceneStore.getState().startTool(data.tool);
                   const mcpThinkingId = `thinking-${aiEventId}`;
                   if (!thinkingEventCreated) {
                     addEvent({
@@ -881,7 +839,6 @@ export function UnifiedStream({
                 }
 
                 case "mcp_tool_end": {
-                  useSceneStore.getState().endTool();
                   const mcpTeThinkingId = `thinking-${aiEventId}`;
                   if (thinkingEventCreated) {
                     updateThinkingTools(mcpTeThinkingId, [
@@ -939,26 +896,21 @@ export function UnifiedStream({
       setConversationId,
       setReplyTo,
       speakText,
-      pushSpatialMessage,
-      updateSpatialMessage,
     ],
   );
 
   // ---------------------------------------------------------------------------
-  // Consume messages from CockpitActionBar (store-based coupling)
+  // Listen for FAB voice messages (FloatingMicFAB dispatches custom events)
   // ---------------------------------------------------------------------------
 
-  const pendingActionBarMessage = useCockpitStore(
-    (s) => s.pendingActionBarMessage,
-  );
-  const clearActionBarMessage = useCockpitStore((s) => s.clearActionBarMessage);
-
   useEffect(() => {
-    if (pendingActionBarMessage) {
-      sendMessage(pendingActionBarMessage, "text");
-      clearActionBarMessage();
-    }
-  }, [pendingActionBarMessage, clearActionBarMessage, sendMessage]);
+    const handler = (e: Event) => {
+      const text = (e as CustomEvent).detail?.text;
+      if (text) sendMessage(text, "voice_transcript");
+    };
+    window.addEventListener("exo-voice-message", handler);
+    return () => window.removeEventListener("exo-voice-message", handler);
+  }, [sendMessage]);
 
   // ---------------------------------------------------------------------------
   // File upload via presigned URL

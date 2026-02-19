@@ -4,6 +4,8 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AppShell } from "@/components/shell/AppShell";
+import { GoalStrip } from "@/components/shell/GoalStrip";
 
 export const metadata: Metadata = {
   title: {
@@ -13,10 +15,8 @@ export const metadata: Metadata = {
 };
 
 /**
- * Dashboard Layout — Minimal wrapper
- *
- * Chat-first cockpit paradigm: CyberpunkDashboard renders 3D scene + CockpitHUDShell.
- * Layout only does auth check and provides error boundary.
+ * Dashboard Layout — AppShell wrapper with auth check.
+ * GoalStrip rendered in TopBar slot.
  */
 export default async function DashboardLayout({
   children,
@@ -33,8 +33,8 @@ export default async function DashboardLayout({
   }
 
   return (
-    <main id="main-content" role="main" aria-label="Dashboard">
-      <ErrorBoundary>{children}</ErrorBoundary>
-    </main>
+    <ErrorBoundary>
+      <AppShell topBarSlot={<GoalStrip />}>{children}</AppShell>
+    </ErrorBoundary>
   );
 }

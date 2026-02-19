@@ -2,9 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import "../styles/cockpit.css";
-@import "../styles/mindmap.css";
-@import "../styles/workspace.css";
+/* cockpit.css, mindmap.css, workspace.css removed — new AppShell UI */
 
 @layer base {
   /*
@@ -794,11 +792,6 @@ body,
 
 /* Forced colors mode (Windows high contrast) */
 @media (forced-colors: active) {
-  .hud-action-cell,
-  .cockpit-hud-toggle {
-    border: 1px solid ButtonText;
-  }
-
   button:focus-visible,
   a:focus-visible,
   input:focus-visible {
@@ -838,6 +831,15 @@ body,
   border-radius: 0.5rem;
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Hide scrollbar for horizontal scroll containers (goal strip, etc.) */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Ensure minimum touch target size on interactive elements */

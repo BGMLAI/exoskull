@@ -4,6 +4,60 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-19] UI Redesign: Voice-First Conversation-Centric Layout
+
+### What
+Complete UI redesign replacing the 3D cockpit (React Three Fiber scene + CockpitHUDShell overlay) with a clean, mobile-first, conversation-centric layout. Voice-first approach with giant mic FAB, goal strip in topbar, integration hub, app gallery, channel selector, and onboarding flow.
+
+### New Components (20 files)
+| File | Purpose |
+|------|---------|
+| `components/shell/AppShell.tsx` | Master layout: sidebar + topbar + content |
+| `components/shell/TopBar.tsx` | Logo, GoalStrip slot, UserMenu dropdown |
+| `components/shell/Sidebar.tsx` | Collapsible nav: Home, Goals, Apps, Integrations, Knowledge, Settings |
+| `components/shell/MobileNav.tsx` | Bottom tab bar for mobile |
+| `components/shell/GoalStrip.tsx` | Horizontal scrollable goal badges |
+| `components/shell/GoalBadge.tsx` | Compact goal: emoji + name + minibar + % |
+| `components/conversation/ConversationView.tsx` | UnifiedStream + FloatingMicFAB wrapper |
+| `components/conversation/FloatingMicFAB.tsx` | 64px fixed mic button with states: idle/listening/processing |
+| `components/conversation/ChannelSelector.tsx` | Dropdown to pick SMS/WhatsApp/Email/etc channel |
+| `components/conversation/OnboardingBanner.tsx` | Dismissible welcome card for new users |
+| `components/integrations/IntegrationHub.tsx` | Grid: connected rigs, available rigs, channels |
+| `components/integrations/IntegrationCard.tsx` | Per-rig card with OAuth connect button |
+| `components/integrations/ChannelManager.tsx` | Toggle grid for 12 messaging channels |
+| `components/apps/AppGallery.tsx` | App grid with search, installed/available |
+| `components/apps/AppCard.tsx` | App card with open/toggle actions |
+| `lib/stores/useAppStore.ts` | Minimal Zustand store replacing useCockpitStore |
+| `app/dashboard/integrations/page.tsx` | Integration hub page |
+| `app/dashboard/apps/page.tsx` | App gallery page |
+
+### Modified Files
+| File | Change |
+|------|--------|
+| `app/dashboard/layout.tsx` | Renders AppShell instead of bare ErrorBoundary |
+| `app/dashboard/page.tsx` | ConversationView instead of CyberpunkDashboard |
+| `components/stream/UnifiedStream.tsx` | Removed useSceneStore/useSpatialChatStore/useCockpitStore refs, added FAB voice listener |
+| `components/stream/VoiceInputBar.tsx` | Added ChannelSelector |
+| `components/stream/EmptyState.tsx` | Added OnboardingBanner for new users |
+| `app/globals.css` | Removed cockpit.css/mindmap.css/workspace.css imports, added scrollbar-none |
+| `app/layout.tsx` | Fixed skip link target (#main → #main-content) |
+
+### What Stays Unchanged
+- All `app/api/*` routes (backend untouched)
+- All `lib/rigs/*`, `lib/iors/*`, `lib/agent-sdk/*`, `lib/gateway/*`
+- All `components/stream/events/*` (23 event renderers)
+- All `components/ui/*` (Shadcn primitives)
+- All `components/widgets/*` (24 widget components)
+- Theme system (4 themes, HSL CSS custom properties)
+- `lib/hooks/useStreamState.ts`, `useDictation.ts`, `useTTS.ts`
+
+### Architecture
+- **Layout:** Sidebar + TopBar + Content (desktop) / TopBar + Content + BottomNav (mobile)
+- **State:** `useAppStore` (10 fields) replaces `useCockpitStore` (30+ fields) for active UI
+- **3D files:** Still present for type checking but no longer imported by active routes
+
+---
+
 ## [2026-02-19] Feature: Full Google & Meta Integration — 42 New IORS Tools
 
 ### What
