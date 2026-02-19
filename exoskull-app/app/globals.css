@@ -84,8 +84,9 @@
     --sidebar-muted: 240 4% 46%;
     --sidebar-active: 0 0% 3.5%;
     --sidebar-active-text: 0 0% 98%;
-    --bg-void: 240 5% 96%;
-    --orb-glow-opacity: 0.4;
+    /* 3D scene — ALWAYS dark for orb/glow visibility */
+    --bg-void: 240 5% 8%;
+    --orb-glow-opacity: 0.6;
   }
 
   /* ===== Theme C: Neural ===== */
@@ -162,9 +163,9 @@
     --accent-voice: 263 70% 50%;
     --accent-health: 142 76% 36%;
 
-    /* 3D scene overrides */
-    --bg-void: 220 14% 94%;
-    --orb-glow-opacity: 0.3;
+    /* 3D scene — ALWAYS dark for orb/glow visibility */
+    --bg-void: 220 20% 8%;
+    --orb-glow-opacity: 0.7;
   }
 }
 

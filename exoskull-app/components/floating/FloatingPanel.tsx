@@ -8,8 +8,8 @@ import {
   type PanelId,
 } from "@/lib/stores/useFloatingPanelsStore";
 
-const MIN_W = 200;
-const MIN_H = 150;
+const MIN_W = 300;
+const MIN_H = 220;
 
 export interface FloatingPanelProps {
   id: PanelId;

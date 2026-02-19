@@ -220,6 +220,15 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
         loadChildren(mapNode.id);
       }
       setFocusedNode(mapNode.id);
+
+      // Open node-detail floating panel with this node's data
+      const fps = useFloatingPanelsStore.getState();
+      fps.setSelectedNode(mapNode);
+      if (!fps.isOpen("node-detail")) {
+        fps.openPanel("node-detail");
+      } else {
+        fps.focusPanel("node-detail");
+      }
     },
     [expandedNodes, expandNode, loadChildren, setFocusedNode],
   );
@@ -332,13 +341,13 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
       />
 
       {/* Node count badge */}
-      <div className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/60 backdrop-blur border border-cyan-900/30 rounded-lg font-mono text-[11px] text-cyan-400/60">
+      <div className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/60 backdrop-blur border border-cyan-900/30 rounded-lg font-mono text-xs text-cyan-400/70">
         {graphData.nodes.length} nodes · {graphData.links.length} links
       </div>
 
       {/* Hovered node tooltip */}
       {hoveredNodeId && !contextMenu && (
-        <div className="absolute top-3 left-3 px-3 py-2 bg-black/70 backdrop-blur border border-cyan-900/30 rounded-lg max-w-xs">
+        <div className="absolute top-3 left-3 px-4 py-3 bg-black/80 backdrop-blur border border-cyan-900/30 rounded-lg max-w-sm">
           {(() => {
             const n = graphData.nodes.find((n) => n.id === hoveredNodeId);
             if (!n) return null;
@@ -347,14 +356,14 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
                 <div className="font-mono text-xs text-cyan-400 uppercase tracking-wider mb-1">
                   {n.type}
                 </div>
-                <div className="text-sm text-white font-medium">{n.name}</div>
+                <div className="text-base text-white font-medium">{n.name}</div>
                 {n.description && (
-                  <div className="text-xs text-slate-400 mt-1 line-clamp-2">
+                  <div className="text-sm text-slate-300 mt-1 line-clamp-3">
                     {n.description}
                   </div>
                 )}
                 {n.status && (
-                  <div className="text-[10px] text-slate-500 mt-1">
+                  <div className="text-xs text-slate-400 mt-1">
                     Status: {n.status}
                   </div>
                 )}

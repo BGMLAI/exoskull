@@ -38,16 +38,16 @@ interface FloatingPanelsStore {
 const getDefaults = (): Record<PanelId, PanelState> => {
   const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
   return {
-    chat: { x: vw - 420, y: 60, w: 400, h: 500, minimized: false, zIndex: 10 },
-    tasks: { x: 20, y: 60, w: 320, h: 400, minimized: false, zIndex: 10 },
-    calendar: { x: 20, y: 480, w: 320, h: 300, minimized: false, zIndex: 10 },
-    knowledge: { x: 360, y: 60, w: 320, h: 400, minimized: false, zIndex: 10 },
-    email: { x: 360, y: 480, w: 320, h: 300, minimized: false, zIndex: 10 },
+    chat: { x: vw - 520, y: 40, w: 500, h: 600, minimized: false, zIndex: 10 },
+    tasks: { x: 20, y: 40, w: 380, h: 480, minimized: false, zIndex: 10 },
+    calendar: { x: 20, y: 540, w: 380, h: 340, minimized: false, zIndex: 10 },
+    knowledge: { x: 420, y: 40, w: 380, h: 480, minimized: false, zIndex: 10 },
+    email: { x: 420, y: 540, w: 380, h: 340, minimized: false, zIndex: 10 },
     "node-detail": {
-      x: 400,
-      y: 100,
-      w: 360,
-      h: 450,
+      x: 440,
+      y: 80,
+      w: 400,
+      h: 500,
       minimized: false,
       zIndex: 10,
     },
