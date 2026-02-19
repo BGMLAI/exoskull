@@ -4,6 +4,19 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-19] UI Audit — Fix All Broken/Dead Cockpit Elements
+
+### Fixed
+
+- **ReactionButtons** — Wired 4 dead buttons: Reject (👎), Accept (👍), React (😊) send to chat; Attach triggers file upload.
+- **CockpitActionBar DELETE** — Sends `/delete` for previewed item or `/clear` when no preview open.
+- **CockpitActionBar IORS** — Changed from `<div>` to `<button>`, opens IORS status preview.
+- **CockpitActionBar ZACHOWAJ** — Sends `/save` with item context.
+- **PreviewPane ActionButtons** — "Czatuj o tym" / "Dodaj zadanie" now functional for ALL preview types.
+- **CSS** — Input cursor, placeholder visibility, scrollbar width fixes.
+
+---
+
 ## [2026-02-19] Chat-First Cockpit Redesign (3 Phases)
 
 ### Phase 1: Strip & Stabilize

@@ -211,6 +211,7 @@ function EmailPreview({ data }: { data?: Record<string, unknown> }) {
           {String(data.body_preview)}
         </div>
       ) : null}
+      <PreviewActions itemTitle={String(data.subject || "email")} />
     </div>
   );
 }
@@ -238,6 +239,7 @@ function TaskPreview({ data }: { data?: Record<string, unknown> }) {
           {String(data.description)}
         </div>
       ) : null}
+      <PreviewActions itemTitle={String(data.title || "zadanie")} />
     </div>
   );
 }
@@ -305,6 +307,7 @@ function CalendarPreview({ data }: { data?: Record<string, unknown> }) {
         label="Link"
         value={data.link ? String(data.link) : undefined}
       />
+      <PreviewActions itemTitle={String(data.title || "wydarzenie")} />
     </div>
   );
 }
@@ -337,6 +340,7 @@ function ActivityPreview({ data }: { data?: Record<string, unknown> }) {
           {JSON.stringify(data.metadata, null, 2)}
         </div>
       ) : null}
+      <PreviewActions itemTitle={String(data.action_name || "aktywność")} />
     </div>
   );
 }
@@ -456,23 +460,32 @@ function ValuePreview({ data }: { data?: Record<string, unknown> }) {
         </div>
       )}
 
-      {/* Action buttons */}
-      <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <ActionButton label="Czatuj o tym" color="#06b6d4" />
-        <ActionButton label="Dodaj zadanie" color="#3b82f6" />
-        <ActionButton label="Edytuj" color="#8b5cf6" />
-      </div>
+      <PreviewActions itemTitle={String(data?.name || data?.title || "")} />
     </div>
   );
 }
 
-function ActionButton({ label, color }: { label: string; color: string }) {
+function ActionButton({
+  label,
+  color,
+  action,
+  itemTitle,
+}: {
+  label: string;
+  color: string;
+  action: "chat" | "task";
+  itemTitle: string;
+}) {
   return (
     <button
       onClick={() => {
         const store = useCockpitStore.getState();
         store.closePreview();
-        // Return to chat — user can type about the topic
+        if (action === "chat") {
+          store.sendFromActionBar(`Opowiedz mi więcej o: ${itemTitle}`);
+        } else if (action === "task") {
+          store.sendFromActionBar(`/task Nowe zadanie dotyczące: ${itemTitle}`);
+        }
       }}
       style={{
         background: `${color}15`,
@@ -498,6 +511,25 @@ function ActionButton({ label, color }: { label: string; color: string }) {
     >
       {label}
     </button>
+  );
+}
+
+function PreviewActions({ itemTitle }: { itemTitle: string }) {
+  return (
+    <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <ActionButton
+        label="Czatuj o tym"
+        color="#06b6d4"
+        action="chat"
+        itemTitle={itemTitle}
+      />
+      <ActionButton
+        label="Dodaj zadanie"
+        color="#3b82f6"
+        action="task"
+        itemTitle={itemTitle}
+      />
+    </div>
   );
 }
 

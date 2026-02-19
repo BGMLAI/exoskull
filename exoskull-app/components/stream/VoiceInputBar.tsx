@@ -453,6 +453,7 @@ export function VoiceInputBar({
         multiple
         onChange={handleFileChange}
         className="hidden"
+        data-voice-upload="true"
       />
 
       {/* Input bar */}

@@ -18,6 +18,8 @@ import { useCockpitStore } from "@/lib/stores/useCockpitStore";
 export function CockpitActionBar() {
   const openPreview = useCockpitStore((s) => s.openPreview);
   const sendFromActionBar = useCockpitStore((s) => s.sendFromActionBar);
+  const previewTarget = useCockpitStore((s) => s.previewTarget);
+  const closePreview = useCockpitStore((s) => s.closePreview);
 
   const [gaugeData, setGaugeData] = useState({
     health: 0,
@@ -68,20 +70,69 @@ export function CockpitActionBar() {
     setInputValue("");
   }, [inputValue, sendFromActionBar]);
 
+  // DELETE: If preview is open, ask IORS to delete that item. Otherwise clear chat.
+  const handleDelete = useCallback(() => {
+    if (previewTarget) {
+      sendFromActionBar(
+        `/delete ${previewTarget.type}:${previewTarget.id} "${previewTarget.title}"`,
+      );
+      closePreview();
+    } else {
+      sendFromActionBar("/clear");
+    }
+  }, [previewTarget, sendFromActionBar, closePreview]);
+
+  // IORS: Show IORS status in preview
+  const handleIORSClick = useCallback(() => {
+    openPreview({
+      type: "activity",
+      id: "iors-status",
+      title: "Status IORS",
+      data: {
+        action_name: "System Status",
+        action_type: "status",
+        description: `System: ${gaugeData.health}% | Zadania: ${gaugeData.tasksDone}%`,
+        status:
+          gaugeData.health >= 80
+            ? "healthy"
+            : gaugeData.health >= 50
+              ? "degraded"
+              : "critical",
+      },
+    });
+  }, [openPreview, gaugeData]);
+
+  // ZACHOWAJ: Bookmark the current preview item or ask IORS to save context
+  const handleSave = useCallback(() => {
+    if (previewTarget) {
+      sendFromActionBar(
+        `/save ${previewTarget.type}:${previewTarget.id} "${previewTarget.title}"`,
+      );
+    } else {
+      sendFromActionBar("/save Zachowaj bieżący kontekst rozmowy");
+    }
+  }, [previewTarget, sendFromActionBar]);
+
   return (
     <div className="hud-action-bar">
       {/* Cell 1: Delete / Black Hole */}
       <button
         className="hud-action-cell hud-action-cell--danger"
-        title="Usuń / Czarna dziura"
-        aria-label="Usuń wybrany element"
+        title={previewTarget ? `Usuń: ${previewTarget.title}` : "Wyczyść czat"}
+        aria-label={previewTarget ? "Usuń wybrany element" : "Wyczyść czat"}
+        onClick={handleDelete}
       >
         <Trash2 size={16} aria-hidden="true" />
         <span className="hud-action-label">USUŃ</span>
       </button>
 
       {/* Cell 2: IORS Process + mini gauges */}
-      <div className="hud-action-cell hud-action-cell--process">
+      <button
+        className="hud-action-cell hud-action-cell--process"
+        title="Status IORS"
+        aria-label="Pokaż status IORS"
+        onClick={handleIORSClick}
+      >
         <Activity size={14} style={{ color: "var(--hud-purple)" }} />
         <span
           className="hud-action-label"
@@ -103,7 +154,7 @@ export function CockpitActionBar() {
             size={32}
           />
         </div>
-      </div>
+      </button>
 
       {/* Cell 3: Input (center, largest) */}
       <div className="hud-action-cell hud-action-cell--input">
@@ -154,8 +205,13 @@ export function CockpitActionBar() {
       {/* Cell 5: Save / Bookmark */}
       <button
         className="hud-action-cell hud-action-cell--save"
-        title="Zachowaj"
+        title={
+          previewTarget
+            ? `Zachowaj: ${previewTarget.title}`
+            : "Zachowaj kontekst"
+        }
         aria-label="Zachowaj bieżący element"
+        onClick={handleSave}
       >
         <Bookmark size={16} style={{ color: "var(--hud-amber)" }} />
         <span

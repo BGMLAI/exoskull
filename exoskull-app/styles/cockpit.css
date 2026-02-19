@@ -201,7 +201,7 @@
   flex: 1;
   min-width: 0;
   padding: 0 8px;
-  cursor: default;
+  cursor: text;
 }
 
 .hud-action-input {
@@ -226,6 +226,11 @@
 .hud-action-input::placeholder {
   color: var(--hud-text-muted);
   font-size: 11px;
+  opacity: 0.7;
+}
+
+.hud-action-input:focus::placeholder {
+  opacity: 0.4;
 }
 
 /* Knowledge cell */
@@ -494,7 +499,7 @@
 }
 
 .hud-panel-body::-webkit-scrollbar {
-  width: 3px;
+  width: 6px;
 }
 
 .hud-panel-body::-webkit-scrollbar-track {
