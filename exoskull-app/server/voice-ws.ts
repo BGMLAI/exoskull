@@ -35,6 +35,7 @@ import {
 } from "../lib/voice/conversation-handler";
 import type { VoiceSession } from "../lib/voice/conversation-handler";
 import { runExoSkullAgent } from "../lib/agent-sdk/exoskull-agent";
+import { appendMessage } from "../lib/unified-thread";
 import { logger } from "../lib/logger";
 
 // ============================================================================
@@ -292,6 +293,21 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
   logger.info("[VoiceWS] User:", userText);
 
   try {
+    // Persist user message to unified thread BEFORE agent runs
+    // so getThreadContext() inside the agent includes this turn
+    await appendMessage(wsSession.tenantId, {
+      role: "user",
+      content: userText,
+      channel: "voice",
+      direction: "inbound",
+      source_type: "voice_session",
+      source_id: wsSession.sessionId,
+    }).catch((e) =>
+      logger.error("[VoiceWS] Pre-agent appendMessage failed:", {
+        error: e instanceof Error ? e.message : String(e),
+      }),
+    );
+
     // Stream response token-by-token via ConversationRelay.
     // Each token goes to Twilio → ElevenLabs TTS immediately.
     // User hears first words within ~0.5-1s instead of waiting 3-8s.
@@ -335,8 +351,13 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
     });
 
     // Update session in DB (unified thread + voice session)
+    // skipUserAppend: user message already written above before agent ran
     try {
-      await updateSession(wsSession.sessionId, userText, result.text);
+      await updateSession(wsSession.sessionId, userText, result.text, {
+        tenantId: wsSession.tenantId,
+        channel: "voice",
+        skipUserAppend: true,
+      });
     } catch (e) {
       console.error("[VoiceWS] Session update error:", e);
     }

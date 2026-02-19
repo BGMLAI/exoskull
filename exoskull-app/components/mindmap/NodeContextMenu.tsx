@@ -31,6 +31,7 @@ interface NodeContextMenuProps {
   onChangeVisual: (nodeId: string, visualType: NodeVisualType) => void;
   onOpenModelPicker: (nodeId: string) => void;
   onViewDetails: (node: MindMapNode) => void;
+  onDelete?: (nodeId: string, nodeType: string) => void;
 }
 
 export function NodeContextMenu({
@@ -43,6 +44,7 @@ export function NodeContextMenu({
   onChangeVisual,
   onOpenModelPicker,
   onViewDetails,
+  onDelete,
 }: NodeContextMenuProps) {
   const handleAction = useCallback(
     (action: () => void) => {
@@ -140,6 +142,20 @@ export function NodeContextMenu({
           <Link2 className="w-3.5 h-3.5" />
           Dolacz model 3D
         </button>
+
+        {/* Delete */}
+        {onDelete && (
+          <>
+            <div className="border-t border-border/50 my-1" />
+            <button
+              onClick={() => handleAction(() => onDelete(node.id, node.type))}
+              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-destructive/10 text-destructive hover:text-destructive transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Usun
+            </button>
+          </>
+        )}
       </div>
     </>
   );

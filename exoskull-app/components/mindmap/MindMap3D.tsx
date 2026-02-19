@@ -22,7 +22,8 @@ import { createCardObject } from "./node-renderers/CardRenderer";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeDetailPanel } from "./NodeDetailPanel";
 import { ModelPicker } from "./ModelPicker";
-import type { NodeVisualType } from "@/lib/types/orb-types";
+import { OrbDeleteConfirm } from "@/components/cockpit/OrbDeleteConfirm";
+import type { NodeVisualType, OrbNodeType } from "@/lib/types/orb-types";
 
 // Dynamic import to avoid SSR issues with three.js
 const ForceGraph3DComponent = dynamic(
@@ -49,7 +50,7 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fgRef = useRef<any>(null);
 
-  const { rootNodes, loadChildren, updateNode } = useOrbData();
+  const { rootNodes, loadChildren, updateNode, removeNode } = useOrbData();
   const {
     expandedNodes,
     focusedNodeId,
@@ -74,6 +75,13 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
   const [modelPickerNodeId, setModelPickerNodeId] = useState<string | null>(
     null,
   );
+
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+    type: OrbNodeType;
+  } | null>(null);
 
   // Auto-expand root values on mount
   useEffect(() => {
@@ -352,6 +360,14 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
           onChangeVisual={handleChangeVisual}
           onOpenModelPicker={(id) => setModelPickerNodeId(id)}
           onViewDetails={(node) => setDetailNode(node)}
+          onDelete={(nodeId, nodeType) => {
+            const n = graphData.nodes.find((n) => n.id === nodeId);
+            setDeleteTarget({
+              id: nodeId,
+              name: n?.name || nodeId,
+              type: nodeType as OrbNodeType,
+            });
+          }}
         />
       )}
 
@@ -363,6 +379,18 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
         isOpen={modelPickerNodeId !== null}
         onClose={() => setModelPickerNodeId(null)}
         onSelect={handleModelSelect}
+      />
+
+      {/* Delete confirmation dialog */}
+      <OrbDeleteConfirm
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        nodeLabel={deleteTarget?.name || ""}
+        nodeType={deleteTarget?.type || "op"}
+        onConfirm={async () => {
+          if (!deleteTarget) return false;
+          return removeNode(deleteTarget.id, deleteTarget.type);
+        }}
       />
     </div>
   );

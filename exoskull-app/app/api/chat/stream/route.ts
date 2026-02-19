@@ -15,6 +15,7 @@ import type { GatewayMessage } from "@/lib/gateway/types";
 import type { ProcessingCallback } from "@/lib/voice/conversation-handler";
 import { getToolLabel } from "@/lib/stream/tool-labels";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
+import { appendMessage } from "@/lib/unified-thread";
 
 import { logger } from "@/lib/logger";
 import { withApiLog } from "@/lib/api/request-logger";
@@ -165,6 +166,77 @@ async function tryVpsProxy(
     }
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// VPS Stream Relay — tee stream to client + capture assistant text for thread
+// ---------------------------------------------------------------------------
+
+function relayAndPersistVpsStream(
+  vpsResponse: Response,
+  tenantId: string,
+): Response {
+  const reader = vpsResponse.body!.getReader();
+  const decoder = new TextDecoder();
+  let assistantText = "";
+
+  const stream = new ReadableStream({
+    async pull(controller) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          // Stream finished — persist assistant response to unified thread
+          if (assistantText) {
+            appendMessage(tenantId, {
+              role: "assistant",
+              content: assistantText,
+              channel: "web_chat",
+              direction: "outbound",
+              source_type: "web_chat",
+            }).catch((err) =>
+              logger.warn(
+                "[ChatStream] VPS assistant thread append failed:",
+                err instanceof Error ? err.message : String(err),
+              ),
+            );
+          }
+          controller.close();
+          return;
+        }
+
+        // Pass through to client
+        controller.enqueue(value);
+
+        // Parse SSE events to capture fullText from "done" event
+        const text = decoder.decode(value, { stream: true });
+        for (const line of text.split("\n")) {
+          if (line.startsWith("data: ")) {
+            try {
+              const parsed = JSON.parse(line.slice(6));
+              if (parsed.type === "done" && parsed.fullText) {
+                assistantText = parsed.fullText;
+              }
+            } catch {
+              /* not JSON, skip */
+            }
+          }
+        }
+      } catch (err) {
+        logger.error("[ChatStream] VPS stream relay error:", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -400,14 +472,29 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
     const vpsResponse = await tryVpsProxy(message, tenantId, conversationId);
 
     if (vpsResponse) {
-      // VPS handled it — relay SSE stream + track usage
+      // VPS handled it — persist user message to unified thread for continuity
+      // (gateway local path does its own append, but VPS bypasses gateway entirely)
+      await appendMessage(tenantId, {
+        role: "user",
+        content: message,
+        channel: "web_chat",
+        direction: "inbound",
+        source_type: "web_chat",
+      }).catch((err) =>
+        logger.warn(
+          "[ChatStream] VPS user thread append failed:",
+          err instanceof Error ? err.message : String(err),
+        ),
+      );
+
       incrementUsage(tenantId, "conversations").catch((err) => {
         logger.warn(
           "[ChatStream] Usage tracking failed:",
           err instanceof Error ? err.message : String(err),
         );
       });
-      return vpsResponse;
+      // Relay SSE stream to client + capture assistant text for thread persistence
+      return relayAndPersistVpsStream(vpsResponse, tenantId);
     }
 
     // --- Fallback to local gateway pipeline ---
