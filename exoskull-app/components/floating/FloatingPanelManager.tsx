@@ -352,12 +352,111 @@ function EmailContent() {
 }
 
 function NodeDetailContent() {
+  const node = useFloatingPanelsStore((s) => s.selectedNode);
+
+  if (!node) {
+    return (
+      <div className="p-4 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground mb-2">Node Detail</p>
+        <p className="text-xs opacity-60">
+          Kliknij prawym przyciskiem na węzeł i wybierz &quot;Szczegóły&quot;.
+        </p>
+      </div>
+    );
+  }
+
+  const statusColors: Record<string, string> = {
+    active: "text-green-400 bg-green-900/20 border-green-800/30",
+    paused: "text-yellow-400 bg-yellow-900/20 border-yellow-800/30",
+    completed: "text-cyan-400 bg-cyan-900/20 border-cyan-800/30",
+    abandoned: "text-red-400 bg-red-900/20 border-red-800/30",
+  };
+
   return (
-    <div className="p-4 text-sm text-muted-foreground">
-      <p className="font-medium text-foreground mb-2">Node Detail</p>
-      <p className="text-xs opacity-60">
-        Select a node in the mindmap to see its details here.
-      </p>
+    <div className="px-4 py-3 space-y-3 overflow-y-auto chat-scroll text-sm">
+      {/* Header */}
+      <div>
+        <div className="text-[10px] font-mono text-primary uppercase tracking-wider mb-0.5">
+          {node.type}
+        </div>
+        <h3 className="text-sm font-medium text-foreground">{node.name}</h3>
+      </div>
+
+      {/* Status */}
+      {node.status && (
+        <div>
+          <label className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1">
+            Status
+          </label>
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] border ${statusColors[node.status] || "text-muted-foreground bg-muted border-border"}`}
+          >
+            {node.status}
+          </span>
+        </div>
+      )}
+
+      {/* Description */}
+      {node.description && (
+        <div>
+          <label className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1">
+            Opis
+          </label>
+          <p className="text-xs text-foreground leading-relaxed">
+            {node.description}
+          </p>
+        </div>
+      )}
+
+      {/* Progress */}
+      {node.progress !== undefined && node.progress > 0 && (
+        <div>
+          <label className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1">
+            Postep
+          </label>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1.5 bg-black/30 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all"
+                style={{ width: `${Math.min(100, node.progress)}%` }}
+              />
+            </div>
+            <span className="text-[11px] text-primary font-mono">
+              {Math.round(node.progress)}%
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Tags */}
+      {node.tags && node.tags.length > 0 && (
+        <div>
+          <label className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider block mb-1">
+            Tagi
+          </label>
+          <div className="flex flex-wrap gap-1">
+            {node.tags.map((tag) => (
+              <span
+                key={tag}
+                className="px-2 py-0.5 text-[10px] bg-primary/10 text-primary border border-primary/20 rounded-full"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Color */}
+      <div className="flex items-center gap-2">
+        <div
+          className="w-3 h-3 rounded-full border border-white/10"
+          style={{ backgroundColor: node.color }}
+        />
+        <span className="text-[10px] text-muted-foreground font-mono">
+          {node.color}
+        </span>
+      </div>
     </div>
   );
 }

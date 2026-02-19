@@ -23,6 +23,7 @@ import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeDetailPanel } from "./NodeDetailPanel";
 import { ModelPicker } from "./ModelPicker";
 import { OrbDeleteConfirm } from "@/components/cockpit/OrbDeleteConfirm";
+import { useFloatingPanelsStore } from "@/lib/stores/useFloatingPanelsStore";
 import type { NodeVisualType, OrbNodeType } from "@/lib/types/orb-types";
 
 // Dynamic import to avoid SSR issues with three.js
@@ -377,7 +378,15 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
           }}
           onChangeVisual={handleChangeVisual}
           onOpenModelPicker={(id) => setModelPickerNodeId(id)}
-          onViewDetails={(node) => setDetailNode(node)}
+          onViewDetails={(node) => {
+            setDetailNode(node);
+            // Also publish to floating panel store
+            const fps = useFloatingPanelsStore.getState();
+            fps.setSelectedNode(node);
+            if (!fps.isOpen("node-detail")) {
+              fps.openPanel("node-detail");
+            }
+          }}
           onDelete={(nodeId, nodeType) => {
             const n = graphData.nodes.find((n) => n.id === nodeId);
             setDeleteTarget({

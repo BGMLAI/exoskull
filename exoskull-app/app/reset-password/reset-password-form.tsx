@@ -1,40 +1,61 @@
 "use client";
 
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { resetPassword } from "../login/actions";
+import { cn } from "@/lib/utils";
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const message = searchParams.get("message");
+  const [email, setEmail] = useState("");
+  const [touched, setTouched] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const isInvalid = touched && email.length > 0 && !EMAIL_REGEX.test(email);
+  const canSubmit = EMAIL_REGEX.test(email) && !submitting;
+
+  async function handleSubmit(formData: FormData) {
+    setSubmitting(true);
+    try {
+      await resetPassword(formData);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <main
-      className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4"
+      className="min-h-screen flex items-center justify-center bg-background px-4"
       id="main-content"
     >
-      <div className="max-w-md w-full space-y-6 p-8 bg-slate-800/50 border border-slate-700 rounded-xl">
+      <div className="max-w-md w-full space-y-6 p-8 bg-card/80 border border-border rounded-xl backdrop-blur-sm">
         <div>
           <Link href="/" className="block text-center">
-            <h1 className="text-4xl font-bold text-white">ExoSkull</h1>
+            <h1 className="text-4xl font-bold text-foreground">ExoSkull</h1>
           </Link>
-          <p className="text-center text-slate-400 mt-2">Resetowanie hasla</p>
+          <p className="text-center text-muted-foreground mt-2">
+            Resetowanie hasla
+          </p>
         </div>
 
         {message && (
           <div
             role="status"
-            className="p-4 bg-blue-900/30 border border-blue-700/50 rounded-lg text-sm text-blue-300"
+            className="p-4 bg-primary/10 border border-primary/30 rounded-lg text-sm text-primary"
           >
             {message}
           </div>
         )}
 
-        <form action={resetPassword} className="space-y-4">
+        <form action={handleSubmit} className="space-y-4">
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium mb-2 text-slate-300"
+              className="block text-sm font-medium mb-2 text-foreground"
             >
               Email
             </label>
@@ -44,24 +65,47 @@ export function ResetPasswordForm() {
               type="email"
               required
               aria-required="true"
+              aria-invalid={isInvalid || undefined}
+              aria-describedby={isInvalid ? "email-error" : undefined}
               autoComplete="email"
-              className="w-full px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => setTouched(true)}
+              className={cn(
+                "w-full px-4 py-2 bg-background border rounded-lg text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary focus:border-transparent",
+                isInvalid ? "border-destructive" : "border-border",
+              )}
               placeholder="twoj@email.pl"
             />
+            {isInvalid && (
+              <p
+                id="email-error"
+                className="text-xs mt-1 text-destructive"
+                role="alert"
+              >
+                Podaj prawidlowy adres email
+              </p>
+            )}
           </div>
 
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+            disabled={!canSubmit}
+            className={cn(
+              "w-full font-medium py-3 px-4 rounded-lg transition-colors",
+              canSubmit
+                ? "bg-primary hover:bg-primary/90 text-primary-foreground"
+                : "bg-muted text-muted-foreground cursor-not-allowed",
+            )}
           >
-            Wyslij link do resetu
+            {submitting ? "Wysylanie..." : "Wyslij link do resetu"}
           </button>
         </form>
 
         <div className="text-center">
           <Link
             href="/login"
-            className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+            className="text-sm text-primary hover:text-primary/80 transition-colors"
           >
             Wroc do logowania
           </Link>

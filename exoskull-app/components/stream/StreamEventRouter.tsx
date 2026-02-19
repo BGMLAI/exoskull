@@ -34,6 +34,10 @@ import { ToolExecution } from "./events/ToolExecution";
 import { SearchResultsEvent } from "./events/SearchResultsEvent";
 import { RichContentEvent } from "./events/RichContentEvent";
 
+// Claude Code events — file changes and diffs
+import { DiffViewer } from "./events/DiffViewer";
+import { FileChangeEvent } from "./events/FileChangeEvent";
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -92,6 +96,10 @@ function EventContent({ event }: { event: StreamEvent }) {
       return <SearchResultsEvent event={event} />;
     case "rich_content":
       return <RichContentEvent event={event} />;
+    case "file_change":
+      return <FileChangeEvent event={event} />;
+    case "diff_view":
+      return <DiffViewer event={event} />;
     default:
       return null;
   }
@@ -126,6 +134,8 @@ const SELF_BORDERED_TYPES = new Set([
   "emotion_reading",
   "search_results",
   "rich_content",
+  "file_change",
+  "diff_view",
 ]);
 
 // ---------------------------------------------------------------------------

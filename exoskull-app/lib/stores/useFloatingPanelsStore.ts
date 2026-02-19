@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { MindMapNode } from "@/lib/mindmap/graph-converter";
 
 export type PanelId =
   | "chat"
@@ -20,6 +21,8 @@ interface PanelState {
 interface FloatingPanelsStore {
   panels: Record<string, PanelState>;
   topZ: number;
+  /** Node selected in MindMap3D — consumed by node-detail floating panel */
+  selectedNode: MindMapNode | null;
   openPanel: (id: PanelId, defaults?: Partial<PanelState>) => void;
   closePanel: (id: PanelId) => void;
   minimizePanel: (id: PanelId) => void;
@@ -27,6 +30,7 @@ interface FloatingPanelsStore {
   focusPanel: (id: PanelId) => void;
   updatePanel: (id: PanelId, update: Partial<PanelState>) => void;
   isOpen: (id: PanelId) => boolean;
+  setSelectedNode: (node: MindMapNode | null) => void;
 }
 
 // Default positions for each panel type
@@ -84,6 +88,7 @@ export const useFloatingPanelsStore = create<FloatingPanelsStore>(
   (set, get) => ({
     panels: loadFromStorage(),
     topZ: 10,
+    selectedNode: null,
 
     openPanel: (id, defaults) =>
       set((s) => {
@@ -143,5 +148,7 @@ export const useFloatingPanelsStore = create<FloatingPanelsStore>(
       }),
 
     isOpen: (id) => !!get().panels[id],
+
+    setSelectedNode: (node) => set({ selectedNode: node }),
   }),
 );
