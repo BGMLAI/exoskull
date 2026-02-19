@@ -397,50 +397,8 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
   }
 });
 
-// Debug GET — simulates start flow without Twilio signature
-export const GET = withApiLog(async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const debug = url.searchParams.get("debug");
-
-  if (debug === "voice-test") {
-    try {
-      const steps: string[] = [];
-
-      steps.push("1. findTenantByPhone...");
-      const tenant = await findTenantByPhone("+48607090956");
-      steps.push(`   tenant: ${tenant ? tenant.id : "null"}`);
-
-      const tenantId = tenant?.id || "anonymous";
-
-      steps.push("2. VOICE_WS_URL: " + (process.env.VOICE_WS_URL || "NOT SET"));
-
-      steps.push("3. getOrCreateSession...");
-      const session = await getOrCreateSession("debug-" + Date.now(), tenantId);
-      steps.push(`   session: ${session.id}`);
-
-      steps.push("4. generateGreeting...");
-      const greeting = await generateGreeting(tenantId);
-      steps.push(`   greeting: ${greeting}`);
-
-      steps.push("5. textToSpeech...");
-      try {
-        const { textToSpeech } = await import("@/lib/voice/elevenlabs-tts");
-        const buf = await textToSpeech("test");
-        steps.push(`   tts: OK (${buf.byteLength} bytes)`);
-      } catch (e: any) {
-        steps.push(`   tts: FAIL — ${e.message}`);
-      }
-
-      return NextResponse.json({ success: true, steps });
-    } catch (e: any) {
-      return NextResponse.json({
-        success: false,
-        error: e.message,
-        stack: e.stack?.split("\n").slice(0, 5),
-      });
-    }
-  }
-
+// Health check GET
+export const GET = withApiLog(async function GET() {
   return NextResponse.json({
     status: "ok",
     endpoint: "Twilio Voice Webhook",
