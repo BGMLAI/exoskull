@@ -145,7 +145,7 @@ export function WorkspaceLayout({ tenantId }: WorkspaceLayoutProps) {
     : mainSize.height || window.innerHeight;
 
   return (
-    <div className="fixed inset-0 flex bg-[#050510] overflow-hidden">
+    <div className="fixed inset-0 flex bg-background overflow-hidden">
       {/* ── Left Panel: Sources ── */}
       {leftOpen ? (
         <div

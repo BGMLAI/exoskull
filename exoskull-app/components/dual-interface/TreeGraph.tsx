@@ -445,7 +445,7 @@ export function TreeGraph({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full bg-[#050510] overflow-hidden"
+      className="relative w-full h-full bg-background overflow-hidden"
     >
       {/* Force graph */}
       <ForceGraph2D
@@ -453,7 +453,7 @@ export function TreeGraph({
         graphData={graphData}
         width={dimensions.width}
         height={dimensions.height}
-        backgroundColor="#050510"
+        backgroundColor="hsl(var(--bg-void, 240 60% 3%))"
         nodeCanvasObject={paintNode}
         nodePointerAreaPaint={(
           node: Record<string, unknown>,

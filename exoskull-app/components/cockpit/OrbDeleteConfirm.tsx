@@ -102,7 +102,7 @@ export function OrbDeleteConfirm({
       <div
         className="w-full max-w-sm flex flex-col gap-5"
         style={{
-          background: "rgba(10, 10, 28, 0.95)",
+          background: "hsl(var(--card) / 0.95)",
           border: "1px solid rgba(239, 68, 68, 0.25)",
           borderRadius: 12,
           padding: 24,

@@ -51,7 +51,7 @@ import {
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-[#050510]">
+    <div className="w-full h-full flex items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
         <span className="text-xs text-white/40">Ładowanie światów...</span>
@@ -1187,7 +1187,7 @@ export function WorldsGraph({
     <div
       ref={containerRef}
       className={cn(
-        "relative w-full h-full bg-[#050510] overflow-hidden",
+        "relative w-full h-full bg-background overflow-hidden",
         className,
       )}
       style={{ cursor: hoveredNode ? "pointer" : "grab" }}

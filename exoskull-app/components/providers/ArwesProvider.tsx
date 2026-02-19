@@ -24,7 +24,7 @@ export function ArwesProvider({ children }: ArwesProviderProps) {
         {
           "--arwes-cyan": "#00d4ff",
           "--arwes-violet": "#8b5cf6",
-          "--arwes-dark": "#050510",
+          "--arwes-dark": "hsl(var(--bg-void, 240 60% 3%))",
           "--arwes-glow": "0 0 12px rgba(0, 212, 255, 0.3)",
         } as React.CSSProperties
       }

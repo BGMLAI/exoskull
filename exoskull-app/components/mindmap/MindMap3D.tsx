@@ -31,7 +31,7 @@ const ForceGraph3DComponent = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full flex items-center justify-center bg-[#050510] text-cyan-400/60 font-mono text-sm">
+      <div className="w-full h-full flex items-center justify-center bg-background text-cyan-400/60 font-mono text-sm">
         Inicjalizacja mapy mysli...
       </div>
     ),
@@ -43,8 +43,26 @@ interface MindMap3DProps {
   height?: number;
 }
 
-// 3D scene ALWAYS uses dark background — orbs, glow, and labels are designed for dark
-const SCENE_BG = "#050510";
+/** Read --bg-void CSS variable and convert HSL to hex for Three.js */
+function getSceneBg(): string {
+  if (typeof window === "undefined") return "#050510";
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue("--bg-void")
+    .trim();
+  if (!raw) return "#050510";
+  const [h, s, l] = raw.split(/\s+/).map((v) => parseFloat(v));
+  if (isNaN(h) || isNaN(s) || isNaN(l)) return "#050510";
+  // HSL → hex conversion
+  const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const color = l / 100 - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
 
 export function MindMap3D({ width, height }: MindMap3DProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

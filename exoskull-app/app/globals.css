@@ -50,6 +50,8 @@
     --sidebar-active: 191 100% 50%;
     --sidebar-active-text: 0 0% 0%;
     --glow-color: 191 100% 50%;
+    --bg-void: 240 60% 3%;
+    --orb-glow-opacity: 0.8;
   }
 
   /* ===== Theme B: XO Minimal (light) ===== */
@@ -82,6 +84,8 @@
     --sidebar-muted: 240 4% 46%;
     --sidebar-active: 0 0% 3.5%;
     --sidebar-active-text: 0 0% 98%;
+    --bg-void: 240 5% 96%;
+    --orb-glow-opacity: 0.4;
   }
 
   /* ===== Theme C: Neural ===== */
@@ -115,6 +119,8 @@
     --sidebar-active: 263 70% 66%;
     --sidebar-active-text: 0 0% 100%;
     --glow-color: 263 70% 66%;
+    --bg-void: 263 60% 5%;
+    --orb-glow-opacity: 0.7;
   }
 
   /* ===== Theme D: Gemini Hybrid (light, multi-color accents) ===== */
