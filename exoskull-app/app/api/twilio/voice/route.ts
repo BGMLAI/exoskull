@@ -386,16 +386,68 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       headers: { "Content-Type": "application/xml" },
     });
   } catch (error) {
-    logger.error("[Twilio Voice] Fatal error:", error);
-
-    return new NextResponse(generateErrorTwiML(), {
-      headers: { "Content-Type": "application/xml" },
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error("[Twilio Voice] Fatal error:", {
+      message: err.message,
+      name: err.name,
+      stack: err.stack?.split("\n").slice(0, 5).join("\n"),
     });
+
+    // Include error details in TwiML for debugging (safe — only heard by caller)
+    const debugMsg = `Błąd: ${err.message.substring(0, 100)}`;
+    return new NextResponse(
+      `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Maja" language="pl-PL">${debugMsg}</Say><Hangup/></Response>`,
+      {
+        headers: { "Content-Type": "application/xml" },
+      },
+    );
   }
 });
 
-// Also handle GET for testing
+// Debug GET — simulates start flow without Twilio signature
 export const GET = withApiLog(async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+  const debug = url.searchParams.get("debug");
+
+  if (debug === "voice-test") {
+    try {
+      const steps: string[] = [];
+
+      steps.push("1. findTenantByPhone...");
+      const tenant = await findTenantByPhone("+48607090956");
+      steps.push(`   tenant: ${tenant ? tenant.id : "null"}`);
+
+      const tenantId = tenant?.id || "anonymous";
+
+      steps.push("2. VOICE_WS_URL: " + (process.env.VOICE_WS_URL || "NOT SET"));
+
+      steps.push("3. getOrCreateSession...");
+      const session = await getOrCreateSession("debug-" + Date.now(), tenantId);
+      steps.push(`   session: ${session.id}`);
+
+      steps.push("4. generateGreeting...");
+      const greeting = await generateGreeting(tenantId);
+      steps.push(`   greeting: ${greeting}`);
+
+      steps.push("5. textToSpeech...");
+      try {
+        const { textToSpeech } = await import("@/lib/voice/elevenlabs-tts");
+        const buf = await textToSpeech("test");
+        steps.push(`   tts: OK (${buf.length} bytes)`);
+      } catch (e: any) {
+        steps.push(`   tts: FAIL — ${e.message}`);
+      }
+
+      return NextResponse.json({ success: true, steps });
+    } catch (e: any) {
+      return NextResponse.json({
+        success: false,
+        error: e.message,
+        stack: e.stack?.split("\n").slice(0, 5),
+      });
+    }
+  }
+
   return NextResponse.json({
     status: "ok",
     endpoint: "Twilio Voice Webhook",
