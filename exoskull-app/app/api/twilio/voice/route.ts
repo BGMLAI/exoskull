@@ -433,7 +433,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       try {
         const { textToSpeech } = await import("@/lib/voice/elevenlabs-tts");
         const buf = await textToSpeech("test");
-        steps.push(`   tts: OK (${buf.length} bytes)`);
+        steps.push(`   tts: OK (${buf.byteLength} bytes)`);
       } catch (e: any) {
         steps.push(`   tts: FAIL — ${e.message}`);
       }
