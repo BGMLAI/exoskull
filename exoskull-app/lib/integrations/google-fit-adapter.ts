@@ -292,6 +292,332 @@ export async function getCalories(
 }
 
 /**
+ * Get weight data
+ */
+export async function getWeight(
+  tenantId: string,
+  startDate: Date,
+  endDate: Date,
+): Promise<{
+  ok: boolean;
+  data?: Array<{ date: string; kg: number }>;
+  error?: string;
+}> {
+  const result = await fitFetch(tenantId, "/dataset:aggregate", {
+    method: "POST",
+    body: JSON.stringify({
+      aggregateBy: [{ dataTypeName: "com.google.weight" }],
+      bucketByTime: { durationMillis: 86400000 },
+      startTimeMillis: startDate.getTime(),
+      endTimeMillis: endDate.getTime(),
+    }),
+  });
+
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const buckets =
+    (
+      result.data as {
+        bucket?: Array<{
+          startTimeMillis: string;
+          dataset: Array<{ point: Array<{ value: Array<{ fpVal: number }> }> }>;
+        }>;
+      }
+    )?.bucket || [];
+
+  const data = buckets
+    .filter((b) => b.dataset?.[0]?.point?.length)
+    .map((b) => ({
+      date: new Date(parseInt(b.startTimeMillis)).toISOString().split("T")[0],
+      kg: Math.round((b.dataset[0].point[0]?.value[0]?.fpVal || 0) * 10) / 10,
+    }));
+
+  return { ok: true, data };
+}
+
+/**
+ * Get blood pressure data
+ */
+export async function getBloodPressure(
+  tenantId: string,
+  startDate: Date,
+  endDate: Date,
+): Promise<{
+  ok: boolean;
+  data?: Array<{ date: string; systolic: number; diastolic: number }>;
+  error?: string;
+}> {
+  const result = await fitFetch(tenantId, "/dataset:aggregate", {
+    method: "POST",
+    body: JSON.stringify({
+      aggregateBy: [{ dataTypeName: "com.google.blood_pressure" }],
+      bucketByTime: { durationMillis: 86400000 },
+      startTimeMillis: startDate.getTime(),
+      endTimeMillis: endDate.getTime(),
+    }),
+  });
+
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const buckets =
+    (
+      result.data as {
+        bucket?: Array<{
+          startTimeMillis: string;
+          dataset: Array<{ point: Array<{ value: Array<{ fpVal: number }> }> }>;
+        }>;
+      }
+    )?.bucket || [];
+
+  const data = buckets
+    .filter((b) => b.dataset?.[0]?.point?.length)
+    .map((b) => ({
+      date: new Date(parseInt(b.startTimeMillis)).toISOString().split("T")[0],
+      systolic: Math.round(b.dataset[0].point[0]?.value[0]?.fpVal || 0),
+      diastolic: Math.round(b.dataset[0].point[0]?.value[1]?.fpVal || 0),
+    }));
+
+  return { ok: true, data };
+}
+
+/**
+ * Get blood glucose data
+ */
+export async function getBloodGlucose(
+  tenantId: string,
+  startDate: Date,
+  endDate: Date,
+): Promise<{
+  ok: boolean;
+  data?: Array<{ date: string; mmolL: number }>;
+  error?: string;
+}> {
+  const result = await fitFetch(tenantId, "/dataset:aggregate", {
+    method: "POST",
+    body: JSON.stringify({
+      aggregateBy: [{ dataTypeName: "com.google.blood_glucose" }],
+      bucketByTime: { durationMillis: 86400000 },
+      startTimeMillis: startDate.getTime(),
+      endTimeMillis: endDate.getTime(),
+    }),
+  });
+
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const buckets =
+    (
+      result.data as {
+        bucket?: Array<{
+          startTimeMillis: string;
+          dataset: Array<{ point: Array<{ value: Array<{ fpVal: number }> }> }>;
+        }>;
+      }
+    )?.bucket || [];
+
+  const data = buckets
+    .filter((b) => b.dataset?.[0]?.point?.length)
+    .map((b) => ({
+      date: new Date(parseInt(b.startTimeMillis)).toISOString().split("T")[0],
+      mmolL:
+        Math.round((b.dataset[0].point[0]?.value[0]?.fpVal || 0) * 10) / 10,
+    }));
+
+  return { ok: true, data };
+}
+
+// ============================================================================
+// WRITE OPERATIONS
+// ============================================================================
+
+const DATA_SOURCE_PREFIX = "raw:com.google";
+
+async function ensureDataSource(
+  tenantId: string,
+  dataTypeName: string,
+  dataSourceId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  // Try to get existing data source
+  const getResult = await fitFetch(tenantId, `/dataSources/${dataSourceId}`);
+  if (getResult.ok) return { ok: true };
+
+  // Create data source
+  const fieldMap: Record<string, Array<{ name: string; format: string }>> = {
+    "com.google.weight": [{ name: "weight", format: "floatPoint" }],
+    "com.google.activity.segment": [{ name: "activity", format: "integer" }],
+    "com.google.hydration": [{ name: "volume", format: "floatPoint" }],
+  };
+
+  const fields = fieldMap[dataTypeName];
+  if (!fields)
+    return { ok: false, error: `Unknown data type: ${dataTypeName}` };
+
+  const createResult = await fitFetch(tenantId, "/dataSources", {
+    method: "POST",
+    body: JSON.stringify({
+      dataStreamId: dataSourceId,
+      type: "raw",
+      application: { name: "ExoSkull" },
+      dataType: {
+        name: dataTypeName,
+        field: fields,
+      },
+      device: {
+        type: "unknown",
+        manufacturer: "ExoSkull",
+        model: "IORS",
+        uid: "exoskull-iors",
+        version: "1",
+      },
+    }),
+  });
+
+  return createResult.ok
+    ? { ok: true }
+    : { ok: false, error: createResult.error };
+}
+
+/**
+ * Log a weight measurement
+ */
+export async function logWeight(
+  tenantId: string,
+  weightKg: number,
+): Promise<{ ok: boolean; formatted?: string; error?: string }> {
+  const dataSourceId = `${DATA_SOURCE_PREFIX}.weight:com.exoskull.iors:ExoSkull:IORS:exoskull-iors`;
+  const setupResult = await ensureDataSource(
+    tenantId,
+    "com.google.weight",
+    dataSourceId,
+  );
+  if (!setupResult.ok) {
+    // Fallback: try without creating source
+    logger.warn(
+      "[GoogleFit] Data source creation failed, trying direct insert:",
+      setupResult.error,
+    );
+  }
+
+  const now = Date.now();
+  const nanos = now * 1000000;
+  const datasetId = `${nanos}-${nanos}`;
+
+  const result = await fitFetch(
+    tenantId,
+    `/dataSources/${encodeURIComponent(dataSourceId)}/datasets/${datasetId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        dataSourceId,
+        minStartTimeNs: nanos.toString(),
+        maxEndTimeNs: nanos.toString(),
+        point: [
+          {
+            startTimeNanos: nanos.toString(),
+            endTimeNanos: nanos.toString(),
+            dataTypeName: "com.google.weight",
+            value: [{ fpVal: weightKg }],
+          },
+        ],
+      }),
+    },
+  );
+
+  if (!result.ok) return { ok: false, error: result.error };
+  return { ok: true, formatted: `Zapisano wagę: ${weightKg} kg` };
+}
+
+/**
+ * Log a workout session
+ */
+export async function logWorkout(
+  tenantId: string,
+  activityType: string,
+  durationMinutes: number,
+  calories?: number,
+): Promise<{ ok: boolean; formatted?: string; error?: string }> {
+  // Map common activity names to Google Fit activity type codes
+  const activityMap: Record<string, number> = {
+    running: 8,
+    walking: 7,
+    cycling: 1,
+    swimming: 82,
+    yoga: 100,
+    hiking: 35,
+    gym: 80,
+    weight_training: 80,
+    dancing: 24,
+    rowing: 103,
+    elliptical: 25,
+    stair_climbing: 68,
+  };
+
+  const activityCode = activityMap[activityType.toLowerCase()] || 4; // 4 = unknown
+
+  const now = Date.now();
+  const startMs = now - durationMinutes * 60 * 1000;
+
+  const result = await fitFetch(tenantId, "/sessions", {
+    method: "PUT",
+    body: JSON.stringify({
+      id: `exoskull-workout-${now}`,
+      name: activityType,
+      startTimeMillis: startMs.toString(),
+      endTimeMillis: now.toString(),
+      activityType: activityCode,
+      application: { name: "ExoSkull" },
+    }),
+  });
+
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const parts = [`Zapisano trening: ${activityType} (${durationMinutes} min)`];
+  if (calories) parts.push(`${calories} kcal`);
+  return { ok: true, formatted: parts.join(", ") };
+}
+
+/**
+ * Log water intake
+ */
+export async function logWaterIntake(
+  tenantId: string,
+  amountMl: number,
+): Promise<{ ok: boolean; formatted?: string; error?: string }> {
+  const dataSourceId = `${DATA_SOURCE_PREFIX}.hydration:com.exoskull.iors:ExoSkull:IORS:exoskull-iors`;
+  await ensureDataSource(tenantId, "com.google.hydration", dataSourceId).catch(
+    () => {},
+  );
+
+  const now = Date.now();
+  const nanos = now * 1000000;
+  const datasetId = `${nanos}-${nanos}`;
+  const liters = amountMl / 1000;
+
+  const result = await fitFetch(
+    tenantId,
+    `/dataSources/${encodeURIComponent(dataSourceId)}/datasets/${datasetId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        dataSourceId,
+        minStartTimeNs: nanos.toString(),
+        maxEndTimeNs: nanos.toString(),
+        point: [
+          {
+            startTimeNanos: nanos.toString(),
+            endTimeNanos: nanos.toString(),
+            dataTypeName: "com.google.hydration",
+            value: [{ fpVal: liters }],
+          },
+        ],
+      }),
+    },
+  );
+
+  if (!result.ok) return { ok: false, error: result.error };
+  return { ok: true, formatted: `Zapisano: ${amountMl} ml wody (${liters} l)` };
+}
+
+/**
  * Get comprehensive health summary for a date range
  */
 export async function getHealthSummary(

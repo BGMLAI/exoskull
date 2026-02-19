@@ -406,6 +406,38 @@ export const RIG_DEFINITIONS = {
   },
 
   // =====================================================
+  // THREADS (Instagram Threads)
+  // =====================================================
+  threads: {
+    slug: "threads" as const,
+    name: "Threads",
+    description: "Publikuj posty, odpowiadaj i zarządzaj kontem na Threads",
+    icon: "🧵",
+    category: "social" as const,
+    oauth: {
+      authUrl: "https://threads.net/oauth/authorize",
+      tokenUrl: "https://graph.threads.net/oauth/access_token",
+      scopes: [
+        "threads_basic",
+        "threads_content_publish",
+        "threads_manage_insights",
+        "threads_manage_replies",
+        "threads_read_replies",
+      ],
+      clientIdEnv: "THREADS_APP_ID",
+      clientSecretEnv: "THREADS_APP_SECRET",
+    },
+    api: {
+      baseUrl: "https://graph.threads.net/v1.0",
+      rateLimit: { requests: 100, period: "hour" as const },
+    },
+    sync: {
+      frequency: "daily" as const,
+      dataTypes: ["profile", "posts", "replies"],
+    },
+  },
+
+  // =====================================================
   // APPLE
   // =====================================================
   apple: {

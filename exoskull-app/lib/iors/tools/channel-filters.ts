@@ -44,6 +44,19 @@ export const VOICE_TOOL_NAMES = new Set([
   "email_summary",
   // Google Contacts
   "search_contacts",
+  // Google Calendar
+  "list_calendar_events",
+  "create_calendar_event",
+  // Google Tasks
+  "list_google_tasks",
+  "create_google_task",
+  "complete_google_task",
+  // Google Maps
+  "search_places",
+  "get_directions",
+  // Google Fit write
+  "log_weight",
+  "log_workout",
   // Integrations
   "connect_rig",
   "list_integrations",
@@ -131,10 +144,62 @@ export const WEB_TOOL_NAMES = new Set([
   "slack_read_channel",
   "notion_search",
   "notion_create_page",
-  // Google Contacts
+  // Google Contacts (read + write)
   "search_contacts",
   "list_contacts",
   "get_contact_details",
+  "create_contact",
+  "update_contact",
+  "delete_contact",
+  // Google Calendar
+  "list_calendar_events",
+  "create_calendar_event",
+  "update_calendar_event",
+  "delete_calendar_event",
+  "check_availability",
+  // Google Tasks
+  "list_google_tasks",
+  "create_google_task",
+  "complete_google_task",
+  "delete_google_task",
+  // Google Drive (read + write)
+  "upload_drive_file",
+  "create_drive_folder",
+  // Google Fit (read + write)
+  "log_weight",
+  "log_workout",
+  "log_water",
+  // Google Maps & Places
+  "search_places",
+  "get_place_details",
+  "get_directions",
+  "geocode_address",
+  // Google Ads
+  "list_ad_campaigns",
+  "get_ad_performance",
+  "pause_ad_campaign",
+  "enable_ad_campaign",
+  "get_ad_account_summary",
+  // Google Analytics
+  "get_analytics_report",
+  "get_analytics_realtime",
+  "list_analytics_properties",
+  // Facebook
+  "publish_page_post",
+  "get_page_insights",
+  "list_fb_ad_campaigns",
+  "get_fb_ad_performance",
+  "create_fb_ad_campaign",
+  "pause_fb_ad_campaign",
+  "get_fb_ad_accounts",
+  // Instagram
+  "publish_instagram_post",
+  "publish_instagram_reel",
+  "send_instagram_dm",
+  // Threads
+  "publish_threads_post",
+  "list_threads_posts",
+  "reply_threads_post",
   // Integrations (app autodetekcja)
   "connect_rig",
   "composio_connect",

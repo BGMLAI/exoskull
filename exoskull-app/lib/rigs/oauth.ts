@@ -111,24 +111,46 @@ const GOOGLE_MINIMAL_SCOPES = [
   "https://www.googleapis.com/auth/userinfo.profile",
 ];
 
-// Core Google Scopes (Gmail + Calendar + Fit — primary use case)
+// Core Google Scopes (Gmail + Calendar + Fit + Tasks + Drive + Contacts + Ads + Analytics)
 const GOOGLE_CORE_SCOPES = [
   ...GOOGLE_MINIMAL_SCOPES,
 
   // Gmail
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/gmail.compose",
 
-  // Calendar
-  "https://www.googleapis.com/auth/calendar.readonly",
+  // Calendar (full read/write)
+  "https://www.googleapis.com/auth/calendar",
   "https://www.googleapis.com/auth/calendar.events",
 
-  // Google Fit (read-only — needed for health data sync)
+  // Tasks
+  "https://www.googleapis.com/auth/tasks",
+
+  // Drive
+  "https://www.googleapis.com/auth/drive.file",
+  "https://www.googleapis.com/auth/drive.readonly",
+
+  // Contacts (full read/write)
+  "https://www.googleapis.com/auth/contacts",
+
+  // Google Fit (read + write)
   "https://www.googleapis.com/auth/fitness.activity.read",
+  "https://www.googleapis.com/auth/fitness.activity.write",
   "https://www.googleapis.com/auth/fitness.sleep.read",
   "https://www.googleapis.com/auth/fitness.heart_rate.read",
   "https://www.googleapis.com/auth/fitness.body.read",
+  "https://www.googleapis.com/auth/fitness.body.write",
+  "https://www.googleapis.com/auth/fitness.nutrition.read",
   "https://www.googleapis.com/auth/fitness.location.read",
+  "https://www.googleapis.com/auth/fitness.blood_glucose.read",
+  "https://www.googleapis.com/auth/fitness.blood_pressure.read",
+
+  // Google Ads
+  "https://www.googleapis.com/auth/adwords",
+
+  // Google Analytics
+  "https://www.googleapis.com/auth/analytics.readonly",
 ];
 
 // Full Google Scopes (enable after OAuth confirmed working + APIs enabled in GCP)
@@ -356,6 +378,7 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
       "instagram_basic",
       "instagram_manage_insights",
       "instagram_content_publish",
+      "instagram_manage_messages",
       // Ads / Marketing API
       "ads_management",
       "ads_read",
@@ -369,6 +392,25 @@ export const RIG_OAUTH_CONFIGS: Record<string, () => OAuthConfig> = {
     clientId: process.env.FACEBOOK_APP_ID || "",
     clientSecret: process.env.FACEBOOK_APP_SECRET || "",
     redirectUri: `${BASE_URL}/api/rigs/facebook/callback`,
+  }),
+
+  // =====================================================
+  // THREADS (Instagram Threads via graph.threads.net)
+  // =====================================================
+  threads: () => ({
+    authUrl: "https://threads.net/oauth/authorize",
+    tokenUrl: "https://graph.threads.net/oauth/access_token",
+    scopes: [
+      "threads_basic",
+      "threads_content_publish",
+      "threads_manage_insights",
+      "threads_manage_replies",
+      "threads_read_replies",
+    ],
+    clientId: process.env.THREADS_APP_ID || process.env.FACEBOOK_APP_ID || "",
+    clientSecret:
+      process.env.THREADS_APP_SECRET || process.env.FACEBOOK_APP_SECRET || "",
+    redirectUri: `${BASE_URL}/api/rigs/threads/callback`,
   }),
 
   // =====================================================

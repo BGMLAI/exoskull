@@ -316,12 +316,26 @@ export class GoogleWorkspaceClient {
 
   async createEvent(
     calendarId: string = "primary",
-    event: Partial<CalendarEvent>,
+    event: Partial<CalendarEvent> & { conferenceData?: unknown },
+    addMeetLink?: boolean,
   ): Promise<CalendarEvent> {
-    return this.fetch(`${CALENDAR_API}/calendars/${calendarId}/events`, {
-      method: "POST",
-      body: JSON.stringify(event),
-    });
+    const body = { ...event };
+    if (addMeetLink) {
+      (body as Record<string, unknown>).conferenceData = {
+        createRequest: {
+          requestId: `exoskull-${Date.now()}`,
+          conferenceSolutionKey: { type: "hangoutsMeet" },
+        },
+      };
+    }
+    const conferenceParam = addMeetLink ? "?conferenceDataVersion=1" : "";
+    return this.fetch(
+      `${CALENDAR_API}/calendars/${calendarId}/events${conferenceParam}`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    );
   }
 
   async updateEvent(

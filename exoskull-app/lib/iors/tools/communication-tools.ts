@@ -226,16 +226,49 @@ export const communicationTools: ToolDefinition[] = [
       const subject = input.subject as string;
       const body = input.body as string;
 
-      // Try Composio Gmail first (sends FROM user's actual email)
+      // Try 1: Google Workspace sendEmail (sends FROM user's actual email via Gmail API)
+      try {
+        const { getServiceSupabase: getSupa } =
+          await import("@/lib/supabase/service");
+        const { ensureFreshToken } = await import("@/lib/rigs/oauth");
+        const { GoogleWorkspaceClient } =
+          await import("@/lib/rigs/google-workspace/client");
+
+        const supabase = getSupa();
+        for (const slug of ["google", "google-workspace"]) {
+          const { data: conn } = await supabase
+            .from("exo_rig_connections")
+            .select("id, rig_slug, access_token, refresh_token, expires_at")
+            .eq("tenant_id", tenantId)
+            .eq("rig_slug", slug)
+            .maybeSingle();
+
+          if (conn?.access_token) {
+            const freshToken = await ensureFreshToken(conn);
+            const gwsClient = new GoogleWorkspaceClient(freshToken);
+            await gwsClient.sendEmail(toEmail, subject, body);
+            await appendMessage(tenantId, {
+              role: "assistant",
+              content: `[Email via Gmail do ${toEmail}] Temat: ${subject}`,
+              channel: "email",
+              direction: "outbound",
+              source_type: "voice_session",
+            }).catch(() => {});
+            return `Email wysłany do ${toEmail} z Twojego konta Gmail.`;
+          }
+        }
+      } catch (gwsErr) {
+        logger.warn("[CommunicationTools] Google Workspace Gmail failed:", {
+          error: gwsErr instanceof Error ? gwsErr.message : gwsErr,
+        });
+      }
+
+      // Try 2: Composio Gmail (legacy fallback)
       try {
         const { hasConnection, executeAction } =
           await import("@/lib/integrations/composio-adapter");
         const gmailConnected = await hasConnection(tenantId, "GMAIL");
         if (gmailConnected) {
-          logger.info("[CommunicationTools] send_email via Composio Gmail:", {
-            tenantId,
-            to: toEmail,
-          });
           const result = await executeAction("GMAIL_SEND_EMAIL", tenantId, {
             to: toEmail,
             subject,
@@ -252,21 +285,18 @@ export const communicationTools: ToolDefinition[] = [
             return `Email wysłany do ${toEmail} z Twojego konta Gmail.`;
           }
           logger.warn(
-            "[CommunicationTools] Composio Gmail failed, falling back to Resend:",
+            "[CommunicationTools] Composio Gmail failed:",
             result.error,
           );
         }
       } catch (composioErr) {
-        logger.warn(
-          "[CommunicationTools] Composio check failed, using Resend:",
-          {
-            error:
-              composioErr instanceof Error ? composioErr.message : composioErr,
-          },
-        );
+        logger.warn("[CommunicationTools] Composio check failed:", {
+          error:
+            composioErr instanceof Error ? composioErr.message : composioErr,
+        });
       }
 
-      // Fallback: Resend (sends FROM iors@exoskull.xyz)
+      // Try 3: Resend (sends FROM iors@exoskull.xyz)
       const RESEND_API_KEY = process.env.RESEND_API_KEY;
       if (!RESEND_API_KEY) {
         return "Email nie jest jeszcze skonfigurowany. Powiedz 'połącz Gmail' żeby wysyłać ze swojego konta.";
@@ -304,11 +334,9 @@ export const communicationTools: ToolDefinition[] = [
           source_type: "voice_session",
         }).catch((err) => {
           logger.warn(
-            "[CommunicationTools] Failed to append email to unified thread:",
+            "[CommunicationTools] Failed to append email to thread:",
             {
               error: err instanceof Error ? err.message : String(err),
-              tenantId,
-              email: toEmail,
             },
           );
         });
@@ -348,6 +376,52 @@ export const communicationTools: ToolDefinition[] = [
         messageLength: message.length,
       });
 
+      // Try 1: Tenant's WhatsApp via Meta Cloud API (from exo_meta_pages or direct rig)
+      try {
+        const { createWhatsAppClientForAccount, getWhatsAppClient } =
+          await import("@/lib/channels/whatsapp/client");
+
+        // Check for tenant-specific WhatsApp config in exo_meta_pages
+        const supabase = getServiceSupabase();
+        const { data: metaPage } = await supabase
+          .from("exo_meta_pages")
+          .select("whatsapp_token, whatsapp_phone_number_id")
+          .eq("tenant_id", tenantId)
+          .not("whatsapp_token", "is", null)
+          .maybeSingle();
+
+        let waClient;
+        if (metaPage?.whatsapp_token && metaPage?.whatsapp_phone_number_id) {
+          waClient = createWhatsAppClientForAccount(
+            metaPage.whatsapp_token,
+            metaPage.whatsapp_phone_number_id,
+          );
+        } else {
+          // Try singleton from env vars
+          waClient = getWhatsAppClient();
+        }
+
+        if (waClient) {
+          await waClient.sendTextMessage(phoneNumber, message);
+          await appendMessage(tenantId, {
+            role: "assistant",
+            content: `[WhatsApp do ${input.phone_number}]: ${message}`,
+            channel: "whatsapp",
+            direction: "outbound",
+            source_type: "voice_session",
+          }).catch(() => {});
+          return `WhatsApp wysłany do ${input.phone_number}`;
+        }
+      } catch (metaErr) {
+        logger.warn(
+          "[CommunicationTools] Meta WhatsApp failed, trying Twilio:",
+          {
+            error: metaErr instanceof Error ? metaErr.message : metaErr,
+          },
+        );
+      }
+
+      // Try 2: Twilio WhatsApp fallback
       const sid = process.env.TWILIO_ACCOUNT_SID;
       const token = process.env.TWILIO_AUTH_TOKEN;
       const fromNumber =
@@ -372,13 +446,7 @@ export const communicationTools: ToolDefinition[] = [
           channel: "whatsapp",
           direction: "outbound",
           source_type: "voice_session",
-        }).catch((err) => {
-          logger.warn(
-            "[CommunicationTools] Failed to append WhatsApp to thread:",
-            { error: err instanceof Error ? err.message : String(err) },
-          );
-        });
-
+        }).catch(() => {});
         return `WhatsApp wysłany do ${input.phone_number}`;
       } catch (waError) {
         logger.error("[CommunicationTools] send_whatsapp error:", {
@@ -393,25 +461,31 @@ export const communicationTools: ToolDefinition[] = [
     definition: {
       name: "send_messenger",
       description:
-        "Wyślij wiadomość Facebook Messenger do kontaktu (po imieniu).",
+        "Wyślij wiadomość Facebook Messenger do użytkownika (po PSID lub page_id).",
       input_schema: {
         type: "object" as const,
         properties: {
-          contact_name: {
+          recipient_id: {
             type: "string",
-            description: "Imię i nazwisko kontaktu (szukamy w CRM)",
+            description: "PSID (Page-Scoped ID) odbiorcy w Messengerze",
           },
           message: {
             type: "string",
             description: "Treść wiadomości Messenger",
           },
+          page_id: {
+            type: "string",
+            description:
+              "ID strony Facebook (opcjonalnie — użyje pierwszej dostępnej)",
+          },
         },
-        required: ["contact_name", "message"],
+        required: ["recipient_id", "message"],
       },
     },
     execute: async (input: Record<string, unknown>, tenantId?: string) => {
-      const contactName = input.contact_name as string;
+      const recipientId = input.recipient_id as string;
       const message = input.message as string;
+      const pageId = input.page_id as string | undefined;
 
       if (!tenantId) {
         return "Błąd: brak identyfikatora użytkownika.";
@@ -419,45 +493,58 @@ export const communicationTools: ToolDefinition[] = [
 
       logger.info("[CommunicationTools] send_messenger:", {
         tenantId,
-        contact: contactName,
+        recipientId,
         messageLength: message.length,
       });
 
       try {
-        const { hasConnection, executeAction } =
-          await import("@/lib/integrations/composio-adapter");
-        const fbConnected = await hasConnection(tenantId, "FACEBOOK");
+        const { createMessengerClientForPage } =
+          await import("@/lib/channels/messenger/client");
 
-        if (!fbConnected) {
+        // Look up page token from exo_meta_pages or from Facebook rig connection
+        const supabase = getServiceSupabase();
+
+        // Try exo_meta_pages first
+        let pageToken: string | null = null;
+
+        const pageQuery = supabase
+          .from("exo_meta_pages")
+          .select("page_access_token, page_id")
+          .eq("tenant_id", tenantId);
+
+        if (pageId) {
+          pageQuery.eq("page_id", pageId);
+        }
+
+        const { data: metaPage } = await pageQuery.maybeSingle();
+
+        if (metaPage?.page_access_token) {
+          pageToken = metaPage.page_access_token;
+        } else {
+          // Fallback: use singleton env token
+          pageToken = process.env.MESSENGER_PAGE_ACCESS_TOKEN || null;
+        }
+
+        if (!pageToken) {
           return "Messenger wymaga połączenia z Facebook. Powiedz 'połącz Facebook' albo użyj connect_rig.";
         }
 
-        const result = await executeAction("FACEBOOK_SEND_MESSAGE", tenantId, {
-          recipient_name: contactName,
-          message,
-        });
+        const client = createMessengerClientForPage(pageToken);
+        await client.sendTextMessage(recipientId, message);
 
-        if (result.success) {
-          await appendMessage(tenantId, {
-            role: "assistant",
-            content: `[Messenger do ${contactName}]: ${message}`,
-            channel: "messenger",
-            direction: "outbound",
-            source_type: "voice_session",
-          }).catch((err) => {
-            logger.warn(
-              "[CommunicationTools] Failed to append Messenger to thread:",
-              { error: err instanceof Error ? err.message : String(err) },
-            );
-          });
-          return `Messenger wysłany do ${contactName}.`;
-        }
+        await appendMessage(tenantId, {
+          role: "assistant",
+          content: `[Messenger do ${recipientId}]: ${message}`,
+          channel: "messenger",
+          direction: "outbound",
+          source_type: "voice_session",
+        }).catch(() => {});
 
-        return `Nie udało się wysłać Messengera do ${contactName}: ${result.error || "nieznany błąd"}`;
+        return `Messenger wysłany do ${recipientId}.`;
       } catch (err) {
         logger.error("[CommunicationTools] send_messenger error:", {
           tenantId,
-          contact: contactName,
+          recipientId,
           error: err instanceof Error ? err.message : err,
         });
         return `Błąd wysyłania Messengera: ${err instanceof Error ? err.message : "nieznany"}`;

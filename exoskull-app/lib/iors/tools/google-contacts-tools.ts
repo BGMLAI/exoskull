@@ -10,6 +10,9 @@ import {
   searchContacts,
   listContacts,
   getContact,
+  createContact,
+  updateContact,
+  deleteContact,
 } from "@/lib/integrations/google-contacts-adapter";
 
 export const googleContactsTools: ToolDefinition[] = [
@@ -124,6 +127,109 @@ export const googleContactsTools: ToolDefinition[] = [
         return result.formatted!;
       } catch (err) {
         return `Blad Google Contacts: ${err instanceof Error ? err.message : err}`;
+      }
+    },
+  },
+  {
+    definition: {
+      name: "create_contact",
+      description: "Dodaj nowy kontakt do Google Contacts użytkownika.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          given_name: { type: "string", description: "Imię" },
+          family_name: { type: "string", description: "Nazwisko" },
+          email: { type: "string", description: "Adres email" },
+          phone: { type: "string", description: "Numer telefonu" },
+          organization: { type: "string", description: "Firma / organizacja" },
+        },
+        required: ["given_name"],
+      },
+    },
+    execute: async (input, tenantId) => {
+      try {
+        const result = await createContact(tenantId, {
+          givenName: input.given_name as string,
+          familyName: input.family_name as string | undefined,
+          email: input.email as string | undefined,
+          phone: input.phone as string | undefined,
+          organization: input.organization as string | undefined,
+        });
+        if (!result.ok)
+          return result.error || "Nie udało się utworzyć kontaktu.";
+        return result.formatted!;
+      } catch (err) {
+        return `Błąd: ${err instanceof Error ? err.message : err}`;
+      }
+    },
+  },
+  {
+    definition: {
+      name: "update_contact",
+      description:
+        "Zaktualizuj istniejący kontakt Google (imię, email, telefon, organizacja).",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          resource_name: {
+            type: "string",
+            description: 'ID kontaktu (np. "people/c1234567890")',
+          },
+          given_name: { type: "string", description: "Nowe imię" },
+          family_name: { type: "string", description: "Nowe nazwisko" },
+          email: { type: "string", description: "Nowy email" },
+          phone: { type: "string", description: "Nowy telefon" },
+          organization: { type: "string", description: "Nowa firma" },
+        },
+        required: ["resource_name"],
+      },
+    },
+    execute: async (input, tenantId) => {
+      try {
+        const result = await updateContact(
+          tenantId,
+          input.resource_name as string,
+          {
+            givenName: input.given_name as string | undefined,
+            familyName: input.family_name as string | undefined,
+            email: input.email as string | undefined,
+            phone: input.phone as string | undefined,
+            organization: input.organization as string | undefined,
+          },
+        );
+        if (!result.ok)
+          return result.error || "Nie udało się zaktualizować kontaktu.";
+        return result.formatted!;
+      } catch (err) {
+        return `Błąd: ${err instanceof Error ? err.message : err}`;
+      }
+    },
+  },
+  {
+    definition: {
+      name: "delete_contact",
+      description: "Usuń kontakt z Google Contacts.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          resource_name: {
+            type: "string",
+            description: 'ID kontaktu do usunięcia (np. "people/c1234567890")',
+          },
+        },
+        required: ["resource_name"],
+      },
+    },
+    execute: async (input, tenantId) => {
+      try {
+        const result = await deleteContact(
+          tenantId,
+          input.resource_name as string,
+        );
+        if (!result.ok) return result.error || "Nie udało się usunąć kontaktu.";
+        return "Kontakt usunięty.";
+      } catch (err) {
+        return `Błąd: ${err instanceof Error ? err.message : err}`;
       }
     },
   },

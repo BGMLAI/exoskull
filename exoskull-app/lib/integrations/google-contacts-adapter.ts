@@ -54,6 +54,7 @@ async function getValidToken(tenantId: string): Promise<string | null> {
 async function peopleFetch<T>(
   tenantId: string,
   path: string,
+  options?: RequestInit,
 ): Promise<{ ok: boolean; data?: T; error?: string }> {
   const token = await getValidToken(tenantId);
   if (!token)
@@ -65,7 +66,12 @@ async function peopleFetch<T>(
 
   try {
     const res = await fetch(`${PEOPLE_API}${path}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...(options?.headers || {}),
+      },
     });
 
     if (!res.ok) {
@@ -74,6 +80,11 @@ async function peopleFetch<T>(
         ok: false,
         error: `Google People API ${res.status}: ${errText}`,
       };
+    }
+
+    // DELETE returns empty body
+    if (res.status === 204 || options?.method === "DELETE") {
+      return { ok: true };
     }
 
     const data = (await res.json()) as T;
@@ -238,4 +249,131 @@ export async function getContact(
 
   const contact = mapContact(result.data!);
   return { ok: true, contact, formatted: formatContact(contact) };
+}
+
+/**
+ * Create a new contact.
+ */
+export async function createContact(
+  tenantId: string,
+  params: {
+    givenName: string;
+    familyName?: string;
+    email?: string;
+    phone?: string;
+    organization?: string;
+  },
+): Promise<{
+  ok: boolean;
+  contact?: Contact;
+  formatted?: string;
+  error?: string;
+}> {
+  const body: Record<string, unknown> = {
+    names: [
+      { givenName: params.givenName, familyName: params.familyName || "" },
+    ],
+  };
+  if (params.email) body.emailAddresses = [{ value: params.email }];
+  if (params.phone) body.phoneNumbers = [{ value: params.phone }];
+  if (params.organization) body.organizations = [{ name: params.organization }];
+
+  const result = await peopleFetch<PeopleConnection>(
+    tenantId,
+    `/people:createContact?personFields=${PERSON_FIELDS}`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const contact = mapContact(result.data!);
+  return {
+    ok: true,
+    contact,
+    formatted: `Utworzono: ${formatContact(contact)}`,
+  };
+}
+
+/**
+ * Update an existing contact. Requires resourceName (e.g. "people/c1234567890").
+ */
+export async function updateContact(
+  tenantId: string,
+  resourceName: string,
+  params: {
+    givenName?: string;
+    familyName?: string;
+    email?: string;
+    phone?: string;
+    organization?: string;
+  },
+): Promise<{
+  ok: boolean;
+  contact?: Contact;
+  formatted?: string;
+  error?: string;
+}> {
+  // First get current etag
+  const current = await peopleFetch<PeopleConnection & { etag: string }>(
+    tenantId,
+    `/${resourceName}?personFields=${PERSON_FIELDS}`,
+  );
+  if (!current.ok) return { ok: false, error: current.error };
+
+  const updateMask: string[] = [];
+  const body: Record<string, unknown> = {
+    etag: current.data!.etag,
+    resourceName,
+  };
+
+  if (params.givenName || params.familyName) {
+    body.names = [
+      { givenName: params.givenName, familyName: params.familyName },
+    ];
+    updateMask.push("names");
+  }
+  if (params.email) {
+    body.emailAddresses = [{ value: params.email }];
+    updateMask.push("emailAddresses");
+  }
+  if (params.phone) {
+    body.phoneNumbers = [{ value: params.phone }];
+    updateMask.push("phoneNumbers");
+  }
+  if (params.organization) {
+    body.organizations = [{ name: params.organization }];
+    updateMask.push("organizations");
+  }
+
+  if (!updateMask.length)
+    return { ok: false, error: "Brak pól do zaktualizowania." };
+
+  const result = await peopleFetch<PeopleConnection>(
+    tenantId,
+    `/${resourceName}:updateContact?updatePersonFields=${updateMask.join(",")}&personFields=${PERSON_FIELDS}`,
+    { method: "PATCH", body: JSON.stringify(body) },
+  );
+
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const contact = mapContact(result.data!);
+  return {
+    ok: true,
+    contact,
+    formatted: `Zaktualizowano: ${formatContact(contact)}`,
+  };
+}
+
+/**
+ * Delete a contact by resourceName.
+ */
+export async function deleteContact(
+  tenantId: string,
+  resourceName: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await peopleFetch(tenantId, `/${resourceName}:deleteContact`, {
+    method: "DELETE",
+  });
+
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
 }

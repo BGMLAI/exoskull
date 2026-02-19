@@ -308,6 +308,143 @@ async function extractPdf(
 }
 
 /**
+ * Upload a file to Google Drive
+ */
+export async function uploadFile(
+  tenantId: string,
+  fileName: string,
+  content: string,
+  mimeType: string = "text/plain",
+  folderId?: string,
+): Promise<{
+  ok: boolean;
+  file?: DriveFile;
+  formatted?: string;
+  error?: string;
+}> {
+  const token = await getValidToken(tenantId);
+  if (!token)
+    return {
+      ok: false,
+      error: "No valid Google Drive token. Please reconnect.",
+    };
+
+  try {
+    const boundary = "exoskull_upload_boundary";
+    const metadata: Record<string, unknown> = {
+      name: fileName,
+      mimeType,
+    };
+    if (folderId) metadata.parents = [folderId];
+
+    const multipartBody = [
+      `--${boundary}`,
+      "Content-Type: application/json; charset=UTF-8",
+      "",
+      JSON.stringify(metadata),
+      `--${boundary}`,
+      `Content-Type: ${mimeType}`,
+      "",
+      content,
+      `--${boundary}--`,
+    ].join("\r\n");
+
+    const res = await fetch(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,modifiedTime,size",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": `multipart/related; boundary=${boundary}`,
+        },
+        body: multipartBody,
+      },
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      return {
+        ok: false,
+        error: `Drive upload error ${res.status}: ${errText}`,
+      };
+    }
+
+    const file = (await res.json()) as DriveFile;
+    return {
+      ok: true,
+      file,
+      formatted: `Przesłano: ${file.name} (id: ${file.id})`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Upload failed: ${err instanceof Error ? err.message : err}`,
+    };
+  }
+}
+
+/**
+ * Create a folder in Google Drive
+ */
+export async function createFolder(
+  tenantId: string,
+  folderName: string,
+  parentFolderId?: string,
+): Promise<{
+  ok: boolean;
+  folder?: DriveFile;
+  formatted?: string;
+  error?: string;
+}> {
+  const token = await getValidToken(tenantId);
+  if (!token)
+    return {
+      ok: false,
+      error: "No valid Google Drive token. Please reconnect.",
+    };
+
+  try {
+    const metadata: Record<string, unknown> = {
+      name: folderName,
+      mimeType: "application/vnd.google-apps.folder",
+    };
+    if (parentFolderId) metadata.parents = [parentFolderId];
+
+    const res = await fetch(
+      `${DRIVE_BASE}/files?fields=id,name,mimeType,modifiedTime`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(metadata),
+      },
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      return {
+        ok: false,
+        error: `Drive folder error ${res.status}: ${errText}`,
+      };
+    }
+
+    const folder = (await res.json()) as DriveFile;
+    return {
+      ok: true,
+      folder,
+      formatted: `Utworzono folder: ${folder.name} (id: ${folder.id})`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Folder creation failed: ${err instanceof Error ? err.message : err}`,
+    };
+  }
+}
+
+/**
  * Search files across Drive
  */
 export async function searchFiles(

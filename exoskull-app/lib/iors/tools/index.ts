@@ -60,6 +60,15 @@ import { codeExecutionTools } from "./code-execution-tools";
 import { mcpBridgeTools } from "./mcp-bridge-tools";
 import { agentFactoryTools } from "./agent-factory-tools";
 
+// Phase 3 — Google & Meta Full Integration
+import { googleCalendarTools } from "./google-calendar-tools";
+import { googleTasksTools } from "./google-tasks-tools";
+import { googleMapsTools } from "./google-maps-tools";
+import { googleAdsTools } from "./google-ads-tools";
+import { googleAnalyticsTools } from "./google-analytics-tools";
+import { facebookTools } from "./facebook-tools";
+import { threadsTools } from "./threads-tools";
+
 /**
  * All IORS extension tools, merged from all domain files.
  */
@@ -104,6 +113,14 @@ export const IORS_EXTENSION_TOOLS = [
   ...mcpBridgeTools,
   // Agent factory tools (create/spawn/list agents, recursive hierarchy)
   ...agentFactoryTools,
+  // Phase 3 — Google & Meta Full Integration (34 new tools)
+  ...googleCalendarTools,
+  ...googleTasksTools,
+  ...googleMapsTools,
+  ...googleAdsTools,
+  ...googleAnalyticsTools,
+  ...facebookTools,
+  ...threadsTools,
 ];
 
 // Register tools and dynamic resolver in the shared registry so

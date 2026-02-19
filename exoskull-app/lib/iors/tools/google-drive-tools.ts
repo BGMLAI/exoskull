@@ -9,6 +9,8 @@ import {
   searchFiles,
   readFileContent,
   listFiles,
+  uploadFile,
+  createFolder,
 } from "@/lib/integrations/google-drive-adapter";
 
 export const googleDriveTools: ToolDefinition[] = [
@@ -109,6 +111,78 @@ export const googleDriveTools: ToolDefinition[] = [
         return `Pliki na Drive (${result.files.length}):\n${lines.join("\n")}`;
       } catch (err) {
         return `Blad listowania: ${err instanceof Error ? err.message : err}`;
+      }
+    },
+  },
+  {
+    definition: {
+      name: "upload_drive_file",
+      description: "Prześlij plik tekstowy na Google Drive użytkownika.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          file_name: {
+            type: "string",
+            description: "Nazwa pliku (np. notes.txt)",
+          },
+          content: { type: "string", description: "Treść pliku" },
+          mime_type: {
+            type: "string",
+            description: "Typ MIME (domyślnie text/plain)",
+          },
+          folder_id: {
+            type: "string",
+            description: "ID folderu docelowego (opcjonalnie)",
+          },
+        },
+        required: ["file_name", "content"],
+      },
+    },
+    execute: async (input, tenantId) => {
+      try {
+        const result = await uploadFile(
+          tenantId,
+          input.file_name as string,
+          input.content as string,
+          (input.mime_type as string) || "text/plain",
+          input.folder_id as string | undefined,
+        );
+        if (!result.ok) return result.error || "Nie udało się przesłać pliku.";
+        return result.formatted!;
+      } catch (err) {
+        return `Błąd: ${err instanceof Error ? err.message : err}`;
+      }
+    },
+    timeoutMs: 30000,
+  },
+  {
+    definition: {
+      name: "create_drive_folder",
+      description: "Utwórz nowy folder na Google Drive.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          folder_name: { type: "string", description: "Nazwa folderu" },
+          parent_folder_id: {
+            type: "string",
+            description: "ID folderu nadrzędnego (opcjonalnie)",
+          },
+        },
+        required: ["folder_name"],
+      },
+    },
+    execute: async (input, tenantId) => {
+      try {
+        const result = await createFolder(
+          tenantId,
+          input.folder_name as string,
+          input.parent_folder_id as string | undefined,
+        );
+        if (!result.ok)
+          return result.error || "Nie udało się utworzyć folderu.";
+        return result.formatted!;
+      } catch (err) {
+        return `Błąd: ${err instanceof Error ? err.message : err}`;
       }
     },
   },

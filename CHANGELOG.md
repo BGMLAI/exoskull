@@ -4,6 +4,72 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-19] Feature: Full Google & Meta Integration — 42 New IORS Tools
+
+### What
+Massive expansion of IORS tool surface — the AI agent can now fully control Google Workspace (Calendar, Tasks, Contacts CRUD, Drive write, Fit write, Maps, Ads, Analytics) and Meta platforms (Facebook pages/ads, Instagram publish/DM, Threads). Also fixed 3 broken communication tools (Gmail, WhatsApp, Messenger) with proper priority chains.
+
+### New Tools (42)
+
+| Category | Tools | Count |
+|----------|-------|-------|
+| **Google Calendar** | list_calendar_events, create_calendar_event, update_calendar_event, delete_calendar_event, check_availability | 5 |
+| **Google Tasks** | list_google_tasks, create_google_task, complete_google_task, delete_google_task | 4 |
+| **Google Contacts** | create_contact, update_contact, delete_contact | 3 |
+| **Google Drive** | upload_drive_file, create_drive_folder | 2 |
+| **Google Fit** | log_weight, log_workout, log_water | 3 |
+| **Google Maps** | search_places, get_place_details, get_directions, geocode_address | 4 |
+| **Google Ads** | list_ad_campaigns, get_ad_performance, pause_ad_campaign, enable_ad_campaign, get_ad_account_summary | 5 |
+| **Google Analytics** | get_analytics_report, get_analytics_realtime, list_analytics_properties | 3 |
+| **Facebook** | publish_page_post, get_page_insights, list_fb_ad_campaigns, get_fb_ad_performance, create_fb_ad_campaign, pause_fb_ad_campaign, get_fb_ad_accounts | 7 |
+| **Instagram** | publish_instagram_post, publish_instagram_reel, send_instagram_dm | 3 |
+| **Threads** | publish_threads_post, list_threads_posts, reply_threads_post | 3 |
+
+### Fixes
+| Tool | Before | After |
+|------|--------|-------|
+| **send_email** | Composio only (often broken) | GWS `sendEmail()` → Composio → Resend |
+| **send_whatsapp** | Twilio only | Meta Cloud API → Twilio fallback |
+| **send_messenger** | Composio `FACEBOOK_SEND_MESSAGE` | MessengerClient with PSID |
+
+### Infrastructure
+- **OAuth scopes**: Expanded `GOOGLE_CORE_SCOPES` from ~10 to ~25 scopes (calendar, tasks, drive.file, contacts, fit write, adwords, analytics)
+- **Threads rig**: New OAuth rig for Meta Threads API (graph.threads.net/v1.0)
+- **Facebook scopes**: Added `instagram_manage_messages`
+- **GWS client**: `createEvent()` now supports `addMeetLink` for Google Meet conferenceData
+- **Channel filters**: All 42 tools registered in WEB; voice-appropriate subset in VOICE
+
+### New Files (13)
+- `lib/integrations/google-calendar-adapter.ts`
+- `lib/iors/tools/google-calendar-tools.ts`
+- `lib/integrations/google-tasks-adapter.ts`
+- `lib/iors/tools/google-tasks-tools.ts`
+- `lib/integrations/google-maps-adapter.ts`
+- `lib/iors/tools/google-maps-tools.ts`
+- `lib/rigs/google-ads/client.ts`
+- `lib/iors/tools/google-ads-tools.ts`
+- `lib/integrations/google-analytics-adapter.ts`
+- `lib/iors/tools/google-analytics-tools.ts`
+- `lib/iors/tools/facebook-tools.ts`
+- `lib/channels/threads/client.ts`
+- `lib/iors/tools/threads-tools.ts`
+
+### Modified Files (12)
+- `lib/rigs/oauth.ts` — scope expansion + threads rig
+- `lib/iors/tools/communication-tools.ts` — fixed send_email, send_whatsapp, send_messenger
+- `lib/rigs/google-workspace/client.ts` — conferenceData/Meet support
+- `lib/integrations/google-contacts-adapter.ts` — CRUD operations
+- `lib/iors/tools/google-contacts-tools.ts` — 3 new CRUD tools
+- `lib/integrations/google-drive-adapter.ts` — upload + createFolder
+- `lib/iors/tools/google-drive-tools.ts` — 2 new write tools
+- `lib/integrations/google-fit-adapter.ts` — expanded reads + write operations
+- `lib/iors/tools/google-fit-tools.ts` — expanded get_health_data + 3 write tools
+- `lib/iors/tools/index.ts` — registered 7 new tool arrays
+- `lib/iors/tools/channel-filters.ts` — 42 new tool names in VOICE/WEB
+- `lib/rigs/index.ts` — threads rig definition
+
+---
+
 ## [2026-02-18] Feature: Self-Modification Engine with Kernel Protection
 
 ### What
