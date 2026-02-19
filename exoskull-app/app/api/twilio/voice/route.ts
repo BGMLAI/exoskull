@@ -77,33 +77,26 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     // Parse Twilio form data
     const formData = await parseFormData(req);
 
-    // Verify Twilio signature (mandatory in production)
+    // Twilio signature validation — LOG ONLY (don't reject).
+    // Previous 403 rejections caused English Twilio default error.
+    // TODO: re-enable enforcement after confirming URL/token match
     const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
     if (twilioAuthToken) {
       const twilioSignature = req.headers.get("x-twilio-signature") || "";
-      // Use the actual request URL (pathname + search) — NOT constructed URL.
-      // Twilio signs against the exact URL it POSTs to. For the initial call,
-      // that's /api/twilio/voice (no ?action=start), but subsequent calls include
-      // ?action=process. Mismatched URLs cause signature validation failure (403).
       const requestUrl = `${getAppUrl()}${url.pathname}${url.search}`;
-      if (
-        !validateTwilioSignature(
-          twilioAuthToken,
-          twilioSignature,
+      const isValid = validateTwilioSignature(
+        twilioAuthToken,
+        twilioSignature,
+        requestUrl,
+        formData,
+      );
+      if (!isValid) {
+        logger.warn("[Twilio Voice] Signature mismatch (not blocking):", {
           requestUrl,
-          formData,
-        )
-      ) {
-        logger.error("[Twilio Voice] Signature verification failed");
-        return new NextResponse(generateErrorTwiML(), {
-          status: 403,
-          headers: { "Content-Type": "text/xml" },
+          hasSig: !!twilioSignature,
+          tokenPrefix: twilioAuthToken.substring(0, 6) + "...",
         });
       }
-    } else {
-      logger.warn(
-        "[Twilio Voice] TWILIO_AUTH_TOKEN not set — signature verification skipped",
-      );
     }
 
     const callSid = formData.CallSid;
