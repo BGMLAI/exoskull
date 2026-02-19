@@ -278,7 +278,7 @@ export async function runExoSkullAgent(
     buildDynamicContext(req.tenantId),
     analyzeEmotion(req.userMessage),
     loadFilteredTools(req.tenantId, toolFilter),
-    getThreadContext(req.tenantId, 20),
+    getThreadContext(req.tenantId, 50),
     unifiedSearch({
       tenantId: req.tenantId,
       query: req.userMessage,
