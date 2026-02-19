@@ -50,18 +50,20 @@ export const appBuilderTools: ToolDefinition[] = [
         .map((c) => `  - ${c.name}: ${c.description || c.type}`)
         .join("\n");
 
+      const isActive =
+        app.status === "active" || app.approval_status === "approved";
+
       return [
-        `Aplikacja "${app.name}" została zbudowana!`,
+        `Aplikacja "${app.name}" została zbudowana${isActive ? " i aktywowana" : ""}!`,
         "",
         `Slug: ${app.slug}`,
         `Tabela: ${app.table_name}`,
         `Kolumny:`,
         columnList,
         "",
-        `Widget został dodany do dashboardu.`,
-        `Możesz go zobaczyć po odświeżeniu strony.`,
-        "",
-        `Aby dodać dane, użyj widgetu lub powiedz mi co chcesz zalogować.`,
+        isActive
+          ? `Widget dodany do dashboardu. Odswiez strone zeby go zobaczyc.\nAby dodac dane, uzyj widgetu lub powiedz mi co chcesz zalogowac.`
+          : `Aplikacja czeka na zatwierdzenie. Napisz "zatwierdz aplikacje ${app.slug}" aby ja aktywowac.`,
       ].join("\n");
     },
   },

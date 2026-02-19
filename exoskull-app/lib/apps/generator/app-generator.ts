@@ -67,7 +67,7 @@ export async function generateApp(
       // Step 4: Build the schema SQL for reference (table NOT created yet)
       const schemaSql = buildSchemaSql(spec);
 
-      // Step 5: Store in app registry as PENDING (no table or widget yet)
+      // Step 5: Store in app registry
       const { data: app, error: insertError } = await supabase
         .from("exo_generated_apps")
         .insert({
@@ -98,7 +98,25 @@ export async function generateApp(
         };
       }
 
-      // Step 6: Send SMS notification to tenant about pending app
+      // Step 6: Auto-activate when built from chat (user already requested it)
+      if (request.source === "chat_command" && app) {
+        const activation = await activateApp(app.id, tenant_id);
+        if (activation.success) {
+          logger.info(
+            `[AppGenerator] App auto-activated from chat: ${spec.slug}`,
+          );
+          return {
+            success: true,
+            app: { ...app, status: "active", approval_status: "approved" },
+          };
+        }
+        // If activation fails, fall through to pending flow
+        logger.warn(
+          `[AppGenerator] Auto-activation failed for ${spec.slug}: ${activation.error}`,
+        );
+      }
+
+      // Fallback: SMS notification for non-chat sources
       await sendAppApprovalNotification(supabase, tenant_id, spec);
 
       logger.info(
