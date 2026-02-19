@@ -113,7 +113,7 @@ function SceneContent() {
   return (
     <>
       {/* Lighting */}
-      <ambientLight intensity={1.2} color={0x1a1a30} />
+      <ambientLight intensity={2.5} color={0xc0c8e0} />
 
       {/* Camera controls */}
       <OrbitControls
@@ -180,7 +180,7 @@ export default function CyberpunkSceneInner({
       gl={{
         antialias: true,
         toneMapping: THREE.ACESFilmicToneMapping,
-        toneMappingExposure: 1.5,
+        toneMappingExposure: 2.8,
       }}
       dpr={[1, 1.5]}
       style={{
@@ -193,8 +193,8 @@ export default function CyberpunkSceneInner({
         pointerEvents: "auto",
       }}
       onCreated={({ scene }) => {
-        scene.fog = new THREE.Fog(0x0a0a1c, 25, 110);
-        scene.background = new THREE.Color(0x0a0a1c);
+        scene.fog = new THREE.Fog(0x1e2a4a, 30, 120);
+        scene.background = new THREE.Color(0x1e2a4a);
       }}
     >
       <SceneContent />

@@ -10,9 +10,9 @@
 
 /* ── Cockpit CSS Variables ── */
 .cockpit-hud {
-  --hud-bg: rgba(10, 10, 28, 0.8);
-  --hud-bg-solid: rgba(5, 5, 16, 0.92);
-  --hud-bg-glass: rgba(10, 10, 28, 0.65);
+  --hud-bg: rgba(30, 42, 74, 0.7);
+  --hud-bg-solid: rgba(25, 35, 65, 0.85);
+  --hud-bg-glass: rgba(30, 42, 74, 0.5);
   --hud-border: rgba(255, 255, 255, 0.1);
   --hud-border-hover: rgba(255, 255, 255, 0.18);
   --hud-text: rgba(255, 255, 255, 0.85);

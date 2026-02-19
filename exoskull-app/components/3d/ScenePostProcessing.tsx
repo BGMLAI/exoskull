@@ -5,7 +5,6 @@ import { useFrame } from "@react-three/fiber";
 import {
   EffectComposer,
   Bloom,
-  Vignette,
   ChromaticAberration,
 } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
@@ -28,7 +27,7 @@ export function ScenePostProcessing() {
     // Bloom pulse
     if (bloomRef.current) {
       bloomRef.current.intensity =
-        1.6 + Math.sin(clock.elapsedTime * 0.5) * 0.15;
+        0.8 + Math.sin(clock.elapsedTime * 0.5) * 0.1;
     }
 
     // FPS check every 2 seconds
@@ -48,15 +47,10 @@ export function ScenePostProcessing() {
     <EffectComposer>
       <Bloom
         ref={bloomRef}
-        intensity={1.6}
-        luminanceThreshold={0.15}
+        intensity={0.8}
+        luminanceThreshold={0.3}
         luminanceSmoothing={0.5}
         mipmapBlur
-      />
-      <Vignette
-        offset={0.3}
-        darkness={0.4}
-        blendFunction={BlendFunction.NORMAL}
       />
       <ChromaticAberration
         offset={

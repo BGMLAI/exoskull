@@ -9,48 +9,50 @@
 @layer base {
   /*
    * ExoSkull Theme System
-   * 3 branded themes: dark-ops, xo-minimal, neural
-   * Default (:root) = xo-minimal (light, clean)
+   * 4 branded themes: dark-ops, xo-minimal, neural, gemini-hybrid
+   * Default: gemini-hybrid (light, friendly)
    * .dark fallback kept for system dark mode compatibility
    */
 
-  /* ===== :root — Layout/structural only ===== */
+  /* ===== :root — Layout/structural defaults ===== */
   :root {
     --radius: 0.625rem;
+    /* Default glow-color fallback (overridden per-theme) */
+    --glow-color: 213 94% 52%;
   }
 
   /* ===== Theme A: Dark Ops (default) ===== */
   .dark-ops,
   .dark {
-    --background: 0 0% 7%;
-    --foreground: 240 5% 90%;
-    --card: 240 4% 13%;
+    --background: 220 20% 14%;
+    --foreground: 220 10% 92%;
+    --card: 220 18% 20%;
     --card-foreground: 0 0% 98%;
-    --popover: 240 4% 10%;
+    --popover: 220 18% 17%;
     --popover-foreground: 0 0% 98%;
     --primary: 191 100% 50%;
     --primary-foreground: 0 0% 0%;
     --secondary: 215 25% 17%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 4% 20%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 220 15% 25%;
+    --muted-foreground: 220 8% 68%;
     --accent: 38 100% 50%;
     --accent-foreground: 0 0% 0%;
     --destructive: 354 100% 64%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 4% 22%;
-    --input: 240 4% 22%;
+    --border: 220 15% 28%;
+    --input: 220 15% 28%;
     --ring: 191 100% 50%;
 
     /* Dark Ops specific */
-    --sidebar-bg: 0 0% 5%;
-    --sidebar-border: 240 4% 18%;
-    --sidebar-text: 240 5% 82%;
-    --sidebar-muted: 240 5% 45%;
+    --sidebar-bg: 220 20% 11%;
+    --sidebar-border: 220 15% 25%;
+    --sidebar-text: 220 10% 85%;
+    --sidebar-muted: 220 8% 50%;
     --sidebar-active: 191 100% 50%;
     --sidebar-active-text: 0 0% 0%;
     --glow-color: 191 100% 50%;
-    --bg-void: 240 60% 3%;
+    --bg-void: 220 30% 15%;
     --orb-glow-opacity: 0.8;
   }
 
@@ -75,7 +77,6 @@
     --border: 240 6% 90%;
     --input: 240 6% 90%;
     --ring: 0 0% 3.5%;
-    --radius: 0.625rem;
 
     /* XO Minimal specific */
     --sidebar-bg: 0 0% 100%;
@@ -84,6 +85,7 @@
     --sidebar-muted: 240 4% 46%;
     --sidebar-active: 0 0% 3.5%;
     --sidebar-active-text: 0 0% 98%;
+    --glow-color: 0 0% 3.5%;
     /* 3D scene — ALWAYS dark for orb/glow visibility */
     --bg-void: 240 5% 8%;
     --orb-glow-opacity: 0.6;
@@ -110,7 +112,6 @@
     --border: 263 45% 25%;
     --input: 263 45% 25%;
     --ring: 263 70% 66%;
-    --radius: 0.625rem;
 
     /* Neural specific */
     --sidebar-bg: 270 60% 5%;
@@ -145,7 +146,6 @@
     --border: 220 13% 87%;
     --input: 220 13% 87%;
     --ring: 213 94% 52%;
-    --radius: 0.625rem;
 
     /* Gemini Hybrid specific */
     --sidebar-bg: 0 0% 100%;
@@ -154,6 +154,7 @@
     --sidebar-muted: 220 9% 46%;
     --sidebar-active: 213 94% 52%;
     --sidebar-active-text: 0 0% 100%;
+    --glow-color: 213 94% 52%;
 
     /* Multi-color section accents */
     --accent-tasks: 217 91% 60%;
