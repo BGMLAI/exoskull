@@ -52,6 +52,7 @@ import { dashboardTools } from "./dashboard-tools";
 // New tools — Phase 2 (Total Overhaul)
 import { googleFitTools } from "./google-fit-tools";
 import { googleDriveTools } from "./google-drive-tools";
+import { googleContactsTools } from "./google-contacts-tools";
 import { contentTools } from "./content-tools";
 import { strategyTools } from "./strategy-tools";
 import { outboundTools } from "./outbound-tools";
@@ -93,6 +94,7 @@ export const IORS_EXTENSION_TOOLS = [
   // Phase 2 tools
   ...googleFitTools,
   ...googleDriveTools,
+  ...googleContactsTools,
   ...contentTools,
   ...strategyTools,
   ...outboundTools,
