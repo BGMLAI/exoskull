@@ -43,8 +43,12 @@ export function ToolExecutionOverlay() {
       )}
     >
       <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
-      <span className="text-sm font-medium text-white/80">{displayName}</span>
-      {elapsed > 0 && <span className="text-xs text-white/40">{elapsed}s</span>}
+      <span className="text-sm font-medium text-foreground/80">
+        {displayName}
+      </span>
+      {elapsed > 0 && (
+        <span className="text-xs text-foreground/40">{elapsed}s</span>
+      )}
     </div>
   );
 }

@@ -4,8 +4,6 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useCockpitStore } from "@/lib/stores/useCockpitStore";
 import { useCockpitKeys } from "@/lib/hooks/useCockpitKeys";
 import { CockpitTopBar } from "./CockpitTopBar";
-import { CockpitActionBar } from "./CockpitActionBar";
-import { BottomPanelGrid } from "./BottomPanelGrid";
 import { CenterViewport } from "./CenterViewport";
 import { ChannelOrbs } from "./ChannelOrbs";
 import { ReactionButtons } from "./ReactionButtons";
@@ -226,22 +224,6 @@ export function CockpitHUDShell() {
               <CenterViewport />
             </div>
           </section>
-
-          {/* ── Bottom: Panel grid (2x2) ── */}
-          <div
-            className="cockpit-zone cockpit-zone--panels"
-            style={{ pointerEvents: "auto" }}
-          >
-            <BottomPanelGrid />
-          </div>
-
-          {/* ── Bottom: Action bar (5 cells) ── */}
-          <div
-            className="cockpit-zone cockpit-zone--actions"
-            style={{ pointerEvents: "auto" }}
-          >
-            <CockpitActionBar />
-          </div>
         </>
       )}
 

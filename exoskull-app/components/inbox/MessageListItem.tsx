@@ -127,8 +127,8 @@ export function MessageListItem({
         {/* Avatar / Channel indicator */}
         <div
           className={cn(
-            "h-10 w-10 rounded-full flex items-center justify-center text-white flex-shrink-0",
-            CHANNEL_COLORS[message.channel] || "bg-gray-500",
+            "h-10 w-10 rounded-full flex items-center justify-center text-primary-foreground flex-shrink-0",
+            CHANNEL_COLORS[message.channel] || "bg-muted",
           )}
         >
           {CHANNEL_ICONS[message.channel] || (

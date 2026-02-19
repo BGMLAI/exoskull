@@ -34,8 +34,8 @@ export function DictationButton({
         "rounded-full transition-colors shrink-0",
         buttonSize,
         isListening
-          ? "bg-red-500 text-white animate-pulse"
-          : "bg-slate-600 text-slate-300 hover:bg-slate-500",
+          ? "bg-destructive text-destructive-foreground animate-pulse"
+          : "bg-muted text-muted-foreground hover:bg-muted/80",
         disabled && "opacity-50 cursor-not-allowed",
         className,
       )}

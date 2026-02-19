@@ -175,7 +175,7 @@ export function ExtensionCard({ extension, onArchive }: ExtensionCardProps) {
                     ) : (
                       <Badge
                         variant="outline"
-                        className="bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400 border-0 text-xs"
+                        className="bg-muted text-muted-foreground border-0 text-xs"
                       >
                         <PowerOff className="w-3 h-3 mr-1" />
                         Off

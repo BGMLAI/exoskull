@@ -180,8 +180,8 @@ export function QuickSettingsCard({ tenantId }: QuickSettingsCardProps) {
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-3">
-            <div className="h-8 bg-gray-200 dark:bg-gray-800 rounded w-full" />
-            <div className="h-8 bg-gray-200 dark:bg-gray-800 rounded w-2/3" />
+            <div className="h-8 bg-muted rounded w-full" />
+            <div className="h-8 bg-muted rounded w-2/3" />
           </div>
         </CardContent>
       </Card>

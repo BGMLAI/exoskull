@@ -29,7 +29,7 @@ export function ThemeSwitcher() {
 
   if (!mounted) {
     return (
-      <div className="w-8 h-8 rounded bg-black/40 border border-slate-800 animate-pulse" />
+      <div className="w-8 h-8 rounded bg-muted border border-border animate-pulse" />
     );
   }
 
@@ -45,7 +45,7 @@ export function ThemeSwitcher() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-mono text-slate-400 hover:text-white bg-black/40 hover:bg-slate-800/60 border border-slate-800 hover:border-slate-600/60 rounded backdrop-blur-sm transition-all duration-200"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-mono text-muted-foreground hover:text-foreground bg-muted/40 hover:bg-muted border border-border hover:border-border/80 rounded backdrop-blur-sm transition-all duration-200"
           title="Switch theme"
         >
           <span

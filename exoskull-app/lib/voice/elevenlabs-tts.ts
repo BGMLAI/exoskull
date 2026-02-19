@@ -1,11 +1,11 @@
 /**
- * Cartesia Text-to-Speech (Sonic 3)
+ * ElevenLabs Text-to-Speech (Turbo v2.5)
  *
- * Generates speech audio from text using Cartesia API.
+ * Generates speech audio from text using ElevenLabs API.
  * Supports caching to reduce API costs.
  *
- * Migration: Replaced ElevenLabs Turbo v2.5 with Cartesia Sonic 3 (5x cheaper, 2x faster TTFA).
- * File name kept as elevenlabs-tts.ts to avoid changing imports across consumers.
+ * Migration: Switched back from Cartesia Sonic 3 (500 errors) to ElevenLabs.
+ * Uses same ELEVENLABS_API_KEY / ELEVENLABS_VOICE_ID as /api/tts endpoint.
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -16,12 +16,10 @@ import { logger } from "@/lib/logger";
 // CONFIGURATION
 // ============================================================================
 
-const CARTESIA_API_KEY = process.env.CARTESIA_API_KEY!;
-// Default: "Tomek - Casual Companion" (energetic male, casual conversations, Polish)
-const CARTESIA_VOICE_ID =
-  process.env.CARTESIA_VOICE_ID || "82a7fc13-2927-4e42-9b8a-bb1f9e506521";
-const CARTESIA_MODEL = "sonic-3";
-const CARTESIA_API_VERSION = "2025-04-16";
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY!;
+const ELEVENLABS_VOICE_ID =
+  process.env.ELEVENLABS_VOICE_ID || "3kPofxWv5xLwBvMVraip";
+const ELEVENLABS_MODEL = "eleven_turbo_v2_5";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -56,62 +54,64 @@ export interface TTSResult {
 // ============================================================================
 
 /**
- * Generate speech audio from text using Cartesia Sonic 3
+ * Generate speech audio from text using ElevenLabs Turbo v2.5
  */
 export async function textToSpeech(
   text: string,
   options: TTSOptions = {},
 ): Promise<ArrayBuffer> {
-  const voiceId = options.voiceId || CARTESIA_VOICE_ID;
-  const language = options.language || "pl";
+  const voiceId = options.voiceId || ELEVENLABS_VOICE_ID;
 
-  if (!CARTESIA_API_KEY) {
-    throw new Error("[Cartesia TTS] Missing CARTESIA_API_KEY");
+  if (!ELEVENLABS_API_KEY) {
+    throw new Error("[ElevenLabs TTS] Missing ELEVENLABS_API_KEY");
   }
 
   const startTime = Date.now();
 
-  // Timeout: 5 seconds — if Cartesia doesn't respond, fallback to Twilio voice
-  const TTS_TIMEOUT_MS = 5000;
+  const TTS_TIMEOUT_MS = 10000;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TTS_TIMEOUT_MS);
 
   try {
-    const response = await fetch("https://api.cartesia.ai/tts/bytes", {
-      method: "POST",
-      headers: {
-        "X-API-Key": CARTESIA_API_KEY,
-        "Cartesia-Version": CARTESIA_API_VERSION,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model_id: CARTESIA_MODEL,
-        transcript: text,
-        voice: { mode: "id", id: voiceId },
-        output_format: {
-          container: "mp3",
-          encoding: "mp3",
-          sample_rate: 44100,
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+      {
+        method: "POST",
+        headers: {
+          "xi-api-key": ELEVENLABS_API_KEY,
+          "Content-Type": "application/json",
+          Accept: "audio/mpeg",
         },
-        language,
-        ...(options.speed ? { speed: options.speed } : {}),
-      }),
-      signal: controller.signal,
-    }).finally(() => clearTimeout(timeoutId));
+        body: JSON.stringify({
+          text,
+          model_id: options.modelId || ELEVENLABS_MODEL,
+          voice_settings: {
+            stability: options.stability ?? 0.65,
+            similarity_boost: options.similarityBoost ?? 0.8,
+            style: options.style ?? 0.05,
+            use_speaker_boost: options.useSpeakerBoost ?? true,
+            speed: options.speed ?? 1.15,
+          },
+        }),
+        signal: controller.signal,
+      },
+    ).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error("[Cartesia TTS] API Error:", {
+      logger.error("[ElevenLabs TTS] API Error:", {
         status: response.status,
         error: errorText,
       });
-      throw new Error(`Cartesia TTS failed: ${response.status} - ${errorText}`);
+      throw new Error(
+        `ElevenLabs TTS failed: ${response.status} - ${errorText}`,
+      );
     }
 
     const audioBuffer = await response.arrayBuffer();
     const durationMs = Date.now() - startTime;
 
-    logger.info("[Cartesia TTS] Generated:", {
+    logger.info("[ElevenLabs TTS] Generated:", {
       textLength: text.length,
       audioBytes: audioBuffer.byteLength,
       durationMs,
@@ -121,16 +121,18 @@ export async function textToSpeech(
   } catch (error) {
     if (error instanceof Error) {
       if (error.name === "AbortError") {
-        logger.error("[Cartesia TTS] Timeout po 5s - fallback do Twilio voice");
-        throw new Error("Cartesia TTS timeout - using fallback voice");
+        logger.error(
+          "[ElevenLabs TTS] Timeout po 10s - fallback do Twilio voice",
+        );
+        throw new Error("ElevenLabs TTS timeout - using fallback voice");
       }
-      logger.error("[Cartesia TTS] Error:", {
+      logger.error("[ElevenLabs TTS] Error:", {
         name: error.name,
         message: error.message,
         voiceId,
       });
     } else {
-      logger.error("[Cartesia TTS] Unknown error:", error);
+      logger.error("[ElevenLabs TTS] Unknown error:", error);
     }
     throw error;
   }
@@ -143,7 +145,7 @@ export async function textToSpeech(
 /**
  * Generate hash for caching
  */
-function hashText(text: string, voiceId: string = CARTESIA_VOICE_ID): string {
+function hashText(text: string, voiceId: string = ELEVENLABS_VOICE_ID): string {
   return crypto.createHash("md5").update(`${voiceId}:${text}`).digest("hex");
 }
 
@@ -173,7 +175,7 @@ export async function uploadTTSAudio(
     });
 
   if (uploadError) {
-    logger.error("[Cartesia TTS] Upload error:", uploadError);
+    logger.error("[ElevenLabs TTS] Upload error:", uploadError);
     throw new Error(`Failed to upload TTS audio: ${uploadError.message}`);
   }
 
@@ -181,7 +183,7 @@ export async function uploadTTSAudio(
     .from(AUDIO_BUCKET)
     .getPublicUrl(fileName);
 
-  logger.info("[Cartesia TTS] Uploaded audio:", fileName);
+  logger.info("[ElevenLabs TTS] Uploaded audio:", fileName);
 
   return urlData.publicUrl;
 }
@@ -209,7 +211,7 @@ export async function generateAndUploadTTS(
       .from(AUDIO_BUCKET)
       .getPublicUrl(cachedPath);
 
-    logger.info("[Cartesia TTS] Cache hit:", cacheKey);
+    logger.info("[ElevenLabs TTS] Cache hit:", cacheKey);
 
     return {
       audioBuffer: await cachedFile.arrayBuffer(),
@@ -231,8 +233,8 @@ export async function generateAndUploadTTS(
       contentType: "audio/mpeg",
       upsert: true,
     })
-    .then(() => logger.info("[Cartesia TTS] Cached:", cacheKey))
-    .catch((err) => logger.warn("[Cartesia TTS] Cache write failed:", err));
+    .then(() => logger.info("[ElevenLabs TTS] Cached:", cacheKey))
+    .catch((err) => logger.warn("[ElevenLabs TTS] Cache write failed:", err));
 
   return {
     audioBuffer,
@@ -261,7 +263,7 @@ const COMMON_PHRASES = [
  * Run this on app startup or via cron
  */
 export async function precacheCommonPhrases(): Promise<void> {
-  logger.info("[Cartesia TTS] Pre-caching common phrases...");
+  logger.info("[ElevenLabs TTS] Pre-caching common phrases...");
 
   for (const phrase of COMMON_PHRASES) {
     try {
@@ -274,7 +276,10 @@ export async function precacheCommonPhrases(): Promise<void> {
         .list("cache", { search: `${cacheKey}.mp3` });
 
       if (data && data.length > 0) {
-        logger.info("[Cartesia TTS] Already cached:", phrase.substring(0, 30));
+        logger.info(
+          "[ElevenLabs TTS] Already cached:",
+          phrase.substring(0, 30),
+        );
         continue;
       }
 
@@ -287,16 +292,16 @@ export async function precacheCommonPhrases(): Promise<void> {
           upsert: true,
         });
 
-      logger.info("[Cartesia TTS] Cached:", phrase.substring(0, 30));
+      logger.info("[ElevenLabs TTS] Cached:", phrase.substring(0, 30));
 
-      // Rate limit: wait 200ms between requests (Cartesia is faster than ElevenLabs)
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      // Rate limit: wait 500ms between requests
+      await new Promise((resolve) => setTimeout(resolve, 500));
     } catch (error) {
-      logger.error("[Cartesia TTS] Failed to cache phrase:", phrase, error);
+      logger.error("[ElevenLabs TTS] Failed to cache phrase:", phrase, error);
     }
   }
 
-  logger.info("[Cartesia TTS] Pre-caching complete");
+  logger.info("[ElevenLabs TTS] Pre-caching complete");
 }
 
 // ============================================================================
@@ -314,7 +319,7 @@ export async function cleanupSessionAudio(sessionId: string): Promise<void> {
     .list(sessionId);
 
   if (listError) {
-    logger.error("[Cartesia TTS] List error:", listError);
+    logger.error("[ElevenLabs TTS] List error:", listError);
     return;
   }
 
@@ -329,9 +334,9 @@ export async function cleanupSessionAudio(sessionId: string): Promise<void> {
     .remove(filesToDelete);
 
   if (deleteError) {
-    logger.error("[Cartesia TTS] Delete error:", deleteError);
+    logger.error("[ElevenLabs TTS] Delete error:", deleteError);
     return;
   }
 
-  logger.info("[Cartesia TTS] Cleaned up session audio:", sessionId);
+  logger.info("[ElevenLabs TTS] Cleaned up session audio:", sessionId);
 }

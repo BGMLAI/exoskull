@@ -4,7 +4,6 @@ import { CyberpunkScene } from "@/components/3d/CyberpunkScene";
 import { CockpitHUDShell } from "@/components/cockpit/CockpitHUDShell";
 import { ToolExecutionOverlay } from "./ToolExecutionOverlay";
 import { CodeSidebar } from "./CodeSidebar";
-import { FloatingCallButton } from "@/components/voice/FloatingCallButton";
 import { OrbContextMenuOverlay } from "@/components/3d/OrbContextMenu";
 import { useCockpitStore } from "@/lib/stores/useCockpitStore";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
@@ -57,11 +56,6 @@ export function CyberpunkDashboard({ tenantId }: CyberpunkDashboardProps) {
             Wyloguj
           </button>
         </form>
-      </div>
-
-      {/* ── z-50: Floating voice call button ── */}
-      <div className="fixed z-50 bottom-5 right-5">
-        <FloatingCallButton tenantId={tenantId} />
       </div>
     </div>
   );

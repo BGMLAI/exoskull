@@ -34,20 +34,20 @@ export function DataFreshness({
 
   if (!lastRefreshed) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
         \u0141adowanie...
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
       <span>Ostatnia aktualizacja: {formatAge(lastRefreshed)}</span>
       {onRefresh && (
         <button
           type="button"
           onClick={onRefresh}
-          className="inline-flex items-center justify-center rounded p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          className="inline-flex items-center justify-center rounded p-0.5 hover:bg-muted transition-colors"
           title="Od\u015bwie\u017c dane"
         >
           <svg

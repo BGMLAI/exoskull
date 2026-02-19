@@ -1,27 +1,30 @@
 /* ============================================================================
  * MindMap3D — Styles for 3D force-directed mind map
+ * ============================================================================
+ * Uses CSS custom properties for theme compatibility.
+ * Falls back to hsl(var(--primary)) / hsl(var(--glow-color)) where possible.
  * ============================================================================ */
 
 /* Node hover glow effect */
 .mindmap-node-hover {
-  filter: brightness(1.3) drop-shadow(0 0 8px var(--arwes-cyan, #00d4ff));
+  filter: brightness(1.3) drop-shadow(0 0 8px hsl(var(--glow-color)));
 }
 
 /* Tooltip styling */
 .mindmap-tooltip {
-  background: rgba(5, 5, 16, 0.85);
+  background: hsl(var(--popover) / 0.92);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 212, 255, 0.15);
+  border: 1px solid hsl(var(--border) / 0.3);
   border-radius: 8px;
   padding: 8px 12px;
   font-family: var(--font-mono);
-  color: #e2e8f0;
+  color: hsl(var(--popover-foreground));
   font-size: 11px;
   max-width: 240px;
   pointer-events: none;
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.4),
-    0 0 12px rgba(0, 212, 255, 0.08);
+    0 0 12px hsl(var(--glow-color) / 0.08);
 }
 
 /* Mind map container transitions */
@@ -45,11 +48,11 @@
 
 .mindmap-controls button {
   padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.6);
+  background: hsl(var(--background) / 0.6);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(0, 212, 255, 0.15);
+  border: 1px solid hsl(var(--glow-color) / 0.15);
   border-radius: 6px;
-  color: rgba(0, 212, 255, 0.6);
+  color: hsl(var(--glow-color) / 0.6);
   font-size: 10px;
   font-family: var(--font-mono);
   cursor: pointer;
@@ -57,15 +60,15 @@
 }
 
 .mindmap-controls button:hover {
-  background: rgba(0, 212, 255, 0.1);
-  border-color: rgba(0, 212, 255, 0.3);
-  color: #00d4ff;
+  background: hsl(var(--glow-color) / 0.1);
+  border-color: hsl(var(--glow-color) / 0.3);
+  color: hsl(var(--glow-color));
 }
 
 .mindmap-controls button.active {
-  background: rgba(0, 212, 255, 0.15);
-  border-color: rgba(0, 212, 255, 0.4);
-  color: #00d4ff;
+  background: hsl(var(--glow-color) / 0.15);
+  border-color: hsl(var(--glow-color) / 0.4);
+  color: hsl(var(--glow-color));
 }
 
 /* Node expansion animation */
@@ -95,6 +98,6 @@
     filter: brightness(1);
   }
   50% {
-    filter: brightness(2) drop-shadow(0 0 4px #00d4ff);
+    filter: brightness(2) drop-shadow(0 0 4px hsl(var(--glow-color)));
   }
 }

@@ -64,7 +64,7 @@ export function CollapsibleSidebar({
       {iorsName && (
         <div className="px-6 py-3 border-b">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground text-xs font-bold shrink-0">
               {iorsName[0]?.toUpperCase() || "I"}
             </div>
             <div className="min-w-0">

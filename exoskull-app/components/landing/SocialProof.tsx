@@ -11,10 +11,10 @@ export function SocialProof() {
     <div className="flex justify-center gap-8 md:gap-12 py-8">
       {CAPABILITIES.map((item) => (
         <div key={item.label} className="text-center">
-          <div className="text-3xl md:text-4xl font-bold text-white">
+          <div className="text-3xl md:text-4xl font-bold text-foreground">
             {item.value}
           </div>
-          <div className="text-sm text-slate-500 mt-1">{item.label}</div>
+          <div className="text-sm text-muted-foreground mt-1">{item.label}</div>
         </div>
       ))}
     </div>

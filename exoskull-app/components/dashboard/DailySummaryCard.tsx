@@ -45,8 +45,8 @@ export function DailySummaryCard({
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-2">
-            <div className="h-6 bg-gray-200 dark:bg-gray-800 rounded w-3/4" />
-            <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/2" />
+            <div className="h-6 bg-muted rounded w-3/4" />
+            <div className="h-4 bg-muted rounded w-1/2" />
           </div>
         </CardContent>
       </Card>

@@ -42,7 +42,7 @@ function CopyButton({ text }: { text: string }) {
       {copied ? (
         <Check className="w-3.5 h-3.5 text-green-400" />
       ) : (
-        <Copy className="w-3.5 h-3.5 text-gray-400" />
+        <Copy className="w-3.5 h-3.5 text-muted-foreground" />
       )}
     </button>
   );
@@ -155,7 +155,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
               return (
                 <div className="relative my-2 rounded-lg overflow-hidden">
                   {match && (
-                    <div className="bg-[#282c34] text-[10px] text-gray-400 px-3 py-1 border-b border-white/5">
+                    <div className="bg-muted text-[10px] text-muted-foreground px-3 py-1 border-b border-border/20">
                       {match[1]}
                     </div>
                   )}

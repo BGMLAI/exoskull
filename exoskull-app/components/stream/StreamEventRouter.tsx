@@ -205,7 +205,7 @@ export function StreamEventRouter({ event, onReply }: StreamEventRouterProps) {
           <div
             className={cn(
               "absolute -left-1 top-3 w-2 h-2 rounded-full opacity-60",
-              category === "system" && "bg-gray-400",
+              category === "system" && "bg-muted-foreground",
               category === "ai_insight" && "bg-purple-500",
               category === "task" && "bg-blue-500",
               category === "alert" && "bg-red-500",
