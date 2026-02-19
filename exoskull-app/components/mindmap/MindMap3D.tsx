@@ -32,7 +32,7 @@ const ForceGraph3DComponent = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="w-full h-full flex items-center justify-center bg-background text-cyan-400/60 font-mono text-sm">
+      <div className="w-full h-full flex items-center justify-center bg-[#0a0a1c] text-cyan-400/60 font-mono text-sm">
         Inicjalizacja mapy mysli...
       </div>
     ),
@@ -44,26 +44,15 @@ interface MindMap3DProps {
   height?: number;
 }
 
-/** Read --bg-void CSS variable and convert HSL to hex for Three.js */
-function getSceneBg(): string {
-  if (typeof window === "undefined") return "#050510";
-  const raw = getComputedStyle(document.documentElement)
-    .getPropertyValue("--bg-void")
-    .trim();
-  if (!raw) return "#050510";
-  const [h, s, l] = raw.split(/\s+/).map((v) => parseFloat(v));
-  if (isNaN(h) || isNaN(s) || isNaN(l)) return "#050510";
-  // HSL → hex conversion
-  const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
-  const f = (n: number) => {
-    const k = (n + h / 30) % 12;
-    const color = l / 100 - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-    return Math.round(255 * color)
-      .toString(16)
-      .padStart(2, "0");
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
-}
+/**
+ * 3D scene background — ALWAYS dark regardless of theme.
+ * Orbs, glow effects, and labels require a dark canvas.
+ * Floating panels overlay this with their own theme-appropriate backgrounds.
+ *
+ * Previous approach read --bg-void CSS var but had race conditions with
+ * next-themes class application timing.
+ */
+const SCENE_BG = "#0a0a1c";
 
 export function MindMap3D({ width, height }: MindMap3DProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -316,7 +305,7 @@ export function MindMap3D({ width, height }: MindMap3DProps) {
         graphData={graphData}
         width={width}
         height={height}
-        backgroundColor={getSceneBg()}
+        backgroundColor={SCENE_BG}
         nodeThreeObject={nodeThreeObject}
         nodeThreeObjectExtend={false}
         onNodeClick={handleNodeClick}
