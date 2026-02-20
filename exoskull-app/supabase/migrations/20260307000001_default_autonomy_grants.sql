@@ -17,6 +17,7 @@ BEGIN
     WHERE id NOT IN (
       SELECT DISTINCT user_id FROM user_autonomy_grants WHERE is_active = TRUE
     )
+    AND id IN (SELECT id FROM auth.users)
   LOOP
     -- Communication: wellness check-ins
     INSERT INTO user_autonomy_grants (user_id, action_pattern, category, daily_limit, is_active)
