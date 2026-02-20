@@ -34,7 +34,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
 
     if (query) {
       q = q.or(
-        `subject.ilike.%${query}%,snippet.ilike.%${query}%,from_name.ilike.%${query}%,body_text.ilike.%${query}%`,
+        `subject.ilike.%${query}%,snippet.ilike.%${query}%,from_name.ilike.%${query}%,from_email.ilike.%${query}%,body_text.ilike.%${query}%`,
       );
     }
 

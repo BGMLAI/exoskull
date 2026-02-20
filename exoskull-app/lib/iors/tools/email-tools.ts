@@ -103,11 +103,13 @@ export const emailTools: ToolDefinition[] = [
         properties: {
           query: {
             type: "string",
-            description: "Szukana fraza (temat, nadawca, tresc)",
+            description:
+              "Szukana fraza — szuka w temacie, tresci, nazwie nadawcy I adresie email nadawcy. Podaj imie, nazwisko, adres email lub temat.",
           },
           from: {
             type: "string",
-            description: "Filtr: adres email nadawcy",
+            description:
+              "Filtr: adres email nadawcy (dokladny lub czesc). Uzyj gdy user podaje adres email.",
           },
           category: {
             type: "string",
@@ -120,14 +122,15 @@ export const emailTools: ToolDefinition[] = [
           },
           days_back: {
             type: "number",
-            description: "Ile dni wstecz szukac (domyslnie 30)",
+            description:
+              "Ile dni wstecz szukac (domyslnie 30). Uzyj 90 lub 365 jesli nie ma wynikow.",
           },
           limit: {
             type: "number",
             description: "Max wynikow (domyslnie 10)",
           },
         },
-        required: ["query"],
+        required: [],
       },
     },
     execute: async (input, tenantId) => {
@@ -135,11 +138,12 @@ export const emailTools: ToolDefinition[] = [
       const daysBack = (input.days_back as number) || 30;
       const limit = Math.min((input.limit as number) || 10, 20);
       const since = new Date(Date.now() - daysBack * 86400_000).toISOString();
-      const searchQuery = input.query as string;
+      const searchQuery = (input.query as string) || "";
 
       logger.info("[EmailTools:search_emails:start]", {
         tenantId: tenantId.slice(0, 8),
-        query: searchQuery,
+        query: searchQuery || "(empty)",
+        from: input.from || "(none)",
         daysBack,
         limit,
       });
@@ -155,7 +159,7 @@ export const emailTools: ToolDefinition[] = [
           .order("date_received", { ascending: false })
           .limit(limit);
 
-        // Apply filters
+        // Exact from_email filter (when user provides email address)
         if (input.from) {
           q = q.ilike("from_email", `%${input.from}%`);
         }
@@ -166,10 +170,10 @@ export const emailTools: ToolDefinition[] = [
           q = q.eq("priority", input.priority);
         }
 
-        // Text search in subject + snippet + body_text + from_name
+        // Text search in subject + snippet + body_text + from_name + from_email
         if (searchQuery) {
           q = q.or(
-            `subject.ilike.%${searchQuery}%,snippet.ilike.%${searchQuery}%,from_name.ilike.%${searchQuery}%,body_text.ilike.%${searchQuery}%`,
+            `subject.ilike.%${searchQuery}%,snippet.ilike.%${searchQuery}%,from_name.ilike.%${searchQuery}%,from_email.ilike.%${searchQuery}%,body_text.ilike.%${searchQuery}%`,
           );
         }
 
@@ -197,7 +201,27 @@ export const emailTools: ToolDefinition[] = [
       }> | null;
 
       if (!emails?.length) {
-        return `Nie znaleziono emaili pasujacych do "${searchQuery}"`;
+        // Check if any emails exist at all for this tenant
+        const countResult = await retryQuery("search_emails:count", () =>
+          supabase
+            .from("exo_analyzed_emails")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenantId),
+        );
+        const totalEmails =
+          (countResult.data as unknown as number) ??
+          (countResult as unknown as { count?: number }).count ??
+          0;
+
+        if (totalEmails === 0) {
+          return `Brak zsynchronizowanych emaili. Upewnij sie, ze masz polaczone konto email (Gmail/Outlook) w Ustawienia > Integracje. Synchronizacja uruchomi sie automatycznie.`;
+        }
+
+        const hint =
+          daysBack < 90
+            ? ` Sprobuj z wiekszym zakresem dat (np. days_back=365).`
+            : "";
+        return `Nie znaleziono emaili pasujacych do "${searchQuery || input.from || "brak frazy"}" w ostatnich ${daysBack} dniach (w bazie jest ${totalEmails} emaili).${hint}`;
       }
 
       logger.info("[EmailTools:search_emails:success]", {

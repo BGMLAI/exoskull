@@ -306,7 +306,7 @@ export async function getThreadContext(
   tenantId: string,
   limit: number = 20,
 ): Promise<{ role: "user" | "assistant"; content: string }[]> {
-  const messages = await getRecentMessages(tenantId, limit);
+  const messages = await getConversationalMessages(tenantId, limit);
 
   if (messages.length === 0) return [];
 
