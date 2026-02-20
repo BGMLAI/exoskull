@@ -206,11 +206,17 @@ export function useDictation(
       streamRef.current = stream;
       startLevelMonitor(stream);
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-          ? "audio/webm;codecs=opus"
-          : "audio/webm",
-      });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : MediaRecorder.isTypeSupported("audio/mp4")
+            ? "audio/mp4"
+            : undefined;
+      const mediaRecorder = new MediaRecorder(
+        stream,
+        mimeType ? { mimeType } : undefined,
+      );
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (e) => {
@@ -223,7 +229,9 @@ export function useDictation(
         streamRef.current = null;
 
         const duration = Date.now() - recordStartRef.current;
-        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const audioBlob = new Blob(chunksRef.current, {
+          type: mediaRecorder.mimeType || "audio/webm",
+        });
 
         if (duration < 1000 || audioBlob.size < 1000) {
           // Too short — in continuous mode, just restart

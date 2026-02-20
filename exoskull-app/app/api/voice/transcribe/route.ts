@@ -28,7 +28,7 @@ async function tryOpenAI(
 
   try {
     const form = new FormData();
-    form.append("file", audio, "audio.webm");
+    form.append("file", audio, audio.name || "audio.webm");
     form.append("model", "whisper-1");
     form.append("language", "pl");
     form.append("response_format", "verbose_json");
@@ -106,7 +106,7 @@ async function tryGroq(
 
   try {
     const form = new FormData();
-    form.append("file", audio, "audio.webm");
+    form.append("file", audio, audio.name || "audio.webm");
     form.append("model", "whisper-large-v3-turbo");
     form.append("language", "pl");
     form.append("response_format", "verbose_json");
@@ -197,8 +197,17 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       return NextResponse.json({ transcript: "" });
     }
 
+    // Determine file extension from MIME type (Safari sends audio/mp4)
+    const ext =
+      audio.type === "audio/mp4" || audio.type === "audio/aac"
+        ? "mp4"
+        : audio.type === "audio/ogg"
+          ? "ogg"
+          : "webm";
+    const audioFile = new File([audio], `audio.${ext}`, { type: audio.type });
+
     // Tier 1: OpenAI Whisper (more accurate, original model)
-    const openaiResult = await tryOpenAI(audio);
+    const openaiResult = await tryOpenAI(audioFile);
     if (openaiResult && openaiResult.transcript) {
       logger.info(
         "[Transcribe] OpenAI succeeded:",
@@ -209,7 +218,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     }
 
     // Tier 2: Groq Whisper (fast, free)
-    const groqResult = await tryGroq(audio);
+    const groqResult = await tryGroq(audioFile);
     if (groqResult && groqResult.transcript) {
       logger.info(
         "[Transcribe] Groq succeeded:",

@@ -159,11 +159,17 @@ export function VoiceCallOverlay({ open, onClose }: VoiceCallOverlayProps) {
       streamRef.current = stream;
       startLevelMonitor(stream);
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-          ? "audio/webm;codecs=opus"
-          : "audio/webm",
-      });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : MediaRecorder.isTypeSupported("audio/mp4")
+            ? "audio/mp4"
+            : undefined;
+      const mediaRecorder = new MediaRecorder(
+        stream,
+        mimeType ? { mimeType } : undefined,
+      );
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (e) => {
@@ -176,7 +182,9 @@ export function VoiceCallOverlay({ open, onClose }: VoiceCallOverlayProps) {
         streamRef.current = null;
 
         const dur = Date.now() - recordStartRef.current;
-        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const audioBlob = new Blob(chunksRef.current, {
+          type: mediaRecorder.mimeType || "audio/webm",
+        });
 
         if (dur < 800 || audioBlob.size < 500) {
           // Too short — restart
