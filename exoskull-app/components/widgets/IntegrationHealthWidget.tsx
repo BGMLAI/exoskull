@@ -33,7 +33,6 @@ const INTEGRATION_LABELS: Record<string, { name: string; icon: string }> = {
   google_drive: { name: "Google Drive", icon: "hard-drive" },
   google_calendar: { name: "Google Calendar", icon: "calendar" },
   twilio: { name: "Twilio (Voice)", icon: "phone" },
-  composio: { name: "Composio", icon: "plug" },
   elevenlabs: { name: "ElevenLabs (TTS)", icon: "mic" },
   openai: { name: "OpenAI", icon: "brain" },
   anthropic: { name: "Anthropic", icon: "brain" },

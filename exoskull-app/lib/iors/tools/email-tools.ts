@@ -201,20 +201,61 @@ export const emailTools: ToolDefinition[] = [
       }> | null;
 
       if (!emails?.length) {
-        // Check if any emails exist at all for this tenant
-        const countResult = await retryQuery("search_emails:count", () =>
-          supabase
-            .from("exo_analyzed_emails")
-            .select("id", { count: "exact", head: true })
-            .eq("tenant_id", tenantId),
-        );
+        // Check total email count + account status in parallel
+        const [countResult, accountResult] = await Promise.all([
+          retryQuery("search_emails:count", () =>
+            supabase
+              .from("exo_analyzed_emails")
+              .select("id", { count: "exact", head: true })
+              .eq("tenant_id", tenantId),
+          ),
+          retryQuery("search_emails:account_check", () =>
+            supabase
+              .from("exo_email_accounts")
+              .select(
+                "id, email_address, sync_enabled, last_sync_at, sync_error",
+              )
+              .eq("tenant_id", tenantId)
+              .limit(5),
+          ),
+        ]);
+
+        // Supabase returns count on the response object (not inside data) when head:true
         const totalEmails =
-          (countResult.data as unknown as number) ??
-          (countResult as unknown as { count?: number }).count ??
-          0;
+          (countResult as unknown as { count?: number | null }).count ?? 0;
+
+        const accounts =
+          (accountResult.data as Array<{
+            id: string;
+            email_address: string;
+            sync_enabled: boolean;
+            last_sync_at: string | null;
+            sync_error: string | null;
+          }> | null) || [];
 
         if (totalEmails === 0) {
-          return `Brak zsynchronizowanych emaili. Upewnij sie, ze masz polaczone konto email (Gmail/Outlook) w Ustawienia > Integracje. Synchronizacja uruchomi sie automatycznie.`;
+          // Give detailed diagnostic based on account status
+          if (accounts.length === 0) {
+            return `Brak polaczonego konta email. Polacz Gmail/Outlook w Ustawienia > Integracje.`;
+          }
+
+          const acct = accounts[0];
+          if (!acct.sync_enabled) {
+            return `Konto ${acct.email_address} jest polaczone ale synchronizacja jest wylaczona. Wlacz ja w Ustawienia > Integracje.`;
+          }
+          if (acct.sync_error) {
+            return `Konto ${acct.email_address} ma blad synchronizacji: ${acct.sync_error}. Sprobuj ponownie polaczyc w Ustawienia > Integracje.`;
+          }
+          if (!acct.last_sync_at) {
+            return `Konto ${acct.email_address} jest polaczone. Pierwsza synchronizacja jeszcze nie nastapila — powinna ruszyc w ciagu kilku minut.`;
+          }
+
+          // Account exists, sync enabled, no error, but 0 emails — sync might be stale
+          const lastSync = new Date(acct.last_sync_at);
+          const minutesAgo = Math.round(
+            (Date.now() - lastSync.getTime()) / 60000,
+          );
+          return `Konto ${acct.email_address} jest polaczone (ostatnia sync: ${minutesAgo} min temu), ale w bazie brak emaili. Mozliwe ze synchronizacja nie pobiera wiadomosci — sprawdz logi lub polacz ponownie.`;
         }
 
         const hint =

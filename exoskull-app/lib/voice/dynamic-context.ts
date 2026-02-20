@@ -8,7 +8,6 @@
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { getThreadSummary } from "../unified-thread";
 import { getPendingSuggestions } from "../skills/detector";
-import { listConnections } from "@/lib/integrations/composio-adapter";
 import { getTaskStats } from "@/lib/tasks/task-service";
 import {
   getUserHighlights,
@@ -159,8 +158,8 @@ export async function buildDynamicContext(
       .from("exo_user_documents")
       .select("status", { count: "planned" })
       .eq("tenant_id", tenantId),
-    // 8. Composio connected integrations
-    listConnections(tenantId).catch(() => []),
+    // 8. (Removed — Composio integration removed)
+    Promise.resolve([]),
     // 9. Generated apps (self-awareness)
     supabase
       .from("exo_generated_apps")
@@ -454,13 +453,6 @@ export async function buildDynamicContext(
       const desc = note.ai_summary || note.title || "(bez tytułu)";
       context += `- ${date} [${note.type}]: ${desc}\n`;
     }
-  }
-
-  // Connected integrations (Composio)
-  if (connections.length > 0) {
-    const connList = connections.map((c) => c.toolkit).join(", ");
-    context += `- Podlaczone integracje: ${connList}\n`;
-    context += `  → Mozesz uzywac tych uslug (np. wyslij email przez Gmail, sprawdz kalendarz). Uzyj "composio_action".\n`;
   }
 
   // Skill suggestions

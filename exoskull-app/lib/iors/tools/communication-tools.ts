@@ -263,40 +263,7 @@ export const communicationTools: ToolDefinition[] = [
         });
       }
 
-      // Try 2: Composio Gmail (legacy fallback)
-      try {
-        const { hasConnection, executeAction } =
-          await import("@/lib/integrations/composio-adapter");
-        const gmailConnected = await hasConnection(tenantId, "GMAIL");
-        if (gmailConnected) {
-          const result = await executeAction("GMAIL_SEND_EMAIL", tenantId, {
-            to: toEmail,
-            subject,
-            body,
-          });
-          if (result.success) {
-            await appendMessage(tenantId, {
-              role: "assistant",
-              content: `[Email via Gmail do ${toEmail}] Temat: ${subject}`,
-              channel: "email",
-              direction: "outbound",
-              source_type: "voice_session",
-            }).catch(() => {});
-            return `Email wysłany do ${toEmail} z Twojego konta Gmail.`;
-          }
-          logger.warn(
-            "[CommunicationTools] Composio Gmail failed:",
-            result.error,
-          );
-        }
-      } catch (composioErr) {
-        logger.warn("[CommunicationTools] Composio check failed:", {
-          error:
-            composioErr instanceof Error ? composioErr.message : composioErr,
-        });
-      }
-
-      // Try 3: Resend (sends FROM iors@exoskull.xyz)
+      // Try 2: Resend (sends FROM iors@exoskull.xyz)
       const RESEND_API_KEY = process.env.RESEND_API_KEY;
       if (!RESEND_API_KEY) {
         return "Email nie jest jeszcze skonfigurowany. Powiedz 'połącz Gmail' żeby wysyłać ze swojego konta.";

@@ -42,7 +42,7 @@ export function buildAppDetectionContext(
   tenantId: string,
   userMessage: string,
   rigConnections: Array<{ rig_slug: string; sync_status: string }>,
-  composioConnections: Array<{ toolkit: string; status: string }>,
+  _composioConnections?: Array<{ toolkit: string; status: string }>,
 ): AppDetectionResult {
   const detectedSlugs = detectAppMentions(userMessage);
 
@@ -50,16 +50,11 @@ export function buildAppDetectionContext(
     return { contextFragment: "", detectedApps: [] };
   }
 
-  // Build sets of already-connected slugs for fast lookup
+  // Build set of already-connected rig slugs for fast lookup
   const connectedRigs = new Set(
     rigConnections
       .filter((r) => r.sync_status === "active" || r.sync_status === "synced")
       .map((r) => r.rig_slug),
-  );
-  const connectedComposio = new Set(
-    composioConnections
-      .filter((c) => c.status === "ACTIVE" || c.status === "active")
-      .map((c) => c.toolkit.toUpperCase()),
   );
 
   const detectedApps: DetectedApp[] = [];
@@ -69,11 +64,10 @@ export function buildAppDetectionContext(
     const mapping = getAppMapping(slug);
     if (!mapping) continue;
 
-    // Check if already connected
-    const isConnected =
-      mapping.connectorType === "rig"
-        ? connectedRigs.has(slug)
-        : connectedComposio.has(slug.toUpperCase());
+    // Only rig-type connectors are supported now
+    if (mapping.connectorType !== "rig") continue;
+
+    const isConnected = connectedRigs.has(slug);
 
     detectedApps.push({ slug, mapping, alreadyConnected: isConnected });
 
@@ -89,11 +83,7 @@ export function buildAppDetectionContext(
 
   // Build context fragment
   const appLines = unconnectedApps.map((a) => {
-    const toolInstruction =
-      a.mapping.connectorType === "rig"
-        ? `użyj narzędzia connect_rig z rig_slug="${a.slug}"`
-        : `użyj narzędzia composio_connect z toolkit="${a.slug}"`;
-    return `- ${a.mapping.displayName} — ${toolInstruction}`;
+    return `- ${a.mapping.displayName} — użyj narzędzia connect_rig z rig_slug="${a.slug}"`;
   });
 
   const contextFragment = [

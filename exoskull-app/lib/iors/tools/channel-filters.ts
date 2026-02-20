@@ -202,9 +202,7 @@ export const WEB_TOOL_NAMES = new Set([
   "reply_threads_post",
   // Integrations (app autodetekcja)
   "connect_rig",
-  "composio_connect",
   "list_integrations",
-  "composio_list_apps",
 ]);
 
 // ============================================================================

@@ -33,7 +33,6 @@ import { memoryTools } from "./memory-tools";
 import { skillGoalTools } from "./skill-goal-tools";
 import { communicationTools } from "./communication-tools";
 import { emotionTools } from "./emotion-tools";
-import { composioTools } from "./composio-tools";
 import { feedbackTools } from "./feedback-tools";
 import { knowledgeTools } from "./knowledge-tools";
 import { appBuilderTools } from "./app-builder-tools";
@@ -85,7 +84,6 @@ export const IORS_EXTENSION_TOOLS = [
   ...skillGoalTools,
   ...communicationTools,
   ...emotionTools,
-  ...composioTools,
   ...feedbackTools,
   ...knowledgeTools,
   ...appBuilderTools,

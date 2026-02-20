@@ -34,7 +34,6 @@ import type { UnifiedSearchResult } from "@/lib/memory/types";
 import type { EmotionState } from "@/lib/emotion/types";
 import { logger } from "@/lib/logger";
 import { buildAppDetectionContext } from "@/lib/integrations/app-context-builder";
-import { listConnections } from "@/lib/integrations/composio-adapter";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { classify } from "@/lib/bgml/classifier";
 import { selectFramework } from "@/lib/bgml/framework-selector";
@@ -273,7 +272,6 @@ export async function runExoSkullAgent(
     threadHistory,
     memoryResults,
     rigConnections,
-    composioConnections,
   ] = await Promise.all([
     buildDynamicContext(req.tenantId),
     analyzeEmotion(req.userMessage),
@@ -307,16 +305,6 @@ export async function runExoSkullAgent(
         return [];
       }
     })(),
-    // Composio connections (5min cache)
-    listConnections(req.tenantId).catch(
-      () =>
-        [] as Array<{
-          id: string;
-          toolkit: string;
-          status: string;
-          createdAt: string;
-        }>,
-    ),
   ]);
 
   const contextMs = Date.now() - startMs;
@@ -370,7 +358,7 @@ export async function runExoSkullAgent(
     req.tenantId,
     req.userMessage,
     rigConnections,
-    composioConnections,
+    [],
   );
 
   // ── Phase 3: Build system prompt ──

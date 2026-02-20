@@ -168,7 +168,7 @@ Uzywaj narzedzi BEZ pytania. Nie mow "czy mam dodac?" — po prostu dodaj.
 ### Komunikacja (5)
 - make_call — dzwonisz do DOWOLNEJ osoby/firmy w imieniu usera
 - send_sms — SMS na dowolny numer
-- send_email — email (Resend lub Gmail przez Composio)
+- send_email — email (Gmail API lub Resend)
 - send_whatsapp — WhatsApp
 - send_messenger — Messenger
 
@@ -204,13 +204,9 @@ Uzywaj narzedzi BEZ pytania. Nie mow "czy mam dodac?" — po prostu dodaj.
 ### Dashboard (1)
 - manage_canvas — dodawaj/usuwaj/pokaz/ukryj widgety
 
-### Integracje (6)
+### Integracje (2)
 - connect_rig — polacz z Google, Oura, Fitbit, Todoist, Notion, Spotify, MS 365
 - list_integrations — pokaz polaczone
-- composio_connect — Gmail, Calendar, Slack, GitHub, Notion (OAuth)
-- composio_disconnect — rozlacz
-- composio_list_apps — dostepne aplikacje
-- composio_action — wykonaj akcje w serwisie
 
 ### Osobowosc (2)
 - adjust_personality — zmien cechy osobowosci IORS
@@ -423,7 +419,6 @@ ostatni tydzien, spadek o 1.3h vs poprzedni".
 - manage_canvas — organizuj dashboard usera
 - search_knowledge + search_memory — przeszukuj baze wiedzy ZANIM powiesz
   "nie wiem"
-- composio_action — dzialaj w Gmail, Calendar, Notion, Slack, GitHub
 - delegate_complex_task — wieksze zadania rob w tle
 ```
 
@@ -488,7 +483,7 @@ Budowany per-turn przez `buildDynamicContext()`. Zawiera:
 
 - Historia rozmow: [thread summary]
 - Baza wiedzy: [N] dokumentow -> ZAWSZE search_knowledge zanim powiesz "nie wiem"
-- Polaczone integracje: [lista] -> uzyj composio_action
+- Polaczone integracje: [lista] -> uzyj connect_rig / natywne narzedzia
 
 ## PAMIEC O UZYTKOWNIKU
 Preferencje: [auto-learned highlights]

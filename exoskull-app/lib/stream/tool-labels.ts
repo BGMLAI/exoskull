@@ -49,12 +49,6 @@ const TOOL_LABELS: Record<string, string> = {
   manage_canvas: "Aktualizuję dashboard...",
   modify_dashboard: "Modyfikuję dashboard...",
 
-  // Integrations
-  composio_connect: "Łączę integrację...",
-  composio_disconnect: "Odłączam integrację...",
-  composio_list_apps: "Sprawdzam aplikacje...",
-  composio_action: "Wykonuję akcję...",
-
   // Autonomy
   propose_intervention: "Proponuję interwencję...",
   connect_rig: "Łączę urządzenie...",

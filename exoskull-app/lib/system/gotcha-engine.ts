@@ -120,7 +120,7 @@ export async function loadGoals(tenantId: string): Promise<GoalDefinition[]> {
       name: "Heal Integration",
       objective: "Diagnose and fix a broken integration",
       inputs: ["integration_name", "error_log", "tenant_id"],
-      tools: ["composio_action", "composio_connect", "search_web"],
+      tools: ["connect_rig", "search_web"],
       expectedOutputs: ["integration restored", "root cause identified"],
       edgeCases: [
         "OAuth expired → re-auth flow",
@@ -178,7 +178,8 @@ export async function loadToolManifest(
 
 function categorizeToolByName(name: string): string {
   if (name.includes("email")) return "communication";
-  if (name.includes("composio")) return "integration";
+  if (name.includes("rig") || name.includes("integration"))
+    return "integration";
   if (name.includes("task")) return "productivity";
   if (name.includes("knowledge") || name.includes("search")) return "knowledge";
   if (

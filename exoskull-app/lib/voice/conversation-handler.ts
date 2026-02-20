@@ -34,7 +34,6 @@ import {
 import { unifiedSearch } from "@/lib/memory/unified-search";
 import { logger } from "@/lib/logger";
 import { buildAppDetectionContext } from "@/lib/integrations/app-context-builder";
-import { listConnections } from "@/lib/integrations/composio-adapter";
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
@@ -532,20 +531,11 @@ export async function processUserMessage(
   } catch {
     // Non-blocking — continue without rig connections
   }
-  const composioConns = await listConnections(session.tenantId).catch(
-    () =>
-      [] as Array<{
-        id: string;
-        toolkit: string;
-        status: string;
-        createdAt: string;
-      }>,
-  );
   const appDetection = buildAppDetectionContext(
     session.tenantId,
     userMessage,
     rigConns,
-    composioConns,
+    [],
   );
   if (appDetection.contextFragment) {
     dynamicContext += appDetection.contextFragment;

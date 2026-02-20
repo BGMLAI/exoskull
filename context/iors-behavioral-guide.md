@@ -324,7 +324,7 @@ IORS: [make_call] "Dzwonię."
 [...asynchronicznie, IORS prowadzi rozmowę z recepcją...]
 IORS: [SMS] "Dentysta: poniedziałek 15:30, ul. Zielona 12.
 Dodałem do kalendarza i ustawiłem przypomnienie na niedzielę wieczór."
-[composio_action: google_calendar.create_event]
+[create_calendar_event]
 [plan_action: dentist_reminder @ Sunday 20:00]
 ```
 IORS nie tylko umawia — SAM dodaje do kalendarza i SAM ustawia przypomnienie.
@@ -378,7 +378,7 @@ wpływają na wagę. Z danych wychodzi że w dni kiedy jesz białko na
 **Łączenie:**
 ```
 User: "Połącz Google Calendar"
-IORS: [composio_connect: google_calendar] "Link do autoryzacji wysłany.
+IORS: [connect_rig: google-calendar] "Link do autoryzacji wysłany.
 Jak połączysz — automatycznie zsynchronizuję Twoje spotkania z taskami
 i ustawię inteligentne przypomnienia."
 [...OAuth flow...]
@@ -390,7 +390,7 @@ IORS nie mówi "teraz widzę Twoje spotkania" — od razu ANALIZUJE i PROPONUJE 
 **IORS sam proponuje integrację:**
 ```
 [User wspomina o Todoist 3 razy w rozmowach]
-IORS: [composio_connect: todoist] "Widzę że używasz Todoist.
+IORS: [connect_rig: todoist] "Widzę że używasz Todoist.
 Mogę zsynchronizować — Twoje taski z Todoist pojawią się tu,
 i odwrotnie. Wysyłam link do autoryzacji."
 ```
@@ -671,7 +671,7 @@ IORS sam się optymalizuje na podstawie danych. Nie czeka na feedback.
 |------|------|--------|
 | make_call | Dzwoni do DOWOLNEJ osoby/firmy | STREFA 3 (obcy) / STREFA 2 (znani) |
 | send_sms | SMS na dowolny numer | STREFA 2 |
-| send_email | Email (Resend lub Gmail przez Composio) | STREFA 2 |
+| send_email | Email (Gmail API lub Resend) | STREFA 2 |
 | send_whatsapp | WhatsApp | STREFA 2 |
 | send_messenger | Messenger | STREFA 2 |
 
@@ -723,15 +723,11 @@ IORS sam się optymalizuje na podstawie danych. Nie czeka na feedback.
 |------|------|--------|
 | manage_canvas | Dodaj/usuń/pokaż/ukryj widgety | STREFA 1 |
 
-### Integracje (6)
+### Integracje (2)
 | Tool | Opis | Strefa |
 |------|------|--------|
 | connect_rig | OAuth połączenie | STREFA 2 |
 | list_integrations | Pokaż połączone | STREFA 1 |
-| composio_connect | Gmail, Calendar, itd. (OAuth) | STREFA 2 |
-| composio_disconnect | Rozłącz | STREFA 2 |
-| composio_list_apps | Dostępne aplikacje | STREFA 1 |
-| composio_action | Wykonaj akcję w serwisie | STREFA 1-2 (zależy od akcji) |
 
 ### Osobowość (2)
 | Tool | Opis | Strefa |

@@ -14,8 +14,8 @@
 export interface AppMapping {
   displayName: string;
   connectorSlug: string;
-  connectorType: "rig" | "composio";
-  connectToolName: "connect_rig" | "composio_connect";
+  connectorType: "rig";
+  connectToolName: "connect_rig";
   category:
     | "productivity"
     | "health"
@@ -81,38 +81,6 @@ register(
     category: "productivity",
   },
 );
-
-register(["trello", "w trello", "z trello", "trella", "na trello"], {
-  displayName: "Trello",
-  connectorSlug: "TRELLO",
-  connectorType: "composio",
-  connectToolName: "composio_connect",
-  category: "productivity",
-});
-
-register(["linear", "w linear", "z linear", "lineara", "linearze"], {
-  displayName: "Linear",
-  connectorSlug: "LINEAR",
-  connectorType: "composio",
-  connectToolName: "composio_connect",
-  category: "dev",
-});
-
-register(["asana", "w asanie", "asany", "z asany", "do asany", "asaną"], {
-  displayName: "Asana",
-  connectorSlug: "ASANA",
-  connectorType: "composio",
-  connectToolName: "composio_connect",
-  category: "productivity",
-});
-
-register(["jira", "w jirze", "jiry", "z jiry", "do jiry", "jirą"], {
-  displayName: "Jira",
-  connectorSlug: "JIRA",
-  connectorType: "composio",
-  connectToolName: "composio_connect",
-  category: "dev",
-});
 
 // ── Google Suite ──
 
@@ -354,14 +322,6 @@ register(
 );
 
 // ── Finance ──
-
-register(["stripe", "stripem", "ze stripe'a", "stripe'a"], {
-  displayName: "Stripe",
-  connectorSlug: "STRIPE",
-  connectorType: "composio",
-  connectToolName: "composio_connect",
-  category: "finance",
-});
 
 // ============================================================================
 // PUBLIC API
