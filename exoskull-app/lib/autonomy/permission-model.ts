@@ -12,6 +12,7 @@ import {
   PermissionCategory,
 } from "./types";
 
+import { seedDefaultGrants, isDefaultGranted } from "./default-grants";
 import { logger } from "@/lib/logger";
 // ============================================================================
 // PERMISSION MODEL CLASS
@@ -50,6 +51,13 @@ export class PermissionModel {
 
       if (error) {
         logger.error("[PermissionModel] RPC error:", error);
+        // Fallback to defaults on DB error
+        if (isDefaultGranted(action)) {
+          logger.info(
+            `[PermissionModel] Fallback: default grant for ${action}`,
+          );
+          return { granted: true, reason: "granted" };
+        }
         return { granted: false, reason: "no_matching_grant" };
       }
 
@@ -60,6 +68,21 @@ export class PermissionModel {
       // Check why it was denied
       const grant = await this.findMatchingGrant(userId, action);
       if (!grant) {
+        // No grants in DB at all — check defaults and seed them
+        const allGrants = await this.getUserGrants(userId, false);
+        if (allGrants.length === 0) {
+          // Tenant has NO grants — seed defaults asynchronously
+          seedDefaultGrants(userId).catch((err) =>
+            logger.error("[PermissionModel] Background seed failed:", err),
+          );
+          // Check against in-memory defaults for immediate response
+          if (isDefaultGranted(action)) {
+            logger.info(
+              `[PermissionModel] Default-granted: ${action} for ${userId} (seeding DB)`,
+            );
+            return { granted: true, reason: "granted" };
+          }
+        }
         return { granted: false, reason: "no_matching_grant" };
       }
 
@@ -89,6 +112,10 @@ export class PermissionModel {
       return { granted: false, reason: "no_matching_grant" };
     } catch (error) {
       logger.error("[PermissionModel] Check error:", error);
+      // Fallback to defaults on any error
+      if (isDefaultGranted(action)) {
+        return { granted: true, reason: "granted" };
+      }
       return { granted: false, reason: "no_matching_grant" };
     }
   }

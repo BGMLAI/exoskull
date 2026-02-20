@@ -24,6 +24,7 @@ import {
   sendProactiveMessage,
 } from "@/lib/cron/tenant-utils";
 import { canSendProactive } from "@/lib/autonomy/outbound-triggers";
+import { planDailyActions } from "@/lib/goals/daily-action-planner";
 import { ensureFreshToken } from "@/lib/rigs/oauth";
 import { createGoogleClient } from "@/lib/rigs/google/client";
 
@@ -159,6 +160,20 @@ async function handler(req: NextRequest) {
         const googleData = googleRes;
         const healthMetrics = healthRes.data || [];
 
+        // Generate daily goal actions (creates tasks + returns briefing section)
+        let dailyActionsBriefing = "";
+        try {
+          if (Date.now() - startTime < TIMEOUT_MS - 20_000) {
+            const dailyPlan = await planDailyActions(tenant.id);
+            dailyActionsBriefing = dailyPlan.briefingSection;
+          }
+        } catch (err) {
+          logger.warn("[MorningBriefing] Daily action planning failed:", {
+            tenantId: tenant.id,
+            error: err instanceof Error ? err.message : err,
+          });
+        }
+
         // Build health summary from metrics
         const healthSummary: Record<string, { value: number; unit: string }> =
           {};
@@ -194,6 +209,7 @@ async function handler(req: NextRequest) {
             sleep_min: healthSummary.sleep?.value || null,
             calories: healthSummary.calories?.value || null,
           },
+          goal_actions: dailyActionsBriefing || null,
           language: tenant.language || "pl",
         });
 
@@ -201,7 +217,7 @@ async function handler(req: NextRequest) {
           messages: [
             {
               role: "system",
-              content: `You are IORS — the user's intelligent life assistant. Generate a concise morning briefing in ${tenant.language || "pl"} language. Be warm but direct. Use short sentences. Include: today's calendar, health summary (steps/sleep/HR if available), top priorities, unread emails count. Max 500 chars (SMS-friendly).`,
+              content: `You are IORS — the user's intelligent life assistant. Generate a concise morning briefing in ${tenant.language || "pl"} language. Be warm but direct. Use short sentences. Include: today's calendar, health summary (steps/sleep/HR if available), top priorities, unread emails count. If goal_actions are provided, include them as "Dziś dla celów:" section. Max 600 chars (SMS-friendly).`,
             },
             {
               role: "user",

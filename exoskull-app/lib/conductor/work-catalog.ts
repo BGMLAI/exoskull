@@ -517,6 +517,49 @@ export const WORK_CATALOG: WorkCatalogEntry[] = [
     },
   },
 
+  // ── OPTIMIZATION: Outcome Analysis ──────────────────────────────
+  {
+    id: "outcome_analysis",
+    name: "Intervention Outcome Analysis",
+    category: "optimization",
+    costTier: "free",
+    estimatedCostCents: 0,
+    maxDurationMs: 15_000,
+    cooldownMinutes: 360, // Once every 6h
+    perTenant: true,
+    isEligible: async (ctx) => {
+      const { getServiceSupabase } = await import("@/lib/supabase/service");
+      const { count } = await getServiceSupabase()
+        .from("exo_interventions")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", ctx.tenantId!)
+        .eq("status", "completed")
+        .gte("executed_at", new Date(Date.now() - 48 * 3600000).toISOString());
+      return (count || 0) > 0;
+    },
+    execute: async (ctx) => {
+      try {
+        const { analyzeRecentOutcomes } =
+          await import("@/lib/autonomy/outcome-tracker");
+        const result = await analyzeRecentOutcomes(ctx.tenantId!);
+        return {
+          success: true,
+          costCents: 0,
+          result: {
+            processed: result.processed,
+            outcomes: result.outcomes.length,
+          },
+        };
+      } catch (err) {
+        return {
+          success: false,
+          costCents: 0,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+  },
+
   // ── SPECULATIVE (Priority 10) ──────────────────────────────────
 
   {

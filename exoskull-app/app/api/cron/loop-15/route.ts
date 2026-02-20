@@ -318,6 +318,36 @@ async function handler(req: NextRequest) {
       }
     }
 
+    // Step 5: MAPE-K cycle — run for tenants that had "observation" action
+    let mapekResult = null;
+    const observationTenants = evaluationResults.filter(
+      (r) => r.action === "observation",
+    );
+    if (
+      observationTenants.length > 0 &&
+      Date.now() - startTime < TIMEOUT_MS - 10_000
+    ) {
+      try {
+        const { runAutonomyCycle } = await import("@/lib/autonomy/mape-k-loop");
+        // Run MAPE-K for first observation tenant (budget: 1 per loop-15)
+        mapekResult = await runAutonomyCycle(
+          observationTenants[0].tenantId,
+          "cron",
+          "loop-15-observation",
+        );
+        logger.info("[Loop15] MAPE-K cycle completed:", {
+          tenantId: observationTenants[0].tenantId,
+          proposed: mapekResult.plan.interventions.length,
+          executed: mapekResult.execute.interventionsExecuted,
+          durationMs: mapekResult.durationMs,
+        });
+      } catch (mapekErr) {
+        logger.error("[Loop15] MAPE-K cycle failed:", {
+          error: mapekErr instanceof Error ? mapekErr.message : mapekErr,
+        });
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       evaluated,
@@ -328,6 +358,16 @@ async function handler(req: NextRequest) {
             action: ralphResult.action.type,
             description: ralphResult.action.description,
             durationMs: ralphResult.durationMs,
+          }
+        : null,
+      mapek: mapekResult
+        ? {
+            tenantId: mapekResult.tenantId,
+            issues: mapekResult.analyze.issues.length,
+            proposed: mapekResult.plan.interventions.length,
+            executed: mapekResult.execute.interventionsExecuted,
+            learnings: mapekResult.knowledge.learnings.length,
+            durationMs: mapekResult.durationMs,
           }
         : null,
       evaluations: evaluationResults,

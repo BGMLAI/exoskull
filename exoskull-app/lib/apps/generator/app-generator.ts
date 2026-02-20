@@ -98,13 +98,26 @@ export async function generateApp(
         };
       }
 
-      // Step 6: Auto-activate when built from chat (user already requested it)
-      if (request.source === "chat_command" && app) {
+      // Step 6: Auto-activate when built from chat or safe autonomous sources
+      const autoActivateSources = [
+        "chat_command", // User explicitly requested
+        "iors_suggestion", // IORS detected need (Ralph Loop)
+        "auto_detection", // Pattern detection (3+ mentions)
+      ];
+      if (autoActivateSources.includes(request.source) && app) {
         const activation = await activateApp(app.id, tenant_id);
         if (activation.success) {
           logger.info(
-            `[AppGenerator] App auto-activated from chat: ${spec.slug}`,
+            `[AppGenerator] App auto-activated from ${request.source}: ${spec.slug}`,
           );
+
+          // Notify user about auto-created app (non-blocking)
+          if (request.source !== "chat_command") {
+            sendAppCreatedNotification(supabase, tenant_id, spec).catch((err) =>
+              logger.warn("[AppGenerator] Notification failed:", err),
+            );
+          }
+
           return {
             success: true,
             app: { ...app, status: "active", approval_status: "approved" },
@@ -452,6 +465,54 @@ async function sendAppApprovalNotification(
   } catch (error) {
     // Non-fatal — app is still pending, user can approve via chat
     logger.error("[AppGenerator] Failed to send approval SMS:", error);
+  }
+}
+
+/**
+ * Send SMS/notification to tenant about an auto-created app.
+ */
+async function sendAppCreatedNotification(
+  supabase: ReturnType<typeof getServiceSupabase>,
+  tenantId: string,
+  spec: AppSpec,
+): Promise<void> {
+  try {
+    const { data: tenant } = await supabase
+      .from("exo_tenants")
+      .select("phone")
+      .eq("id", tenantId)
+      .single();
+
+    if (!tenant?.phone) return;
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+    if (!accountSid || !authToken || !fromNumber) return;
+
+    const body = `ExoSkull stworzył dla Ciebie: "${spec.name}" — ${spec.description}. Znajdziesz go na dashboardzie. Jeśli nie chcesz, napisz "usuń aplikację ${spec.slug}".`;
+
+    const params = new URLSearchParams({
+      To: tenant.phone,
+      From: fromNumber,
+      Body: body.length > 1500 ? body.substring(0, 1497) + "..." : body,
+    });
+
+    await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            "Basic " +
+            Buffer.from(`${accountSid}:${authToken}`).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params.toString(),
+      },
+    );
+  } catch (error) {
+    logger.error("[AppGenerator] App created notification failed:", error);
   }
 }
 

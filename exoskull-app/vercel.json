@@ -181,6 +181,10 @@
     {
       "path": "/api/cron/signal-triage",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/skill-auto-generator",
+      "schedule": "0 4 * * *"
     }
   ]
 }

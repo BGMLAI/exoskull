@@ -23,6 +23,8 @@ import { getAlignmentGuardian } from "./guardian";
 import { collectMonitorData } from "./mape-k-monitor";
 import { analyzeMonitorData, planInterventionForIssue } from "./mape-k-analyze";
 
+import { analyzeRecentOutcomes } from "./outcome-tracker";
+import { learnFromOutcomes } from "./learning-engine";
 import { logger } from "@/lib/logger";
 
 // ============================================================================
@@ -533,7 +535,37 @@ export class MAPEKLoop {
       );
     }
 
-    // 4. Log learning event
+    // 4. Analyze recent intervention outcomes (closed-loop feedback)
+    try {
+      const outcomeResult = await analyzeRecentOutcomes(tenantId);
+      if (outcomeResult.processed > 0) {
+        feedbackProcessed += outcomeResult.processed;
+        learnings.push(
+          `Outcome analysis: ${outcomeResult.outcomes.length} outcomes tracked from ${outcomeResult.processed} interventions`,
+        );
+      }
+    } catch (err) {
+      logger.warn(
+        "[MAPE-K] Outcome analysis failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+
+    // 5. Run learning engine (updates tenant preferences)
+    try {
+      const learningResult = await learnFromOutcomes(tenantId);
+      if (learningResult.preferences_updated > 0) {
+        patternsUpdated += learningResult.preferences_updated;
+        learnings.push(...learningResult.insights);
+      }
+    } catch (err) {
+      logger.warn(
+        "[MAPE-K] Learning engine failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+
+    // 6. Log learning event
     await this.supabase.from("learning_events").insert({
       tenant_id: tenantId,
       event_type: patternsDetected > 0 ? "pattern_detected" : "agent_completed",
@@ -541,6 +573,7 @@ export class MAPEKLoop {
         phase: "knowledge",
         feedbackProcessed,
         patternsDetected,
+        patternsUpdated,
         learnings,
         interventionsCreated: executeResult.interventionsCreated,
         interventionsExecuted: executeResult.interventionsExecuted,
