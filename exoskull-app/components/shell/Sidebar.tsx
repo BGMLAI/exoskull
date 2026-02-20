@@ -10,6 +10,7 @@ import {
   Target,
   Brain,
   ChevronLeft,
+  TreePine,
 } from "lucide-react";
 import { useAppStore } from "@/lib/stores/useAppStore";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/goals", label: "Cele", icon: Target },
   { href: "/dashboard/apps", label: "Aplikacje", icon: LayoutGrid },
   { href: "/dashboard/integrations", label: "Integracje", icon: Plug },
+  { href: "/dashboard/values", label: "Bieguny", icon: TreePine },
   { href: "/dashboard/knowledge", label: "Wiedza", icon: Brain },
   { href: "/dashboard/settings", label: "Ustawienia", icon: Settings },
 ] as const;

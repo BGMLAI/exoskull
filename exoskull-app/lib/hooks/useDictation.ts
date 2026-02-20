@@ -15,11 +15,16 @@ interface UseDictationReturn {
   isListening: boolean;
   isSupported: boolean;
   interimTranscript: string;
+  continuous: boolean;
   toggleListening: () => void;
+  setContinuous: (on: boolean) => void;
+  startListening: () => void;
+  stopListening: () => void;
 }
 
 // ============================================================================
 // HOOK — MediaRecorder → OpenAI/Groq Whisper (/api/voice/transcribe)
+// Supports continuous mode: auto-restart after transcription.
 // ============================================================================
 
 export function useDictation(
@@ -30,6 +35,7 @@ export function useDictation(
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState("");
+  const [continuous, setContinuousState] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -42,21 +48,27 @@ export function useDictation(
   const silenceStartRef = useRef<number | null>(null);
   const onFinalTranscriptRef = useRef(onFinalTranscript);
   const onErrorRef = useRef(onError);
+  const continuousRef = useRef(false);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const SILENCE_TIMEOUT_MS = 1500; // 1.5 seconds silence → auto-stop
-  const MAX_RECORDING_MS = 120_000; // 2 min safety limit
+  const SILENCE_TIMEOUT_MS = 1500;
+  const MAX_RECORDING_MS = 120_000;
+  const RESTART_DELAY_MS = 300; // brief pause between segments in continuous mode
 
-  // Keep refs fresh to avoid stale closures
+  // Keep refs fresh
   onFinalTranscriptRef.current = onFinalTranscript;
   onErrorRef.current = onError;
 
-  // Check mic support on mount
+  const setContinuous = useCallback((on: boolean) => {
+    setContinuousState(on);
+    continuousRef.current = on;
+  }, []);
+
   useEffect(() => {
     const hasMic = typeof navigator !== "undefined" && !!navigator.mediaDevices;
     setIsSupported(hasMic);
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (mediaRecorderRef.current?.state === "recording") {
@@ -64,12 +76,13 @@ export function useDictation(
       }
       streamRef.current?.getTracks().forEach((t) => t.stop());
       if (levelIntervalRef.current) clearInterval(levelIntervalRef.current);
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       audioContextRef.current?.close().catch(() => {});
     };
   }, []);
 
   // --------------------------------------------------------------------------
-  // Audio level monitoring (detect silent mic)
+  // Audio level monitoring
   // --------------------------------------------------------------------------
 
   const startLevelMonitor = useCallback((stream: MediaStream) => {
@@ -91,7 +104,6 @@ export function useDictation(
         analyser.getByteFrequencyData(dataArray);
         const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
 
-        // Max recording duration safety
         const elapsed = Date.now() - recordStartRef.current;
         if (elapsed >= MAX_RECORDING_MS) {
           if (mediaRecorderRef.current?.state === "recording") {
@@ -102,31 +114,27 @@ export function useDictation(
 
         if (avg > 5) {
           hadAudioRef.current = true;
-          silenceStartRef.current = null; // Reset silence timer
-          setInterimTranscript("Nagrywam... 🎤");
+          silenceStartRef.current = null;
+          setInterimTranscript("Nagrywam...");
         } else if (hadAudioRef.current) {
-          // Had audio before, now silent → start auto-stop countdown
           if (!silenceStartRef.current) {
             silenceStartRef.current = Date.now();
           }
           const silentFor = Date.now() - silenceStartRef.current;
           if (silentFor >= SILENCE_TIMEOUT_MS) {
-            // Auto-stop after 5s silence
             if (mediaRecorderRef.current?.state === "recording") {
               mediaRecorderRef.current.stop();
             }
             return;
           }
           const remaining = Math.ceil((SILENCE_TIMEOUT_MS - silentFor) / 1000);
-          setInterimTranscript(`Cisza... auto-wysyłka za ${remaining}s`);
+          setInterimTranscript(`Cisza... auto-wysylka za ${remaining}s`);
         } else if (!hadAudioRef.current) {
-          setInterimTranscript(
-            "🔇 Mikrofon nie łapie dźwięku — sprawdź ustawienia",
-          );
+          setInterimTranscript("Mikrofon nie lapie dzwieku");
         }
       }, 300);
     } catch {
-      // AudioContext not available — skip level monitoring
+      // AudioContext not available
     }
   }, []);
 
@@ -141,7 +149,7 @@ export function useDictation(
   }, []);
 
   // --------------------------------------------------------------------------
-  // Transcribe via Whisper (OpenAI primary, Groq fallback)
+  // Transcribe
   // --------------------------------------------------------------------------
 
   const transcribeAudio = useCallback(async (audioBlob: Blob) => {
@@ -169,8 +177,8 @@ export function useDictation(
       if (!transcript?.trim()) {
         onErrorRef.current?.(
           hadAudioRef.current
-            ? "Nie rozpoznano mowy. Mów wyraźniej i bliżej mikrofonu."
-            : "Mikrofon nie nagrał dźwięku. Sprawdź: Windows Settings → Privacy → Microphone",
+            ? "Nie rozpoznano mowy. Mow wyrazniej."
+            : "Mikrofon nie nagral dzwieku.",
         );
         return;
       }
@@ -179,7 +187,7 @@ export function useDictation(
     } catch (err) {
       console.error("[useDictation] Transcription failed:", err);
       onErrorRef.current?.(
-        err instanceof Error ? err.message : "Błąd transkrypcji",
+        err instanceof Error ? err.message : "Blad transkrypcji",
       );
     } finally {
       setInterimTranscript("");
@@ -196,8 +204,6 @@ export function useDictation(
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-
-      // Start audio level monitoring
       startLevelMonitor(stream);
 
       const mediaRecorder = new MediaRecorder(stream, {
@@ -219,55 +225,75 @@ export function useDictation(
         const duration = Date.now() - recordStartRef.current;
         const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
 
-        console.log("[useDictation] Recording stopped:", {
-          duration: `${duration}ms`,
-          blobSize: `${audioBlob.size} bytes`,
-          chunks: chunksRef.current.length,
-          hadAudio: hadAudioRef.current,
-        });
-
-        // Require at least 1s of recording
         if (duration < 1000 || audioBlob.size < 1000) {
-          onErrorRef.current?.(
-            `Za krótkie nagranie (${Math.round(duration / 1000)}s, ${Math.round(audioBlob.size / 1024)}KB). Mów dłużej.`,
-          );
-          setIsListening(false);
-          setInterimTranscript("");
+          // Too short — in continuous mode, just restart
+          if (continuousRef.current) {
+            setInterimTranscript("Slucham...");
+            restartTimerRef.current = setTimeout(() => {
+              startRecording();
+            }, RESTART_DELAY_MS);
+          } else {
+            onErrorRef.current?.(
+              `Za krotkie nagranie (${Math.round(duration / 1000)}s). Mow dluzej.`,
+            );
+            setIsListening(false);
+            setInterimTranscript("");
+          }
           return;
         }
 
-        // Warn if no audio detected but still try
-        if (!hadAudioRef.current) {
-          console.warn(
-            "[useDictation] No audio detected during recording — mic may be muted",
-          );
-        }
-
-        transcribeAudio(audioBlob);
+        // Transcribe, then restart if continuous
+        transcribeAudio(audioBlob).finally(() => {
+          if (continuousRef.current) {
+            setInterimTranscript("Slucham...");
+            restartTimerRef.current = setTimeout(() => {
+              startRecording();
+            }, RESTART_DELAY_MS);
+          }
+        });
       };
 
       mediaRecorder.start(250);
       recordStartRef.current = Date.now();
       setIsListening(true);
-      setInterimTranscript("Nagrywam...");
+      setInterimTranscript(
+        continuousRef.current ? "Slucham..." : "Nagrywam...",
+      );
     } catch (err) {
       console.error("[useDictation] getUserMedia failed:", err);
       onErrorRef.current?.(
-        "Brak dostępu do mikrofonu. Sprawdź ustawienia przeglądarki.",
+        "Brak dostepu do mikrofonu. Sprawdz ustawienia przegladarki.",
       );
       setIsListening(false);
     }
   }, [transcribeAudio, startLevelMonitor, stopLevelMonitor]);
 
   const stopRecording = useCallback(() => {
+    // Cancel any pending restart
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+    // Disable continuous so onstop doesn't restart
+    continuousRef.current = false;
+    setContinuousState(false);
+
     if (mediaRecorderRef.current?.state === "recording") {
       mediaRecorderRef.current.stop();
     }
   }, []);
 
   // --------------------------------------------------------------------------
-  // Toggle
+  // Public API
   // --------------------------------------------------------------------------
+
+  const startListening = useCallback(() => {
+    if (!isListening) startRecording();
+  }, [isListening, startRecording]);
+
+  const stopListening = useCallback(() => {
+    stopRecording();
+  }, [stopRecording]);
 
   const toggleListening = useCallback(() => {
     if (isListening) {
@@ -281,6 +307,10 @@ export function useDictation(
     isListening,
     isSupported,
     interimTranscript,
+    continuous,
     toggleListening,
+    setContinuous,
+    startListening,
+    stopListening,
   };
 }

@@ -200,7 +200,7 @@ export function ValueTreeWidget() {
         <CardTitle className="text-lg flex items-center justify-between">
           <span className="flex items-center gap-2">
             <TreePine className="h-5 w-5 text-emerald-500" />
-            Drzewo wartosci
+            Bieguny
           </span>
           <div className="flex items-center gap-1">
             <Link

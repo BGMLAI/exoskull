@@ -14,7 +14,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 // ============================================================================
 // NAVIGATION CONFIG
-// Simplified: 5 items (was 8). Tasks/Goals/Skills merged into Wartosci.
+// Simplified: 5 items (was 8). Tasks/Goals/Skills merged into Bieguny.
 // Memory merged into Wiedza.
 // ============================================================================
 
@@ -23,7 +23,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard/knowledge", label: "Wiedza", icon: FolderTree },
   { href: "/dashboard/emails", label: "Skrzynka", icon: Mail },
-  { href: "/dashboard/values", label: "Wartosci", icon: TreePine },
+  { href: "/dashboard/values", label: "Bieguny", icon: TreePine },
   { href: "/dashboard/settings", label: "Ustawienia", icon: Settings },
 ];
 

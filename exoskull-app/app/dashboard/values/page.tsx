@@ -133,8 +133,8 @@ const DEFAULT_COLORS = [
 ];
 
 const TYPE_LABELS: Record<string, string> = {
-  value: "Wartosc",
-  loop: "Biegun",
+  value: "Biegun",
+  loop: "Podrzedny",
   quest: "Quest",
   mission: "Misja",
   challenge: "Wyzwanie",
@@ -400,7 +400,7 @@ export default function ValuesPage() {
       });
 
       if (res.ok) {
-        toast.success("Wartosc zaktualizowana");
+        toast.success("Biegun zaktualizowany");
         setEditingId(null);
         fetchValues();
       } else {
@@ -429,7 +429,7 @@ export default function ValuesPage() {
       });
 
       if (res.ok) {
-        toast.success("Wartosci domyslne utworzone");
+        toast.success("Bieguny domyslne utworzone");
         fetchValues();
       }
     } catch {
@@ -461,9 +461,7 @@ export default function ValuesPage() {
       <div className="flex items-center justify-center h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950">
         <div className="text-center">
           <Loader2 className="h-10 w-10 animate-spin text-indigo-400 mx-auto mb-3" />
-          <p className="text-indigo-300/60 text-sm">
-            Ladowanie hierarchii wartosci...
-          </p>
+          <p className="text-indigo-300/60 text-sm">Ladowanie biegunow...</p>
         </div>
       </div>
     );
@@ -482,10 +480,10 @@ export default function ValuesPage() {
               <div className="absolute inset-0 blur-2xl bg-indigo-500/10 rounded-full" />
             </div>
             <h2 className="text-2xl font-bold text-white/90 mb-2">
-              Brak wartosci
+              Brak biegunow
             </h2>
             <p className="text-indigo-300/60 mb-8 text-center max-w-md leading-relaxed">
-              Wartosci to najwyzszy poziom Twojej hierarchii zyciowej. Definiuja
+              Bieguny to najwyzszy poziom Twojej hierarchii zyciowej. Definiuja
               co jest dla Ciebie najwazniejsze. Cala struktura zycia buduje sie
               na nich.
             </p>
@@ -494,7 +492,7 @@ export default function ValuesPage() {
               className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/25"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Utworz wartosci domyslne
+              Utworz bieguny domyslne
             </Button>
           </div>
         ) : (
@@ -538,7 +536,7 @@ export default function ValuesPage() {
         <div className="absolute top-4 left-4 z-10">
           <h1 className="text-2xl font-bold flex items-center gap-2 text-white/90">
             <TreePine className="h-6 w-6 text-emerald-400" />
-            Drzewo wartosci
+            Bieguny
             <Badge
               variant="outline"
               className="text-xs text-indigo-300/80 border-indigo-500/30 ml-2"
@@ -547,7 +545,7 @@ export default function ValuesPage() {
             </Badge>
           </h1>
           <p className="text-sm text-indigo-300/50 mt-1">
-            {stats.values} wartosci / {stats.loops} biegunow / {stats.quests}{" "}
+            {stats.values} biegunow / {stats.loops} podrzednych / {stats.quests}{" "}
             questow / {stats.missions} misji / {stats.challenges} wyzwan
           </p>
         </div>
@@ -980,11 +978,11 @@ export default function ValuesPage() {
               Sciezka hierarchii
             </p>
             <p className="text-xs text-white/50">
-              {selectedNode.type === "value" && "Wartosc"}
+              {selectedNode.type === "value" && "Biegun"}
               {selectedNode.type === "loop" &&
-                `Wartosc > ${selectedNode.parentName || "?"}`}
+                `Biegun > ${selectedNode.parentName || "?"}`}
               {selectedNode.type === "quest" &&
-                `Wartosc > Biegun > ${selectedNode.name}`}
+                `Biegun > Podrzedny > ${selectedNode.name}`}
               {selectedNode.type === "mission" &&
                 `... > Quest > ${selectedNode.name}`}
               {selectedNode.type === "challenge" &&
