@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { MobileNav } from "./MobileNav";
+import { useAppStore } from "@/lib/stores/useAppStore";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -17,6 +19,13 @@ interface AppShellProps {
  * Mobile: TopBar + Content + BottomNav
  */
 export function AppShell({ children, topBarSlot }: AppShellProps) {
+  // Close sidebar on mobile on first render
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      useAppStore.getState().setSidebarOpen(false);
+    }
+  }, []);
+
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
       {/* Sidebar (desktop: always, mobile: overlay) */}
