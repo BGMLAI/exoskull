@@ -1,5 +1,69 @@
 # Session Log
 
+## [2026-02-20] Autonomy Pipeline Activation — Closed-Loop Goal Optimization
+
+### Tasks
+
+- Phase 1.1: Default autonomy grants + permission model fallback: **SUCCESS**
+- Phase 1.2: Wire MAPE-K cycle to loop-15 CRON: **SUCCESS**
+- Phase 1.3: Skill auto-generator CRON (daily 4AM): **SUCCESS**
+- Phase 2.1: Daily action planner + morning briefing hook: **SUCCESS**
+- Phase 2.2: Outcome tracker + learning engine + MAPE-K integration: **SUCCESS**
+- Phase 3: Auto-activate IORS apps + conductor work catalog: **SUCCESS**
+- TypeScript compilation (`tsc --noEmit`): **SUCCESS** (0 errors)
+- DB migration (4 tenants seeded, 2 new tables): **SUCCESS**
+- Vercel deploy: **SUCCESS** (● Ready)
+- Git push: **SUCCESS** (3 commits: `72fa176`, `c93e54d`)
+
+### Root Cause
+
+The entire autonomy system (41 CRONs, MAPE-K, Conductor) was well-architected but **dead** because:
+
+1. `user_autonomy_grants` table was **empty** for all tenants → every `isActionPermitted()` returned false
+2. MAPE-K loop existed but **wasn't scheduled** on any CRON
+3. Skill detector stored suggestions but **nobody called** the generator
+4. App builder only auto-activated from `chat_command`, not IORS suggestions
+
+### New Files
+
+| File                                                             | Purpose                                                                       |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `lib/autonomy/default-grants.ts`                                 | 9 conservative default grants per tenant + `isDefaultGranted()` fallback      |
+| `lib/skills/auto-generator.ts`                                   | Bridges skill detection → generation (daily CRON)                             |
+| `app/api/cron/skill-auto-generator/route.ts`                     | CRON endpoint for skill auto-generation                                       |
+| `lib/goals/daily-action-planner.ts`                              | Goal → daily tasks (morning) + completion review (evening)                    |
+| `lib/autonomy/outcome-tracker.ts`                                | Tracks intervention effectiveness (user_response, goal_progress, ignored)     |
+| `lib/autonomy/learning-engine.ts`                                | Learns preferences from outcomes (best_contact_hour, preferred_channel)       |
+| `supabase/migrations/20260307000001_default_autonomy_grants.sql` | Seeds grants + creates `exo_intervention_outcomes` + `exo_tenant_preferences` |
+
+### Modified Files
+
+| File                                     | Change                                                |
+| ---------------------------------------- | ----------------------------------------------------- |
+| `lib/autonomy/permission-model.ts`       | Fallback to default grants when DB empty + async seed |
+| `app/api/cron/loop-15/route.ts`          | Added MAPE-K cycle as Step 5                          |
+| `app/api/cron/morning-briefing/route.ts` | Hooks daily action planner into briefing              |
+| `lib/autonomy/mape-k-loop.ts`            | Knowledge phase: outcome analysis + learning engine   |
+| `lib/apps/generator/app-generator.ts`    | Auto-activate from iors_suggestion + auto_detection   |
+| `lib/conductor/work-catalog.ts`          | Added outcome_analysis work type                      |
+| `vercel.json`                            | Added skill-auto-generator CRON (4AM daily)           |
+
+### Key Decisions
+
+- Default grants are conservative (daily limits: 5 SMS wellness, 3 SMS goal, 10 tasks, 20 health logs)
+- Denied by default: `make_call:*`, `spend_money:*`, `delete_data:*`, `modify_source:*`, `create_event:*`
+- MAPE-K runs max 1 cycle per loop-15 (budget-controlled)
+- Outcome tracker uses 48h analysis window
+- Learning engine stores preferences in `exo_tenant_preferences` with confidence scores
+
+### Migration Fix
+
+- Initial migration failed on tenant `00000000-0000-0000-0000-000000000000` (system tenant not in `auth.users`)
+- Fixed by adding `AND id IN (SELECT id FROM auth.users)` filter
+- All 4 real tenants seeded successfully (36 grants total)
+
+---
+
 ## [2026-02-19] Full Google & Meta Integration — 42 New IORS Tools
 
 ### Tasks

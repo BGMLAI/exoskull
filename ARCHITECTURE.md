@@ -3,7 +3,7 @@
 
 **Version:** 7.0
 **Created:** 2026-02-01
-**Updated:** 2026-02-18
+**Updated:** 2026-02-20
 **Status:** 🟡 Active Development — MVP Live (exoskull.xyz)
 
 ---
@@ -1749,12 +1749,14 @@ MAPE_K_Loop = {
 
     knowledge: {
       description: "Update knowledge base with results",
-      storage: "Skill Memory (Layer 14)",
+      storage: "Skill Memory (Layer 14) + exo_tenant_preferences + exo_intervention_outcomes",
       learning: [
         "What worked → encode as pattern",
         "What failed → encode as anti-pattern",
-        "Update user preferences",
-        "Improve future predictions"
+        "Update user preferences (best_contact_hour, preferred_channel, message_style)",
+        "Improve future predictions",
+        "Outcome tracker: analyze 48h window → user_response | goal_progress | ignored",
+        "Learning engine: aggregate effectiveness → update tenant preferences"
       ]
     }
   },
@@ -2145,16 +2147,16 @@ Emotion_Intelligence = {
 | L7: Discovery & Relationship | Onboarding (~60 topics), profile extraction | ✅ Live |
 | L8: Gap Detection | Weekly CRON (Sun 09:00), 7 life domains, skill suggestions, auto-expire 14d | ✅ Live |
 | L9: Success Metrics | Goal engine, dashboard, CRON auto-progress, voice tools | ✅ Live |
-| L10: Self-Optimization | Full MAPE-K loop (6h CRON), system metrics, cross-domain correlations, enhanced A+P+E+K | ✅ Live |
+| L10: Self-Optimization | Full MAPE-K loop (every 15min via loop-15), outcome tracking, learning engine, preference storage. Closed-loop: intervention → outcome → learn → optimize | ✅ Live |
 | L11: Emotion Intelligence | Text + voice fusion, crisis detection, adaptive responses, trends dashboard | ✅ Live |
 | L12: Total Recall Memory | Daily summaries, search, 50+ msg context | ✅ Live |
 | L13: Data Lake | Bronze/Silver/Gold ETL pipeline | ✅ Live |
-| L14: Skill Memory & Dynamic Generation | Full pipeline live (6 stages, dashboard, suggestions, circuit breaker) | ✅ Live |
+| L14: Skill Memory & Dynamic Generation | Full pipeline live (6 stages, dashboard, suggestions, circuit breaker, auto-generator CRON daily 4AM) | ✅ Live |
 | L15: Custom App Builder | Mod system (5 mods), Rig system (6 rigs), Dynamic Skills pipeline designed | ✅ Live |
-| L16: Autonomous Actions | Outbound calls, proactive messaging, email integration, 22 permission categories, two-tier consent | ✅ Live |
+| L16: Autonomous Actions | Outbound calls, proactive messaging, email integration, 22 permission categories, two-tier consent, default grants auto-seeded, daily action planner (goal→task) | ✅ Live |
 | L17: Device Integration | Oura + Google Fit live | ⏳ Partial |
 | L18: Android Integration | Zero-install SMS/Voice. APK planned | 🔴 Planned |
-| L19: CRON Operations | 28 jobs, TZ-aware, rate-limited, MAPEK 3-tier loop | ✅ Live |
+| L19: CRON Operations | 29 jobs (+ skill-auto-generator daily 4AM), TZ-aware, rate-limited, MAPEK 3-tier loop | ✅ Live |
 | L20: Progressive Deployment | Vercel auto-deploy, exoskull.xyz | ✅ Live |
 | L21: Guardrails | RLS, auth, rate limits, circuit breaker | ✅ Live |
 
@@ -2737,7 +2739,7 @@ App_Builder = {
 
 **All actions system can take autonomously (with user approval).**
 
-> **Implementation (Feb 2026):** Outbound calls, proactive messaging, and email integration all live. Tables: exo_interventions, exo_guardian_system. Intervention executor runs every 15min. 22 permission categories with two-tier consent system (with_approval + autonomous). Voice tools: plan_action, list_planned_actions, cancel_planned_action, delegate_complex_task. Full MAPE-K loop with 3-tier CRON (petla 1min, loop-15 15min, loop-daily 24h). Rate limit: 8 proactive messages/day.
+> **Implementation (Feb 2026):** Outbound calls, proactive messaging, and email integration all live. Tables: exo_interventions, exo_guardian_system, exo_intervention_outcomes, exo_tenant_preferences. Intervention executor runs every 15min. 22 permission categories with two-tier consent system (with_approval + autonomous). **Default grants auto-seeded** for new tenants (9 conservative grants: send_sms:wellness/goal/reminder, send_email:summary, send_notification:*, create_task:*, complete_task:*, log_health:*, trigger_checkin:*). **Daily action planner**: morning briefing generates goal-derived tasks, evening review tracks completion. Voice tools: plan_action, list_planned_actions, cancel_planned_action, delegate_complex_task. Full MAPE-K loop with 3-tier CRON (petla 1min, loop-15 15min + MAPE-K cycle, loop-daily 24h). Outcome tracker → learning engine → preference optimization. Rate limit: 8 proactive messages/day.
 
 ```javascript
 Autonomous_Actions = {

@@ -1,5 +1,18 @@
 # ExoSkull Learnings
 
+## Empty Permission Table = Dead Autonomy (2026-02-20)
+
+- `user_autonomy_grants` empty → all `isActionPermitted()` returns false → zero autonomous actions
+- Solution: `default-grants.ts` seeds 9 conservative grants per tenant on first check
+- Permission model falls back to in-memory defaults while DB seed runs async
+- Lesson: Always have default permissions. "Deny all" as initial state kills the entire pipeline silently.
+
+## Supabase Migration FK Gotcha (2026-02-20)
+
+- `exo_tenants` has system row `00000000-...` not in `auth.users` → FK violation on `user_autonomy_grants.user_id`
+- Fix: `AND id IN (SELECT id FROM auth.users)` in migration SELECT
+- Lesson: Always filter tenant iterations by FK existence
+
 ## ESM vs CJS in Next.js Scripts
 
 - ExoSkull uses ESM (`import`/`export`) throughout. Inline `tsx -e` with `require()` fails.

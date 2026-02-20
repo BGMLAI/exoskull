@@ -1,5 +1,21 @@
 # ExoSkull Learnings
 
+## Empty Permission Table = Dead Autonomy (2026-02-20)
+**Pattern:** Entire autonomy system (41 CRONs, MAPE-K, Conductor, interventions) was architecturally complete but produced zero autonomous actions.
+**Root cause:** `user_autonomy_grants` table was empty. Every `isActionPermitted()` call returned `false`.
+**Solution:** Default grants seeded on first permission check (async DB seed + immediate in-memory fallback). Migration seeds existing tenants.
+**Lesson:** Permission systems must have sane defaults. "Deny all" as initial state blocks the entire pipeline silently — no errors, just nothing happens.
+
+## System Tenant FK Constraint (2026-02-20)
+**Pattern:** `exo_tenants` contains a system row with UUID `00000000-0000-0000-0000-000000000000` that doesn't exist in `auth.users`.
+**Solution:** Filter migrations with `AND id IN (SELECT id FROM auth.users)` to skip non-auth tenants.
+**Lesson:** Always filter by FK existence when iterating over tenant tables. Null/system UUIDs are common.
+
+## Closed-Loop Feedback Required (2026-02-20)
+**Pattern:** System executed interventions but never measured if they worked. No feedback = no optimization.
+**Solution:** Outcome tracker (48h window: did user respond? did goal progress? → effectiveness score) + learning engine (aggregate → update preferences).
+**Lesson:** Open-loop systems don't improve. Always build: act → measure → learn → adapt.
+
 ## Puppeteer on Windows — ESM vs CJS (2026-02-17)
 **Pattern:** Puppeteer ESM imports fail on Windows when module resolution conflicts.
 **Solution:** CJS fallback with `puppeteer-core` + explicit Chrome path: `C:\Program Files\Google\Chrome\Application\chrome.exe`.

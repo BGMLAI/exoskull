@@ -4,6 +4,51 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-20] Autonomy Pipeline Activation — Closed-Loop Goal Optimization
+
+### Why
+The entire autonomy system (41 CRONs, MAPE-K, Conductor, interventions) was architecturally complete but produced zero autonomous actions. Root cause: `user_autonomy_grants` table was empty for all tenants, MAPE-K wasn't wired to any CRON, and skill generation had no trigger.
+
+### What
+- **Default grants**: 9 conservative permission grants auto-seeded per tenant (SMS wellness/goal/reminder, email summary, notifications, tasks, health logging). Denied by default: calls, spending, data deletion, source modification, calendar events.
+- **MAPE-K wired to loop-15**: Autonomic optimization cycle now runs every 15 minutes (was unscheduled)
+- **Skill auto-generator CRON**: Bridges detection → generation gap (daily 4AM, max 3 skills/run, confidence >= 0.75)
+- **Daily action planner**: Active goals → concrete daily tasks (morning briefing) + completion tracking (evening review)
+- **Outcome tracker**: Measures intervention effectiveness over 48h window (user_response, goal_progress, ignored)
+- **Learning engine**: Aggregates outcomes → learns best_contact_hour, preferred_channel, message_style → stores in `exo_tenant_preferences`
+- **App auto-activation**: IORS suggestions and auto-detection now trigger app creation (was chat_command only)
+- **Conductor work type**: `outcome_analysis` added (6h cooldown, per-tenant)
+
+### DB Changes
+- New table: `exo_intervention_outcomes` (intervention effectiveness tracking)
+- New table: `exo_tenant_preferences` (AI-learned user preferences)
+- New column: `exo_interventions.learned_from`
+- 36 default grants seeded (4 tenants x 9 grants)
+
+### New Files (7)
+| File | Purpose |
+|------|---------|
+| `lib/autonomy/default-grants.ts` | Default permission grants + `isDefaultGranted()` fallback |
+| `lib/skills/auto-generator.ts` | Skill detection → generation bridge |
+| `app/api/cron/skill-auto-generator/route.ts` | Daily CRON endpoint |
+| `lib/goals/daily-action-planner.ts` | Goal → daily tasks + evening review |
+| `lib/autonomy/outcome-tracker.ts` | Intervention effectiveness measurement |
+| `lib/autonomy/learning-engine.ts` | Preference learning from outcomes |
+| `supabase/migrations/20260307000001_default_autonomy_grants.sql` | DB migration |
+
+### Modified Files (7)
+| File | Change |
+|------|--------|
+| `lib/autonomy/permission-model.ts` | Fallback to defaults when DB empty |
+| `app/api/cron/loop-15/route.ts` | Added MAPE-K cycle as Step 5 |
+| `app/api/cron/morning-briefing/route.ts` | Hooks daily action planner |
+| `lib/autonomy/mape-k-loop.ts` | Knowledge phase: outcome + learning |
+| `lib/apps/generator/app-generator.ts` | Auto-activate from iors_suggestion |
+| `lib/conductor/work-catalog.ts` | Added outcome_analysis work type |
+| `vercel.json` | Added skill-auto-generator CRON |
+
+---
+
 ## [2026-02-19] UI Redesign: Voice-First Conversation-Centric Layout
 
 ### What
