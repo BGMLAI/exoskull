@@ -334,11 +334,30 @@ export interface UploadDocumentResult {
   category: string;
 }
 
+/** Threshold above which we use signed URL upload (bypasses Vercel 4.5MB body limit) */
+const SIGNED_URL_THRESHOLD = 4 * 1024 * 1024; // 4MB
+
 export async function uploadDocument(
   tenantId: string,
   file: File,
   category?: string,
+  onProgress?: (pct: number) => void,
 ): Promise<UploadDocumentResult> {
+  if (file.size > SIGNED_URL_THRESHOLD) {
+    return uploadViaSignedUrl(tenantId, file, category, onProgress);
+  }
+  return uploadDirect(tenantId, file, category, onProgress);
+}
+
+/** Small files: direct FormData through Vercel serverless function */
+async function uploadDirect(
+  tenantId: string,
+  file: File,
+  category?: string,
+  onProgress?: (pct: number) => void,
+): Promise<UploadDocumentResult> {
+  onProgress?.(10);
+
   const formData = new FormData();
   formData.append("file", file);
   formData.append("tenant_id", tenantId);
@@ -354,7 +373,99 @@ export async function uploadDocument(
     throw new Error(error.error || "Blad uploadu pliku");
   }
 
+  onProgress?.(100);
   const data = await res.json();
+  return data.document;
+}
+
+/** Large files: signed URL upload directly to Supabase Storage (bypasses Vercel) */
+async function uploadViaSignedUrl(
+  tenantId: string,
+  file: File,
+  category?: string,
+  onProgress?: (pct: number) => void,
+): Promise<UploadDocumentResult> {
+  onProgress?.(2);
+
+  // Step 1: Get signed upload URL
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  const urlRes = await fetch("/api/knowledge/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      filename: file.name,
+      contentType: file.type,
+      fileSize: file.size,
+      category: category || "other",
+    }),
+  });
+
+  if (!urlRes.ok) {
+    const err = await urlRes.json();
+    if (err.useMultipart) {
+      throw new Error(
+        `Plik za duzy (max 500MB dla tego typu uploadu). Uzyj mniejszego pliku.`,
+      );
+    }
+    throw new Error(err.error || "Nie udalo sie uzyskac URL uploadu");
+  }
+
+  const { signedUrl, token, documentId, mimeType } = await urlRes.json();
+
+  onProgress?.(5);
+
+  // Step 2: Upload file directly to Supabase Storage via XHR (real progress)
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) {
+        // Map upload progress to 5-90% range
+        const pct = 5 + Math.round((e.loaded / e.total) * 85);
+        onProgress?.(pct);
+      }
+    });
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+      }
+    });
+
+    xhr.addEventListener("error", () => {
+      reject(new Error("Blad sieci podczas uploadu"));
+    });
+
+    xhr.addEventListener("abort", () => {
+      reject(new Error("Upload anulowany"));
+    });
+
+    xhr.open("PUT", signedUrl);
+    xhr.setRequestHeader(
+      "Content-Type",
+      mimeType || file.type || "application/octet-stream",
+    );
+    xhr.send(file);
+  });
+
+  onProgress?.(92);
+
+  // Step 3: Confirm upload — triggers document processing
+  const confirmRes = await fetch("/api/knowledge/confirm-upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ documentId }),
+  });
+
+  if (!confirmRes.ok) {
+    const err = await confirmRes.json();
+    throw new Error(err.error || "Nie udalo sie potwierdzic uploadu");
+  }
+
+  onProgress?.(100);
+  const data = await confirmRes.json();
   return data.document;
 }
 
