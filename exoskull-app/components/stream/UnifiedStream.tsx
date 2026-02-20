@@ -920,6 +920,7 @@ export function UnifiedStream({
     async (file: File) => {
       const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
       const eventId = `upload-${Date.now()}`;
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
 
       // 1. Show uploading state in stream
       addEvent({
@@ -949,16 +950,39 @@ export function UnifiedStream({
         if (!urlRes.ok) throw new Error("Nie udalo sie uzyskac URL uploadu");
         const { signedUrl, documentId, mimeType } = await urlRes.json();
 
-        // 3. Upload directly to storage (use correct MIME from server)
-        const uploadRes = await fetch(signedUrl, {
-          method: "PUT",
-          headers: {
-            "Content-Type": mimeType || file.type || "application/octet-stream",
-          },
-          body: file,
-        });
+        // 3. Upload directly to storage via XHR (real progress for large files)
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
 
-        if (!uploadRes.ok) throw new Error("Upload nie powiodl sie");
+          xhr.upload.addEventListener("progress", () => {
+            // XHR progress fires but FileUploadEvent only shows status text
+            // (uploading/processing/ready) — no progress bar needed here
+          });
+
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(
+                new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`),
+              );
+            }
+          });
+
+          xhr.addEventListener("error", () =>
+            reject(new Error("Blad sieci podczas uploadu")),
+          );
+          xhr.addEventListener("abort", () =>
+            reject(new Error("Upload anulowany")),
+          );
+
+          xhr.open("PUT", signedUrl);
+          xhr.setRequestHeader(
+            "Content-Type",
+            mimeType || file.type || "application/octet-stream",
+          );
+          xhr.send(file);
+        });
 
         // 4. Update status → processing
         updateFileUpload(eventId, "processing");
@@ -980,12 +1004,18 @@ export function UnifiedStream({
           "ready",
           confirmData.chunks || confirmData.document?.chunk_count,
         );
+
+        // 7. Notify AI about the uploaded file so it can reference it
+        sendMessage(
+          `[Wgrałem plik: ${file.name} (${sizeMB} MB). Potwierdź że go widzisz w bazie wiedzy.]`,
+          "text",
+        );
       } catch (err) {
         console.error("[UnifiedStream] File upload failed:", err);
         updateFileUpload(eventId, "failed");
       }
     },
-    [addEvent, updateFileUpload],
+    [addEvent, updateFileUpload, sendMessage],
   );
 
   // ---------------------------------------------------------------------------
