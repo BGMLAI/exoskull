@@ -113,6 +113,16 @@ async function fetchFullGmailMessage(
   const attachmentNames = extractAttachmentNames(msg.payload);
   const attachmentMetadata = extractAttachmentMetadata(msg.payload);
 
+  // Extract List-Unsubscribe headers (RFC 2369 / RFC 8058)
+  const listUnsubscribeRaw = getHeader("List-Unsubscribe");
+  const listUnsubscribePost = getHeader("List-Unsubscribe-Post");
+  let listUnsubscribeUrl: string | undefined;
+  if (listUnsubscribeRaw) {
+    // Extract HTTP(S) URL from header like: <https://...>, <mailto:...>
+    const httpMatch = listUnsubscribeRaw.match(/<(https?:\/\/[^>]+)>/i);
+    listUnsubscribeUrl = httpMatch ? httpMatch[1] : undefined;
+  }
+
   return {
     messageId: msg.id,
     threadId: msg.threadId,
@@ -130,6 +140,8 @@ async function fetchFullGmailMessage(
     attachmentNames,
     attachmentMetadata,
     labels: msg.labelIds || [],
+    listUnsubscribeUrl,
+    listUnsubscribePost: listUnsubscribePost || undefined,
   };
 }
 

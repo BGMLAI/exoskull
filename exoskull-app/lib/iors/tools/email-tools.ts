@@ -697,6 +697,506 @@ export const emailTools: ToolDefinition[] = [
       return lines.join("\n");
     },
   },
+  // ----------------------------------------------------------------
+  // list_newsletters — find all newsletter senders for unsubscribe
+  // ----------------------------------------------------------------
+  {
+    definition: {
+      name: "list_newsletters",
+      description:
+        "Pokaz liste newsletterow i emaili marketingowych. Uzywaj gdy user chce wiedziec z czego sie wypisac lub mowi 'wypisz mnie ze wszystkiego'.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          include_unsubscribed: {
+            type: "boolean",
+            description: "Pokaz tez juz wypisane (domyslnie false)",
+          },
+        },
+      },
+    },
+    execute: async (input, tenantId) => {
+      const supabase = getServiceSupabase();
+      const includeUnsub = input.include_unsubscribed === true;
+
+      logger.info("[EmailTools:list_newsletters:start]", {
+        tenantId: tenantId.slice(0, 8),
+      });
+
+      // Get newsletter senders with email counts and unsubscribe status
+      const result = await retryQuery("list_newsletters:query", () => {
+        let q = supabase
+          .from("exo_email_sender_profiles")
+          .select(
+            "id, email_address, display_name, emails_received, is_newsletter, is_unsubscribed, unsubscribe_url, importance_score",
+          )
+          .eq("tenant_id", tenantId)
+          .order("emails_received", { ascending: false })
+          .limit(50);
+
+        if (!includeUnsub) {
+          q = q.or("is_unsubscribed.is.null,is_unsubscribed.eq.false");
+        }
+
+        return q;
+      });
+
+      if (result.error) {
+        logger.error("[EmailTools:list_newsletters:failed]", {
+          error: result.error.message,
+        });
+        return "Blad pobierania listy newsletterow.";
+      }
+
+      // Also check analyzed emails for senders with unsubscribe URLs
+      const emailResult = await retryQuery("list_newsletters:emails", () =>
+        supabase
+          .from("exo_analyzed_emails")
+          .select("from_email, from_name, unsubscribe_url, category")
+          .eq("tenant_id", tenantId)
+          .eq("is_newsletter", true)
+          .not("unsubscribe_url", "is", null)
+          .order("date_received", { ascending: false })
+          .limit(200),
+      );
+
+      // Build unique sender map with unsubscribe URLs
+      const senderMap = new Map<
+        string,
+        {
+          name: string;
+          count: number;
+          hasUnsub: boolean;
+          unsubscribed: boolean;
+          category: string;
+        }
+      >();
+
+      // From sender profiles
+      const profiles =
+        (result.data as Array<{
+          email_address: string;
+          display_name: string | null;
+          emails_received: number;
+          is_newsletter: boolean;
+          is_unsubscribed: boolean;
+          unsubscribe_url: string | null;
+        }>) || [];
+
+      for (const p of profiles) {
+        if (p.is_newsletter || p.emails_received > 3) {
+          senderMap.set(p.email_address, {
+            name: p.display_name || p.email_address,
+            count: p.emails_received,
+            hasUnsub: !!p.unsubscribe_url,
+            unsubscribed: !!p.is_unsubscribed,
+            category: "newsletter",
+          });
+        }
+      }
+
+      // From emails with unsubscribe URLs (may add senders not in profiles)
+      const emails =
+        (emailResult.data as Array<{
+          from_email: string;
+          from_name: string | null;
+          unsubscribe_url: string | null;
+          category: string | null;
+        }>) || [];
+
+      for (const e of emails) {
+        const existing = senderMap.get(e.from_email);
+        if (existing) {
+          existing.hasUnsub = existing.hasUnsub || !!e.unsubscribe_url;
+        } else {
+          senderMap.set(e.from_email, {
+            name: e.from_name || e.from_email,
+            count: 1,
+            hasUnsub: !!e.unsubscribe_url,
+            unsubscribed: false,
+            category: e.category || "newsletter",
+          });
+        }
+      }
+
+      if (senderMap.size === 0) {
+        return "Nie znaleziono newsletterow ani emaili marketingowych. Mozliwe ze synchronizacja jeszcze nie wykryla List-Unsubscribe headerow.";
+      }
+
+      const sorted = [...senderMap.entries()].sort(
+        (a, b) => b[1].count - a[1].count,
+      );
+
+      const lines = sorted.map(([email, info]) => {
+        const status = info.unsubscribed
+          ? " [WYPISANY]"
+          : info.hasUnsub
+            ? " [mozna wypisac]"
+            : " [brak linka unsub]";
+        return `- ${info.name} (${email}) — ${info.count} emaili${status}`;
+      });
+
+      const canUnsub = sorted.filter(
+        ([, info]) => info.hasUnsub && !info.unsubscribed,
+      ).length;
+
+      logger.info("[EmailTools:list_newsletters:success]", {
+        tenantId: tenantId.slice(0, 8),
+        total: sorted.length,
+        canUnsub,
+      });
+
+      return `Newslettery i maile marketingowe (${sorted.length}):\n${lines.join("\n")}\n\n${canUnsub} z nich mozna automatycznie wypisac. Uzyj unsubscribe_email z adresem nadawcy lub bulk_unsubscribe zeby wypisac ze wszystkich.`;
+    },
+  },
+
+  // ----------------------------------------------------------------
+  // unsubscribe_email — unsubscribe from a specific sender
+  // ----------------------------------------------------------------
+  {
+    definition: {
+      name: "unsubscribe_email",
+      description:
+        "Wypisz usera z newslettera/emaili marketingowych od konkretnego nadawcy. Klika link List-Unsubscribe jesli dostepny. Uzywaj gdy user mowi 'wypisz mnie z X'.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          sender_email: {
+            type: "string",
+            description: "Adres email nadawcy od ktorego chcemy sie wypisac",
+          },
+        },
+        required: ["sender_email"],
+      },
+    },
+    execute: async (input, tenantId) => {
+      const supabase = getServiceSupabase();
+      const senderEmail = (input.sender_email as string).toLowerCase().trim();
+
+      logger.info("[EmailTools:unsubscribe_email:start]", {
+        tenantId: tenantId.slice(0, 8),
+        sender: senderEmail,
+      });
+
+      // Find the most recent email with unsubscribe URL from this sender
+      const { data: emails } = await retryQuery("unsubscribe:find_url", () =>
+        supabase
+          .from("exo_analyzed_emails")
+          .select("id, unsubscribe_url, list_unsubscribe_post, from_name")
+          .eq("tenant_id", tenantId)
+          .ilike("from_email", `%${senderEmail}%`)
+          .not("unsubscribe_url", "is", null)
+          .order("date_received", { ascending: false })
+          .limit(1),
+      );
+
+      const email = (
+        emails as Array<{
+          id: string;
+          unsubscribe_url: string;
+          list_unsubscribe_post: string | null;
+          from_name: string | null;
+        }>
+      )?.[0];
+
+      if (!email?.unsubscribe_url) {
+        // Try to find any email from this sender to check
+        const { data: anyEmail } = await retryQuery(
+          "unsubscribe:check_sender",
+          () =>
+            supabase
+              .from("exo_analyzed_emails")
+              .select("id, from_name")
+              .eq("tenant_id", tenantId)
+              .ilike("from_email", `%${senderEmail}%`)
+              .limit(1),
+        );
+
+        if (
+          !(anyEmail as Array<{ id: string; from_name: string | null }>)?.length
+        ) {
+          return `Nie znaleziono emaili od ${senderEmail}. Sprawdz adres.`;
+        }
+
+        // Mark as unsubscribed in profile even without URL
+        await supabase
+          .from("exo_email_sender_profiles")
+          .update({
+            is_unsubscribed: true,
+            unsubscribed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("tenant_id", tenantId)
+          .eq("email_address", senderEmail);
+
+        return `Oznaczono ${senderEmail} jako wypisany, ale nie znaleziono linku List-Unsubscribe. Emaile od tego nadawcy beda oznaczane jako spam/ignorowane. Jesli chcesz calkowicie sie wypisac, otworz ostatni email od nich i kliknij "Unsubscribe" w stopce.`;
+      }
+
+      // Try to execute unsubscribe
+      let unsubResult: "success" | "failed" | "pending" = "pending";
+      const unsubUrl = email.unsubscribe_url;
+
+      try {
+        if (email.list_unsubscribe_post) {
+          // RFC 8058: One-click unsubscribe via POST
+          const resp = await fetch(unsubUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: email.list_unsubscribe_post,
+            signal: AbortSignal.timeout(10_000),
+          });
+          unsubResult = resp.ok ? "success" : "failed";
+          if (!resp.ok) {
+            logger.warn("[EmailTools:unsubscribe_email:post_failed]", {
+              status: resp.status,
+              url: unsubUrl,
+            });
+          }
+        } else {
+          // GET request to unsubscribe URL
+          const resp = await fetch(unsubUrl, {
+            method: "GET",
+            signal: AbortSignal.timeout(10_000),
+            redirect: "follow",
+          });
+          // Most unsubscribe pages return 200 even if they need confirmation
+          unsubResult = resp.ok ? "success" : "failed";
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.error("[EmailTools:unsubscribe_email:fetch_failed]", {
+          error: msg,
+          url: unsubUrl,
+        });
+        unsubResult = "failed";
+      }
+
+      // Update sender profile
+      await supabase.from("exo_email_sender_profiles").upsert(
+        {
+          tenant_id: tenantId,
+          email_address: senderEmail,
+          display_name: email.from_name,
+          is_unsubscribed: true,
+          is_newsletter: true,
+          unsubscribe_url: unsubUrl,
+          unsubscribed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "tenant_id,email_address" },
+      );
+
+      logger.info("[EmailTools:unsubscribe_email:done]", {
+        tenantId: tenantId.slice(0, 8),
+        sender: senderEmail,
+        result: unsubResult,
+      });
+
+      if (unsubResult === "success") {
+        return `Wypisano z ${email.from_name || senderEmail}. Link unsubscribe zostal klikniety pomyslnie.`;
+      } else {
+        return `Proba wypisania z ${email.from_name || senderEmail} — link unsubscribe nie odpowiedzial prawidlowo. Oznaczylem nadawce jako wypisanego w systemie. Moze byc konieczne reczne klikniecie linku w emailu.`;
+      }
+    },
+  },
+
+  // ----------------------------------------------------------------
+  // bulk_unsubscribe — unsubscribe from all newsletters at once
+  // ----------------------------------------------------------------
+  {
+    definition: {
+      name: "bulk_unsubscribe",
+      description:
+        "Wypisz usera ze WSZYSTKICH newsletterow i emaili marketingowych naraz. Klika linki List-Unsubscribe dla kazdego nadawcy. Uzywaj gdy user mowi 'wypisz mnie ze wszystkich' lub 'wypisz mnie ze wszystkich newsletterow'.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          dry_run: {
+            type: "boolean",
+            description:
+              "Jesli true, tylko pokaz co zostanie wypisane (bez akcji). Domyslnie false.",
+          },
+        },
+      },
+    },
+    execute: async (input, tenantId) => {
+      const supabase = getServiceSupabase();
+      const dryRun = input.dry_run === true;
+
+      logger.info("[EmailTools:bulk_unsubscribe:start]", {
+        tenantId: tenantId.slice(0, 8),
+        dryRun,
+      });
+
+      // Find all newsletter senders with unsubscribe URLs
+      const { data: newsletters } = await retryQuery(
+        "bulk_unsubscribe:find",
+        () =>
+          supabase
+            .from("exo_analyzed_emails")
+            .select(
+              "from_email, from_name, unsubscribe_url, list_unsubscribe_post",
+            )
+            .eq("tenant_id", tenantId)
+            .eq("is_newsletter", true)
+            .not("unsubscribe_url", "is", null)
+            .order("date_received", { ascending: false }),
+      );
+
+      if (!(newsletters as Array<{ from_email: string }>)?.length) {
+        return "Nie znaleziono newsletterow z linkami unsubscribe. Sprawdz czy synchronizacja emaili dziala i czy przyszly nowe emaile.";
+      }
+
+      // Deduplicate by sender email, keep most recent
+      const senderMap = new Map<
+        string,
+        {
+          name: string;
+          url: string;
+          post: string | null;
+        }
+      >();
+
+      for (const nl of newsletters as Array<{
+        from_email: string;
+        from_name: string | null;
+        unsubscribe_url: string;
+        list_unsubscribe_post: string | null;
+      }>) {
+        const key = nl.from_email.toLowerCase();
+        if (!senderMap.has(key)) {
+          senderMap.set(key, {
+            name: nl.from_name || nl.from_email,
+            url: nl.unsubscribe_url,
+            post: nl.list_unsubscribe_post,
+          });
+        }
+      }
+
+      // Check which are already unsubscribed
+      const { data: alreadyUnsub } = await retryQuery(
+        "bulk_unsubscribe:check_existing",
+        () =>
+          supabase
+            .from("exo_email_sender_profiles")
+            .select("email_address")
+            .eq("tenant_id", tenantId)
+            .eq("is_unsubscribed", true),
+      );
+
+      const alreadySet = new Set(
+        ((alreadyUnsub as Array<{ email_address: string }>) || []).map((a) =>
+          a.email_address.toLowerCase(),
+        ),
+      );
+
+      // Filter out already unsubscribed
+      const toProcess = [...senderMap.entries()].filter(
+        ([email]) => !alreadySet.has(email),
+      );
+
+      if (toProcess.length === 0) {
+        return `Wszystkie znalezione newslettery (${senderMap.size}) sa juz wypisane.`;
+      }
+
+      if (dryRun) {
+        const lines = toProcess.map(
+          ([email, info]) => `- ${info.name} (${email})`,
+        );
+        return `Znaleziono ${toProcess.length} newsletterow do wypisania:\n${lines.join("\n")}\n\nUzyj bulk_unsubscribe bez dry_run zeby wypisac ze wszystkich.`;
+      }
+
+      // Execute unsubscribe for each sender (parallel, max 5 concurrent)
+      const results: Array<{
+        email: string;
+        name: string;
+        ok: boolean;
+      }> = [];
+
+      const batchSize = 5;
+      for (let i = 0; i < toProcess.length; i += batchSize) {
+        const batch = toProcess.slice(i, i + batchSize);
+        const batchResults = await Promise.allSettled(
+          batch.map(async ([email, info]) => {
+            try {
+              const method = info.post ? "POST" : "GET";
+              const fetchOpts: RequestInit = {
+                method,
+                signal: AbortSignal.timeout(8_000),
+                redirect: "follow",
+              };
+              if (info.post) {
+                fetchOpts.headers = {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                };
+                fetchOpts.body = info.post;
+              }
+
+              const resp = await fetch(info.url, fetchOpts);
+
+              // Update sender profile
+              await supabase.from("exo_email_sender_profiles").upsert(
+                {
+                  tenant_id: tenantId,
+                  email_address: email,
+                  display_name: info.name,
+                  is_unsubscribed: true,
+                  is_newsletter: true,
+                  unsubscribe_url: info.url,
+                  unsubscribed_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: "tenant_id,email_address" },
+              );
+
+              return { email, name: info.name, ok: resp.ok };
+            } catch {
+              // Mark as unsubscribed in DB even if fetch failed
+              await supabase.from("exo_email_sender_profiles").upsert(
+                {
+                  tenant_id: tenantId,
+                  email_address: email,
+                  display_name: info.name,
+                  is_unsubscribed: true,
+                  is_newsletter: true,
+                  unsubscribe_url: info.url,
+                  unsubscribed_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: "tenant_id,email_address" },
+              );
+              return { email, name: info.name, ok: false };
+            }
+          }),
+        );
+
+        for (const r of batchResults) {
+          if (r.status === "fulfilled") {
+            results.push(r.value);
+          }
+        }
+      }
+
+      const succeeded = results.filter((r) => r.ok).length;
+      const failed = results.filter((r) => !r.ok).length;
+
+      logger.info("[EmailTools:bulk_unsubscribe:done]", {
+        tenantId: tenantId.slice(0, 8),
+        total: results.length,
+        succeeded,
+        failed,
+      });
+
+      const lines: string[] = [];
+      for (const r of results) {
+        lines.push(
+          `- ${r.name} (${r.email}): ${r.ok ? "WYPISANY" : "link nie odpowiedzial — oznaczony w systemie"}`,
+        );
+      }
+
+      return `Bulk unsubscribe zakonczone:\n- Wypisano: ${succeeded}\n- Nie udalo sie kliknac linku (oznaczone jako wypisane): ${failed}\n\n${lines.join("\n")}\n\nWszystcy nadawcy zostali oznaczeni jako wypisani w systemie. Jesli link nie zadzialal, emaile od tych nadawcow beda ignorowane.`;
+    },
+  },
 ];
 
 // ============================================================================

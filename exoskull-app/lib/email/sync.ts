@@ -199,6 +199,15 @@ async function syncSingleAccount(account: EmailAccount): Promise<SyncResult> {
           ? "inbound"
           : "self";
 
+    // Detect newsletter by List-Unsubscribe header or common patterns
+    const isNewsletter = !!(
+      email.listUnsubscribeUrl ||
+      email.listUnsubscribePost ||
+      (email.labels || []).some((l) =>
+        ["CATEGORY_PROMOTIONS", "CATEGORY_UPDATES"].includes(l),
+      )
+    );
+
     const { error: insertErr } = await supabase
       .from("exo_analyzed_emails")
       .upsert(
@@ -223,6 +232,9 @@ async function syncSingleAccount(account: EmailAccount): Promise<SyncResult> {
           is_read: email.isRead,
           labels: email.labels || [],
           analysis_status: "pending",
+          unsubscribe_url: email.listUnsubscribeUrl || null,
+          list_unsubscribe_post: email.listUnsubscribePost || null,
+          is_newsletter: isNewsletter,
         },
         {
           onConflict: "account_id,provider_message_id",

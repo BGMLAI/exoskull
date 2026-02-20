@@ -135,6 +135,8 @@ export interface RawEmail {
   attachmentNames: string[];
   attachmentMetadata?: AttachmentMeta[];
   labels?: string[];
+  listUnsubscribeUrl?: string;
+  listUnsubscribePost?: string;
 }
 
 export interface SyncResult {

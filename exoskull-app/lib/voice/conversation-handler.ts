@@ -199,6 +199,9 @@ const WEB_ESSENTIAL_TOOL_NAMES = new Set([
   "email_summary",
   "email_follow_ups",
   "email_sender_info",
+  "list_newsletters",
+  "unsubscribe_email",
+  "bulk_unsubscribe",
   // Emotion & Personality
   "tau_assess",
   // Web
