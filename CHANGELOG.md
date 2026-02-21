@@ -4,6 +4,37 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-21] Production Security Hardening + Build Fix
+
+### Why
+Production validation audit revealed 5 critical blockers: build OOM, XSS in email rendering, Twilio signature validation disabled, VPS secret exposed, and stack traces leaked in 39 API error responses.
+
+### What
+- **Build OOM fix**: Increased Node heap to 4GB (`--max-old-space-size=4096`), Sentry wrapper conditionally applied only when `SENTRY_AUTH_TOKEN` is set
+- **XSS fix**: Installed `dompurify`, email HTML now sanitized with explicit tag/attribute allowlist via DOMPurify
+- **Twilio signature enforcement**: Re-enabled — invalid signatures now return 403 with error TwiML (was log-only)
+- **VPS secret**: Added `vps-executor/.env` to `.gitignore`
+- **Error leakage**: Removed `stack` and `details` from all 39 API route error responses (server-side logging preserved)
+- **Safe error utility**: New `lib/api/safe-error.ts` for consistent error handling
+
+### Files Changed (46)
+| Category | Files | Change |
+|----------|-------|--------|
+| Build | `package.json`, `next.config.js` | Heap size + conditional Sentry |
+| XSS | `app/dashboard/emails/page.tsx`, `package.json` | DOMPurify sanitization |
+| Auth | `app/api/twilio/voice/route.ts` | Signature enforcement + error message cleanup |
+| Secrets | `.gitignore` | VPS env exclusion |
+| Error leakage | 39 API routes | Removed stack/details from JSON responses |
+| Utility | `lib/api/safe-error.ts` | New file |
+
+### Remaining (non-blocking)
+- 33 npm vulnerabilities (dependency upgrades needed — Next.js, fast-xml-parser, xlsx)
+- Input validation gaps (zod schemas on some POST endpoints)
+- SSRF guard not applied to all fetch() calls
+- Rate limiting incomplete on some endpoints
+
+---
+
 ## [2026-02-20] Autonomy Pipeline Activation — Closed-Loop Goal Optimization
 
 ### Why

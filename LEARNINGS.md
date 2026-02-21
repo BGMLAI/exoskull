@@ -1,5 +1,20 @@
 # ExoSkull Learnings
 
+## Sentry Wrapper Causes Build OOM (2026-02-21)
+**Pattern:** `withSentryConfig()` wrapping `nextConfig` causes JS heap OOM (~1.5GB) during `next build`, even when no Sentry auth token is set.
+**Solution:** Conditionally apply `withSentryConfig` only when `SENTRY_AUTH_TOKEN` is present. Also increase Node heap to 4GB in build script.
+**Lesson:** Heavy build-time wrappers (Sentry, Datadog) should be conditional. Don't pay the cost when the integration isn't configured.
+
+## Error Responses Leak Internal Details (2026-02-21)
+**Pattern:** 39 API routes included `stack: error.stack` or `details: error.message` in JSON error responses sent to clients. Exposes file paths, code structure, and dependency versions.
+**Solution:** Systematic removal of all `stack` and `details` fields from `NextResponse.json()` error payloads. Server-side `logger.error()` preserved for debugging.
+**Lesson:** Always audit error responses for information leakage. Pattern: `logger.error(full_details)` + `NextResponse.json({ error: "generic message" })`. Never return raw error messages to clients.
+
+## Webhook Signature Validation Must Be Enforced, Not Logged (2026-02-21)
+**Pattern:** Twilio voice webhook had signature validation disabled (log-only) because previous 403s caused English error messages instead of Polish TwiML.
+**Solution:** Re-enable enforcement, return proper TwiML error response (not raw HTTP) so Twilio plays the correct language error.
+**Lesson:** When disabling security for debugging, never leave it disabled. Use proper error responses that match the protocol (TwiML for Twilio, not JSON).
+
 ## Empty Permission Table = Dead Autonomy (2026-02-20)
 **Pattern:** Entire autonomy system (41 CRONs, MAPE-K, Conductor, interventions) was architecturally complete but produced zero autonomous actions.
 **Root cause:** `user_autonomy_grants` table was empty. Every `isActionPermitted()` call returned `false`.
