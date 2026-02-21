@@ -18,7 +18,7 @@ import { logger } from "@/lib/logger";
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY!;
 const ELEVENLABS_VOICE_ID =
-  process.env.ELEVENLABS_VOICE_ID || "3kPofxWv5xLwBvMVraip";
+  process.env.ELEVENLABS_VOICE_ID || "vhGAGQee0VjHonqyxGxd";
 const ELEVENLABS_MODEL = "eleven_turbo_v2_5";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -86,11 +86,11 @@ export async function textToSpeech(
           text,
           model_id: options.modelId || ELEVENLABS_MODEL,
           voice_settings: {
-            stability: options.stability ?? 0.65,
-            similarity_boost: options.similarityBoost ?? 0.8,
+            stability: options.stability ?? 0.8,
+            similarity_boost: options.similarityBoost ?? 0.85,
             style: options.style ?? 0.05,
             use_speaker_boost: options.useSpeakerBoost ?? true,
-            speed: options.speed ?? 1.15,
+            speed: options.speed ?? 1.1,
           },
         }),
         signal: controller.signal,
