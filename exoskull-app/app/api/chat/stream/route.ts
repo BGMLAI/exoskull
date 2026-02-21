@@ -507,10 +507,10 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       );
     }
 
-    // --- VPS proxy DISABLED for chat — filesystem MCP too slow (30s+ timeouts) ---
-    // VPS agent still available via /api/claude-code/ for dedicated coding panel.
-    // All chat messages now go through local gateway (IORS tools, controlled timeouts).
-    const vpsResponse = null;
+    // Route coding messages to VPS agent, conversational to local gateway
+    const vpsResponse = isCodeRelatedMessage(message)
+      ? await tryVpsProxy(message, tenantId, conversationId)
+      : null;
 
     if (vpsResponse) {
       // VPS handled it — persist user message to unified thread for continuity
@@ -538,8 +538,12 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       return relayAndPersistVpsStream(vpsResponse, tenantId);
     }
 
-    // --- Fallback to local gateway pipeline ---
-    logger.info("[ChatStream] VPS unavailable — using local fallback");
+    // --- Local gateway pipeline (conversational or VPS fallback) ---
+    logger.info("[ChatStream] Using local gateway", {
+      reason: isCodeRelatedMessage(message)
+        ? "vps_unavailable"
+        : "conversational",
+    });
     const stream = createLocalStream(message, tenantId, conversationId);
 
     return new Response(stream, {
