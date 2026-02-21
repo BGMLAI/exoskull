@@ -290,10 +290,7 @@ async function handler(req: NextRequest) {
   } catch (error) {
     logger.error("[AsyncCRON] Error:", error);
     return NextResponse.json(
-      {
-        error: "Async task processing failed",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Async task processing failed" },
       { status: 500 },
     );
   }

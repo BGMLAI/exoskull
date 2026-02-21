@@ -96,10 +96,7 @@ export const POST = withApiLog(async function POST(
   } catch (error) {
     logger.error("[Skills API] Approve error:", error);
     return NextResponse.json(
-      {
-        error: "Failed to process approval",
-        details: (error as Error).message,
-      },
+      { error: "Failed to process approval" },
       { status: 500 },
     );
   }

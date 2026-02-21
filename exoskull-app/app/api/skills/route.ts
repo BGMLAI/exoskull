@@ -55,7 +55,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
   } catch (error) {
     logger.error("[Skills API] List error:", error);
     return NextResponse.json(
-      { error: "Failed to list skills", details: (error as Error).message },
+      { error: "Failed to list skills" },
       { status: 500 },
     );
   }

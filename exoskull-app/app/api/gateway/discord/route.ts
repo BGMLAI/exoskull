@@ -85,7 +85,6 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
   } catch (error) {
     logger.error("[Discord Route] Error:", {
       error: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json({ ok: true });
   }

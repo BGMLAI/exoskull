@@ -43,10 +43,7 @@ async function handler(request: NextRequest) {
   } catch (error) {
     logger.error("[CRON] skill-lifecycle error:", error);
     return NextResponse.json(
-      {
-        error: "Skill lifecycle cron failed",
-        details: (error as Error).message,
-      },
+      { error: "Skill lifecycle cron failed" },
       { status: 500 },
     );
   }

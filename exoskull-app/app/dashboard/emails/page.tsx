@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import DOMPurify from "dompurify";
 
 // ============================================================================
 // TYPES
@@ -276,7 +277,55 @@ export default function EmailsPage() {
                 {selectedEmail.body_html ? (
                   <div
                     dangerouslySetInnerHTML={{
-                      __html: selectedEmail.body_html,
+                      __html: DOMPurify.sanitize(selectedEmail.body_html, {
+                        ALLOWED_TAGS: [
+                          "p",
+                          "br",
+                          "b",
+                          "i",
+                          "em",
+                          "strong",
+                          "a",
+                          "ul",
+                          "ol",
+                          "li",
+                          "h1",
+                          "h2",
+                          "h3",
+                          "h4",
+                          "h5",
+                          "h6",
+                          "blockquote",
+                          "pre",
+                          "code",
+                          "table",
+                          "thead",
+                          "tbody",
+                          "tr",
+                          "th",
+                          "td",
+                          "div",
+                          "span",
+                          "img",
+                          "hr",
+                          "sub",
+                          "sup",
+                        ],
+                        ALLOWED_ATTR: [
+                          "href",
+                          "src",
+                          "alt",
+                          "title",
+                          "class",
+                          "style",
+                          "target",
+                          "rel",
+                          "width",
+                          "height",
+                        ],
+                        ALLOW_DATA_ATTR: false,
+                        ADD_ATTR: ["target"],
+                      }),
                     }}
                   />
                 ) : (

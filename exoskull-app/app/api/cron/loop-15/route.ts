@@ -376,10 +376,7 @@ async function handler(req: NextRequest) {
   } catch (error) {
     logger.error("[Loop15] Error:", error);
     return NextResponse.json(
-      {
-        error: "Loop-15 processing failed",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Loop-15 processing failed" },
       { status: 500 },
     );
   }

@@ -125,10 +125,7 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
   } catch (error) {
     logger.error("[Skills API] Suggestions PATCH error:", error);
     return NextResponse.json(
-      {
-        error: "Failed to process suggestion",
-        details: (error as Error).message,
-      },
+      { error: "Failed to process suggestion" },
       { status: 500 },
     );
   }

@@ -34,7 +34,6 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
   } catch (error) {
     logger.error("[TTS API] Error:", {
       error: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
       { error: "TTS generation failed" },

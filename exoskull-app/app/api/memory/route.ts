@@ -66,7 +66,6 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
   } catch (error) {
     logger.error("[Memory API] Error:", {
       error: error instanceof Error ? error.message : error,
-      stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
       { error: "Internal server error" },

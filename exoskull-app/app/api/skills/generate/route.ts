@@ -102,13 +102,9 @@ export const POST = withApiLog(
     } catch (error) {
       logger.error("[Skills API] Generate error:", {
         message: (error as Error).message,
-        stack: (error as Error).stack,
       });
       return NextResponse.json(
-        {
-          error: "Failed to generate skill",
-          details: (error as Error).message,
-        },
+        { error: "Failed to generate skill" },
         { status: 500 },
       );
     }

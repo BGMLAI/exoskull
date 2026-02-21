@@ -69,7 +69,6 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
   } catch (error) {
     logger.error("[Telegram Route] Error:", {
       error: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
     });
     // Return 200 to prevent Telegram from retrying
     return NextResponse.json({ ok: true });

@@ -68,21 +68,17 @@ const nextConfig = {
   }
 }
 
-module.exports = withSentryConfig(nextConfig, {
-  // Suppress source map upload logs in build output
-  silent: true,
+// Only wrap with Sentry when auth token is available (prevents OOM during local builds)
+const sentryEnabled = !!process.env.SENTRY_AUTH_TOKEN;
 
-  // Upload source maps for better stack traces
-  widenClientFileUpload: true,
-
-  // Hides source maps from generated client bundles
-  hideSourceMaps: true,
-
-  // Automatically tree-shake Sentry logger statements
-  disableLogger: true,
-
-  // Only upload source maps when SENTRY_AUTH_TOKEN is set
-  authToken: process.env.SENTRY_AUTH_TOKEN,
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-})
+module.exports = sentryEnabled
+  ? withSentryConfig(nextConfig, {
+      silent: true,
+      widenClientFileUpload: true,
+      hideSourceMaps: true,
+      disableLogger: true,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+    })
+  : nextConfig;

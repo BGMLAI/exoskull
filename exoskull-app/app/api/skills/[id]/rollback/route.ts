@@ -72,9 +72,6 @@ export const POST = withApiLog(async function POST(
     });
   } catch (error) {
     logger.error("[Skills API] Rollback error:", error);
-    return NextResponse.json(
-      { error: "Failed to rollback", details: (error as Error).message },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to rollback" }, { status: 500 });
   }
 });

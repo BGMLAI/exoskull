@@ -102,7 +102,6 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
   } catch (error) {
     logger.error("[SMS Gateway] Error:", {
       error: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
     });
     // Always return 200 to prevent Twilio retries
     return twimlResponse();

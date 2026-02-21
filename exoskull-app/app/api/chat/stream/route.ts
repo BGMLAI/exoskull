@@ -392,7 +392,6 @@ function createLocalStream(
         logger.error("[Chat Stream] Gateway processing error:", {
           error: errMsg,
           tenantId,
-          stack: error instanceof Error ? error.stack : undefined,
         });
 
         // Classify error for client-side retry logic
@@ -511,7 +510,6 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
   } catch (error) {
     logger.error("[Chat Stream] Error:", {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
     });
     return new Response(JSON.stringify({ error: "Failed to start stream" }), {
       status: 500,

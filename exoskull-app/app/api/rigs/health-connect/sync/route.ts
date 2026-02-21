@@ -173,7 +173,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
     if (insertError) {
       logger.error("[Health Connect] Failed to insert metrics:", insertError);
       return NextResponse.json(
-        { error: "Failed to save metrics", details: insertError.message },
+        { error: "Failed to save metrics" },
         { status: 500 },
       );
     }

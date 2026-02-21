@@ -143,10 +143,7 @@ async function handler(req: NextRequest) {
   } catch (error) {
     logger.error("[VoiceCRON] Error:", error);
     return NextResponse.json(
-      {
-        error: "Voice transcription CRON failed",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Voice transcription CRON failed" },
       { status: 500 },
     );
   }

@@ -63,7 +63,6 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
   } catch (error) {
     logger.error("[Notifications API] GET error:", {
       error: error instanceof Error ? error.message : error,
-      stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
       { error: "Internal server error" },
@@ -121,7 +120,6 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
   } catch (error) {
     logger.error("[Notifications API] PATCH error:", {
       error: error instanceof Error ? error.message : error,
-      stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
       { error: "Internal server error" },

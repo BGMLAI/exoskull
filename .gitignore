@@ -42,6 +42,9 @@ boy burger/
 
 .vercel
 
+# VPS secrets
+vps-executor/.env
+
 # Android secrets
 android/local.properties
 android/app/google-services.json

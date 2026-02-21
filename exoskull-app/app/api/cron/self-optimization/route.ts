@@ -100,10 +100,7 @@ async function handler(req: NextRequest) {
   } catch (error) {
     logger.error("[SelfOptimization] CRON error:", error);
     return NextResponse.json(
-      {
-        error: "Self-optimization failed",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Self-optimization failed" },
       { status: 500 },
     );
   }

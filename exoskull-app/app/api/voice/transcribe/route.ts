@@ -241,7 +241,6 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
   } catch (error) {
     logger.error("[Transcribe] Error:", {
       error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
       { error: "Transcription failed" },

@@ -265,10 +265,7 @@ async function handler(req: NextRequest) {
   } catch (error) {
     logger.error("[MorningBriefing] Fatal:", error);
     return NextResponse.json(
-      {
-        error: "Morning briefing failed",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Morning briefing failed" },
       { status: 500 },
     );
   }

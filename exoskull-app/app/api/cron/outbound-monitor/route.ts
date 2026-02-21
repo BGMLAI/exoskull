@@ -101,10 +101,7 @@ async function handler(req: NextRequest) {
   } catch (error) {
     logger.error("[OutboundMonitor] CRON error:", error);
     return NextResponse.json(
-      {
-        error: "Outbound monitor failed",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Outbound monitor failed" },
       { status: 500 },
     );
   }

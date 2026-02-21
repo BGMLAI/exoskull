@@ -131,7 +131,6 @@ export const POST = withApiLog(
     } catch (error) {
       logger.error("[BirthChat] Error:", {
         error: error instanceof Error ? error.message : error,
-        stack: error instanceof Error ? error.stack : undefined,
       });
       return NextResponse.json(
         { error: "Failed to process message" },

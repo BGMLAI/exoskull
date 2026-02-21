@@ -221,7 +221,6 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
   } catch (error) {
     logger.error("[MetaPages] POST error:", {
       error: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }

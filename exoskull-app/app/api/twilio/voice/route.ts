@@ -77,9 +77,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     // Parse Twilio form data
     const formData = await parseFormData(req);
 
-    // Twilio signature validation — LOG ONLY (don't reject).
-    // Previous 403 rejections caused English Twilio default error.
-    // TODO: re-enable enforcement after confirming URL/token match
+    // Twilio signature validation — ENFORCED
     const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
     if (twilioAuthToken) {
       const twilioSignature = req.headers.get("x-twilio-signature") || "";
@@ -91,12 +89,19 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         formData,
       );
       if (!isValid) {
-        logger.warn("[Twilio Voice] Signature mismatch (not blocking):", {
+        logger.warn("[Twilio Voice] Signature mismatch — REJECTED:", {
           requestUrl,
           hasSig: !!twilioSignature,
-          tokenPrefix: twilioAuthToken.substring(0, 6) + "...",
+        });
+        return new NextResponse(generateErrorTwiML(), {
+          status: 403,
+          headers: { "Content-Type": "application/xml" },
         });
       }
+    } else {
+      logger.warn(
+        "[Twilio Voice] TWILIO_AUTH_TOKEN not set — skipping signature validation",
+      );
     }
 
     const callSid = formData.CallSid;
@@ -386,14 +391,9 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       stack: err.stack?.split("\n").slice(0, 5).join("\n"),
     });
 
-    // Include error details in TwiML for debugging (safe — only heard by caller)
-    const debugMsg = `Błąd: ${err.message.substring(0, 100)}`;
-    return new NextResponse(
-      `<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Maja" language="pl-PL">${debugMsg}</Say><Hangup/></Response>`,
-      {
-        headers: { "Content-Type": "application/xml" },
-      },
-    );
+    return new NextResponse(generateErrorTwiML(), {
+      headers: { "Content-Type": "application/xml" },
+    });
   }
 });
 

@@ -57,10 +57,7 @@ export const GET = withApiLog(async function GET(
     });
   } catch (error) {
     logger.error("[Skills API] GET error:", error);
-    return NextResponse.json(
-      { error: "Failed to get skill", details: (error as Error).message },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to get skill" }, { status: 500 });
   }
 });
 
@@ -112,7 +109,7 @@ export const PATCH = withApiLog(async function PATCH(
   } catch (error) {
     logger.error("[Skills API] PATCH error:", error);
     return NextResponse.json(
-      { error: "Failed to update skill", details: (error as Error).message },
+      { error: "Failed to update skill" },
       { status: 500 },
     );
   }
@@ -151,7 +148,7 @@ export const DELETE = withApiLog(async function DELETE(
   } catch (error) {
     logger.error("[Skills API] DELETE error:", error);
     return NextResponse.json(
-      { error: "Failed to archive skill", details: (error as Error).message },
+      { error: "Failed to archive skill" },
       { status: 500 },
     );
   }

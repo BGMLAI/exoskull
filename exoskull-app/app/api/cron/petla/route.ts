@@ -120,10 +120,7 @@ async function handler(req: NextRequest) {
   } catch (error) {
     logger.error("[Petla] Error:", error);
     return NextResponse.json(
-      {
-        error: "Petla processing failed",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Petla processing failed" },
       { status: 500 },
     );
   }

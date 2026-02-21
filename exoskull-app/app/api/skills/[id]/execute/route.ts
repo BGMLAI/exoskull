@@ -104,7 +104,7 @@ export const POST = withApiLog(async function POST(
   } catch (error) {
     logger.error("[Skills API] Execute error:", error);
     return NextResponse.json(
-      { error: "Failed to execute skill", details: (error as Error).message },
+      { error: "Failed to execute skill" },
       { status: 500 },
     );
   }

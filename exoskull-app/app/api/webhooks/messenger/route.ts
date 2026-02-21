@@ -247,7 +247,6 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
   } catch (error) {
     logger.error("[Messenger] Webhook processing error:", {
       error: error instanceof Error ? error.message : "Unknown error",
-      stack: error instanceof Error ? error.stack : undefined,
     });
     // Always return 200 to Meta - they retry on errors which causes duplicates
     return NextResponse.json({ received: true });

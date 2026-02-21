@@ -35,10 +35,7 @@ async function handler(req: NextRequest) {
     });
 
     return NextResponse.json(
-      {
-        error: "Skill auto-generator failed",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Skill auto-generator failed" },
       { status: 500 },
     );
   }

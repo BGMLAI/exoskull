@@ -132,10 +132,9 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
     const errMsg = error instanceof Error ? error.message : String(error);
     logger.error("[Voice Chat] Error:", {
       error: errMsg,
-      stack: error instanceof Error ? error.stack : undefined,
     });
     return NextResponse.json(
-      { error: "Failed to process voice message", detail: errMsg },
+      { error: "Failed to process voice message" },
       { status: 500 },
     );
   }

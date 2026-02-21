@@ -74,7 +74,7 @@ export const GET = withApiLog(async function GET(
   } catch (error) {
     logger.error("[Mods API] GET error:", error);
     return NextResponse.json(
-      { error: "Failed to get mod data", details: (error as Error).message },
+      { error: "Failed to get mod data" },
       { status: 500 },
     );
   }
@@ -164,7 +164,7 @@ export const POST = withApiLog(async function POST(
   } catch (error) {
     logger.error("[Mods API] POST error:", error);
     return NextResponse.json(
-      { error: "Failed to execute action", details: (error as Error).message },
+      { error: "Failed to execute action" },
       { status: 500 },
     );
   }

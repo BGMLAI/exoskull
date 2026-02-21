@@ -306,10 +306,7 @@ async function handler(req: NextRequest) {
   } catch (error) {
     logger.error("[LoopDaily] Error:", error);
     return NextResponse.json(
-      {
-        error: "Loop-daily processing failed",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Loop-daily processing failed" },
       { status: 500 },
     );
   }

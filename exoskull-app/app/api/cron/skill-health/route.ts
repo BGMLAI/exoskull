@@ -27,7 +27,7 @@ async function handler(_request: NextRequest) {
   if (fetchError) {
     logger.error("[CRON] skill-health fetch error:", fetchError);
     return NextResponse.json(
-      { error: "Failed to fetch skills", details: fetchError.message },
+      { error: "Failed to fetch skills" },
       { status: 500 },
     );
   }
