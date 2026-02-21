@@ -22,8 +22,15 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - PORT=3500
     restart: unless-stopped
+    networks:
+      - default
+      - agent-backend_agent-net
     deploy:
       resources:
         limits:
           memory: 256M
           cpus: "0.5"
+
+networks:
+  agent-backend_agent-net:
+    external: true
