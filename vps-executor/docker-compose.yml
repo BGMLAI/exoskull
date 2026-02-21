@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3500:3500"
+      - "3501:3500"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp
@@ -19,6 +19,7 @@ services:
       - /root/args:/root/args:ro
     environment:
       - VPS_EXECUTOR_SECRET=${VPS_EXECUTOR_SECRET}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - PORT=3500
     restart: unless-stopped
     deploy:

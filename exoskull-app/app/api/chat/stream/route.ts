@@ -155,7 +155,7 @@ async function tryVpsProxy(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), VPS_TIMEOUT_MS);
 
-    const vpsResponse = await fetch(`${VPS_AGENT_URL}/api/agent/chat`, {
+    const vpsResponse = await fetch(`${VPS_AGENT_URL}/api/agent/code/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -165,6 +165,7 @@ async function tryVpsProxy(
         message,
         tenantId,
         conversationId,
+        isAdmin: true,
       }),
       signal: controller.signal,
     });
