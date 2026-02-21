@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 
 const VPS_AGENT_URL = process.env.VPS_AGENT_URL; // e.g. https://agent.exoskull.xyz
 const VPS_AGENT_SECRET = process.env.VPS_AGENT_SECRET;
-const VPS_TIMEOUT_MS = 5000; // 5s to establish connection, then stream
+const VPS_TIMEOUT_MS = 3000; // 3s to establish connection (was 5s — too slow)
 
 // ---------------------------------------------------------------------------
 // VPS Circuit Breaker (prevents 5s latency spike when VPS is down)
@@ -37,8 +37,8 @@ const VPS_TIMEOUT_MS = 5000; // 5s to establish connection, then stream
 // ---------------------------------------------------------------------------
 type CircuitState = "closed" | "open" | "half_open";
 
-const VPS_CB_THRESHOLD = 3; // failures before opening
-const VPS_CB_RESET_MS = 30_000; // 30s before half-open probe
+const VPS_CB_THRESHOLD = 2; // failures before opening (was 3 — faster fallback)
+const VPS_CB_RESET_MS = 60_000; // 60s before half-open probe (was 30s — less re-probing)
 
 const vpsCircuit = {
   state: "closed" as CircuitState,
@@ -92,6 +92,46 @@ function recordVpsFailure(): void {
       `[ChatStream] VPS circuit breaker OPEN after ${vpsCircuit.failures} failures — skipping VPS for 30s`,
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Message Classification — only coding tasks go to VPS
+// ---------------------------------------------------------------------------
+
+const CODE_KEYWORDS =
+  /\b(kod|code|plik|file|bug|fix|deploy|build|test|commit|push|merge|branch|refactor|implement|endpoint|api|component|function|class|import|export|npm|git|docker|server|database|schema|migration|route|webpack|typescript|javascript|python|css|html|react|next|supabase|vercel|error|stack\s*trace|exception|compile|lint|debug|PR|pull\s*request)\b/i;
+
+const CONVERSATIONAL_PATTERNS =
+  /^(hej|hey|hi|hello|cześć|czesc|siema|yo|co tam|jak sytuacja|jak idzie|co słychać|co slychac|dzień dobry|dzien dobry|dobry|dobranoc|dzięki|dzieki|thanks|ok|okej|okay|tak|nie|super|fajnie|git|spoko|no i co|status|jak jest|co nowego|elo|witam|witaj|pozdrawiam|bye|papa|nara|na razie|do zobaczenia).{0,20}$/i;
+
+/**
+ * Determine if a message is code-related and should be routed to VPS agent.
+ * Conversational messages skip VPS entirely → handled by local gateway (faster).
+ */
+function isCodeRelatedMessage(message: string): boolean {
+  const trimmed = message.trim();
+
+  // Short casual messages → never code
+  if (trimmed.length < 40 && CONVERSATIONAL_PATTERNS.test(trimmed)) {
+    return false;
+  }
+
+  // Contains code keywords → route to VPS
+  if (CODE_KEYWORDS.test(trimmed)) {
+    return true;
+  }
+
+  // Contains code blocks or file paths → route to VPS
+  if (
+    /```/.test(trimmed) ||
+    /\.\w{1,4}$/.test(trimmed) ||
+    /\/[\w-]+\//.test(trimmed)
+  ) {
+    return true;
+  }
+
+  // Default: conversational → local gateway
+  return false;
 }
 
 /**
@@ -467,8 +507,17 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       );
     }
 
-    // --- Try VPS Agent Backend first ---
-    const vpsResponse = await tryVpsProxy(message, tenantId, conversationId);
+    // --- Route: coding → VPS, conversational → local gateway ---
+    const shouldTryVps = isCodeRelatedMessage(message);
+    const vpsResponse = shouldTryVps
+      ? await tryVpsProxy(message, tenantId, conversationId)
+      : null;
+
+    if (!shouldTryVps) {
+      logger.info(
+        "[ChatStream] Conversational message — skipping VPS, using local gateway",
+      );
+    }
 
     if (vpsResponse) {
       // VPS handled it — persist user message to unified thread for continuity
