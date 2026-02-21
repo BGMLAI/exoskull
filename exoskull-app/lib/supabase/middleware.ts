@@ -90,6 +90,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/mobile/") || // Mobile app — Bearer JWT auth verified in routes
     pathname.startsWith("/api/agent/") || // Local agent — Bearer JWT auth verified in routes
     pathname.startsWith("/api/chat/") || // Chat endpoints — Bearer JWT auth verified in routes (verifyTenantAuth)
+    pathname.startsWith("/api/voice/") || // Voice endpoints — Bearer JWT auth verified in routes (verifyTenantAuth)
     pathname.startsWith("/api/debug/"); // Debug endpoints — own CRON_SECRET auth
 
   // ============================================================================
