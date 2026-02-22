@@ -124,7 +124,7 @@
     },
     {
       "path": "/api/cron/async-tasks",
-      "schedule": "* * * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/predictions",
@@ -136,7 +136,7 @@
     },
     {
       "path": "/api/cron/petla",
-      "schedule": "* * * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/loop-15",
@@ -156,11 +156,11 @@
     },
     {
       "path": "/api/cron/impulse",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/integration-health",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/email-sync",
@@ -168,11 +168,11 @@
     },
     {
       "path": "/api/cron/email-analyze",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/conductor",
-      "schedule": "* * * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/rig-sync",
@@ -180,7 +180,7 @@
     },
     {
       "path": "/api/cron/signal-triage",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/skill-auto-generator",
