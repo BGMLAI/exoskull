@@ -36,7 +36,10 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return NextResponse.json(
-      { error: "TTS generation failed" },
+      {
+        error: "TTS generation failed",
+        detail: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 },
     );
   }
