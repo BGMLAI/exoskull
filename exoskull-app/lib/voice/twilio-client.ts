@@ -20,9 +20,9 @@ const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER!;
 // Type alias for language (Twilio uses specific enum)
 type TwilioLanguage = Parameters<VoiceResponse["say"]>[0]["language"];
 
-// Best available Polish voice for fallback (Amazon Polly Neural = highest quality)
-// Polly.Maja = female neural, Polly.Jan = male neural
-const TWILIO_POLISH_VOICE = "Polly.Maja"; // Female, neural - najlepsza jakość
+// Best available Polish voice for fallback (Amazon Polly via Twilio)
+// Polly.Jacek = male standard, matches user's cloned voice gender
+const TWILIO_POLISH_VOICE = "Polly.Jacek";
 const TWILIO_POLISH_LANGUAGE: TwilioLanguage = "pl-PL" as TwilioLanguage;
 
 // Initialize Twilio client (lazy)
