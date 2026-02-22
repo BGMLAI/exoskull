@@ -148,7 +148,7 @@ async function handler(req: NextRequest) {
                   }),
                 },
               ],
-              taskCategory: "analysis", // Routes to Tier 2 (Haiku)
+              taskCategory: "classification", // Routes to Tier 1 (Gemini Flash)
               tenantId: tenant.tenant_id,
               maxTokens: 200,
               temperature: 0.3,
