@@ -140,7 +140,7 @@
     },
     {
       "path": "/api/cron/loop-15",
-      "schedule": "*/15 * * * *"
+      "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/cron/loop-daily",
