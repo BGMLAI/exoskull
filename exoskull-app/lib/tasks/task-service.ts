@@ -9,6 +9,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { invalidateContextCache } from "@/lib/voice/dynamic-context";
+import { logger } from "@/lib/logger";
 import { dualWriteTask, dualUpdateTask } from "./dual-write";
 import type { TaskInput, TaskOutput } from "./dual-write";
 import { dualReadTask, dualReadTasks } from "./dual-read";
@@ -26,6 +27,13 @@ export async function createTask(
   supabase?: SupabaseClient,
 ): Promise<TaskOutput> {
   const result = await dualWriteTask(tenantId, input, supabase);
+  if (result.id && !result.dual_write_success) {
+    logger.warn("[TaskService] Dual-write partial failure:", {
+      tenantId,
+      taskId: result.id,
+      error: result.error,
+    });
+  }
   invalidateContextCache(tenantId);
   return result;
 }

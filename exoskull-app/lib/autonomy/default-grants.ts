@@ -8,7 +8,7 @@
  * Users can override via dashboard settings or voice commands.
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { PermissionCategory } from "./types";
 import { logger } from "@/lib/logger";
 
@@ -129,11 +129,16 @@ export const DENIED_BY_DEFAULT = [
  *
  * Returns number of grants created.
  */
-export async function seedDefaultGrants(tenantId: string): Promise<number> {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
+export async function seedDefaultGrants(
+  tenantId: string,
+  supabaseClient?: SupabaseClient,
+): Promise<number> {
+  const supabase =
+    supabaseClient ||
+    createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
 
   // Check if tenant already has grants
   const { count } = await supabase

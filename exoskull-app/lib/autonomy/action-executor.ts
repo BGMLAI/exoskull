@@ -26,7 +26,6 @@ import {
 } from "./custom-action-registry";
 
 import { logger } from "@/lib/logger";
-import { createTask, completeTask } from "@/lib/tasks/task-service";
 
 // ============================================================================
 // ACTION EXECUTOR CLASS
@@ -36,11 +35,13 @@ export class ActionExecutor {
   private supabase: SupabaseClient;
   private customActionRegistry: Record<string, CustomActionEntry>;
 
-  constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    );
+  constructor(supabaseClient?: SupabaseClient) {
+    this.supabase =
+      supabaseClient ||
+      createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      );
     this.customActionRegistry = buildCustomActionRegistry(this.supabase);
   }
 
@@ -276,7 +277,8 @@ export class ActionExecutor {
         labels?: string[];
       };
 
-    // Use dual-write task service
+    // Use dual-write task service (dynamic import to avoid circular dep)
+    const { createTask } = await import("@/lib/tasks/task-service");
     const priorityMap: Record<string, 1 | 2 | 3 | 4> = {
       critical: 1,
       high: 2,
@@ -301,6 +303,14 @@ export class ActionExecutor {
       };
     }
 
+    if (!taskResult.dual_write_success) {
+      logger.warn("[ActionExecutor] Task created but dual-write failed:", {
+        taskId: taskResult.id,
+        error: taskResult.error,
+        tenantId: request.tenantId,
+      });
+    }
+
     return {
       success: true,
       actionType: "create_task",
@@ -317,7 +327,8 @@ export class ActionExecutor {
       notes?: string;
     };
 
-    // Use dual-write task service
+    // Use dual-write task service (dynamic import to avoid circular dep)
+    const { completeTask } = await import("@/lib/tasks/task-service");
     const { success, error } = await completeTask(taskId, request.tenantId);
 
     if (!success) {
@@ -877,9 +888,11 @@ export class ActionExecutor {
 
 let actionExecutorInstance: ActionExecutor | null = null;
 
-export function getActionExecutor(): ActionExecutor {
+export function getActionExecutor(
+  supabaseClient?: SupabaseClient,
+): ActionExecutor {
   if (!actionExecutorInstance) {
-    actionExecutorInstance = new ActionExecutor();
+    actionExecutorInstance = new ActionExecutor(supabaseClient);
   }
   return actionExecutorInstance;
 }

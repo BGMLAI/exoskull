@@ -14,6 +14,8 @@ import {
 
 import { seedDefaultGrants, isDefaultGranted } from "./default-grants";
 import { logger } from "@/lib/logger";
+
+const seedingInProgress = new Map<string, Promise<number>>();
 // ============================================================================
 // PERMISSION MODEL CLASS
 // ============================================================================
@@ -24,11 +26,13 @@ export class PermissionModel {
     new Map();
   private cacheTtlMs = 60 * 1000; // 1 minute cache
 
-  constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    );
+  constructor(supabaseClient?: SupabaseClient) {
+    this.supabase =
+      supabaseClient ||
+      createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      );
   }
 
   // ============================================================================
@@ -71,15 +75,35 @@ export class PermissionModel {
         // No grants in DB at all — check defaults and seed them
         const allGrants = await this.getUserGrants(userId, false);
         if (allGrants.length === 0) {
-          // Tenant has NO grants — seed defaults asynchronously
-          seedDefaultGrants(userId).catch((err) =>
-            logger.error("[PermissionModel] Background seed failed:", err),
-          );
-          // Check against in-memory defaults for immediate response
+          // Deduplicate concurrent seed calls per user
+          if (!seedingInProgress.has(userId)) {
+            const seedPromise = seedDefaultGrants(userId)
+              .then((count) => {
+                this.cache.delete(userId);
+                return count;
+              })
+              .catch((err) => {
+                logger.error("[PermissionModel] Seed failed:", err);
+                return 0;
+              })
+              .finally(() => {
+                seedingInProgress.delete(userId);
+              });
+            seedingInProgress.set(userId, seedPromise);
+          }
+          await seedingInProgress.get(userId);
+
+          // Re-check DB after seed
+          const freshGrants = await this.getUserGrants(userId, false);
+          if (freshGrants.length > 0) {
+            const match = this.findMatchingGrantLocal(freshGrants, action);
+            if (match?.isActive) {
+              return { granted: true, reason: "granted" };
+            }
+          }
+
+          // Final fallback to in-memory defaults
           if (isDefaultGranted(action)) {
-            logger.info(
-              `[PermissionModel] Default-granted: ${action} for ${userId} (seeding DB)`,
-            );
             return { granted: true, reason: "granted" };
           }
         }
@@ -433,9 +457,11 @@ export class PermissionModel {
 
 let permissionModelInstance: PermissionModel | null = null;
 
-export function getPermissionModel(): PermissionModel {
+export function getPermissionModel(
+  supabaseClient?: SupabaseClient,
+): PermissionModel {
   if (!permissionModelInstance) {
-    permissionModelInstance = new PermissionModel();
+    permissionModelInstance = new PermissionModel(supabaseClient);
   }
   return permissionModelInstance;
 }

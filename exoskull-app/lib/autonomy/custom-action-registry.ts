@@ -4,8 +4,6 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
-import { getTasks, updateTask } from "@/lib/tasks/task-service";
-
 import { logger } from "@/lib/logger";
 export type CustomActionHandler = (
   tenantId: string,
@@ -195,6 +193,8 @@ export function buildCustomActionRegistry(
         );
 
         try {
+          const { getTasks, updateTask } =
+            await import("@/lib/tasks/task-service");
           const doneTasks = await getTasks(
             tenantId,
             { status: "done" },
