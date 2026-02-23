@@ -292,13 +292,52 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
   const startTime = Date.now();
   logger.info("[VoiceWS] User:", userText);
 
-  // Send brief audio acknowledgment immediately so the user hears feedback
-  // while the agent loads context + waits for Claude's first token (3-8s).
-  // This is a complete utterance (last:true) — the real response follows as
-  // a separate utterance via streaming tokens.
+  // ── Keepalive filler system ──
+  // Send periodic filler phrases while agent loads context + waits for
+  // Claude's first token. This prevents Twilio ConversationRelay from
+  // disconnecting during long thinking pauses (5-15s total).
+  // Each filler is a complete utterance (last:true) so TTS speaks it immediately.
+  const FILLER_PHRASES = [
+    "Hmm...",
+    "Chwileczkę...",
+    "Myślę...",
+    "Zaraz odpowiem...",
+  ];
+  const FILLER_INTERVAL_MS = 3_000;
+  let fillerIndex = 0;
+  let firstTokenReceived = false;
+
+  // Send first filler immediately
   if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "text", token: "Hmm...", last: true }));
+    ws.send(
+      JSON.stringify({
+        type: "text",
+        token: FILLER_PHRASES[fillerIndex],
+        last: true,
+      }),
+    );
+    fillerIndex++;
   }
+
+  // Send subsequent fillers every 3s until first real token arrives
+  const fillerInterval = setInterval(() => {
+    if (
+      firstTokenReceived ||
+      ws.readyState !== WebSocket.OPEN ||
+      fillerIndex >= FILLER_PHRASES.length
+    ) {
+      clearInterval(fillerInterval);
+      return;
+    }
+    ws.send(
+      JSON.stringify({
+        type: "text",
+        token: FILLER_PHRASES[fillerIndex],
+        last: true,
+      }),
+    );
+    fillerIndex++;
+  }, FILLER_INTERVAL_MS);
 
   try {
     // Persist user message to unified thread BEFORE agent runs
@@ -329,12 +368,20 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
       skipThreadAppend: true,
       timeoutMs: 35_000,
       onTextDelta: (delta) => {
+        // Stop filler phrases as soon as real content arrives
+        if (!firstTokenReceived) {
+          firstTokenReceived = true;
+          clearInterval(fillerInterval);
+        }
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: "text", token: delta, last: false }));
           tokenCount++;
         }
       },
     });
+
+    // Ensure filler interval is stopped (may already be stopped by onTextDelta)
+    clearInterval(fillerInterval);
 
     // Send final empty token with last:true to flush ConversationRelay buffer
     if (ws.readyState === WebSocket.OPEN) {
@@ -405,6 +452,9 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
       }, SILENCE_DISCONNECT_MS);
     }
   } catch (error) {
+    // Stop filler interval on error
+    clearInterval(fillerInterval);
+
     console.error("[VoiceWS] Prompt processing error:", {
       error: error instanceof Error ? error.message : error,
       tenantId: wsSession.tenantId,
