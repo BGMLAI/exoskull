@@ -16,6 +16,7 @@ import type { ProcessingCallback } from "@/lib/voice/conversation-handler";
 import { getToolLabel } from "@/lib/stream/tool-labels";
 import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 import { appendMessage } from "@/lib/unified-thread";
+import { isHallucination } from "@/lib/voice/transcribe-voice-note";
 
 import { logger } from "@/lib/logger";
 import { withApiLog } from "@/lib/api/request-logger";
@@ -111,6 +112,9 @@ const CONVERSATIONAL_PATTERNS =
 function isCodeRelatedMessage(message: string): boolean {
   const trimmed = message.trim();
 
+  // Upload confirmations → always local gateway (has knowledge base access)
+  if (/^\[Wgrałem plik:/.test(trimmed)) return false;
+
   // Short casual messages → never code
   if (trimmed.length < 40 && CONVERSATIONAL_PATTERNS.test(trimmed)) {
     return false;
@@ -121,12 +125,22 @@ function isCodeRelatedMessage(message: string): boolean {
     return true;
   }
 
-  // Contains code blocks or file paths → route to VPS
+  // Contains code blocks → route to VPS
+  if (/```/.test(trimmed)) {
+    return true;
+  }
+
+  // Ends with actual code file extension (whitelist, not generic \.\w{1,4})
   if (
-    /```/.test(trimmed) ||
-    /\.\w{1,4}$/.test(trimmed) ||
-    /\/[\w-]+\//.test(trimmed)
+    /\.(ts|tsx|js|jsx|py|rs|go|java|rb|php|css|html|json|yaml|yml|toml|sql|sh|vue|svelte|swift|kt|c|cpp|h|hpp|cs|lua|zig|ex|exs|clj|scala|r|m|pl|bat|ps1|dockerfile)$/i.test(
+      trimmed,
+    )
   ) {
+    return true;
+  }
+
+  // Contains file path pattern (at least 2 segments: /src/components/) → route to VPS
+  if (/\/[\w-]+\/[\w-]+/.test(trimmed)) {
     return true;
   }
 
@@ -494,6 +508,37 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       return new Response(JSON.stringify({ error: "Message is required" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Filter voice transcription noise / hallucinations (YouTube playing in background etc.)
+    if (isHallucination(message)) {
+      logger.debug("[ChatStream] Noise filtered:", {
+        tenantId,
+        message: message.slice(0, 80),
+      });
+      const encoder = new TextEncoder();
+      const noiseStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: "delta", text: "OK." })}\n\n`,
+            ),
+          );
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: "done", fullText: "OK." })}\n\n`,
+            ),
+          );
+          controller.close();
+        },
+      });
+      return new Response(noiseStream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
       });
     }
 

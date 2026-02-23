@@ -6,7 +6,10 @@
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { dispatchReport } from "@/lib/reports/report-dispatcher";
 // appendMessage removed — dispatchReport already writes to unified thread
-import { logProactiveOutbound } from "@/lib/autonomy/outbound-triggers";
+import {
+  canSendProactive,
+  logProactiveOutbound,
+} from "@/lib/autonomy/outbound-triggers";
 import { pushNotifyTenant } from "@/lib/push/fcm";
 import { logger } from "@/lib/logger";
 
@@ -98,6 +101,7 @@ export function isQuietHours(timezone: string, personality?: any): boolean {
 
 /**
  * Send a proactive message to a tenant with full logging.
+ * Includes built-in rate limiting and per-trigger dedup (6h window).
  */
 export async function sendProactiveMessage(
   tenantId: string,
@@ -106,6 +110,34 @@ export async function sendProactiveMessage(
   source: string = "cron",
 ): Promise<{ success: boolean; channel?: string }> {
   try {
+    // Gate 1: Daily rate limit (max 8 proactive messages per day)
+    const allowed = await canSendProactive(tenantId);
+    if (!allowed) {
+      logger.info(`[${source}] Proactive blocked — daily limit reached`, {
+        tenantId,
+        triggerType,
+      });
+      return { success: false };
+    }
+
+    // Gate 2: Per-trigger dedup — same trigger_type sent within last 6 hours?
+    const supabase = getServiceSupabase();
+    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    const { count: recentCount } = await supabase
+      .from("exo_proactive_log")
+      .select("*", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("trigger_type", triggerType)
+      .gte("created_at", sixHoursAgo);
+
+    if ((recentCount || 0) > 0) {
+      logger.debug(
+        `[${source}] Proactive deduped — ${triggerType} sent within 6h`,
+        { tenantId },
+      );
+      return { success: false };
+    }
+
     // dispatchReport already appends to unified thread — don't double-write
     const result = await dispatchReport(tenantId, message, "insight");
 
@@ -123,7 +155,6 @@ export async function sendProactiveMessage(
 
     // Store message_sid for delivery tracking (if SMS was used)
     if (result.messageSid) {
-      const supabase = getServiceSupabase();
       await supabase
         .from("exo_proactive_log")
         .update({ message_sid: result.messageSid })

@@ -337,85 +337,9 @@ async function checkGoalDeadlines(
   return result;
 }
 
-/**
- * D. Pending Approved Interventions — execute approved interventions waiting for dispatch.
- */
-async function checkPendingInterventions(
-  tenantId: string,
-  canMessage: boolean,
-): Promise<ActionResult> {
-  const result: ActionResult = {
-    type: "intervention_execution",
-    count: 0,
-    messagesSent: 0,
-  };
-
-  try {
-    const supabase = getServiceSupabase();
-    const { data: pending, error } = await supabase
-      .from("exo_interventions")
-      .select("id, title, description, action_payload, intervention_type")
-      .eq("tenant_id", tenantId)
-      .eq("status", "approved")
-      .is("executed_at", null)
-      .order("created_at", { ascending: true })
-      .limit(3);
-
-    if (error) {
-      logger.error("[Impulse] Pending interventions query failed:", {
-        tenantId,
-        error: error.message,
-      });
-      return result;
-    }
-
-    if (!pending || pending.length === 0) return result;
-    result.count = pending.length;
-
-    for (const intervention of pending) {
-      try {
-        // Build message from intervention content
-        const message = intervention.description || intervention.title;
-
-        if (canMessage && result.messagesSent === 0) {
-          const sent = await sendProactiveMessage(
-            tenantId,
-            message,
-            "intervention_execution",
-            "impulse",
-          );
-          if (sent.success) result.messagesSent = 1;
-        }
-
-        // Mark as executed regardless (non-message action)
-        await supabase
-          .from("exo_interventions")
-          .update({
-            status: "completed",
-            executed_at: new Date().toISOString(),
-            execution_result: {
-              dispatched_by: "impulse",
-              dispatched_at: new Date().toISOString(),
-            },
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", intervention.id);
-      } catch (err) {
-        logger.error("[Impulse] Failed to execute intervention:", {
-          interventionId: intervention.id,
-          error: err instanceof Error ? err.message : err,
-        });
-      }
-    }
-  } catch (error) {
-    logger.error("[Impulse] checkPendingInterventions error:", {
-      tenantId,
-      error: error instanceof Error ? error.message : error,
-    });
-  }
-
-  return result;
-}
+// Step D (checkPendingInterventions) REMOVED — intervention-executor CRON
+// already handles approved interventions every 15 min. Having both caused
+// double-execution and duplicate proactive messages.
 
 /**
  * E. Stale Email Sync — log warning for accounts not synced in 2+ hours.
@@ -945,14 +869,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
         messagesThisCycle += goalResult.messagesSent;
         totals.totalMessagesSent += goalResult.messagesSent;
 
-        // D. Pending Approved Interventions
-        const interventionResult = await checkPendingInterventions(
-          tenant.id,
-          canMessage && messagesThisCycle < MAX_ACTIONS_PER_TENANT,
-        );
-        totals.actions.intervention_execution += interventionResult.count;
-        messagesThisCycle += interventionResult.messagesSent;
-        totals.totalMessagesSent += interventionResult.messagesSent;
+        // D. (removed — intervention-executor CRON handles this)
 
         // E. Stale Email Sync (no messages — log only)
         const emailResult = await checkStaleEmailSync(tenant.id);

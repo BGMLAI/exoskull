@@ -57,6 +57,17 @@ export function isHallucination(text: string): boolean {
     /dziękuję za wysłuchanie/i,
     /prosimy o subskrybowanie/i,
     /^to (jest|był[ao]?) (wszystko|tyle)/i,
+    // YouTube outro / background noise phrases
+    /nie zapomnijcie zasubskrybować/i,
+    /zafollowować mnie na/i,
+    /zobaczcie co się wydarzyło/i,
+    /dziękuję za oglądanie/i,
+    /dzięk(i|uje) za ogl[aą]danie/i,
+    /praca na farmie w danii/i,
+    /zostaw(cie)? (łapkę|lajka|kciuka)/i,
+    /dajcie znać w komentarz/i,
+    /^(dzień dobry[.\s]*){2,}$/i,
+    /^(halo[.\s?]*){3,}$/i,
   ];
 
   for (const pattern of hallucinations) {
@@ -66,13 +77,14 @@ export function isHallucination(text: string): boolean {
   // Repetition detection: if >60% of words are the same word
   const words = t
     .toLowerCase()
+    .replace(/[.!?,]+/g, "")
     .split(/\s+/)
-    .filter((w) => w.length > 2);
-  if (words.length >= 3) {
+    .filter((w) => w.length > 1);
+  if (words.length >= 4) {
     const freq = new Map<string, number>();
     for (const w of words) freq.set(w, (freq.get(w) || 0) + 1);
     const maxFreq = Math.max(...freq.values());
-    if (maxFreq / words.length > 0.6) return true;
+    if (maxFreq / words.length >= 0.5) return true;
   }
 
   return false;
