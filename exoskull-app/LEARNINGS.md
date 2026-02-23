@@ -1,5 +1,32 @@
 # ExoSkull Learnings
 
+## Middleware Auth: Cookie + Bearer in One Place (2026-02-23)
+
+- Next.js middleware runs BEFORE route handlers. If it only checks cookies, all API/mobile clients get 401 — even if the route handler has its own Bearer auth.
+- **Solution:** Check both in middleware: `supabase.auth.getUser()` for cookies, then `createClient().auth.getUser(token)` for Bearer.
+- Route-level auth (`verifyTenantAuth`) is still needed for tenantId resolution, but middleware unblocks the request first.
+- `createAuthClient()` is cookie-only (SSR helper) — never use it in API routes that need Bearer support. Always use `verifyTenantAuth()`.
+
+## BGML Classifier Must Be Bilingual (2026-02-23)
+
+- English-only keywords → Polish user messages ALL classified as "general" complexity 1 → no frameworks, no DIPPER, no MoA triggered.
+- Domain keywords need BOTH languages: "strategia"/"strategy", "zadanie"/"task", "napisz kod"/"write code".
+- Complexity indicators especially critical in Polish: "przeanalizuj" (analyze), "zaprojektuj" (design), "5-letni plan" (5-year plan).
+- Use stemmed/partial keywords ("cenow" matches "cenowa/cenowy/cenowe") for inflected languages.
+
+## Circular Dependencies in IORS Tool Registry (2026-02-23)
+
+- `discovery-tools.ts` → `index.ts` (IORS_EXTENSION_TOOLS) → `discovery-tools.ts` = circular import crash.
+- **Solution:** Use `shared.ts` exports (`getRegisteredTools()`) instead of barrel `index.ts`.
+- General rule: tools should never import from the tool registry barrel file.
+
+## E2E Testing with Playwright on Root/Server (2026-02-23)
+
+- Chromium refuses to run as root without `--no-sandbox` flag.
+- MCP Playwright wrapper doesn't support custom launch args → use direct Playwright API.
+- `networkidle` wait is more reliable than `domcontentloaded` for SPA navigation.
+- `waitForTimeout` needed for SSE/streaming responses — no DOM element to wait for.
+
 ## BGML Pipeline Design Patterns (2026-02-23)
 
 - **Complexity-based routing is key:** Don't run expensive multi-model ensembles for simple queries. Tier system (1-2: direct, 3: framework, 4: DIPPER, 5: MoA) keeps costs at $0.001-$0.05 per query.

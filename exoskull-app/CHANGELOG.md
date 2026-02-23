@@ -4,6 +4,53 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-23] Auth Fixes + E2E Testing — Bearer Token Support + Polish Classifier
+
+### Bearer Token Auth in Middleware (lib/supabase/middleware.ts)
+
+- **Fixed** middleware to support Bearer token auth alongside cookies
+- Previously: only `supabase.auth.getUser()` (cookie-based) → all API/mobile calls got 401
+- Now: tries cookie first, then Bearer token via `createClient().auth.getUser(token)`
+
+### 10 API Routes Migrated to Dual Auth
+
+- **Replaced** `createAuthClient()` (cookie-only) with `verifyTenantAuth()` (cookie + Bearer) in:
+  - `app/api/skills/route.ts`
+  - `app/api/autonomy/check/route.ts`, `app/api/autonomy/execute/route.ts`
+  - `app/api/knowledge/upload/route.ts`, `app/api/knowledge/confirm-upload/route.ts`
+  - `app/api/knowledge/upload-url/route.ts`, `app/api/knowledge/multipart-upload/route.ts`
+  - `app/api/knowledge/ingest/route.ts`, `app/api/knowledge/upload-folder/route.ts`
+  - `app/api/knowledge/reprocess-all/route.ts` (preserved CRON_SECRET dual-auth)
+
+### BGML Classifier Polish Keywords (lib/bgml/classifier.ts)
+
+- **Added** full Polish keyword support for all 6 domains + 5 complexity levels
+- Previously: English-only keywords → all Polish messages classified as "general" complexity 1
+- Now: bilingual keywords for business, engineering, personal, creative, science, general
+
+### Discovery Tools Circular Dependency Fix (lib/iors/tools/discovery-tools.ts)
+
+- **Fixed** circular import: `discovery-tools.ts` ↔ `index.ts`
+- Changed import from `IORS_EXTENSION_TOOLS` (index.ts) to `getRegisteredTools()` (shared.ts)
+- Fixed `context.tenantId` → `tenantId` (execute signature mismatch)
+
+### Test Infrastructure
+
+- **Created** `scripts/test-engine.ts` — 21 tests for BGML classifier, voting, planner, Byzantine, discovery, pipeline
+- **Created** `/tmp/e2e-test.mjs` — 15 E2E browser tests (Playwright): homepage → login → dashboard → chat → all sections
+- All 21 unit tests PASS, all 15 E2E tests PASS
+
+### Commits
+
+```
+206238d fix: replace cookie-only auth with verifyTenantAuth in 10 API routes
+c8a5031 fix: add Bearer token auth to middleware
+ba6a014 fix: Polish keywords in BGML classifier + circular dep in discovery-tools
+c406d9b fix: discovery-tools execute signature and tenantId reference
+```
+
+---
+
 ## [2026-02-23] Engine Overhaul: BGML Pipeline + Byzantine Consensus + Pre-Search Planner
 
 ### BGML Pipeline (lib/bgml/pipeline.ts)

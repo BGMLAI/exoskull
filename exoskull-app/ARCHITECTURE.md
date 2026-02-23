@@ -449,12 +449,16 @@ Score < 70 → Judge pairwise vs alternative
 Score ≥ 70 → Return to user
 ```
 
+### Classifier Language Support
+
+The classifier uses bilingual (Polish + English) keyword maps for all 6 domains and 5 complexity levels. Polish keywords use stemmed/partial forms to handle inflection (e.g., "cenow" matches "cenowa/cenowy/cenowe").
+
 ### Key Files
 
 | File                                | Purpose                                          |
 | ----------------------------------- | ------------------------------------------------ |
 | `lib/bgml/pipeline.ts`              | Unified orchestrator — routes by complexity      |
-| `lib/bgml/classifier.ts`            | Domain (6 types) + complexity (1-5) detection    |
+| `lib/bgml/classifier.ts`            | Domain (6 types) + complexity (1-5), bilingual   |
 | `lib/bgml/framework-selector.ts`    | Selects specialist framework from DB             |
 | `lib/bgml/dipper.ts`                | 3-perspective ensemble with multi-model          |
 | `lib/bgml/moa.ts`                   | Mixture of Agents — DIPPER → synthesis           |
@@ -474,6 +478,42 @@ The pipeline is wired into `lib/agent-sdk/exoskull-agent.ts`:
 4. **Post-response**: Quality scoring logged for monitoring
 
 Voice channel: BGML capped at framework-only (complexity 3) to preserve TTS latency.
+
+---
+
+## Authentication Architecture (2026-02-23)
+
+### Two-Layer Auth
+
+```
+Request
+  ↓
+Middleware (lib/supabase/middleware.ts)
+  ├─ Method 1: Cookie auth (supabase.auth.getUser())      → web browser
+  ├─ Method 2: Bearer token (createClient.auth.getUser())  → mobile/API
+  ├─ Protected route + no user → redirect to /login (page) or 401 (API)
+  └─ Public routes: /, /login, /api/auth/*, /api/webhooks/*, /api/cron/*, etc.
+  ↓
+Route Handler (verifyTenantAuth)
+  ├─ Resolves userId → tenantId (from exo_tenants)
+  ├─ Supports cookie + Bearer + CRON_SECRET
+  └─ Returns { ok, tenantId, userId } or { ok: false, response: 401 }
+```
+
+### Auth Patterns by Route Type
+
+| Pattern            | Auth Method            | Example                                       |
+| ------------------ | ---------------------- | --------------------------------------------- |
+| Dashboard pages    | Cookie (SSR)           | `/dashboard/*`                                |
+| API routes (user)  | `verifyTenantAuth()`   | `/api/skills`, `/api/knowledge/*`             |
+| CRON endpoints     | `x-cron-secret` header | `/api/cron/*`, `/api/knowledge/reprocess-all` |
+| Mobile/API clients | Bearer JWT token       | `/api/mobile/*`, `/api/chat/*`                |
+| Webhooks           | Own auth (signatures)  | `/api/webhooks/*`, `/api/gateway/*`           |
+| Public             | None                   | `/`, `/login`, `/api/public/*`                |
+
+### Key Rule
+
+**Never use `createAuthClient()`** — it's cookie-only (SSR helper). Always use `verifyTenantAuth()` for API routes.
 
 ---
 

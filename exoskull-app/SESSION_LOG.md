@@ -1,5 +1,45 @@
 # Session Log
 
+## [2026-02-23] Auth Fixes + E2E Testing — Bearer Token Support + Polish Classifier
+
+### Tasks
+
+- Fix discovery-tools execute signature (`context.tenantId` → `tenantId`): **SUCCESS**
+- Fix discovery-tools circular dependency (index.ts ↔ discovery-tools.ts): **SUCCESS**
+- Add Polish keywords to BGML classifier (6 domains + 5 complexity levels): **SUCCESS**
+- Engine unit tests (scripts/test-engine.ts): **SUCCESS** (21/21 PASS)
+- Chat stream integration test (curl + JWT): **SUCCESS** (139 deltas, 2 tool calls)
+- Bearer token auth in middleware: **SUCCESS**
+- Migrate 10 API routes from createAuthClient → verifyTenantAuth: **SUCCESS**
+- API endpoint verification (10/10 return 200 with Bearer): **SUCCESS**
+- E2E browser test (Playwright, 15 tests): **SUCCESS** (15/15 PASS)
+- Vercel deploy (4 commits): **SUCCESS**
+
+### Root Cause Analysis
+
+| Issue                          | Root Cause                                         | Fix                                                       |
+| ------------------------------ | -------------------------------------------------- | --------------------------------------------------------- |
+| 401 on all API endpoints       | Middleware only checked cookies, not Bearer tokens | Added Bearer token verification before blocking           |
+| 401 on skills/knowledge routes | Used `createAuthClient()` (cookie-only SSR helper) | Replaced with `verifyTenantAuth()` (cookie + Bearer)      |
+| Polish queries misclassified   | BGML classifier only had English keywords          | Added bilingual keyword maps for all domains + complexity |
+| Discovery tools crash          | Circular import: discovery-tools ↔ index.ts        | Import `getRegisteredTools()` from shared.ts instead      |
+| Discovery tools wrong arg      | `context.tenantId` from old handler signature      | Changed to `tenantId` (direct execute parameter)          |
+
+### Retries
+
+- Playwright MCP sandbox: 1 retry → switched to direct Playwright API with `--no-sandbox`
+- Test script CJS top-level await: 1 retry → moved dynamic import inside async function
+- Classifier English keywords: 1 retry → added full Polish keyword maps
+
+### Key Decisions
+
+- Bearer token in middleware (not route-level): single point of auth for all protected routes
+- `verifyTenantAuth()` as standard: supports cookie + Bearer + tenantId resolution
+- Playwright `--no-sandbox` flag: required when running as root
+- Test engine as TypeScript script (tsx runner): can import project modules directly
+
+---
+
 ## [2026-02-23] Engine Overhaul: BGML Pipeline + Byzantine + Pre-Search Planner
 
 ### Tasks
