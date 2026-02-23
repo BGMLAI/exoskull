@@ -38,7 +38,7 @@ export async function updateTask(
 ): Promise<{ success: boolean; error?: string }> {
   // Check if this is a completion event with a goal_id
   const isCompletion =
-    updates.status === "done" || updates.status === "completed";
+    updates.status === "done" || (updates.status as string) === "completed";
 
   const result = await dualUpdateTask(taskId, tenantId, updates, supabase);
   invalidateContextCache(tenantId);

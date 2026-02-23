@@ -419,11 +419,11 @@ export class GoogleClient {
       photos,
     ] = await Promise.all([
       this.fitClient.getAllData(startDate, endDate).catch(() => ({
-        steps: [],
-        heartRate: [],
-        calories: [],
-        sleep: [],
-        distance: [],
+        steps: [] as { date: string; steps: number }[],
+        heartRate: [] as { date: string; bpm: number }[],
+        calories: [] as { date: string; calories: number }[],
+        sleep: [] as { date: string; durationMinutes: number }[],
+        distance: [] as { date: string; meters: number }[],
       })),
       this.workspaceClient.getDashboardData().catch(() => ({
         gmail: { unreadCount: 0, recentEmails: [] },

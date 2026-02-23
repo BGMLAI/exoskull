@@ -418,8 +418,8 @@ export async function buildDynamicContext(
                 ? "WYMAGA UWAGI"
                 : "brak danych";
       const days = s.days_remaining !== null ? `, ${s.days_remaining} dni` : "";
-      const momentum =
-        s.momentum === "up" ? " ↑" : s.momentum === "down" ? " ↓" : "";
+      const m = (s as Record<string, unknown>).momentum;
+      const momentum = m === "up" ? " ↑" : m === "down" ? " ↓" : "";
       context += `- ${s.goal.name}: ${Math.round(s.progress_percent)}% [${status}]${days}${momentum}\n`;
     }
     context += `PRIORYTET: cele zagrożone > cele na dobrej drodze. Proaktywnie proponuj akcje dla celów off-track.\n`;
