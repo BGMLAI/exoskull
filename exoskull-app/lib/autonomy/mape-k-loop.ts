@@ -213,23 +213,10 @@ export class MAPEKLoop {
       }
     }
 
-    // 2. Plan interventions for gaps
+    // 2. Plan interventions for gaps — map each gap to a solving action
     for (const gap of analyzeResult.gaps) {
-      interventions.push({
-        type: "gap_detection",
-        title: `Blind spot detected: ${gap.area}`,
-        description: gap.description,
-        actionPayload: {
-          action: "send_notification",
-          params: {
-            title: `ExoSkull noticed a gap in ${gap.area}`,
-            body: gap.suggestedAction || gap.description,
-          },
-        },
-        priority: "low",
-        requiresApproval: true,
-        reasoning: `No activity in ${gap.area} area detected - user might benefit from awareness`,
-      });
+      const gapIntervention = planInterventionForGap(gap);
+      interventions.push(gapIntervention);
     }
 
     // 3. Limit total interventions per cycle
@@ -276,6 +263,30 @@ export class MAPEKLoop {
 
     for (const planned of planResult.interventions) {
       try {
+        // Dedup: skip if same tenant + type + title exists in last 24h
+        const { count: recentCount } = await this.supabase
+          .from("exo_interventions")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
+          .eq("intervention_type", planned.type)
+          .eq("title", planned.title)
+          .gte(
+            "created_at",
+            new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          );
+
+        if (recentCount && recentCount > 0) {
+          logger.info(
+            `[MAPE-K] Dedup: skipping "${planned.title}" — already proposed in last 24h`,
+          );
+          results.push({
+            interventionId: "dedup-skipped",
+            success: false,
+            error: `Dedup: "${planned.title}" already proposed in last 24h`,
+          });
+          continue;
+        }
+
         // Create intervention record
         const { data: intervention, error: createError } =
           await this.supabase.rpc("propose_intervention", {
@@ -588,6 +599,98 @@ export class MAPEKLoop {
       feedbackProcessed,
       learnings,
     };
+  }
+}
+
+// ============================================================================
+// GAP → ACTION MAPPING
+// ============================================================================
+
+/**
+ * Map a detected gap to a solving action instead of a notification.
+ */
+function planInterventionForGap(
+  gap: AnalyzeResult["gaps"][0],
+): PlanResult["interventions"][0] {
+  switch (gap.area) {
+    case "health":
+      return {
+        type: "gap_detection",
+        title: `Auto-generate sleep logger for ${gap.area} gap`,
+        description: gap.description,
+        actionPayload: {
+          action: "build_app",
+          params: {
+            appType: "sleep_logger",
+            reason: gap.description,
+            suggestedFeatures: [
+              "manual sleep log",
+              "sleep quality rating",
+              "weekly trend chart",
+            ],
+          },
+        },
+        priority: "medium",
+        requiresApproval: true, // build_app is a bigger operation — route through CRON executor
+        reasoning: `No health data — build a sleep logger tool instead of nagging`,
+      };
+
+    case "social":
+      return {
+        type: "gap_detection",
+        title: `Social check-in: no interactions detected`,
+        description: gap.description,
+        actionPayload: {
+          action: "trigger_checkin",
+          params: {
+            checkinType: "social",
+            message:
+              "Hey, it's been quiet lately. How are things going? Anyone you've been meaning to reach out to?",
+          },
+        },
+        priority: "low",
+        requiresApproval: false,
+        reasoning: `No social interactions — start a conversation instead of silent notification`,
+      };
+
+    case "integrations":
+      return {
+        type: "gap_detection",
+        title: `Set up health tracker integration`,
+        description: gap.description,
+        actionPayload: {
+          action: "create_task",
+          params: {
+            title: "Set up a health tracker integration",
+            description: `${gap.suggestedAction || gap.description}. ExoSkull works best with connected data sources.`,
+            priority: "medium",
+            labels: ["auto:mape-k", "onboarding"],
+          },
+        },
+        priority: "low",
+        requiresApproval: false,
+        reasoning: `No integrations connected — create actionable task instead of notification`,
+      };
+
+    default:
+      // Fallback for unknown gap areas — still better than send_notification
+      return {
+        type: "gap_detection",
+        title: `Blind spot detected: ${gap.area}`,
+        description: gap.description,
+        actionPayload: {
+          action: "trigger_checkin",
+          params: {
+            checkinType: "general",
+            message:
+              gap.suggestedAction ||
+              `ExoSkull noticed a gap in ${gap.area}. Want to talk about it?`,
+          },
+        },
+        priority: "low",
+        requiresApproval: false,
+        reasoning: `Gap in ${gap.area} — trigger check-in instead of silent notification`,
+      };
   }
 }
 

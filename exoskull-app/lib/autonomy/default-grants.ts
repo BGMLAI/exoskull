@@ -88,6 +88,22 @@ export const DEFAULT_GRANTS: DefaultGrant[] = [
     daily_limit: 5,
     description: "Initiate wellness and energy check-ins",
   },
+
+  // Apps — auto-generate micro-apps from detected needs
+  {
+    action_pattern: "build_app:*",
+    category: "other",
+    daily_limit: 2,
+    description: "Auto-generate micro-apps from detected needs",
+  },
+
+  // Goals — generate and execute goal strategies
+  {
+    action_pattern: "goal_strategy:*",
+    category: "other",
+    daily_limit: 3,
+    description: "Generate and execute goal strategies",
+  },
 ];
 
 /**

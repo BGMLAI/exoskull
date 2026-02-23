@@ -253,32 +253,36 @@ export function planInterventionForIssue(
         title: "Sleep debt detected",
         description: issue.description,
         actionPayload: {
-          action: "send_notification",
+          action: "trigger_checkin",
           params: {
-            title: "Sleep Alert",
-            body: issue.description,
+            checkinType: "sleep",
+            message: `Your average sleep looks low (${issue.data?.avgSleep ? Number(issue.data.avgSleep).toFixed(1) + "h" : "below 6h"}). How did you sleep last night?`,
           },
         },
         priority: issue.severity === "high" ? "high" : "medium",
-        requiresApproval: false, // Low-risk: notification only — Guardian check still applies
-        reasoning: "Sleep debt can impact health and productivity",
+        requiresApproval: false,
+        reasoning:
+          "Sleep debt — ask about sleep quality instead of silent notification",
       };
 
     case "task_overload":
       return {
         type: "task_reminder",
-        title: "Overdue tasks need attention",
+        title: "Review and prioritize overdue tasks",
         description: issue.description,
         actionPayload: {
-          action: "send_notification",
+          action: "create_task",
           params: {
-            title: "Task Overload",
-            body: issue.description,
+            title: `Review ${issue.data?.overdueCount || "overdue"} tasks and prioritize`,
+            description: `${issue.description}. Suggested: cancel stale tasks, delegate what you can, reschedule the rest.`,
+            priority: "high",
+            labels: ["auto:mape-k", "meta-task"],
           },
         },
         priority: issue.severity === "high" ? "high" : "medium",
-        requiresApproval: false, // Low-risk: notification only — Guardian check still applies
-        reasoning: "Many overdue tasks may indicate need for prioritization",
+        requiresApproval: false,
+        reasoning:
+          "Task overload — create actionable meta-task instead of silent notification",
       };
 
     case "health_concern":
@@ -325,15 +329,17 @@ export function planInterventionForIssue(
         title: "Energy and activity check-in",
         description: issue.description,
         actionPayload: {
-          action: "send_notification",
+          action: "trigger_checkin",
           params: {
-            title: "How are you doing?",
-            body: "Noticed low activity today. Everything okay? Sometimes a short walk helps.",
+            checkinType: "energy",
+            message:
+              "Noticed low activity today. How's your energy? Sometimes a short walk or change of scenery helps.",
           },
         },
         priority: "low",
-        requiresApproval: false, // Low-risk: proactive message — Guardian check still applies
-        reasoning: "Low activity + low energy may indicate user needs support",
+        requiresApproval: false,
+        reasoning:
+          "Low activity + low energy — trigger energy check-in instead of silent notification",
       };
 
     case "social_isolation":
