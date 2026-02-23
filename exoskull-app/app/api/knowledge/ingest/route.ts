@@ -16,7 +16,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAuthClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { chunkText, type ChunkOptions } from "@/lib/memory/chunking-pipeline";
 import { storeChunksWithEmbeddings } from "@/lib/memory/vector-store";
@@ -32,15 +32,10 @@ export const dynamic = "force-dynamic";
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
-    const authSupabase = await createAuthClient();
-    const {
-      data: { user },
-    } = await authSupabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
 
-    const tenantId = user.id;
+    const tenantId = auth.tenantId;
     const jobId = req.nextUrl.searchParams.get("jobId");
     const supabase = getServiceSupabase();
 
@@ -102,15 +97,10 @@ interface IngestRequest {
 
 export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
-    const authSupabase = await createAuthClient();
-    const {
-      data: { user },
-    } = await authSupabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
 
-    const tenantId = user.id;
+    const tenantId = auth.tenantId;
     const body: IngestRequest = await req.json();
     const supabase = getServiceSupabase();
 

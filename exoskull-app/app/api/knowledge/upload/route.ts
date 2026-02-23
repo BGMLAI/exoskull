@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAuthClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { withApiLog } from "@/lib/api/request-logger";
 
@@ -44,14 +44,9 @@ const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
 export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     // Auth: verify caller
-    const authSupabase = await createAuthClient();
-    const {
-      data: { user },
-    } = await authSupabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const tenantId = user.id;
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
+    const tenantId = auth.tenantId;
 
     const supabase = getServiceSupabase();
     const formData = await req.formData();

@@ -17,7 +17,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAuthClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import {
   initiateMultipartUpload,
@@ -59,15 +59,10 @@ const ALLOWED_EXTENSIONS = [
 
 export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
-    const authSupabase = await createAuthClient();
-    const {
-      data: { user },
-    } = await authSupabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
 
-    const tenantId = user.id;
+    const tenantId = auth.tenantId;
     const body = await req.json();
     const { action } = body;
 

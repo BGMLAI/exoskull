@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAuthClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import {
   runAutonomyCycle,
   executeAction,
@@ -47,14 +47,9 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       }
       tenantId = bodyTenantId;
     } else {
-      const authSupabase = await createAuthClient();
-      const {
-        data: { user },
-      } = await authSupabase.auth.getUser();
-      if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      tenantId = user.id;
+      const auth = await verifyTenantAuth(request);
+      if (!auth.ok) return auth.response;
+      tenantId = auth.tenantId;
     }
 
     if (!operation) {
@@ -142,14 +137,9 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       }
       tenantId = queryTenantId;
     } else {
-      const authSupabase = await createAuthClient();
-      const {
-        data: { user },
-      } = await authSupabase.auth.getUser();
-      if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      tenantId = user.id;
+      const auth = await verifyTenantAuth(request);
+      if (!auth.ok) return auth.response;
+      tenantId = auth.tenantId;
     }
 
     const type = searchParams.get("type") || "pending";

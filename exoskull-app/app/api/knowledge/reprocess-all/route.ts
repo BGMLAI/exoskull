@@ -15,7 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAuthClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { processDocument } from "@/lib/knowledge/document-processor";
 
@@ -39,14 +39,9 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         );
       }
     } else {
-      const authSupabase = await createAuthClient();
-      const {
-        data: { user },
-      } = await authSupabase.auth.getUser();
-      if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      tenantId = user.id;
+      const auth = await verifyTenantAuth(req);
+      if (!auth.ok) return auth.response;
+      tenantId = auth.tenantId;
     }
 
     const supabase = getServiceSupabase();

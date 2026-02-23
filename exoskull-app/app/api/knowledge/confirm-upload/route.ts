@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAuthClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { withApiLog } from "@/lib/api/request-logger";
@@ -18,16 +18,10 @@ export const dynamic = "force-dynamic";
 
 export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
-    const authSupabase = await createAuthClient();
-    const {
-      data: { user },
-    } = await authSupabase.auth.getUser();
+    const auth = await verifyTenantAuth(req);
+    if (!auth.ok) return auth.response;
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const tenantId = user.id;
+    const tenantId = auth.tenantId;
     const { documentId } = await req.json();
 
     if (!documentId) {

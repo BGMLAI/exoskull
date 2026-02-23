@@ -7,7 +7,7 @@
 
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createAuthClient } from "@/lib/supabase/server";
+import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
@@ -41,14 +41,9 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
     const { userId, action, recordError } = body;
 
     if (!isCronCall) {
-      const authSupabase = await createAuthClient();
-      const {
-        data: { user },
-      } = await authSupabase.auth.getUser();
-      if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      if (userId && userId !== user.id) {
+      const auth = await verifyTenantAuth(request);
+      if (!auth.ok) return auth.response;
+      if (userId && userId !== auth.tenantId) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }
@@ -128,13 +123,8 @@ export const PATCH = withApiLog(async function PATCH(request: NextRequest) {
     );
 
     if (!isCronCall) {
-      const authSupabase = await createAuthClient();
-      const {
-        data: { user },
-      } = await authSupabase.auth.getUser();
-      if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+      const auth = await verifyTenantAuth(request);
+      if (!auth.ok) return auth.response;
     }
 
     const supabase = getServiceSupabase();
