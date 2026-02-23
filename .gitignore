@@ -42,8 +42,15 @@ boy burger/
 
 .vercel
 
-# VPS secrets
+# VPS secrets & build artifacts
 vps-executor/.env
+vps-executor/dist/
+
+# Claude/ChatGPT conversation history (may contain secrets)
+docs/claude-history/
+
+# Firebase
+firebase-debug.log
 
 # Android secrets
 android/local.properties
