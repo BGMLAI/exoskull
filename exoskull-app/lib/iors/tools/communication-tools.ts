@@ -98,11 +98,11 @@ export const communicationTools: ToolDefinition[] = [
               purpose,
               votes: consensus.votes.length,
             });
-            return `Połączenie zablokowane przez system bezpieczeństwa (${consensus.votes.filter((v) => v.decision === "reject").length}/${consensus.votes.length} walidatorów odrzuciło). Powód: ${consensus.reason}`;
+            return `Połączenie zablokowane przez system bezpieczeństwa (${consensus.votes.filter((v) => v.decision === "reject").length}/${consensus.votes.length} walidatorów odrzuciło). Powód: ${consensus.reasoning}`;
           }
           logger.info("[CommunicationTools] Byzantine approved make_call:", {
             decision: consensus.decision,
-            confidence: consensus.confidence,
+            agreement: `${consensus.agreementCount}/${consensus.totalValidators}`,
           });
         } catch (err) {
           // Byzantine is advisory — don't block on failure

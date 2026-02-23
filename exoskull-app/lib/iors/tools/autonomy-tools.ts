@@ -129,7 +129,7 @@ export const autonomyTools: ToolDefinition[] = [
               domain,
               votes: consensus.votes.length,
             });
-            return `Przyznanie uprawnienia "${actionType}" zablokowane przez system bezpieczeństwa. Powód: ${consensus.reason}`;
+            return `Przyznanie uprawnienia "${actionType}" zablokowane przez system bezpieczeństwa. Powód: ${consensus.reasoning}`;
           }
         } catch (err) {
           logger.warn("[AutonomyTools] Byzantine check failed (proceeding):", {

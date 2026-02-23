@@ -33,14 +33,16 @@ export interface ConsensusResult {
 }
 
 export interface ByzantineAction {
-  /** What the user/system wants to do */
-  actionType: string;
+  /** Action type identifier (e.g. "make_call", "grant_autonomy") */
+  type: string;
   /** Description of the action */
   description: string;
+  /** Tenant performing the action */
+  tenantId?: string;
   /** Domain context */
-  domain: string;
-  /** User/tenant context */
-  tenantContext?: string;
-  /** Risk level assessment */
-  riskLevel: "medium" | "high" | "critical";
+  domain?: string;
+  /** Risk level assessment (auto-detected if not provided) */
+  riskLevel?: "medium" | "high" | "critical";
+  /** Extra metadata for logging */
+  metadata?: Record<string, unknown>;
 }

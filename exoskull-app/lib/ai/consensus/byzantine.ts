@@ -105,13 +105,13 @@ async function runAnthropicValidator(
   const startMs = Date.now();
 
   const prompt = VALIDATOR_PROMPT.replace("{role}", config.role)
-    .replace("{actionType}", action.actionType)
+    .replace("{actionType}", action.type)
     .replace("{description}", action.description)
-    .replace("{domain}", action.domain)
-    .replace("{riskLevel}", action.riskLevel)
+    .replace("{domain}", action.domain || "general")
+    .replace("{riskLevel}", action.riskLevel || "medium")
     .replace(
       "{tenantContext}",
-      action.tenantContext ? `Context: ${action.tenantContext}` : "",
+      action.tenantId ? `Tenant: ${action.tenantId}` : "",
     );
 
   try {
@@ -160,13 +160,13 @@ async function runGeminiValidator(
   }
 
   const prompt = VALIDATOR_PROMPT.replace("{role}", config.role)
-    .replace("{actionType}", action.actionType)
+    .replace("{actionType}", action.type)
     .replace("{description}", action.description)
-    .replace("{domain}", action.domain)
-    .replace("{riskLevel}", action.riskLevel)
+    .replace("{domain}", action.domain || "general")
+    .replace("{riskLevel}", action.riskLevel || "medium")
     .replace(
       "{tenantContext}",
-      action.tenantContext ? `Context: ${action.tenantContext}` : "",
+      action.tenantId ? `Tenant: ${action.tenantId}` : "",
     );
 
   try {
@@ -246,9 +246,9 @@ export async function runByzantineConsensus(
   const startMs = Date.now();
 
   logger.info("[Byzantine] Starting consensus for:", {
-    actionType: action.actionType,
-    riskLevel: action.riskLevel,
-    domain: action.domain,
+    actionType: action.type,
+    riskLevel: action.riskLevel || "medium",
+    domain: action.domain || "general",
   });
 
   // Run all validators in parallel
