@@ -15,6 +15,11 @@ import {
   listPermissions,
 } from "../autonomy";
 import type { AutonomyActionType, AutonomyDomain } from "../types";
+import {
+  runByzantineConsensus,
+  requiresConsensus,
+} from "@/lib/ai/consensus/byzantine";
+import { logger } from "@/lib/logger";
 
 export const autonomyTools: ToolDefinition[] = [
   {
@@ -108,6 +113,30 @@ export const autonomyTools: ToolDefinition[] = [
     execute: async (input, tenantId) => {
       const actionType = input.action_type as AutonomyActionType;
       const domain = (input.domain as AutonomyDomain) || "*";
+
+      // Byzantine consensus gate — multi-model validation before granting autonomy
+      if (requiresConsensus("grant_autonomy")) {
+        try {
+          const consensus = await runByzantineConsensus({
+            type: "grant_autonomy",
+            description: `Grant autonomy: ${actionType} in domain ${domain}`,
+            tenantId,
+            metadata: { actionType, domain, threshold: input.threshold_amount },
+          });
+          if (consensus.decision === "reject") {
+            logger.warn("[AutonomyTools] Byzantine rejected grant_autonomy:", {
+              actionType,
+              domain,
+              votes: consensus.votes.length,
+            });
+            return `Przyznanie uprawnienia "${actionType}" zablokowane przez system bezpieczeństwa. Powód: ${consensus.reason}`;
+          }
+        } catch (err) {
+          logger.warn("[AutonomyTools] Byzantine check failed (proceeding):", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
 
       await grantPermission(tenantId, actionType, domain, {
         threshold_amount: input.threshold_amount as number | undefined,

@@ -1,5 +1,48 @@
 # Session Log
 
+## [2026-02-23] Engine Overhaul: BGML Pipeline + Byzantine + Pre-Search Planner
+
+### Tasks
+
+- Phase 0.1: Create env sync script (`scripts/sync-env-to-vercel.sh`): **SUCCESS**
+- Phase 0.2: Fix skill registration after approval: **ALREADY DONE** (correctly implemented)
+- Phase 0.3: Dynamic tool descriptions in system prompt: **SUCCESS**
+- Phase 0.4: Add tool discovery tool: **SUCCESS**
+- Phase 1.1-1.2: Multi-model DIPPER + MoA rewrite: **SUCCESS**
+- Phase 1.3-1.4: Pre-search planner + self-correction: **SUCCESS**
+- Phase 1.5-1.6: Smart tool filtering (25 core + packs) + voice upgrade: **SUCCESS**
+- Phase 1+2.3: Create unified BGML pipeline.ts: **SUCCESS**
+- Phase 2.1: Byzantine consensus for critical decisions: **SUCCESS**
+- Phase 2.2: Seed 30 specialist frameworks: **SUCCESS**
+- Phase 2.4-2.5: Model router quality tracking: **SUCCESS**
+- Wire BGML pipeline into exoskull-agent.ts: **SUCCESS**
+- Wire Byzantine into make_call + grant_autonomy: **SUCCESS**
+- Documentation update: **SUCCESS**
+
+### Architecture Changes
+
+| Component         | Before                                      | After                                                                  |
+| ----------------- | ------------------------------------------- | ---------------------------------------------------------------------- |
+| BGML              | classifier + framework-selector only        | Full pipeline: classify → framework → DIPPER → MoA → quality gate      |
+| DIPPER            | Single model (Haiku) for all 3 perspectives | Multi-model: Gemini (analytical), Sonnet (creative), Haiku (practical) |
+| Planning          | None                                        | Pre-search (memory + web) → intent detection → tool suggestions        |
+| Tool filtering    | Static channel sets                         | 25 core + keyword-activated tool packs                                 |
+| Tool descriptions | Hardcoded 67-tool list                      | Dynamic from IORS registry                                             |
+| Safety            | Single-model trust                          | Byzantine 4-model consensus on critical actions                        |
+| Quality           | None                                        | Heuristic scoring + LLM judge + auto-escalation                        |
+| Voice model       | Haiku                                       | Sonnet                                                                 |
+| Frameworks        | 6                                           | 30 across 6 domains                                                    |
+
+### Notes
+
+- Planner runs in parallel with other Phase 1 context loading (no added latency)
+- Voice channel: BGML capped at framework-only (skip DIPPER/MoA for TTS latency)
+- Byzantine consensus is advisory — failure doesn't block tool execution
+- 10 new files created, 11 files modified
+- No breaking changes to existing API contracts
+
+---
+
 ## [2026-02-23] Fix 5 Critical Chat Bugs — Routing, Spam, Noise, Timeouts
 
 ### Tasks

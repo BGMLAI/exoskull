@@ -4,6 +4,109 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-23] Engine Overhaul: BGML Pipeline + Byzantine Consensus + Pre-Search Planner
+
+### BGML Pipeline (lib/bgml/pipeline.ts)
+
+- **Created** unified BGML pipeline orchestrator with complexity-based routing
+  - Complexity 1-2: Direct response (no BGML)
+  - Complexity 3: Framework-guided (inject specialist framework prompt)
+  - Complexity 4: DIPPER — 3 perspectives from 3 different models (Gemini/Sonnet/Haiku)
+  - Complexity 5: Full MoA — DIPPER → Opus synthesis → quality gate
+- **Auto-escalation:** DIPPER quality < 50 → auto-escalates to MoA
+- **Quality gate:** synthesis score < 70 → LLM judge pairwise comparison
+
+### Multi-Model DIPPER (lib/bgml/dipper.ts)
+
+- **Rewritten** for multi-model diversity: analytical→Gemini, creative→Sonnet, practical→Haiku
+- Uses `scoreResponse()` from voting.ts instead of length heuristic for variant selection
+
+### MoA Rewrite (lib/bgml/moa.ts)
+
+- Accepts diverse models per DIPPER perspective
+- Optional Opus synthesis for critical complexity-5 queries
+- Returns `synthesisModel` for tracking
+
+### Pre-Search Planner (lib/ai/planning/planner.ts)
+
+- **Created** planner with pre-search: memory + Tavily web scan BEFORE planning
+- Runs in parallel: memory search (always) + web search (conditional on complexity & trigger keywords)
+- Intent detection → tool suggestions → BGML domain classification
+- Feeds into smart tool filtering (keyword-based tool packs)
+
+### Byzantine Consensus (lib/ai/consensus/byzantine.ts)
+
+- **Created** 4-validator multi-model consensus for critical actions
+- Models: Gemini Pro (risk), Sonnet (ethics), Haiku (practical), Gemini Flash (speed)
+- 2/3 supermajority required to approve; rejection → user escalation
+- **Wired into:** `make_call`, `grant_autonomy` tools
+
+### Agent SDK Integration (lib/agent-sdk/exoskull-agent.ts)
+
+- **Restructured** Phase 1: planner runs in parallel with context loading
+- **Phase 1b:** Smart tool filter from planner keywords → then load tools
+- **Replaced** ad-hoc BGML injection (classify→selectFramework) with full pipeline call
+- **Added** post-response quality scoring (logged, for monitoring)
+- Voice: BGML capped at framework-only (skip DIPPER/MoA for latency)
+
+### Smart Tool Filtering (lib/iors/tools/channel-filters.ts)
+
+- **Rewritten:** 25 core tools always available + 20 dynamic tool packs
+- Packs activated by intent keywords from planner (email, calendar, code, social, etc.)
+- Voice gets core + essentials; web gets core + relevant packs; async gets ALL
+
+### Dynamic Tool Descriptions (lib/iors/tools/tool-descriptions.ts)
+
+- **Created** tool description generator from actual IORS registry by category
+- Replaces hardcoded 67-tool list in voice system prompt
+
+### Tool Discovery (lib/iors/tools/discovery-tools.ts)
+
+- **Created** `discover_tools` — searches static + dynamic tools by keyword with relevance scoring
+- Registered in ALL channel filters
+
+### 30 Specialist Frameworks (scripts/seed-frameworks.ts)
+
+- **Expanded** from 6 to 30 frameworks across all 6 BGML domains
+- Business (8), Engineering (5), Personal (5), Creative (4), Science (3), General (5)
+
+### Model Router (lib/ai/model-router.ts)
+
+- **Added** quality score tracking per model/domain
+- `recordQualityScore()` method for BGML pipeline integration
+- Quality data logged to `exo_ai_usage.request_metadata`
+
+### Folder Upload Server
+
+- **Created** `app/api/knowledge/upload-folder/route.ts` — bulk upload with folder structure
+- **Created** `scripts/upload-folder.sh` — CLI script for folder uploads
+
+### Env Sync Script
+
+- **Created** `scripts/sync-env-to-vercel.sh` — resolves op:// secrets → Vercel env vars
+
+### Voice Upgrade
+
+- Voice model upgraded from Haiku to Sonnet for better quality
+
+### Files Created (10)
+
+- `lib/bgml/pipeline.ts`, `lib/ai/planning/planner.ts`
+- `lib/ai/consensus/byzantine.ts`, `lib/ai/consensus/types.ts`
+- `lib/iors/tools/tool-descriptions.ts`, `lib/iors/tools/discovery-tools.ts`
+- `app/api/knowledge/upload-folder/route.ts`, `scripts/upload-folder.sh`
+- `scripts/sync-env-to-vercel.sh`
+
+### Files Modified (9)
+
+- `lib/agent-sdk/exoskull-agent.ts`, `lib/bgml/dipper.ts`, `lib/bgml/moa.ts`
+- `lib/iors/tools/channel-filters.ts`, `lib/iors/tools/index.ts`
+- `lib/iors/tools/communication-tools.ts`, `lib/iors/tools/autonomy-tools.ts`
+- `lib/voice/system-prompt.ts`, `lib/ai/model-router.ts`, `lib/ai/types.ts`
+- `scripts/seed-frameworks.ts`
+
+---
+
 ## [2026-02-23] Fix 5 Critical Chat Bugs — Routing, Spam, Noise, Timeouts
 
 ### Bug 1: Bot doesn't see uploaded files

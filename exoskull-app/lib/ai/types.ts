@@ -101,6 +101,10 @@ export interface AIResponse {
   };
   toolCalls?: AIToolCall[];
   latencyMs: number;
+  /** BGML quality score (0-100) if scored via pipeline */
+  qualityScore?: number;
+  /** BGML domain classification */
+  bgmlDomain?: string;
 }
 
 export interface AIToolCall {

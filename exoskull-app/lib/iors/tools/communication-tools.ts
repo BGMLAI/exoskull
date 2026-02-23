@@ -13,6 +13,10 @@ import type { ToolDefinition } from "./shared";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { makeOutboundCall } from "@/lib/voice/twilio-client";
 import { appendMessage } from "@/lib/unified-thread";
+import {
+  runByzantineConsensus,
+  requiresConsensus,
+} from "@/lib/ai/consensus/byzantine";
 
 import { logger } from "@/lib/logger";
 
@@ -78,6 +82,38 @@ export const communicationTools: ToolDefinition[] = [
       const instructions = input.instructions as string;
       const userName = (input.user_name as string) || "użytkownik";
       const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
+
+      // Byzantine consensus gate — multi-model validation before calling strangers
+      if (requiresConsensus("make_call")) {
+        try {
+          const consensus = await runByzantineConsensus({
+            type: "make_call",
+            description: `Call ${phoneNumber} for: ${purpose}. Instructions: ${instructions}`,
+            tenantId,
+            metadata: { phoneNumber, purpose, instructions, userName },
+          });
+          if (consensus.decision === "reject") {
+            logger.warn("[CommunicationTools] Byzantine rejected make_call:", {
+              phoneNumber,
+              purpose,
+              votes: consensus.votes.length,
+            });
+            return `Połączenie zablokowane przez system bezpieczeństwa (${consensus.votes.filter((v) => v.decision === "reject").length}/${consensus.votes.length} walidatorów odrzuciło). Powód: ${consensus.reason}`;
+          }
+          logger.info("[CommunicationTools] Byzantine approved make_call:", {
+            decision: consensus.decision,
+            confidence: consensus.confidence,
+          });
+        } catch (err) {
+          // Byzantine is advisory — don't block on failure
+          logger.warn(
+            "[CommunicationTools] Byzantine check failed (proceeding):",
+            {
+              error: err instanceof Error ? err.message : String(err),
+            },
+          );
+        }
+      }
 
       logger.info("[CommunicationTools] make_call:", { phoneNumber, purpose });
 

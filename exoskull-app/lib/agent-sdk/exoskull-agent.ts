@@ -35,8 +35,9 @@ import type { EmotionState } from "@/lib/emotion/types";
 import { logger } from "@/lib/logger";
 import { buildAppDetectionContext } from "@/lib/integrations/app-context-builder";
 import { getServiceSupabase } from "@/lib/supabase/service";
-import { classify } from "@/lib/bgml/classifier";
-import { selectFramework } from "@/lib/bgml/framework-selector";
+import { runBGMLPipeline, shouldEscalate } from "@/lib/bgml/pipeline";
+import { generatePlan, type ExecutionPlan } from "@/lib/ai/planning/planner";
+import { buildToolDescriptions } from "@/lib/iors/tools/tool-descriptions";
 
 // ============================================================================
 // TYPES
@@ -114,7 +115,7 @@ const WEB_CONFIG = {
 const VOICE_CONFIG = {
   maxTurns: 6,
   timeoutMs: 40_000,
-  model: "claude-haiku-4-5-20251001" as const,
+  model: "claude-sonnet-4-5-20250929" as const, // Upgraded from Haiku for better quality
 };
 
 const ASYNC_CONFIG = {
@@ -241,6 +242,59 @@ async function executeIorsTool(
 }
 
 // ============================================================================
+// REVERSE PROMPT — suggest improvements at the end of complex responses
+// ============================================================================
+
+/**
+ * Build a reverse prompt instruction that tells the agent to append
+ * improvement suggestions at the end of its response.
+ *
+ * Activated for complexity >= 3 (non-voice). The agent will suggest
+ * 2-3 follow-up questions or actions the user could take to go deeper.
+ */
+function buildReversePrompt(
+  complexity: number,
+  planResult: ExecutionPlan | null,
+): string {
+  const domain = planResult?.classification.domain || "general";
+  const intent = planResult?.intent || "general";
+
+  if (complexity >= 5) {
+    return (
+      `\n## REVERSE PROMPT (obowiązkowe na końcu odpowiedzi)\n` +
+      `Po głównej odpowiedzi dodaj sekcję:\n` +
+      `### 🔄 Jak pójść dalej?\n` +
+      `Zaproponuj 3 konkretne kroki pogłębienia tego problemu:\n` +
+      `1. **Kontekst do zbadania** — co jeszcze warto sprawdzić (dane, źródła, perspektywy)\n` +
+      `2. **Akcja do podjęcia** — konkretny następny krok (narzędzie, analiza, test)\n` +
+      `3. **Alternatywne podejście** — inny framework/metoda do tego samego problemu\n` +
+      `Bądź konkretny — nie "zbadaj więcej" ale "porównaj dane z Q3 vs Q4" lub "użyj Blue Ocean zamiast Porter's".\n` +
+      `Domena: ${domain} | Intent: ${intent}`
+    );
+  }
+
+  if (complexity >= 4) {
+    return (
+      `\n## REVERSE PROMPT (obowiązkowe na końcu odpowiedzi)\n` +
+      `Po głównej odpowiedzi dodaj sekcję:\n` +
+      `### 🔄 Co dalej?\n` +
+      `Zaproponuj 2 konkretne sugestie jak użytkownik może pogłębić ten temat:\n` +
+      `- Jaki aspekt warto zbadać głębiej?\n` +
+      `- Jakie narzędzie/akcję mogę wykonać żeby pomóc dalej?\n` +
+      `Bądź konkretny i odnośdo kontekstu rozmowy. Domena: ${domain}`
+    );
+  }
+
+  // Complexity 3 — lighter version
+  return (
+    `\n## REVERSE PROMPT (opcjonalne na końcu odpowiedzi)\n` +
+    `Jeśli temat jest złożony, na końcu odpowiedzi zasugeruj 1-2 pytania pogłębiające ` +
+    `lub akcje które mogę wykonać (np. "Chcesz żebym przeanalizował X?" lub "Mogę porównać Y z Z").\n` +
+    `Nie dodawaj jeśli odpowiedź jest wyczerpująca lub to proste pytanie.`
+  );
+}
+
+// ============================================================================
 // MAIN AGENT FUNCTION
 // ============================================================================
 
@@ -262,20 +316,17 @@ export async function runExoSkullAgent(
 
   req.onThinkingStep?.("Ładuję kontekst", "running");
 
-  // ── Phase 1: Load everything in parallel ──
-  const toolFilter = getToolFilterForChannel(req.channel, req.isAsync);
-
+  // ── Phase 1a: Load context + planner in parallel ──
   const [
     dynamicCtxResult,
     emotionState,
-    filteredTools,
     threadHistory,
     memoryResults,
     rigConnections,
+    planResult,
   ] = await Promise.all([
     buildDynamicContext(req.tenantId),
     analyzeEmotion(req.userMessage),
-    loadFilteredTools(req.tenantId, toolFilter),
     getThreadContext(req.tenantId, 50),
     unifiedSearch({
       tenantId: req.tenantId,
@@ -305,7 +356,22 @@ export async function runExoSkullAgent(
         return [];
       }
     })(),
+    // Planner: pre-search (memory + web) + intent detection + tool suggestions
+    generatePlan(req.userMessage, req.tenantId).catch((err) => {
+      logger.warn("[ExoSkullAgent] Planner failed (non-blocking):", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null as ExecutionPlan | null;
+    }),
   ]);
+
+  // ── Phase 1b: Smart tool filter from planner → load tools ──
+  const toolFilter = getToolFilterForChannel(
+    req.channel,
+    req.isAsync,
+    planResult?.toolPackKeywords,
+  );
+  const filteredTools = await loadFilteredTools(req.tenantId, toolFilter);
 
   const contextMs = Date.now() - startMs;
   logger.info(
@@ -363,10 +429,16 @@ export async function runExoSkullAgent(
 
   // ── Phase 3: Build system prompt ──
   const dynamicContext = dynamicCtxResult.context;
-  const effectiveSystemPrompt =
+  // Inject dynamic tool descriptions into the static system prompt
+  const toolDescriptions = buildToolDescriptions(toolFilter);
+  const baseSystemPrompt = (
     req.systemPromptOverride ||
     dynamicCtxResult.systemPromptOverride ||
-    STATIC_SYSTEM_PROMPT;
+    STATIC_SYSTEM_PROMPT
+  ).replace("{{DYNAMIC_TOOL_DESCRIPTIONS}}", toolDescriptions);
+  const effectiveSystemPrompt = baseSystemPrompt;
+
+  const bgmlComplexity = planResult?.classification.complexity ?? 1;
 
   let systemPrompt: string;
   if (crisis.detected && crisis.protocol) {
@@ -412,27 +484,58 @@ export async function runExoSkullAgent(
     // Append app autodetekcja context (unconnected apps mentioned by user)
     if (appDetection.contextFragment) parts.push(appDetection.contextFragment);
 
-    // ── BGML Framework Injection (for complex queries) ──
+    // ── Planner Context Injection (pre-search + execution plan) ──
+    if (planResult?.contextInjection) {
+      parts.push(planResult.contextInjection);
+    }
+
+    // ── Reverse Prompt (for complex queries — suggest next improvement steps) ──
+    if (bgmlComplexity >= 3 && req.channel !== "voice") {
+      parts.push(buildReversePrompt(bgmlComplexity, planResult));
+    }
+
+    // ── BGML Pipeline (framework + DIPPER + MoA for complex queries) ──
+    // Voice channel: framework only (skip DIPPER/MoA for latency)
+    const maxBgmlTier = req.channel === "voice" ? 3 : 5;
+    const effectiveBgmlComplexity = Math.min(bgmlComplexity, maxBgmlTier);
+
     try {
-      const classification = classify(req.userMessage);
-      if (classification.complexity >= 3) {
-        const framework = await selectFramework(classification.domain);
-        if (framework) {
-          parts.push(
-            `\n## Reasoning Framework: ${framework.name}\n` +
-              `Domain: ${classification.domain} | Complexity: ${classification.complexity}/5\n\n` +
-              framework.prompt_template,
-          );
-          logger.info("[ExoSkullAgent] BGML framework injected:", {
-            framework: framework.slug,
-            domain: classification.domain,
-            complexity: classification.complexity,
-          });
+      if (effectiveBgmlComplexity >= 3) {
+        req.onThinkingStep?.("Analizuję z BGML", "running");
+        const bgmlResult = await runBGMLPipeline(req.userMessage, {
+          forceComplexity: effectiveBgmlComplexity,
+          systemPrompt: effectiveSystemPrompt,
+          maxTokens: effectiveBgmlComplexity >= 5 ? 1536 : 1024,
+        });
+
+        if (bgmlResult.contextInjection) {
+          parts.push(bgmlResult.contextInjection);
         }
+
+        // For DIPPER/MoA, inject pre-computed multi-model analysis
+        if (bgmlResult.precomputedResponse) {
+          parts.push(
+            `\n## BGML Pre-Analysis (${bgmlResult.tier})\n` +
+              `Use this multi-model analysis as your foundation. Build on it, don't repeat it:\n\n` +
+              bgmlResult.precomputedResponse.slice(0, 2000),
+          );
+        }
+
+        logger.info("[ExoSkullAgent] BGML pipeline:", {
+          tier: bgmlResult.tier,
+          complexity: effectiveBgmlComplexity,
+          domain: bgmlResult.classification.domain,
+          framework: bgmlResult.framework?.slug,
+          hasPrecomputed: !!bgmlResult.precomputedResponse,
+          qualityScore: bgmlResult.qualityScore?.score,
+          durationMs: bgmlResult.durationMs,
+          tokens: bgmlResult.totalTokens,
+        });
+        req.onThinkingStep?.("Analizuję z BGML", "done");
       }
     } catch (bgmlErr) {
       // BGML is optional — never break the main flow
-      logger.warn("[ExoSkullAgent] BGML framework injection failed:", {
+      logger.warn("[ExoSkullAgent] BGML pipeline failed (non-blocking):", {
         error: bgmlErr instanceof Error ? bgmlErr.message : String(bgmlErr),
       });
     }
@@ -619,6 +722,22 @@ export async function runExoSkullAgent(
 
   req.onThinkingStep?.("Generuję odpowiedź", "done");
 
+  // ── Post-response quality scoring ──
+  if (finalText && bgmlComplexity >= 3) {
+    try {
+      const qualityCheck = shouldEscalate(finalText);
+      logger.info("[ExoSkullAgent] Response quality:", {
+        score: qualityCheck.score,
+        shouldEscalate: qualityCheck.shouldEscalate,
+        reason: qualityCheck.reason,
+        complexity: bgmlComplexity,
+        intent: planResult?.intent,
+      });
+    } catch {
+      // Quality check is optional — never break the flow
+    }
+  }
+
   // Calculate cost from token usage
   // Sonnet: $3/MTok input, $15/MTok output
   // Haiku: $0.80/MTok input, $4/MTok output
@@ -657,7 +776,14 @@ export async function runExoSkullAgent(
       estimated_cost: costUsd,
       latency_ms: durationMs,
       success: !toolsUsed.includes("emergency_fallback"),
-      request_metadata: { channel: req.channel, numTurns, toolsUsed },
+      request_metadata: {
+        channel: req.channel,
+        numTurns,
+        toolsUsed,
+        bgmlComplexity: bgmlComplexity > 1 ? bgmlComplexity : undefined,
+        plannerIntent: planResult?.intent,
+        hasPreSearch: planResult?.preSearch?.hasRelevantMemory,
+      },
     });
   } catch (logErr) {
     logger.warn("[ExoSkullAgent] Failed to log AI usage:", {

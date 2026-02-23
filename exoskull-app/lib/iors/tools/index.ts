@@ -67,6 +67,7 @@ import { googleAdsTools } from "./google-ads-tools";
 import { googleAnalyticsTools } from "./google-analytics-tools";
 import { facebookTools } from "./facebook-tools";
 import { threadsTools } from "./threads-tools";
+import { discoveryTools } from "./discovery-tools";
 
 /**
  * All IORS extension tools, merged from all domain files.
@@ -119,6 +120,8 @@ export const IORS_EXTENSION_TOOLS = [
   ...googleAnalyticsTools,
   ...facebookTools,
   ...threadsTools,
+  // Discovery tools — available on ALL channels
+  ...discoveryTools,
 ];
 
 // Register tools and dynamic resolver in the shared registry so

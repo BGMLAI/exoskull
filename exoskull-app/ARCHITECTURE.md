@@ -400,6 +400,83 @@ Google APIs ──→ ExoSkull ──→ Supabase
 
 ---
 
+## BGML Pipeline Architecture (2026-02-23)
+
+### Overview
+
+BGML (Byzantine General Markup Language) is ExoSkull's multi-model reasoning pipeline. It routes queries through increasingly sophisticated analysis based on complexity.
+
+### Pipeline Flow
+
+```
+User Message
+  ↓
+BGML Classifier (domain + complexity, ~1ms)  [lib/bgml/classifier.ts]
+  ↓
+Pre-Search Planner                            [lib/ai/planning/planner.ts]
+  ├─ Memory search (always, ~50ms)
+  └─ Web search (conditional, ~200ms via Tavily)
+  ↓
+┌──────────────────────────────────────────────┐
+│ Complexity 1-2: Direct response              │
+│   → Gemini Flash or Sonnet                   │
+│   → No framework, no BGML                    │
+├──────────────────────────────────────────────┤
+│ Complexity 3: Framework-guided               │
+│   → Sonnet + specialist framework (30 avail) │
+│   → Porter's/SWOT/CBT/C4/AIDA/...           │
+├──────────────────────────────────────────────┤
+│ Complexity 4: DIPPER (3 perspectives)        │
+│   → Gemini (analytical)                      │
+│   → Sonnet (creative)                        │
+│   → Haiku (practical)                        │
+│   → Vote best via voting.ts                  │
+├──────────────────────────────────────────────┤
+│ Complexity 5: Full MoA (DIPPER + synthesis)  │
+│   → DIPPER (3 models, 3 perspectives)        │
+│   → Opus synthesizes best response           │
+│   → Quality gate: voting.ts + judge.ts       │
+├──────────────────────────────────────────────┤
+│ Critical action: Byzantine consensus         │
+│   → 4 model validators vote in parallel      │
+│   → 2/3 supermajority required               │
+└──────────────────────────────────────────────┘
+  ↓
+Quality Score (voting.ts)
+  ↓
+Score < 50 → Auto-escalate to MoA
+Score < 70 → Judge pairwise vs alternative
+Score ≥ 70 → Return to user
+```
+
+### Key Files
+
+| File                                | Purpose                                          |
+| ----------------------------------- | ------------------------------------------------ |
+| `lib/bgml/pipeline.ts`              | Unified orchestrator — routes by complexity      |
+| `lib/bgml/classifier.ts`            | Domain (6 types) + complexity (1-5) detection    |
+| `lib/bgml/framework-selector.ts`    | Selects specialist framework from DB             |
+| `lib/bgml/dipper.ts`                | 3-perspective ensemble with multi-model          |
+| `lib/bgml/moa.ts`                   | Mixture of Agents — DIPPER → synthesis           |
+| `lib/bgml/voting.ts`                | Heuristic quality scoring (0-100)                |
+| `lib/bgml/judge.ts`                 | LLM pairwise A/B comparison                      |
+| `lib/ai/planning/planner.ts`        | Pre-search + intent detection + tool suggestions |
+| `lib/ai/consensus/byzantine.ts`     | 4-validator multi-model consensus                |
+| `lib/iors/tools/channel-filters.ts` | 25 core tools + keyword-activated packs          |
+
+### Agent Integration
+
+The pipeline is wired into `lib/agent-sdk/exoskull-agent.ts`:
+
+1. **Phase 1a** (parallel): Planner runs alongside context loading
+2. **Phase 1b** (sequential): Planner keywords → smart tool filter → load tools
+3. **Phase 3**: Planner context injected → BGML pipeline for complexity ≥ 3
+4. **Post-response**: Quality scoring logged for monitoring
+
+Voice channel: BGML capped at framework-only (complexity 3) to preserve TTS latency.
+
+---
+
 ## Future Work (Not Yet Implemented)
 
 - **Database-driven worlds**: `exo_world_positions` + `exo_world_moons` tables (currently demo hardcoded data)

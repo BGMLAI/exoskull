@@ -1,5 +1,20 @@
 # ExoSkull Learnings
 
+## BGML Pipeline Design Patterns (2026-02-23)
+
+- **Complexity-based routing is key:** Don't run expensive multi-model ensembles for simple queries. Tier system (1-2: direct, 3: framework, 4: DIPPER, 5: MoA) keeps costs at $0.001-$0.05 per query.
+- **Multi-model diversity > single-model ensemble:** Using different models per perspective (Gemini for analytical, Sonnet for creative, Haiku for practical) gives genuinely different insights vs same model 3x.
+- **Quality gates prevent quality regression:** Auto-escalation from DIPPER→MoA when quality < 50, and LLM judge as final arbiter. Never ship a response below threshold.
+- **Pre-search before planning, not after:** Running memory + web search BEFORE the planner means the plan already knows what context exists. Avoids wasted tool calls.
+- **Voice latency constraint:** BGML pipeline adds ~2-5s for DIPPER, ~5-10s for MoA. Voice must cap at framework-only (complexity 3). Web can run full pipeline.
+- **Byzantine consensus is advisory:** Never block on consensus failure. If validators can't agree or API fails, proceed with logging. Safety is defense-in-depth, not a single gate.
+
+## Smart Tool Filtering Prevents Prompt Bloat (2026-02-23)
+
+- 150+ tools in system prompt = ~30K tokens wasted. 25 core + intent-activated packs = ~5K tokens.
+- Keyword-to-pack mapping (English + Polish) lets planner activate relevant tools without scanning all descriptions.
+- `discover_tools` as always-available tool lets the agent find tools not in current pack.
+
 ## Empty Permission Table = Dead Autonomy (2026-02-20)
 
 - `user_autonomy_grants` empty → all `isActionPermitted()` returns false → zero autonomous actions

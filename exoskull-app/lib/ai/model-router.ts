@@ -340,6 +340,8 @@ export class ModelRouter {
       outputTokens: response.usage.outputTokens,
       cost: `$${response.usage.estimatedCost.toFixed(6)}`,
       latencyMs: response.latencyMs,
+      qualityScore: response.qualityScore,
+      bgmlDomain: response.bgmlDomain,
       tenantId: options.tenantId,
     });
 
@@ -358,11 +360,39 @@ export class ModelRouter {
           estimated_cost: response.usage.estimatedCost,
           latency_ms: response.latencyMs,
           success: true,
+          request_metadata: {
+            quality_score: response.qualityScore,
+            bgml_domain: response.bgmlDomain,
+          },
         })
         .then(({ error }) => {
           if (error)
             logger.warn("[ModelRouter] Failed to log usage:", error.message);
         });
+    });
+  }
+
+  /**
+   * Record BGML quality score for a model+domain combination.
+   * Used by the BGML pipeline to track which models perform best per domain.
+   */
+  recordQualityScore(
+    model: ModelId,
+    domain: string,
+    qualityScore: number,
+    tenantId?: string,
+  ): void {
+    // Update task history — boost models that score well for a domain
+    const key = `${tenantId || "default"}:bgml_${domain}`;
+    if (qualityScore >= 70) {
+      this.recordSuccess(tenantId, `bgml_${domain}`, model);
+    }
+
+    logger.info("[ModelRouter] Quality score recorded:", {
+      model,
+      domain,
+      qualityScore,
+      tenantId,
     });
   }
 
