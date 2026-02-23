@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS - Spray Paint Reality</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #ffffff;
+            overflow: hidden;
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        #voiceCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        .logo-container {
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 0.5s;
+        }
+
+        .logo-text {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -1px;
+        }
+
+        .logo-dot {
+            width: 14px;
+            height: 14px;
+            background: #E31E24;
+            border-radius: 50%;
+        }
+
+        .status-text {
+            position: fixed;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #333;
+            font-size: 18px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 1.5s;
+            z-index: 10;
+        }
+
+        .status-text.active {
+            color: #E31E24;
+            font-weight: 600;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .logo-text { font-size: 28px; }
+            .logo-dot { width: 10px; height: 10px; }
+            .status-text { font-size: 14px; bottom: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="logo-container">
+        <div class="logo-dot"></div>
+        <div class="logo-text">iors.ai</div>
+        <div class="logo-dot"></div>
+    </div>
+
+    <canvas id="voiceCanvas"></canvas>
+
+    <div class="status-text" id="statusText">Dotknij aby rozpocząć</div>
+
+    <!-- VAPI SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+    <!-- MediaPipe Face Detection -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js"></script>
+    <!-- Hidden video -->
+    <video id="faceVideo" style="display:none;" autoplay playsinline></video>
+
+    <script>
+        // ================================================================
+        // KONFIGURACJA
+        // ================================================================
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = 'adf258e0-3a41-444e-b683-38c195bd7954';
+
+        let vapiInstance = null;
+        let isActive = false;
+        let emotionalIntensity = 0; // 0-1
+
+        const canvas = document.getElementById('voiceCanvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // ================================================================
+        // PERLIN NOISE (simplified 2D)
+        // ================================================================
+        class PerlinNoise {
+            constructor() {
+                this.gradients = {};
+                this.memory = {};
+            }
+
+            rand_vect() {
+                let theta = Math.random() * 2 * Math.PI;
+                return {x: Math.cos(theta), y: Math.sin(theta)};
+            }
+
+            dot_prod_grid(x, y, vx, vy) {
+                let g_vect;
+                let d_vect = {x: x - vx, y: y - vy};
+                let grid_key = `${vx},${vy}`;
+
+                if (this.gradients[grid_key]) {
+                    g_vect = this.gradients[grid_key];
+                } else {
+                    g_vect = this.rand_vect();
+                    this.gradients[grid_key] = g_vect;
+                }
+
+                return d_vect.x * g_vect.x + d_vect.y * g_vect.y;
+            }
+
+            smootherstep(x) {
+                return 6*x**5 - 15*x**4 + 10*x**3;
+            }
+
+            interp(x, a, b) {
+                return a + this.smootherstep(x) * (b-a);
+            }
+
+            get(x, y) {
+                let key = `${x},${y}`;
+                if (this.memory[key]) return this.memory[key];
+
+                let xf = Math.floor(x);
+                let yf = Math.floor(y);
+
+                let tl = this.dot_prod_grid(x, y, xf, yf);
+                let tr = this.dot_prod_grid(x, y, xf+1, yf);
+                let bl = this.dot_prod_grid(x, y, xf, yf+1);
+                let br = this.dot_prod_grid(x, y, xf+1, yf+1);
+
+                let xt = this.interp(x-xf, tl, tr);
+                let xb = this.interp(x-xf, bl, br);
+                let v = this.interp(y-yf, xt, xb);
+
+                this.memory[key] = v;
+                return v;
+            }
+        }
+
+        const noise = new PerlinNoise();
+
+        // ================================================================
+        // SOUNDWAVES (czerwone fale)
+        // ================================================================
+        const soundwaves = [];
+
+        class Soundwave {
+            constructor() {
+                this.radius = 0;
+                this.maxRadius = Math.max(width, height) * 0.8;
+                this.speed = 8;
+                this.opacity = 1;
+            }
+
+            update() {
+                this.radius += this.speed;
+                this.opacity = 1 - (this.radius / this.maxRadius);
+                return this.radius < this.maxRadius;
+            }
+
+            draw() {
+                ctx.strokeStyle = `rgba(227, 30, 36, ${this.opacity * 0.3})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, this.radius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            getForce(x, y) {
+                const dist = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+                const waveDist = Math.abs(dist - this.radius);
+                if (waveDist < 60) {
+                    return (1 - waveDist / 60) * this.opacity;
+                }
+                return 0;
+            }
+        }
+
+        // ================================================================
+        // DENSITY-BASED PARTICLE SYSTEM (SPRAY PAINT)
+        // ================================================================
+        class DensityParticle {
+            constructor() {
+                // Random start position
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+
+                this.vx = 0;
+                this.vy = 0;
+
+                // Różne rozmiary (spray paint)
+                this.size = 0.5 + Math.random() * 2;
+
+                // Offset dla flow field
+                this.noiseOffsetX = Math.random() * 10000;
+                this.noiseOffsetY = Math.random() * 10000;
+
+                // Lifetime dla respawn
+                this.lifetime = Math.random() * 1000;
+                this.maxLifetime = 500 + Math.random() * 500;
+
+                this.alpha = 0.3 + Math.random() * 0.5;
+            }
+
+            update(time, densityMap) {
+                this.lifetime++;
+
+                // Flow field (Perlin noise)
+                const noiseScale = 0.003;
+                const noiseX = this.x * noiseScale + time * 0.0001;
+                const noiseY = this.y * noiseScale + time * 0.0001;
+
+                const angle = noise.get(noiseX, noiseY) * Math.PI * 4;
+
+                // Flow force
+                const flowStrength = 0.5;
+                this.vx += Math.cos(angle) * flowStrength;
+                this.vy += Math.sin(angle) * flowStrength;
+
+                // Density-based attraction (twarz)
+                if (densityMap && emotionalIntensity > 0.2) {
+                    const mapX = Math.floor((this.x / width) * densityMap.width);
+                    const mapY = Math.floor((this.y / height) * densityMap.height);
+
+                    if (mapX >= 0 && mapX < densityMap.width && mapY >= 0 && mapY < densityMap.height) {
+                        const idx = (mapY * densityMap.width + mapX) * 4;
+                        const density = 1 - (densityMap.data[idx] / 255); // Ciemniejsze = wyższa density
+
+                        if (density > 0.3) {
+                            // Attract to high-density areas
+                            const attractStrength = density * emotionalIntensity * 0.02;
+                            // Stay in place (reduce velocity)
+                            this.vx *= (1 - attractStrength);
+                            this.vy *= (1 - attractStrength);
+                        }
+                    }
+                }
+
+                // Soundwave repulsion
+                let totalWaveForce = 0;
+                for (let wave of soundwaves) {
+                    const force = wave.getForce(this.x, this.y);
+                    if (force > 0) {
+                        totalWaveForce += force;
+
+                        // Repel from wave
+                        const dx = this.x - centerX;
+                        const dy = this.y - centerY;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist > 0) {
+                            this.vx += (dx / dist) * force * 2;
+                            this.vy += (dy / dist) * force * 2;
+                        }
+                    }
+                }
+
+                // Damping
+                this.vx *= 0.95;
+                this.vy *= 0.95;
+
+                // Move
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Wrap boundaries
+                if (this.x < 0) this.x = width;
+                if (this.x > width) this.x = 0;
+                if (this.y < 0) this.y = height;
+                if (this.y > height) this.y = 0;
+
+                // Respawn at high-density areas if old
+                if (this.lifetime > this.maxLifetime && densityMap && emotionalIntensity > 0.5) {
+                    this.respawnAtDensity(densityMap);
+                }
+            }
+
+            respawnAtDensity(densityMap) {
+                // Find random high-density point
+                for (let attempt = 0; attempt < 20; attempt++) {
+                    const rx = Math.floor(Math.random() * densityMap.width);
+                    const ry = Math.floor(Math.random() * densityMap.height);
+                    const idx = (ry * densityMap.width + rx) * 4;
+                    const density = 1 - (densityMap.data[idx] / 255);
+
+                    if (density > 0.4) {
+                        this.x = (rx / densityMap.width) * width;
+                        this.y = (ry / densityMap.height) * height;
+                        this.lifetime = 0;
+                        this.vx = (Math.random() - 0.5) * 2;
+                        this.vy = (Math.random() - 0.5) * 2;
+                        break;
+                    }
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = `rgba(0, 0, 0, ${this.alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // ================================================================
+        // PARTICLES INIT (5000-8000 particles)
+        // ================================================================
+        const particles = [];
+        const NUM_PARTICLES = 6000;
+
+        function initParticles() {
+            particles.length = 0;
+            for (let i = 0; i < NUM_PARTICLES; i++) {
+                particles.push(new DensityParticle());
+            }
+        }
+
+        // ================================================================
+        // FACE DETECTION → DENSITY MAP
+        // ================================================================
+        let densityMap = null;
+        let userFaceLandmarks = null;
+
+        async function initFaceDetection() {
+            try {
+                const video = document.getElementById('faceVideo');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: 320, height: 240 }
+                });
+                video.srcObject = stream;
+
+                if (typeof FaceMesh === 'undefined') {
+                    setTimeout(initFaceDetection, 1000);
+                    return;
+                }
+
+                const faceMesh = new FaceMesh({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`
+                });
+
+                faceMesh.setOptions({
+                    maxNumFaces: 1,
+                    refineLandmarks: false,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                faceMesh.onResults((results) => {
+                    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                        userFaceLandmarks = results.multiFaceLandmarks[0];
+                        generateDensityMap();
+                    }
+                });
+
+                async function detectFace() {
+                    if (video.readyState === 4) {
+                        await faceMesh.send({ image: video });
+                    }
+                    setTimeout(detectFace, 200);
+                }
+
+                video.onloadeddata = () => {
+                    console.log('✅ Face detection started');
+                    detectFace();
+                };
+
+            } catch (error) {
+                console.warn('Face detection failed:', error);
+            }
+        }
+
+        function generateDensityMap() {
+            if (!userFaceLandmarks) return;
+
+            // Offscreen canvas for density map
+            const mapCanvas = document.createElement('canvas');
+            mapCanvas.width = 160;
+            mapCanvas.height = 120;
+            const mapCtx = mapCanvas.getContext('2d');
+
+            // White background
+            mapCtx.fillStyle = 'white';
+            mapCtx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
+
+            // Draw face with varying densities
+            mapCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+
+            // Draw landmarks as circles (darker = more particles should be there)
+            userFaceLandmarks.forEach((landmark, i) => {
+                const x = landmark.x * mapCanvas.width;
+                const y = landmark.y * mapCanvas.height;
+
+                // Varying sizes for different features
+                let radius = 2;
+                if (i < 17) radius = 1; // Face outline - lighter
+                if (i >= 33 && i <= 51) radius = 3; // Nose - darker
+                if (i >= 133 && i <= 173) radius = 2.5; // Eyes - medium
+                if (i >= 61 && i <= 91) radius = 2; // Mouth - medium
+
+                mapCtx.beginPath();
+                mapCtx.arc(x, y, radius, 0, Math.PI * 2);
+                mapCtx.fill();
+            });
+
+            // Blur for smooth density
+            mapCtx.filter = 'blur(4px)';
+            mapCtx.drawImage(mapCanvas, 0, 0);
+            mapCtx.filter = 'none';
+
+            // Get image data
+            densityMap = mapCtx.getImageData(0, 0, mapCanvas.width, mapCanvas.height);
+        }
+
+        // ================================================================
+        // ANIMATION LOOP
+        // ================================================================
+        let time = 0;
+        function animate() {
+            // Clear with slight fade (spray paint persistence)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+            ctx.fillRect(0, 0, width, height);
+
+            time += 1;
+
+            // Update and draw soundwaves
+            for (let i = soundwaves.length - 1; i >= 0; i--) {
+                if (!soundwaves[i].update()) {
+                    soundwaves.splice(i, 1);
+                } else {
+                    soundwaves[i].draw();
+                }
+            }
+
+            // Update and draw particles
+            particles.forEach(particle => {
+                particle.update(time, densityMap);
+                particle.draw();
+            });
+
+            // Slowly decrease emotional intensity
+            emotionalIntensity *= 0.999;
+
+            requestAnimationFrame(animate);
+        }
+
+        // ================================================================
+        // RESPONSIVE
+        // ================================================================
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        });
+
+        // ================================================================
+        // VAPI INTEGRATION
+        // ================================================================
+        function initVapi() {
+            if (typeof window.Vapi === 'undefined') {
+                setTimeout(initVapi, 1000);
+                return;
+            }
+
+            vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+            vapiInstance.on('call-start', () => {
+                isActive = true;
+                document.getElementById('statusText').textContent = 'Słucham...';
+                document.getElementById('statusText').classList.add('active');
+            });
+
+            vapiInstance.on('call-end', () => {
+                isActive = false;
+                const statusEl = document.getElementById('statusText');
+                statusEl.textContent = 'Rozmowa zakończona';
+                statusEl.classList.remove('active');
+                setTimeout(() => {
+                    statusEl.textContent = 'Dotknij aby rozpocząć';
+                }, 3000);
+            });
+
+            // IORS speaking - soundwave + emotional intensity
+            vapiInstance.on('message', (msg) => {
+                if (msg.type === 'transcript' && msg.role === 'assistant') {
+                    soundwaves.push(new Soundwave());
+
+                    // Increase emotional intensity randomly
+                    if (Math.random() < 0.4) {
+                        emotionalIntensity = Math.min(1, emotionalIntensity + 0.25);
+                    }
+                }
+            });
+
+            vapiInstance.on('error', (error) => {
+                console.error('VAPI Error:', error);
+                isActive = false;
+            });
+
+            console.log('✅ VAPI initialized');
+        }
+
+        // Click to start/stop
+        canvas.addEventListener('click', () => {
+            if (!vapiInstance) {
+                alert('VAPI nie jest gotowy. Odśwież stronę.');
+                return;
+            }
+
+            if (isActive) {
+                vapiInstance.stop();
+                document.getElementById('statusText').textContent = 'Rozłączanie...';
+            } else {
+                document.getElementById('statusText').textContent = 'Łączenie...';
+                vapiInstance.start(ASSISTANT_ID);
+            }
+        });
+
+        // ================================================================
+        // INIT
+        // ================================================================
+        initParticles();
+        animate();
+        window.addEventListener('load', () => {
+            initVapi();
+            initFaceDetection();
+        });
+
+        console.log('✅ IORS Spray Paint Reality loaded');
+        console.log('Particles:', NUM_PARTICLES);
+    </script>
+</body>
+</html>

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS - Oddychająca Kropka</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            overflow: hidden;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        /* Main container */
+        .vapi-orb-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(ellipse at center, #1a0505 0%, #0a0a0a 70%);
+        }
+
+        /* OPCJA 1: Pojedyncza kropka z aurą */
+        .orb {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .orb:hover {
+            transform: scale(1.05);
+        }
+
+        /* Core czerwona kropka */
+        .orb-core {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, #ff3333 0%, #E31E24 50%, #990000 100%);
+            border-radius: 50%;
+            box-shadow:
+                0 0 40px rgba(227, 30, 36, 0.8),
+                0 0 80px rgba(227, 30, 36, 0.5),
+                inset 0 0 20px rgba(255, 100, 100, 0.3);
+            animation: pulse-core 4s ease-in-out infinite;
+        }
+
+        /* Aura warstwowa (3 warstwy) */
+        .orb-aura {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            border: 2px solid rgba(227, 30, 36, 0.3);
+        }
+
+        .orb-aura-1 {
+            width: 120px;
+            height: 120px;
+            animation: pulse-aura-1 4s ease-in-out infinite;
+        }
+
+        .orb-aura-2 {
+            width: 160px;
+            height: 160px;
+            animation: pulse-aura-2 4s ease-in-out infinite 0.5s;
+        }
+
+        .orb-aura-3 {
+            width: 200px;
+            height: 200px;
+            animation: pulse-aura-3 4s ease-in-out infinite 1s;
+        }
+
+        /* Animacje oddychania */
+        @keyframes pulse-core {
+            0%, 100% {
+                transform: translate(-50%, -50%) scale(1);
+                box-shadow:
+                    0 0 40px rgba(227, 30, 36, 0.8),
+                    0 0 80px rgba(227, 30, 36, 0.5);
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.1);
+                box-shadow:
+                    0 0 60px rgba(227, 30, 36, 1),
+                    0 0 120px rgba(227, 30, 36, 0.7);
+            }
+        }
+
+        @keyframes pulse-aura-1 {
+            0%, 100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0.6;
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.15);
+                opacity: 0.3;
+            }
+        }
+
+        @keyframes pulse-aura-2 {
+            0%, 100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0.4;
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.2);
+                opacity: 0.2;
+            }
+        }
+
+        @keyframes pulse-aura-3 {
+            0%, 100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0.2;
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.25);
+                opacity: 0.1;
+            }
+        }
+
+        /* Stan aktywny (podczas rozmowy) */
+        .orb.active .orb-core {
+            background: radial-gradient(circle, #00ff66 0%, #00cc44 50%, #009933 100%);
+            box-shadow:
+                0 0 60px rgba(0, 255, 102, 0.9),
+                0 0 120px rgba(0, 255, 102, 0.6);
+            animation: pulse-active 1.5s ease-in-out infinite;
+        }
+
+        .orb.active .orb-aura {
+            border-color: rgba(0, 255, 102, 0.5);
+        }
+
+        @keyframes pulse-active {
+            0%, 100% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.15);
+            }
+        }
+
+        /* Tekst instrukcji */
+        .instruction-text {
+            position: absolute;
+            bottom: 80px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 18px;
+            font-weight: 300;
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 1s;
+        }
+
+        .instruction-text.active {
+            display: none;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 0.7; transform: translateY(0); }
+        }
+
+        /* Status text */
+        .status-text {
+            position: absolute;
+            top: 80px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            opacity: 0;
+        }
+
+        .status-text.visible {
+            opacity: 1;
+            animation: fade-in 0.5s ease-in;
+        }
+
+        /* Particle effect (opcjonalne kropeczki wokół) */
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(227, 30, 36, 0.6);
+            border-radius: 50%;
+            animation: float 8s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translate(0, 0);
+                opacity: 0.3;
+            }
+            25% {
+                transform: translate(50px, -30px);
+                opacity: 0.6;
+            }
+            50% {
+                transform: translate(-20px, -60px);
+                opacity: 0.8;
+            }
+            75% {
+                transform: translate(-50px, -30px);
+                opacity: 0.6;
+            }
+        }
+
+        /* Mobile optimization */
+        @media (max-width: 768px) {
+            .orb {
+                width: 150px;
+                height: 150px;
+            }
+
+            .orb-core {
+                width: 60px;
+                height: 60px;
+            }
+
+            .orb-aura-1 { width: 90px; height: 90px; }
+            .orb-aura-2 { width: 120px; height: 120px; }
+            .orb-aura-3 { width: 150px; height: 150px; }
+
+            .instruction-text {
+                font-size: 14px;
+                bottom: 60px;
+            }
+
+            .status-text {
+                font-size: 18px;
+                top: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="vapi-orb-container">
+        <!-- Status text -->
+        <div class="status-text" id="statusText"></div>
+
+        <!-- Main orb -->
+        <div class="orb" id="mainOrb">
+            <!-- Aury -->
+            <div class="orb-aura orb-aura-3"></div>
+            <div class="orb-aura orb-aura-2"></div>
+            <div class="orb-aura orb-aura-1"></div>
+
+            <!-- Core -->
+            <div class="orb-core"></div>
+
+            <!-- Opcjonalne particles (odkomentuj jeśli chcesz) -->
+            <!--
+            <div class="particle" style="top: 20%; left: 10%; animation-delay: 0s;"></div>
+            <div class="particle" style="top: 30%; left: 80%; animation-delay: 1s;"></div>
+            <div class="particle" style="top: 60%; left: 15%; animation-delay: 2s;"></div>
+            <div class="particle" style="top: 70%; left: 85%; animation-delay: 3s;"></div>
+            <div class="particle" style="top: 40%; left: 50%; animation-delay: 4s;"></div>
+            -->
+        </div>
+
+        <!-- Instruction -->
+        <div class="instruction-text" id="instructionText">
+            Dotknij aby rozpocząć
+        </div>
+    </div>
+
+    <!-- VAPI SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+
+    <!-- VAPI Logic -->
+    <script>
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = 'adf258e0-3a41-444e-b683-38c195bd7954';
+
+        let vapiInstance = null;
+        let isActive = false;
+
+        // Initialize VAPI
+        function initVapi() {
+            if (typeof window.Vapi === 'undefined') {
+                console.error('VAPI SDK not loaded');
+                setTimeout(initVapi, 1000);
+                return;
+            }
+
+            vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+            // Event listeners
+            vapiInstance.on('call-start', () => {
+                console.log('Call started');
+                isActive = true;
+                document.getElementById('mainOrb').classList.add('active');
+                document.getElementById('instructionText').classList.add('active');
+                showStatus('Połączony');
+            });
+
+            vapiInstance.on('call-end', () => {
+                console.log('Call ended');
+                isActive = false;
+                document.getElementById('mainOrb').classList.remove('active');
+                document.getElementById('instructionText').classList.remove('active');
+                showStatus('Rozmowa zakończona');
+
+                setTimeout(() => {
+                    hideStatus();
+                }, 3000);
+            });
+
+            vapiInstance.on('speech-start', () => {
+                console.log('User speaking');
+            });
+
+            vapiInstance.on('speech-end', () => {
+                console.log('User stopped speaking');
+            });
+
+            vapiInstance.on('message', (msg) => {
+                console.log('Message:', msg);
+            });
+
+            vapiInstance.on('error', (error) => {
+                console.error('VAPI Error:', error);
+                showStatus('Błąd połączenia');
+                isActive = false;
+                document.getElementById('mainOrb').classList.remove('active');
+            });
+
+            console.log('✅ VAPI initialized');
+        }
+
+        // Show status text
+        function showStatus(text) {
+            const statusEl = document.getElementById('statusText');
+            statusEl.textContent = text;
+            statusEl.classList.add('visible');
+        }
+
+        // Hide status text
+        function hideStatus() {
+            const statusEl = document.getElementById('statusText');
+            statusEl.classList.remove('visible');
+        }
+
+        // Handle orb click
+        document.getElementById('mainOrb').addEventListener('click', () => {
+            if (!vapiInstance) {
+                alert('VAPI nie jest gotowy. Odśwież stronę.');
+                return;
+            }
+
+            if (isActive) {
+                // End call
+                vapiInstance.stop();
+                showStatus('Rozłączanie...');
+            } else {
+                // Start call
+                showStatus('Łączenie...');
+                vapiInstance.start(ASSISTANT_ID);
+            }
+        });
+
+        // Initialize on load
+        window.addEventListener('load', initVapi);
+    </script>
+</body>
+</html>

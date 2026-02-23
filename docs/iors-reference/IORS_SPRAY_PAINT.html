@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS - Spray Paint</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: white;
+            overflow: hidden;
+            font-family: 'Montserrat', sans-serif;
+        }
+        canvas { display: block; }
+
+        .logo {
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            z-index: 10;
+        }
+
+        .status {
+            position: fixed;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #333;
+            font-size: 18px;
+            letter-spacing: 2px;
+            z-index: 10;
+            cursor: pointer;
+        }
+
+        .status.active { color: #E31E24; font-weight: 600; }
+
+        .test-btn {
+            position: fixed;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: #E31E24;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .test-btn:hover { background: #c41a1f; }
+    </style>
+</head>
+<body>
+    <div class="logo">• iors.ai •</div>
+    <canvas id="canvas"></canvas>
+    <button class="test-btn" id="testBtn">TEST SOUNDWAVE</button>
+    <div class="status" id="status">Kliknij aby rozpocząć</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('status');
+
+        let W = canvas.width = window.innerWidth;
+        let H = canvas.height = window.innerHeight;
+
+        // VAPI
+        const VAPI_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = 'adf258e0-3a41-444e-b683-38c195bd7954';
+        let vapi = null;
+        let isActive = false;
+        let emotionLevel = 0; // 0-1
+
+        // SOUNDWAVES
+        const waves = [];
+
+        class Wave {
+            constructor() {
+                this.r = 0;
+                this.maxR = Math.max(W, H) * 0.8;
+                this.speed = 8;
+                this.alpha = 1;
+            }
+
+            update() {
+                this.r += this.speed;
+                this.alpha = 1 - (this.r / this.maxR);
+                return this.r < this.maxR;
+            }
+
+            draw() {
+                ctx.strokeStyle = `rgba(227, 30, 36, ${this.alpha * 0.4})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(W/2, H/2, this.r, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        // PERLIN NOISE (simplified)
+        function noise2D(x, y) {
+            const X = Math.floor(x) & 255;
+            const Y = Math.floor(y) & 255;
+            x -= Math.floor(x);
+            y -= Math.floor(y);
+            const u = fade(x);
+            const v = fade(y);
+
+            const hash = (i) => {
+                const p = [151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,74,165,71,134,139,48,27,166,77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,102,143,54,65,25,63,161,1,216,80,73,209,76,132,187,208,89,18,169,200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,52,217,226,250,124,123,5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,223,183,170,213,119,248,152,2,44,154,163,70,221,153,101,155,167,43,172,9,129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,218,246,97,228,251,34,242,193,238,210,144,12,191,179,162,241,81,51,145,235,249,14,239,107,49,192,214,31,181,199,106,157,184,84,204,176,115,121,50,45,127,4,150,254,138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180];
+                return p[(p[i & 255] + i) & 255];
+            };
+
+            const a = hash(X) + Y;
+            const b = hash(X + 1) + Y;
+
+            const g1 = hash(a) / 255;
+            const g2 = hash(b) / 255;
+            const g3 = hash(a + 1) / 255;
+            const g4 = hash(b + 1) / 255;
+
+            const x1 = lerp(g1, g2, u);
+            const x2 = lerp(g3, g4, u);
+            return lerp(x1, x2, v);
+        }
+
+        function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+        function lerp(a, b, t) { return a + t * (b - a); }
+
+        // PARTICLES (spray paint dots)
+        const particles = [];
+        const NUM = 5000;
+
+        for (let i = 0; i < NUM; i++) {
+            particles.push({
+                x: Math.random() * W,
+                y: Math.random() * H,
+                vx: 0,
+                vy: 0,
+                size: 0.8 + Math.random() * 2,
+                alpha: 0.3 + Math.random() * 0.5,
+                life: Math.random() * 1000
+            });
+        }
+
+        // ANIMATION
+        let frame = 0;
+
+        function animate() {
+            // Spray paint fade (nie full clear!)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.fillRect(0, 0, W, H);
+
+            frame++;
+
+            // Update waves
+            for (let i = waves.length - 1; i >= 0; i--) {
+                if (!waves[i].update()) waves.splice(i, 1);
+                else waves[i].draw();
+            }
+
+            // Update particles
+            particles.forEach(p => {
+                p.life++;
+
+                // FLOW FIELD (Perlin noise)
+                const scale = 0.002;
+                const angle = noise2D(p.x * scale, p.y * scale) * Math.PI * 4;
+
+                const flowStrength = 0.4;
+                p.vx += Math.cos(angle) * flowStrength;
+                p.vy += Math.sin(angle) * flowStrength;
+
+                // Vortex towards center (conditional)
+                if (emotionLevel > 0.3) {
+                    const dx = W/2 - p.x;
+                    const dy = H/2 - p.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+
+                    if (dist > 50) {
+                        const pull = emotionLevel * 0.01;
+                        p.vx += (dx / dist) * pull;
+                        p.vy += (dy / dist) * pull;
+                    }
+                }
+
+                // Wave repulsion
+                waves.forEach(w => {
+                    const dx = p.x - W/2;
+                    const dy = p.y - H/2;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    const wDist = Math.abs(dist - w.r);
+
+                    if (wDist < 60) {
+                        const force = (1 - wDist/60) * w.alpha * 3;
+                        p.vx += (dx / dist) * force;
+                        p.vy += (dy / dist) * force;
+                    }
+                });
+
+                // Damping
+                p.vx *= 0.94;
+                p.vy *= 0.94;
+
+                // Move
+                p.x += p.vx;
+                p.y += p.vy;
+
+                // Wrap
+                if (p.x < -10) p.x = W + 10;
+                if (p.x > W + 10) p.x = -10;
+                if (p.y < -10) p.y = H + 10;
+                if (p.y > H + 10) p.y = -10;
+
+                // Draw (black dots)
+                ctx.fillStyle = `rgba(0, 0, 0, ${p.alpha})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Decay emotion
+            emotionLevel *= 0.998;
+
+            requestAnimationFrame(animate);
+        }
+
+        // VAPI INIT
+        function initVapi() {
+            if (typeof window.Vapi === 'undefined') {
+                setTimeout(initVapi, 500);
+                return;
+            }
+
+            vapi = new window.Vapi(VAPI_KEY);
+
+            vapi.on('call-start', () => {
+                isActive = true;
+                statusEl.textContent = 'Słucham...';
+                statusEl.classList.add('active');
+            });
+
+            vapi.on('call-end', () => {
+                isActive = false;
+                statusEl.textContent = 'Rozmowa zakończona';
+                statusEl.classList.remove('active');
+                setTimeout(() => {
+                    statusEl.textContent = 'Kliknij aby rozpocząć';
+                }, 3000);
+            });
+
+            vapi.on('message', (msg) => {
+                if (msg.type === 'transcript' && msg.role === 'assistant') {
+                    waves.push(new Wave());
+
+                    // Random emotion spike
+                    if (Math.random() < 0.5) {
+                        emotionLevel = Math.min(1, emotionLevel + 0.3);
+                    }
+                }
+            });
+
+            vapi.on('error', (e) => {
+                console.error('VAPI error:', e);
+                isActive = false;
+            });
+
+            console.log('✅ VAPI ready');
+        }
+
+        // TEST BUTTON
+        document.getElementById('testBtn').addEventListener('click', () => {
+            waves.push(new Wave());
+            emotionLevel = Math.min(1, emotionLevel + 0.3);
+            console.log('🌊 Soundwave triggered! Emotion:', emotionLevel.toFixed(2));
+        });
+
+        // CLICK
+        statusEl.addEventListener('click', () => {
+            if (!vapi) {
+                alert('VAPI nie jest gotowy');
+                return;
+            }
+
+            if (isActive) {
+                vapi.stop();
+            } else {
+                statusEl.textContent = 'Łączenie...';
+                vapi.start(ASSISTANT_ID);
+            }
+        });
+
+        // RESIZE
+        window.addEventListener('resize', () => {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+        });
+
+        // START
+        animate();
+        initVapi();
+
+        console.log('✅ Spray Paint loaded - 5000 particles');
+    </script>
+</body>
+</html>

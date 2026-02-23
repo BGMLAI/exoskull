@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="IORS - Internal Operating & Recovery System. AI-powered voice assistance.">
+    <title>iors.ai - AI Voice Assistant</title>
+
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23E31E24'/></svg>">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #ffffff;
+            overflow-x: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+        }
+
+        /* Logo Section - Top Center */
+        .logo-container {
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 100;
+            opacity: 0;
+            animation: fade-in 1.5s ease-out forwards 0.3s;
+        }
+
+        .logo-text {
+            font-size: 48px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -1.5px;
+            user-select: none;
+        }
+
+        .logo-dot {
+            width: 16px;
+            height: 16px;
+            background: #E31E24;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* Chaos Visualization Container */
+        .chaos-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Canvas for chaos particles */
+        #chaosCanvas {
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        /* CTA Buttons Section - Bottom Center */
+        .cta-container {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 24px;
+            z-index: 100;
+            opacity: 0;
+            animation: fade-in 1.5s ease-out forwards 1s;
+        }
+
+        .cta-button {
+            padding: 18px 36px;
+            background: #ffffff;
+            color: #1a1a1a;
+            border: 2px solid #1a1a1a;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-decoration: none;
+            display: inline-block;
+            pointer-events: auto;
+            user-select: none;
+        }
+
+        .cta-button:hover {
+            background: #1a1a1a;
+            color: #ffffff;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .cta-button:active {
+            transform: translateY(0);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .cta-button.primary {
+            background: #E31E24;
+            color: #ffffff;
+            border-color: #E31E24;
+        }
+
+        .cta-button.primary:hover {
+            background: #c41a1f;
+            border-color: #c41a1f;
+        }
+
+        /* Fade-in Animation */
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .logo-container {
+                top: 30px;
+            }
+
+            .logo-text {
+                font-size: 36px;
+                letter-spacing: -1px;
+            }
+
+            .logo-dot {
+                width: 12px;
+                height: 12px;
+            }
+
+            .cta-container {
+                bottom: 60px;
+                flex-direction: column;
+                gap: 16px;
+                width: calc(100vw - 48px);
+            }
+
+            .cta-button {
+                padding: 16px 32px;
+                font-size: 15px;
+                width: 100%;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .logo-text {
+                font-size: 28px;
+            }
+
+            .logo-dot {
+                width: 10px;
+                height: 10px;
+            }
+
+            .cta-container {
+                bottom: 40px;
+            }
+
+            .cta-button {
+                padding: 14px 28px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Logo -->
+    <div class="logo-container">
+        <div class="logo-dot"></div>
+        <div class="logo-text">iors.ai</div>
+        <div class="logo-dot"></div>
+    </div>
+
+    <!-- Chaos Visualization Background -->
+    <div class="chaos-container">
+        <canvas id="chaosCanvas"></canvas>
+    </div>
+
+    <!-- CTA Buttons -->
+    <div class="cta-container">
+        <button class="cta-button primary" id="voiceBtn">
+            Rozpocznij rozmowę
+        </button>
+        <button class="cta-button" id="textBtn">
+            Napisz wiadomość
+        </button>
+    </div>
+
+    <script>
+        // ==========================================
+        // CHAOS PARTICLE SYSTEM (Embedded)
+        // ==========================================
+        const canvas = document.getElementById('chaosCanvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // Simple chaos particle (no face detection for GHL version)
+        class ChaosParticle {
+            constructor(targetX, targetY, size) {
+                // Start near center (galaxy-like)
+                const startAngle = Math.random() * Math.PI * 2;
+                const startDist = Math.pow(Math.random(), 0.6) * Math.min(width, height) * 0.4;
+                this.x = centerX + Math.cos(startAngle) * startDist;
+                this.y = centerY + Math.sin(startAngle) * startDist;
+
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.size = size;
+
+                this.vx = (Math.random() - 0.5) * 0.5;
+                this.vy = (Math.random() - 0.5) * 0.5;
+
+                this.noiseOffset1 = Math.random() * 10000;
+                this.noiseOffset2 = Math.random() * 10000;
+                this.speed1 = 0.001 + Math.random() * 0.002;
+                this.speed2 = 0.0015 + Math.random() * 0.003;
+                this.chaosMultiplier = 0.5 + Math.random() * 0.5;
+            }
+
+            update(time) {
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+
+                const spring = 0.0003;
+                const damping = 0.95;
+
+                this.vx += dx * spring;
+                this.vy += dy * spring;
+
+                // Chaos layers
+                const noise1X = Math.sin(time * this.speed1 + this.noiseOffset1) * 0.8;
+                const noise1Y = Math.cos(time * this.speed1 + this.noiseOffset1) * 0.8;
+                const noise2X = Math.sin(time * this.speed2 + this.noiseOffset2) * 0.5;
+                const noise2Y = Math.cos(time * this.speed2 + this.noiseOffset2) * 0.5;
+
+                this.vx += (noise1X + noise2X) * this.chaosMultiplier * 0.2;
+                this.vy += (noise1Y + noise2Y) * this.chaosMultiplier * 0.2;
+
+                // Rare turbulence
+                if (Math.random() < 0.02) {
+                    this.vx += (Math.random() - 0.5) * 0.5;
+                    this.vy += (Math.random() - 0.5) * 0.5;
+                }
+
+                this.vx *= damping;
+                this.vy *= damping;
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Soft gravity toward center
+                const distFromCenter = Math.sqrt((this.x - centerX) ** 2 + (this.y - centerY) ** 2);
+                const maxDist = Math.min(width, height) * 0.5;
+
+                if (distFromCenter > maxDist * 0.7) {
+                    const gravityStrength = (distFromCenter - maxDist * 0.7) / (maxDist * 0.3);
+                    const angleToCenter = Math.atan2(centerY - this.y, centerX - this.x);
+                    this.vx += Math.cos(angleToCenter) * gravityStrength * 0.5;
+                    this.vy += Math.sin(angleToCenter) * gravityStrength * 0.5;
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = 'rgba(26, 26, 26, 0.6)';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        const particles = [];
+
+        function initParticles() {
+            particles.length = 0;
+            const numParticles = window.innerWidth < 768 ? 800 : 1200; // Fewer on mobile
+
+            // Default ellipse shape
+            const formWidth = Math.min(width, height) * 0.22;
+            const formHeight = Math.min(width, height) * 0.28;
+
+            for (let i = 0; i < numParticles; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const r = Math.pow(Math.random(), 0.7);
+
+                const targetX = centerX + Math.cos(angle) * formWidth * r;
+                const targetY = centerY + Math.sin(angle) * formHeight * r;
+
+                const size = 0.4 + r * 0.8 + Math.random() * 0.4;
+                particles.push(new ChaosParticle(targetX, targetY, size));
+            }
+        }
+
+        let time = 0;
+        function animate() {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+            ctx.fillRect(0, 0, width, height);
+
+            time += 1;
+
+            particles.forEach(particle => {
+                particle.update(time);
+                particle.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            initParticles();
+        });
+
+        initParticles();
+        animate();
+
+        // ==========================================
+        // CTA BUTTON FUNCTIONS
+        // ==========================================
+
+        // Replace these URLs with your actual GHL pages/links
+        const VOICE_CALL_URL = 'vapi-interface-final.html'; // Or full VAPI interface URL
+        const TEXT_CHAT_URL = '#'; // Replace with your chat page URL
+
+        document.getElementById('voiceBtn').addEventListener('click', function() {
+            // Track event
+            trackEvent('voice_call_clicked', { source: 'landing_page' });
+
+            // Redirect to VAPI interface
+            window.location.href = VOICE_CALL_URL;
+        });
+
+        document.getElementById('textBtn').addEventListener('click', function() {
+            // Track event
+            trackEvent('text_chat_clicked', { source: 'landing_page' });
+
+            // TODO: Implement text chat
+            // Options:
+            // 1. Redirect to chat page: window.location.href = TEXT_CHAT_URL;
+            // 2. Open WhatsApp: window.location.href = 'https://wa.me/48123456789';
+            // 3. Open SMS: window.location.href = 'sms:+48123456789';
+            // 4. Open chat widget: openChatWidget();
+
+            alert('Text chat coming soon!');
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'v' || e.key === 'V') {
+                document.getElementById('voiceBtn').click();
+            } else if (e.key === 't' || e.key === 'T') {
+                document.getElementById('textBtn').click();
+            }
+        });
+
+        // ==========================================
+        // ANALYTICS TRACKING
+        // ==========================================
+        function trackEvent(eventName, properties) {
+            // Google Analytics (if installed)
+            if (typeof gtag !== 'undefined') {
+                gtag('event', eventName, properties);
+            }
+
+            // GHL Analytics (if available)
+            if (typeof window.ghl !== 'undefined' && window.ghl.trackEvent) {
+                window.ghl.trackEvent(eventName, properties);
+            }
+
+            // Console log for debugging
+            console.log('Event tracked:', eventName, properties);
+        }
+
+        // Track page load
+        window.addEventListener('load', function() {
+            trackEvent('landing_page_loaded', {
+                load_time: performance.timing.loadEventEnd - performance.timing.navigationStart,
+                device: /mobile/i.test(navigator.userAgent) ? 'mobile' : 'desktop'
+            });
+        });
+    </script>
+</body>
+</html>

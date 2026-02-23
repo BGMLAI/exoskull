@@ -1,0 +1,214 @@
+<!--
+╔═══════════════════════════════════════════════════════════════════════╗
+║                  IORS EMOTION WIDGET - EMBED SNIPPET                  ║
+║                        https://iors.ai                                ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+KROK 1: Wklej ten kod tam gdzie chcesz żeby pojawił się widget
+-->
+
+<iframe
+    id="iorsEmotionWidget"
+    src="https://yourdomain.com/IORS_EMOTION_WIDGET.html"
+    width="320"
+    height="700"
+    style="border: none; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);"
+    allow="camera; microphone"
+></iframe>
+
+<!--
+KROK 2: (OPCJONALNIE) Dodaj kontrolę JavaScript
+Wklej przed zamknięciem </body>
+-->
+
+<script>
+(function() {
+    'use strict';
+
+    // ========================================================================
+    // IORS EMOTION WIDGET CONTROLLER
+    // ========================================================================
+
+    const widget = document.getElementById('iorsEmotionWidget');
+
+    if (!widget) {
+        console.error('IORS Widget: Nie znaleziono iframe z id="iorsEmotionWidget"');
+        return;
+    }
+
+    // ========================================================================
+    // API FUNCTIONS
+    // ========================================================================
+
+    /**
+     * Zaktualizuj emocję manualnie
+     * @param {string} emotion - neutral, happy, sad, angry, anxious, excited, calm
+     * @param {number} intensity - 0-100
+     */
+    window.IORS_updateEmotion = function(emotion, intensity) {
+        widget.contentWindow.postMessage({
+            type: 'IORS_EMOTION_UPDATE',
+            data: { emotion, intensity }
+        }, '*');
+    };
+
+    /**
+     * Rozpocznij rozmowę z IORS (auto emotion detection)
+     */
+    window.IORS_startCall = function() {
+        widget.contentWindow.postMessage({
+            type: 'IORS_START_CALL'
+        }, '*');
+    };
+
+    /**
+     * Zakończ rozmowę z IORS
+     */
+    window.IORS_stopCall = function() {
+        widget.contentWindow.postMessage({
+            type: 'IORS_STOP_CALL'
+        }, '*');
+    };
+
+    // ========================================================================
+    // LISTEN FOR EMOTION CHANGES
+    // ========================================================================
+
+    window.addEventListener('message', function(event) {
+        if (event.data.type === 'IORS_EMOTION_CHANGED') {
+            const emotion = event.data.data.emotion;
+            const intensity = event.data.data.intensity;
+
+            // 📊 LOG DO CONSOLE (usuń w production)
+            console.log('🎭 IORS Emotion:', emotion, '(' + Math.round(intensity) + '%)');
+
+            // ========================================================
+            // TUTAJ DODAJ SWOJĄ LOGIKĘ
+            // ========================================================
+
+            // Przykład 1: Zmień kolor tła strony
+            /*
+            const colors = {
+                happy: '#fda085',
+                sad: '#66a6ff',
+                angry: '#f9d423',
+                anxious: '#fee140',
+                excited: '#330867',
+                calm: '#fed6e3',
+                neutral: '#ffffff'
+            };
+            document.body.style.background = colors[emotion] || '#ffffff';
+            */
+
+            // Przykład 2: Wyślij do Google Analytics
+            /*
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'emotion_change', {
+                    emotion: emotion,
+                    intensity: Math.round(intensity)
+                });
+            }
+            */
+
+            // Przykład 3: Pokaż komunikat w zależności od emocji
+            /*
+            if (emotion === 'sad' && intensity > 60) {
+                showSupportMessage();
+            }
+            */
+
+            // Przykład 4: Custom event dla Twojej aplikacji
+            /*
+            document.dispatchEvent(new CustomEvent('emotionChanged', {
+                detail: { emotion, intensity }
+            }));
+            */
+        }
+    });
+
+    console.log('✅ IORS Emotion Widget loaded');
+    console.log('📖 API:');
+    console.log('  - IORS_updateEmotion(emotion, intensity)');
+    console.log('  - IORS_startCall()');
+    console.log('  - IORS_stopCall()');
+})();
+</script>
+
+<!--
+╔═══════════════════════════════════════════════════════════════════════╗
+║                              PRZYKŁADY UŻYCIA                         ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+1. MANUALNA AKTUALIZACJA EMOCJI:
+
+<button onclick="IORS_updateEmotion('happy', 80)">😊 Jestem szczęśliwy!</button>
+<button onclick="IORS_updateEmotion('sad', 70)">😢 Jestem smutny</button>
+<button onclick="IORS_updateEmotion('neutral', 0)">😐 Reset</button>
+
+─────────────────────────────────────────────────────────────────────────
+
+2. START/STOP ROZMOWY Z IORS:
+
+<button onclick="IORS_startCall()">🎤 Rozpocznij rozmowę</button>
+<button onclick="IORS_stopCall()">🛑 Zakończ rozmowę</button>
+
+─────────────────────────────────────────────────────────────────────────
+
+3. REAGUJ NA ZMIANY EMOCJI:
+
+document.addEventListener('emotionChanged', function(e) {
+    console.log('Emocja:', e.detail.emotion);
+    console.log('Intensywność:', e.detail.intensity);
+});
+
+─────────────────────────────────────────────────────────────────────────
+
+4. DOSTĘPNE EMOCJE:
+
+- neutral  (😐) - Spokojny stan emocjonalny
+- happy    (😊) - Radość
+- sad      (😢) - Smutek
+- angry    (😠) - Złość
+- anxious  (😰) - Niepokój
+- excited  (🤩) - Ekscytacja
+- calm     (😌) - Spokój
+
+─────────────────────────────────────────────────────────────────────────
+
+5. RESPONSIVE LAYOUT:
+
+<div style="display: flex; gap: 20px; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 300px;">
+        <!-- Twoja treść -->
+    </div>
+    <div style="flex: 0 0 320px;">
+        <!-- Widget tutaj -->
+        <iframe id="iorsEmotionWidget" src="..." ...></iframe>
+    </div>
+</div>
+
+─────────────────────────────────────────────────────────────────────────
+
+6. FIXED POSITION (Corner):
+
+<style>
+#iorsEmotionWidget {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 300px;
+    height: 500px;
+    z-index: 9999;
+}
+</style>
+
+─────────────────────────────────────────────────────────────────────────
+
+POTRZEBUJESZ POMOCY?
+
+📖 Pełna dokumentacja: IORS_EMOTION_WIDGET_DEMO.html
+🎮 Live demo: Otwórz IORS_EMOTION_WIDGET_DEMO.html w przeglądarce
+💬 Support: kontakt@iors.ai
+
+╚═══════════════════════════════════════════════════════════════════════╝
+-->

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iors.ai</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #ffffff;
+            overflow-x: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        }
+
+        /* Logo Section - Top Center */
+        .logo-container {
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 100;
+            opacity: 0;
+            animation: fade-in 1.5s ease-out forwards 0.3s;
+        }
+
+        .logo-text {
+            font-size: 48px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -1.5px;
+        }
+
+        .logo-dot {
+            width: 16px;
+            height: 16px;
+            background: #E31E24;
+            border-radius: 50%;
+        }
+
+        /* Chaos Visualization - Full Background */
+        .chaos-embed {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            border: none;
+            z-index: 1;
+            pointer-events: none; /* Allows clicks to pass through to buttons */
+        }
+
+        /* CTA Buttons Section - Bottom Center */
+        .cta-container {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 24px;
+            z-index: 100;
+            opacity: 0;
+            animation: fade-in 1.5s ease-out forwards 1s;
+        }
+
+        .cta-button {
+            padding: 18px 36px;
+            background: #ffffff;
+            color: #1a1a1a;
+            border: 2px solid #1a1a1a;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            text-decoration: none;
+            display: inline-block;
+            pointer-events: auto;
+        }
+
+        .cta-button:hover {
+            background: #1a1a1a;
+            color: #ffffff;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .cta-button:active {
+            transform: translateY(0);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .cta-button.primary {
+            background: #E31E24;
+            color: #ffffff;
+            border-color: #E31E24;
+        }
+
+        .cta-button.primary:hover {
+            background: #c41a1f;
+            border-color: #c41a1f;
+        }
+
+        /* Fade-in Animation */
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .logo-container {
+                top: 30px;
+            }
+
+            .logo-text {
+                font-size: 36px;
+                letter-spacing: -1px;
+            }
+
+            .logo-dot {
+                width: 12px;
+                height: 12px;
+            }
+
+            .cta-container {
+                bottom: 60px;
+                flex-direction: column;
+                gap: 16px;
+            }
+
+            .cta-button {
+                padding: 16px 32px;
+                font-size: 15px;
+                width: 100%;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .logo-text {
+                font-size: 28px;
+            }
+
+            .logo-dot {
+                width: 10px;
+                height: 10px;
+            }
+
+            .cta-container {
+                bottom: 40px;
+                width: calc(100vw - 48px);
+            }
+
+            .cta-button {
+                padding: 14px 28px;
+                font-size: 14px;
+            }
+        }
+
+        /* Hide test button from chaos visualization */
+        iframe ::deep #testButton {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Logo -->
+    <div class="logo-container">
+        <div class="logo-dot"></div>
+        <div class="logo-text">iors.ai</div>
+        <div class="logo-dot"></div>
+    </div>
+
+    <!-- Chaos Visualization Background -->
+    <iframe
+        class="chaos-embed"
+        src="vapi-interface-final.html"
+        title="IORS Chaos Visualization"
+        loading="eager">
+    </iframe>
+
+    <!-- CTA Buttons -->
+    <div class="cta-container">
+        <button class="cta-button primary" id="voiceBtn" onclick="startVoiceCall()">
+            Rozpocznij rozmowę
+        </button>
+        <button class="cta-button" id="textBtn" onclick="startTextChat()">
+            Napisz wiadomość
+        </button>
+    </div>
+
+    <script>
+        // Voice Call - Opens VAPI interface in fullscreen
+        function startVoiceCall() {
+            // Option 1: Navigate to full VAPI interface
+            window.location.href = 'vapi-interface-final.html';
+
+            // Option 2 (Alternative): Open in new window
+            // window.open('vapi-interface-final.html', '_blank', 'width=1200,height=800');
+        }
+
+        // Text Chat - Opens chat widget or redirects to chat page
+        function startTextChat() {
+            // TODO: Implement text chat integration
+            // Options:
+            // 1. Open chat widget/modal
+            // 2. Redirect to chat page
+            // 3. Open WhatsApp/SMS link
+
+            alert('Text chat coming soon!');
+
+            // Example SMS link (replace with your number):
+            // window.location.href = 'sms:+48123456789';
+
+            // Example WhatsApp link:
+            // window.location.href = 'https://wa.me/48123456789';
+
+            // Example chat page redirect:
+            // window.location.href = 'chat.html';
+        }
+
+        // Keyboard shortcuts (optional)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'v' || e.key === 'V') {
+                startVoiceCall();
+            } else if (e.key === 't' || e.key === 'T') {
+                startTextChat();
+            }
+        });
+
+        // Analytics tracking (optional - add your tracking code)
+        function trackEvent(eventName, properties) {
+            // Example: Google Analytics
+            // gtag('event', eventName, properties);
+
+            // Example: Custom analytics
+            console.log('Event:', eventName, properties);
+        }
+
+        // Track button clicks
+        document.getElementById('voiceBtn').addEventListener('click', () => {
+            trackEvent('voice_call_clicked', { source: 'landing_page' });
+        });
+
+        document.getElementById('textBtn').addEventListener('click', () => {
+            trackEvent('text_chat_clicked', { source: 'landing_page' });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS Speaking Avatar</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #ffffff;
+            overflow: hidden;
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .voice-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            cursor: pointer;
+        }
+
+        #avatarCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        .logo-container {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 0.5s;
+        }
+
+        .logo-text {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -1px;
+        }
+
+        .logo-dot {
+            width: 14px;
+            height: 14px;
+            background: #E31E24;
+            border-radius: 50%;
+        }
+
+        /* Transcription panel */
+        .transcript-panel {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 800px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        .message-bubble {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 15px 20px;
+            margin: 10px 0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            animation: slide-up 0.3s ease;
+        }
+
+        .message-bubble.assistant {
+            background: rgba(227, 30, 36, 0.95);
+            color: white;
+            margin-left: 50px;
+        }
+
+        .message-bubble.user {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            margin-right: 50px;
+        }
+
+        .message-header {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            opacity: 0.7;
+        }
+
+        .message-text {
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .message-emotion {
+            font-size: 11px;
+            margin-top: 5px;
+            opacity: 0.8;
+            font-style: italic;
+        }
+
+        @keyframes slide-up {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .status-text {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #333;
+            font-size: 16px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            z-index: 10;
+        }
+
+        .status-text.active {
+            color: #E31E24;
+            font-weight: 600;
+        }
+
+        /* Emotion indicator (floating) */
+        .emotion-indicator {
+            position: absolute;
+            top: 120px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 60px;
+            padding: 15px 25px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .emotion-indicator.active {
+            background: rgba(227, 30, 36, 0.95);
+            color: white;
+        }
+
+        .emotion-emoji-large {
+            font-size: 48px;
+        }
+
+        .emotion-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .emotion-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.7;
+        }
+
+        .emotion-name-large {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .emotion-sources {
+            font-size: 9px;
+            opacity: 0.6;
+        }
+
+        /* Progress indicator */
+        .progress-ring {
+            position: absolute;
+            top: 120px;
+            left: 20px;
+            z-index: 10;
+        }
+
+        .progress-circle {
+            transform: rotate(-90deg);
+        }
+
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 14px;
+            font-weight: 700;
+            color: #E31E24;
+        }
+
+        .progress-label-small {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            color: #666;
+            white-space: nowrap;
+            font-weight: 600;
+        }
+
+        .test-button {
+            position: absolute;
+            bottom: 300px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: #E31E24;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 10;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .test-button:hover {
+            background: #c41a1f;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @media (max-width: 768px) {
+            .logo-text { font-size: 28px; }
+            .transcript-panel { width: 95%; bottom: 60px; }
+            .message-bubble { padding: 12px 16px; }
+            .emotion-indicator { top: 100px; right: 10px; padding: 10px 15px; }
+        }
+
+        #faceVideo {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="voice-container" id="voiceContainer">
+        <div class="logo-container">
+            <div class="logo-dot"></div>
+            <div class="logo-text">iors.ai</div>
+            <div class="logo-dot"></div>
+        </div>
+
+        <canvas id="avatarCanvas"></canvas>
+
+        <!-- Progress Ring -->
+        <div class="progress-ring">
+            <svg width="80" height="80">
+                <circle cx="40" cy="40" r="35" fill="none" stroke="#eee" stroke-width="5"/>
+                <circle id="progressCircle" class="progress-circle" cx="40" cy="40" r="35"
+                        fill="none" stroke="#E31E24" stroke-width="5"
+                        stroke-dasharray="220" stroke-dashoffset="220"/>
+            </svg>
+            <div class="progress-text" id="progressText">0:00</div>
+            <div class="progress-label-small">Awatar</div>
+        </div>
+
+        <!-- Emotion Indicator -->
+        <div class="emotion-indicator" id="emotionIndicator">
+            <div class="emotion-emoji-large" id="emotionEmojiLarge">😐</div>
+            <div class="emotion-info">
+                <div class="emotion-label">TWOJA EMOCJA</div>
+                <div class="emotion-name-large" id="emotionNameLarge">neutral</div>
+                <div class="emotion-sources" id="emotionSources">3 źródła</div>
+            </div>
+        </div>
+
+        <!-- Transcription Panel -->
+        <div class="transcript-panel" id="transcriptPanel"></div>
+
+        <button class="test-button" id="testButton">🎭 TEST (skip to 10 min)</button>
+        <div class="status-text" id="statusText">Dotknij aby rozpocząć</div>
+    </div>
+
+    <video id="faceVideo" autoplay playsinline></video>
+
+    <!-- CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+
+    <script>
+        // ========================================================================
+        // CONFIG
+        // ========================================================================
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = '72577c85-81d4-47b4-99b5-0ca8b6ed7a63';
+
+        const EMOTION_EMOJIS = {
+            happy: '😊', sad: '😢', angry: '😠', disgusted: '🤢',
+            fearful: '😨', surprised: '😲', neutral: '😐'
+        };
+
+        const EMOTION_COLORS = {
+            happy: { r: 255, g: 215, b: 0 },
+            sad: { r: 70, g: 130, b: 180 },
+            angry: { r: 227, g: 30, b: 36 },
+            disgusted: { r: 139, g: 195, b: 74 },
+            fearful: { r: 156, g: 39, b: 176 },
+            surprised: { r: 255, g: 152, b: 0 },
+            neutral: { r: 120, g: 120, b: 120 }
+        };
+
+        let vapiInstance = null;
+        let isActive = false;
+        let iorsIsSpeaking = false;
+        let conversationStartTime = null;
+        let faceFormationProgress = 0;
+        const FORMATION_DURATION = 600000; // 10 min
+
+        let currentEmotions = {
+            faceApi: null,
+            mediaPipe: null,
+            voice: null,
+            consensus: 'neutral'
+        };
+
+        // ========================================================================
+        // CANVAS
+        // ========================================================================
+        const canvas = document.getElementById('avatarCanvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+        let centerX = width / 2;
+        let centerY = height / 2;
+
+        // ========================================================================
+        // PARTICLES (USER FACE AVATAR)
+        // ========================================================================
+        const particles = [];
+        let userFaceLandmarks = null;
+        let mouthLandmarks = []; // Indices for mouth area
+
+        class AvatarParticle {
+            constructor(targetX, targetY, size, landmarkIndex) {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.size = size;
+                this.landmarkIndex = landmarkIndex;
+
+                this.vx = (Math.random() - 0.5) * 3.0;
+                this.vy = (Math.random() - 0.5) * 3.0;
+
+                this.noiseOffset = Math.random() * 100000;
+                this.speed = 0.005 + Math.random() * 0.020;
+                this.chaosMultiplier = 0.5 + Math.random() * 2.5;
+
+                this.currentColor = { r: 227, g: 30, b: 36 };
+                this.targetColor = { r: 227, g: 30, b: 36 };
+
+                // Is this particle part of mouth?
+                this.isMouth = mouthLandmarks.includes(landmarkIndex);
+                this.speakingPulse = 0;
+            }
+
+            updateTarget(landmarks) {
+                if (landmarks && landmarks[this.landmarkIndex]) {
+                    const landmark = landmarks[this.landmarkIndex];
+                    this.targetX = centerX + (landmark.x - 0.5) * width * 0.45;
+                    this.targetY = centerY + (landmark.y - 0.5) * height * 0.55;
+                }
+            }
+
+            setEmotionColor(emotionColor) {
+                this.targetColor = emotionColor;
+            }
+
+            update(time) {
+                const chaosLevel = 1 - faceFormationProgress;
+                const organization = faceFormationProgress;
+
+                // Color lerp
+                this.currentColor.r += (this.targetColor.r - this.currentColor.r) * 0.05;
+                this.currentColor.g += (this.targetColor.g - this.currentColor.g) * 0.05;
+                this.currentColor.b += (this.targetColor.b - this.currentColor.b) * 0.05;
+
+                // Speaking animation (mouth particles)
+                if (this.isMouth && iorsIsSpeaking) {
+                    this.speakingPulse = Math.sin(time * 0.1) * 0.5 + 0.5; // 0-1 pulse
+                } else {
+                    this.speakingPulse *= 0.95; // Fade out
+                }
+
+                if (chaosLevel > 0.3) {
+                    // CHAOS MODE
+                    const n = Math.sin((this.x + this.noiseOffset) * 0.005 + time * this.speed) *
+                             Math.cos((this.y + this.noiseOffset) * 0.005 + time * this.speed);
+
+                    this.vx += n * this.chaosMultiplier * chaosLevel;
+                    this.vy += n * this.chaosMultiplier * chaosLevel;
+                    this.vx += (Math.random() - 0.5) * 2.0 * chaosLevel;
+                    this.vy += (Math.random() - 0.5) * 2.0 * chaosLevel;
+                    this.vx *= 0.96;
+                    this.vy *= 0.96;
+
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    if (this.x < 0) this.x = width;
+                    if (this.x > width) this.x = 0;
+                    if (this.y < 0) this.y = height;
+                    if (this.y > height) this.y = 0;
+                }
+
+                if (organization > 0.1) {
+                    // ORGANIZATION MODE
+                    const dx = this.targetX - this.x;
+                    const dy = this.targetY - this.y;
+
+                    // Add speaking offset to mouth
+                    let speakingOffset = 0;
+                    if (this.isMouth) {
+                        speakingOffset = this.speakingPulse * 8; // Move down when speaking
+                    }
+
+                    const pullStrength = 0.01 + organization * 0.15;
+                    this.vx += dx * pullStrength;
+                    this.vy += (dy + speakingOffset) * pullStrength;
+
+                    this.vx *= 0.85 - organization * 0.15;
+                    this.vy *= 0.85 - organization * 0.15;
+
+                    this.x += this.vx;
+                    this.y += this.vy;
+                }
+            }
+
+            draw() {
+                const alpha = 0.6 + faceFormationProgress * 0.3;
+                const r = Math.floor(this.currentColor.r);
+                const g = Math.floor(this.currentColor.g);
+                const b = Math.floor(this.currentColor.b);
+
+                // Size increases as face forms + pulse when speaking
+                let finalSize = this.size * (0.6 + faceFormationProgress * 0.8);
+                if (this.isMouth && this.speakingPulse > 0.1) {
+                    finalSize *= (1 + this.speakingPulse * 0.5); // Bigger when speaking
+                }
+
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, finalSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles.length = 0;
+            const numParticles = 30000;
+
+            // Mouth landmarks (MediaPipe Face Mesh indices for lips)
+            mouthLandmarks = [
+                61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291,
+                308, 324, 318, 402, 317, 14, 87, 178, 88, 95,
+                78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308
+            ];
+
+            if (userFaceLandmarks && userFaceLandmarks.length > 0) {
+                for (let i = 0; i < numParticles; i++) {
+                    const landmarkIndex = Math.floor(Math.random() * userFaceLandmarks.length);
+                    const landmark = userFaceLandmarks[landmarkIndex];
+                    const targetX = centerX + (landmark.x - 0.5) * width * 0.45;
+                    const targetY = centerY + (landmark.y - 0.5) * height * 0.55;
+
+                    const size = 1.0 + Math.random() * 1.5;
+                    particles.push(new AvatarParticle(targetX, targetY, size, landmarkIndex));
+                }
+            } else {
+                // Default oval
+                const formWidth = Math.min(width, height) * 0.22;
+                const formHeight = Math.min(width, height) * 0.28;
+
+                for (let i = 0; i < numParticles; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const r = Math.random();
+                    const targetX = centerX + Math.cos(angle) * formWidth * r;
+                    const targetY = centerY + Math.sin(angle) * formHeight * r;
+
+                    const size = 1.0 + Math.random() * 1.5;
+                    particles.push(new AvatarParticle(targetX, targetY, size, i % 468));
+                }
+            }
+
+            console.log(`✅ ${numParticles} particles initialized`);
+        }
+
+        // ========================================================================
+        // FACE DETECTION (MediaPipe)
+        // ========================================================================
+        async function initFaceDetection() {
+            try {
+                const video = document.getElementById('faceVideo');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: 640, height: 480 },
+                    audio: true
+                });
+                video.srcObject = stream;
+
+                const checkMediaPipe = () => {
+                    if (typeof FaceMesh === 'undefined') {
+                        setTimeout(checkMediaPipe, 1000);
+                        return;
+                    }
+
+                    const faceMesh = new FaceMesh({
+                        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`
+                    });
+
+                    faceMesh.setOptions({
+                        maxNumFaces: 1,
+                        refineLandmarks: true,
+                        minDetectionConfidence: 0.5,
+                        minTrackingConfidence: 0.5
+                    });
+
+                    faceMesh.onResults((results) => {
+                        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                            userFaceLandmarks = results.multiFaceLandmarks[0];
+
+                            if (particles.length > 0 && faceFormationProgress > 0.1) {
+                                particles.forEach(particle => {
+                                    particle.updateTarget(userFaceLandmarks);
+                                });
+                            }
+                        }
+                    });
+
+                    async function detectFace() {
+                        if (video.readyState === 4) {
+                            await faceMesh.send({ image: video });
+                        }
+                        setTimeout(detectFace, 100);
+                    }
+
+                    video.onloadeddata = () => {
+                        console.log('✅ Face detection ready');
+                        detectFace();
+                    };
+                };
+
+                checkMediaPipe();
+
+            } catch (error) {
+                console.warn('⚠️ Face detection failed:', error);
+            }
+        }
+
+        // ========================================================================
+        // FACE-API.JS EMOTION DETECTION
+        // ========================================================================
+        let faceApiReady = false;
+
+        async function initFaceApi() {
+            try {
+                const checkFaceApi = async () => {
+                    if (typeof faceapi === 'undefined') {
+                        setTimeout(checkFaceApi, 1000);
+                        return;
+                    }
+
+                    console.log('🎭 Loading Face-api.js...');
+                    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
+
+                    await Promise.all([
+                        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+                    ]);
+
+                    faceApiReady = true;
+                    console.log('✅ Face-api.js ready');
+                    setInterval(detectFaceApiEmotion, 1000);
+                };
+
+                checkFaceApi();
+            } catch (error) {
+                console.error('❌ Face-api.js failed:', error);
+            }
+        }
+
+        async function detectFaceApiEmotion() {
+            if (!faceApiReady) return;
+
+            const video = document.getElementById('faceVideo');
+            if (video.readyState !== 4) return;
+
+            try {
+                const detection = await faceapi
+                    .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceExpressions();
+
+                if (detection) {
+                    const expressions = detection.expressions;
+                    let maxEmotion = 'neutral';
+                    let maxScore = 0;
+
+                    for (const [emotion, score] of Object.entries(expressions)) {
+                        if (score > maxScore) {
+                            maxScore = score;
+                            maxEmotion = emotion;
+                        }
+                    }
+
+                    if (maxScore > 0.4) {
+                        currentEmotions.faceApi = { emotion: maxEmotion, confidence: maxScore };
+                        updateConsensusEmotion();
+                    }
+                }
+            } catch (error) {
+                // Silent fail
+            }
+        }
+
+        // ========================================================================
+        // VOICE ANALYSIS
+        // ========================================================================
+        let audioContext = null;
+        let analyser = null;
+
+        async function initVoiceAnalysis() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                source.connect(analyser);
+
+                console.log('✅ Voice analysis ready');
+                setInterval(analyzeVoiceEmotion, 1000);
+            } catch (error) {
+                console.warn('⚠️ Voice analysis failed:', error);
+            }
+        }
+
+        function analyzeVoiceEmotion() {
+            if (!analyser || !isActive) return;
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(dataArray);
+
+            let sum = 0, lowSum = 0, highSum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+                if (i < dataArray.length / 3) lowSum += dataArray[i];
+                if (i > dataArray.length * 2 / 3) highSum += dataArray[i];
+            }
+
+            const volume = sum / dataArray.length;
+            const lowFreq = lowSum / (dataArray.length / 3);
+            const highFreq = highSum / (dataArray.length / 3);
+
+            let emotion = 'neutral';
+            let confidence = 0.5;
+
+            if (volume > 80 && highFreq > 60) {
+                emotion = 'angry';
+                confidence = 0.7;
+            } else if (volume > 70 && highFreq > 50) {
+                emotion = 'surprised';
+                confidence = 0.6;
+            } else if (volume > 50 && lowFreq < 30) {
+                emotion = 'happy';
+                confidence = 0.6;
+            } else if (volume < 40 && lowFreq > 40) {
+                emotion = 'sad';
+                confidence = 0.6;
+            }
+
+            if (volume > 15) {
+                currentEmotions.voice = { emotion, confidence };
+                updateConsensusEmotion();
+            }
+        }
+
+        // ========================================================================
+        // CONSENSUS EMOTION
+        // ========================================================================
+        function updateConsensusEmotion() {
+            const emotions = [
+                currentEmotions.faceApi?.emotion,
+                currentEmotions.mediaPipe?.emotion,
+                currentEmotions.voice?.emotion
+            ].filter(e => e);
+
+            if (emotions.length === 0) return;
+
+            const counts = {};
+            emotions.forEach(e => {
+                counts[e] = (counts[e] || 0) + 1;
+            });
+
+            const consensus = Object.entries(counts)
+                .sort((a, b) => b[1] - a[1])[0][0];
+
+            currentEmotions.consensus = consensus;
+
+            // Update UI
+            document.getElementById('emotionEmojiLarge').textContent = EMOTION_EMOJIS[consensus];
+            document.getElementById('emotionNameLarge').textContent = consensus;
+            document.getElementById('emotionSources').textContent = `${emotions.length} źródła`;
+
+            // Update particle colors
+            const emotionColor = EMOTION_COLORS[consensus];
+            particles.forEach(p => p.setEmotionColor(emotionColor));
+
+            // Send to VAPI (as metadata/message)
+            if (vapiInstance && isActive) {
+                sendEmotionToVAPI(consensus);
+            }
+        }
+
+        // ========================================================================
+        // SEND EMOTION TO VAPI/IORS
+        // ========================================================================
+        function sendEmotionToVAPI(emotion) {
+            if (!vapiInstance) return;
+
+            // Send emotion as conversational message (VAPI will pass to assistant)
+            try {
+                vapiInstance.send({
+                    type: 'add-message',
+                    message: {
+                        role: 'system',
+                        content: `[USER_EMOTION: ${emotion}]`
+                    }
+                });
+                console.log(`📤 Sent emotion to IORS: ${emotion}`);
+            } catch (error) {
+                console.warn('⚠️ Could not send emotion:', error);
+            }
+        }
+
+        // ========================================================================
+        // TRANSCRIPTION PANEL
+        // ========================================================================
+        function addMessage(role, text, emotion = null) {
+            const panel = document.getElementById('transcriptPanel');
+            const bubble = document.createElement('div');
+            bubble.className = `message-bubble ${role}`;
+
+            const header = document.createElement('div');
+            header.className = 'message-header';
+            header.textContent = role === 'assistant' ? 'IORS' : 'TY';
+
+            const messageText = document.createElement('div');
+            messageText.className = 'message-text';
+            messageText.textContent = text;
+
+            bubble.appendChild(header);
+            bubble.appendChild(messageText);
+
+            if (emotion && role === 'user') {
+                const emotionTag = document.createElement('div');
+                emotionTag.className = 'message-emotion';
+                emotionTag.textContent = `${EMOTION_EMOJIS[emotion]} ${emotion}`;
+                bubble.appendChild(emotionTag);
+            }
+
+            panel.appendChild(bubble);
+            panel.scrollTop = panel.scrollHeight;
+
+            // Keep only last 10 messages
+            while (panel.children.length > 10) {
+                panel.removeChild(panel.firstChild);
+            }
+        }
+
+        // ========================================================================
+        // PROGRESS
+        // ========================================================================
+        function updateProgress() {
+            if (!conversationStartTime || !isActive) return;
+
+            const elapsed = Date.now() - conversationStartTime;
+            faceFormationProgress = Math.min(1, elapsed / FORMATION_DURATION);
+
+            // Update ring
+            const circumference = 2 * Math.PI * 35;
+            const offset = circumference - (faceFormationProgress * circumference);
+            document.getElementById('progressCircle').style.strokeDashoffset = offset;
+
+            // Update time
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            document.getElementById('progressText').textContent =
+                `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // ========================================================================
+        // ANIMATION LOOP
+        // ========================================================================
+        let time = 0;
+        function animate() {
+            ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+            ctx.fillRect(0, 0, width, height);
+
+            time += 2;
+            updateProgress();
+
+            particles.forEach(particle => {
+                particle.update(time);
+                particle.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // ========================================================================
+        // VAPI
+        // ========================================================================
+        function initVapi() {
+            const checkVapi = () => {
+                if (typeof window.Vapi === 'undefined') {
+                    setTimeout(checkVapi, 500);
+                    return;
+                }
+
+                vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+                vapiInstance.on('call-start', () => {
+                    isActive = true;
+                    conversationStartTime = Date.now();
+                    document.getElementById('statusText').textContent = 'Słucham...';
+                    document.getElementById('statusText').classList.add('active');
+                });
+
+                vapiInstance.on('call-end', () => {
+                    isActive = false;
+                    iorsIsSpeaking = false;
+                    conversationStartTime = null;
+                    document.getElementById('statusText').textContent = 'Rozmowa zakończona';
+                    document.getElementById('statusText').classList.remove('active');
+                    setTimeout(() => {
+                        document.getElementById('statusText').textContent = 'Dotknij aby rozpocząć';
+                    }, 3000);
+                });
+
+                vapiInstance.on('speech-start', () => {
+                    iorsIsSpeaking = false;
+                });
+
+                vapiInstance.on('speech-end', () => {
+                    iorsIsSpeaking = false;
+                });
+
+                vapiInstance.on('message', (msg) => {
+                    if (msg.type === 'transcript') {
+                        if (msg.role === 'assistant') {
+                            iorsIsSpeaking = true;
+                            addMessage('assistant', msg.transcriptType === 'final' ? msg.transcript : msg.transcript);
+
+                            // Highlight emotion indicator when IORS speaks
+                            document.getElementById('emotionIndicator').classList.add('active');
+                            setTimeout(() => {
+                                document.getElementById('emotionIndicator').classList.remove('active');
+                            }, 1000);
+                        } else if (msg.role === 'user' && msg.transcriptType === 'final') {
+                            addMessage('user', msg.transcript, currentEmotions.consensus);
+                        }
+                    }
+                });
+
+                vapiInstance.on('error', (error) => {
+                    console.error('❌ VAPI Error:', error);
+                });
+
+                console.log('✅ VAPI ready');
+            };
+
+            checkVapi();
+        }
+
+        // ========================================================================
+        // TEST BUTTON
+        // ========================================================================
+        document.getElementById('testButton').addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            if (!conversationStartTime) {
+                conversationStartTime = Date.now() - FORMATION_DURATION;
+                isActive = true;
+                iorsIsSpeaking = true;
+
+                document.getElementById('statusText').textContent = 'TEST MODE';
+                document.getElementById('statusText').classList.add('active');
+
+                // Simulate messages
+                addMessage('assistant', 'Cześć! Jestem IORS. Widzę że czujesz się dobrze dzisiaj!');
+
+                setTimeout(() => {
+                    addMessage('user', 'Tak, czuję się świetnie!', 'happy');
+                }, 2000);
+
+                setTimeout(() => {
+                    addMessage('assistant', 'To wspaniale! Jak mogę Ci dzisiaj pomóc?');
+                    iorsIsSpeaking = true;
+                }, 4000);
+
+                setTimeout(() => {
+                    iorsIsSpeaking = false;
+                }, 6000);
+            } else {
+                conversationStartTime = null;
+                faceFormationProgress = 0;
+                isActive = false;
+                iorsIsSpeaking = false;
+                document.getElementById('statusText').textContent = 'Dotknij aby rozpocząć';
+                document.getElementById('statusText').classList.remove('active');
+                document.getElementById('transcriptPanel').innerHTML = '';
+            }
+        });
+
+        // ========================================================================
+        // CLICK TO START
+        // ========================================================================
+        document.getElementById('voiceContainer').addEventListener('click', (e) => {
+            if (e.target.id === 'testButton') return;
+
+            if (!vapiInstance) {
+                console.warn('VAPI not ready yet, waiting...');
+                return;
+            }
+
+            if (isActive) {
+                vapiInstance.stop();
+            } else {
+                vapiInstance.start(ASSISTANT_ID);
+            }
+        });
+
+        // ========================================================================
+        // RESPONSIVE
+        // ========================================================================
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            centerX = width / 2;
+            centerY = height / 2;
+            initParticles();
+        });
+
+        // ========================================================================
+        // INIT
+        // ========================================================================
+        window.addEventListener('load', () => {
+            initParticles();
+            animate();
+            initVapi();
+            initFaceDetection();
+            initFaceApi();
+            initVoiceAnalysis();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="IORS - Czas wolny i spokój. Robię rzeczy za Ciebie, Ty tylko zatwierdzasz. Pierwsze 10 minut za darmo.">
+    <meta name="theme-color" content="#E31E24">
+    <title>IORS - Czas Wolny i Spokój | Pierwsze 10 minut za darmo</title>
+
+    <!-- Preload critical resources -->
+    <link rel="preload" href="fonts.css" as="style">
+    <link rel="preload" href="style.css" as="style">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="fonts.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="vapi-widget.css">
+
+    <!-- Font preconnects -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Analytics placeholder - replace with your tracking ID -->
+    <!-- <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script> -->
+</head>
+<body>
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loader"></div>
+    </div>
+
+    <!-- Sticky header -->
+    <header class="sticky-header" id="stickyHeader">
+        <div class="container header-content">
+            <div class="header-logo">
+                <span class="letter-i">I</span><span class="letter-o">O</span><span class="letter-r">R</span><span class="letter-s">S</span>
+            </div>
+            <a href="tel:+48123456789" class="header-cta pulse-animation" id="headerCTA">
+                Zadzwoń: +48 123 456 789
+            </a>
+        </div>
+    </header>
+    <!-- Hero Section -->
+    <section class="hero" id="hero">
+        <div class="container">
+            <!-- Animated SVG Logo Background -->
+            <div class="logo-background">
+                <svg class="logo-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                    <circle class="logo-circle" cx="100" cy="100" r="80" fill="none" stroke="#E31E24" stroke-width="0.5" opacity="0.1"/>
+                    <circle class="logo-circle delay-1" cx="100" cy="100" r="60" fill="none" stroke="#E31E24" stroke-width="0.5" opacity="0.1"/>
+                    <circle class="logo-circle delay-2" cx="100" cy="100" r="40" fill="none" stroke="#E31E24" stroke-width="0.5" opacity="0.1"/>
+                </svg>
+            </div>
+
+            <!-- Logo IORS - kropki nad i będą czerwone w CSS -->
+            <h1 class="logo fade-in">
+                <span class="letter-i">I</span><span class="letter-o">O</span><span class="letter-r">R</span><span class="letter-s">S</span>
+            </h1>
+
+            <h2 class="tagline fade-in delay-1">Czas wolny i spokój</h2>
+
+            <p class="subtitle fade-in delay-2">
+                Robię rzeczy za Ciebie.<br>
+                Ty tylko zatwierdzasz.
+            </p>
+
+            <a href="tel:+48123456789" class="cta-button pulse-animation fade-in delay-3" data-event="hero_cta_click">
+                Zadzwoń teraz - pierwsze 10 minut za darmo
+            </a>
+
+            <!-- Trust indicator -->
+            <div class="trust-indicator fade-in delay-4">
+                <p>✓ Bez zobowiązań &nbsp;•&nbsp; ✓ Transparentne płatności &nbsp;•&nbsp; ✓ Wsparcie 24/7</p>
+            </div>
+
+            <!-- Scroll indicator -->
+            <div class="scroll-indicator">
+                <div class="scroll-arrow"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Social Proof Ticker -->
+    <div class="social-proof-ticker" id="socialProofTicker">
+        <div class="ticker-content">
+            <span class="ticker-item">✓ Anna z Warszawy: "Odzyskałam 2h dziennie"</span>
+            <span class="ticker-item">✓ Michał, przedsiębiorca: "Najlepsza inwestycja w spokój"</span>
+            <span class="ticker-item">✓ Kasia, student: "Wreszcie mam czas na siebie"</span>
+            <span class="ticker-item">✓ Tomek, IT: "Genialne rozwiązanie"</span>
+            <span class="ticker-item">✓ Anna z Warszawy: "Odzyskałam 2h dziennie"</span>
+            <span class="ticker-item">✓ Michał, przedsiębiorca: "Najlepsza inwestycja w spokój"</span>
+        </div>
+    </div>
+
+    <!-- Value Proposition -->
+    <section class="value" id="value">
+        <div class="container">
+            <h3 class="scroll-fade">Co zyskujesz</h3>
+
+            <div class="benefits">
+                <div class="benefit scroll-fade">
+                    <div class="benefit-icon">⏱️</div>
+                    <h4>Czas wolny</h4>
+                    <p>Wysyłam emaile, dzwonię, planuję dzień - za Ciebie</p>
+                </div>
+
+                <div class="benefit scroll-fade">
+                    <div class="benefit-icon">🧘</div>
+                    <h4>Spokój</h4>
+                    <p>Dbam o topową formę umysłową i emocjonalną</p>
+                </div>
+
+                <div class="benefit scroll-fade">
+                    <div class="benefit-icon">🎯</div>
+                    <h4>Sprawy się dzieją</h4>
+                    <p>Nie musisz pamiętać - ja przypominam, proponuję, wykonuję</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Trust Badges -->
+    <section class="trust-badges">
+        <div class="container">
+            <div class="badges-wrapper scroll-fade">
+                <div class="badge">
+                    <div class="badge-icon">🔒</div>
+                    <p>Bezpieczne<br>połączenia</p>
+                </div>
+                <div class="badge">
+                    <div class="badge-icon">⚡</div>
+                    <p>Natychmiastowa<br>pomoc</p>
+                </div>
+                <div class="badge">
+                    <div class="badge-icon">💯</div>
+                    <p>100%<br>transparentność</p>
+                </div>
+                <div class="badge">
+                    <div class="badge-icon">❤️</div>
+                    <p>Zaufało nam<br>500+ osób</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works -->
+    <section class="how" id="how">
+        <div class="container">
+            <h3 class="scroll-fade">Jak to działa</h3>
+
+            <div class="steps">
+                <div class="step scroll-fade">
+                    <div class="step-number">1</div>
+                    <h4>Zadzwoń</h4>
+                    <p>Pierwsze 10 minut za darmo</p>
+                </div>
+
+                <div class="step scroll-fade">
+                    <div class="step-number">2</div>
+                    <h4>Opowiedz co się dzieje</h4>
+                    <p>Wysłucham, wesprzę, poznam Twoją sytuację</p>
+                </div>
+
+                <div class="step scroll-fade">
+                    <div class="step-number">3</div>
+                    <h4>Decydujesz</h4>
+                    <p>Kontynuujemy teraz, jutro - albo przemyślisz</p>
+                </div>
+            </div>
+
+            <div class="integrations scroll-fade">
+                <p><strong>Podłącz Gmail, kalendarz, Spotify</strong> - robię rzeczy za Ciebie, zyskujesz czas</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section class="pricing" id="pricing">
+        <div class="container">
+            <h3 class="scroll-fade">Transparentne płatności</h3>
+
+            <div class="pricing-model scroll-fade">
+                <h4>Pay What It Costs + Donation</h4>
+                <p class="pricing-explain">
+                    Płacisz za rzeczywisty koszt rozmowy (~0.50 zł/min)<br>
+                    + donation - <strong>Ty decydujesz ile</strong>
+                </p>
+
+                <div class="pricing-breakdown">
+                    <p>Student? 10 zł donation.</p>
+                    <p>Więcej? Wspieras misję.</p>
+                    <p><strong>Transparentnie</strong> - widzisz na co idą pieniądze.</p>
+                </div>
+
+                <div class="voucher scroll-fade">
+                    <p class="voucher-highlight">Voucher startowy: 25 zł = ~50 minut rozmów</p>
+                    <!-- Limited time countdown -->
+                    <div class="countdown-timer" id="countdownTimer">
+                        <p class="countdown-label">Oferta kończy się za:</p>
+                        <div class="countdown-display">
+                            <div class="countdown-unit">
+                                <span class="countdown-value" id="hours">00</span>
+                                <span class="countdown-label-small">godz</span>
+                            </div>
+                            <span class="countdown-separator">:</span>
+                            <div class="countdown-unit">
+                                <span class="countdown-value" id="minutes">00</span>
+                                <span class="countdown-label-small">min</span>
+                            </div>
+                            <span class="countdown-separator">:</span>
+                            <div class="countdown-unit">
+                                <span class="countdown-value" id="seconds">00</span>
+                                <span class="countdown-label-small">sek</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Final -->
+    <section class="cta-final" id="cta">
+        <div class="container">
+            <h3 class="scroll-fade">Zaczynamy?</h3>
+            <p class="scroll-fade">10 minut za darmo. Bez zobowiązań.</p>
+            <a href="tel:+48123456789" class="cta-button pulse-animation scroll-fade" data-event="final_cta_click">
+                Zadzwoń teraz: +48 123 456 789
+            </a>
+
+            <p class="cta-subtext scroll-fade">Lub wyślij SMS - oddzwonię</p>
+
+            <!-- Live chat integration point -->
+            <div class="chat-widget-placeholder" id="chatWidget">
+                <!-- Insert your live chat widget here (e.g., Tawk.to, Intercom, etc.) -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 IORS. Czas wolny i spokój.</p>
+            <p class="footer-links">
+                <a href="#hero">Start</a> •
+                <a href="#value">Korzyści</a> •
+                <a href="#how">Jak to działa</a> •
+                <a href="#pricing">Cennik</a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Exit Intent Popup -->
+    <div class="exit-popup" id="exitPopup">
+        <div class="exit-popup-content">
+            <button class="exit-popup-close" id="exitPopupClose">&times;</button>
+            <h3>Czekaj! Nie odchodź jeszcze...</h3>
+            <p>Pierwsze 10 minut rozmowy jest <strong>za darmo</strong></p>
+            <p>Bez zobowiązań. Bez ukrytych kosztów.</p>
+            <a href="tel:+48123456789" class="cta-button pulse-animation" data-event="exit_popup_cta_click">
+                Zadzwoń teraz: +48 123 456 789
+            </a>
+            <p class="exit-popup-subtext">Lub zapisz numer na później: +48 123 456 789</p>
+        </div>
+    </div>
+
+    <!-- Success notification -->
+    <div class="success-notification" id="successNotification">
+        <div class="success-icon">✓</div>
+        <p class="success-message">Świetnie! Czekamy na Twój telefon</p>
+    </div>
+
+    <!-- Back to top button -->
+    <button class="back-to-top" id="backToTop" aria-label="Wróć na górę">↑</button>
+
+    <!-- VAPI Web SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+
+    <!-- Scripts -->
+    <script src="scripts.js"></script>
+    <script src="vapi-widget.js"></script>
+
+    <!-- Analytics initialization (example) -->
+    <script>
+        // Google Analytics initialization
+        // window.dataLayer = window.dataLayer || [];
+        // function gtag(){dataLayer.push(arguments);}
+        // gtag('js', new Date());
+        // gtag('config', 'GA_MEASUREMENT_ID');
+
+        // Event tracking helper
+        window.trackEvent = function(eventName, eventData) {
+            console.log('Event:', eventName, eventData);
+            // gtag('event', eventName, eventData);
+        };
+    </script>
+</body>
+</html>

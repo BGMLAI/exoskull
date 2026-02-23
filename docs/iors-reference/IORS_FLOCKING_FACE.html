@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS Flocking Face</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #ffffff;
+            overflow: hidden;
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .voice-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            cursor: pointer;
+        }
+
+        #avatarCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        .logo-container {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 0.5s;
+        }
+
+        .logo-text {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -1px;
+        }
+
+        .logo-dot {
+            width: 14px;
+            height: 14px;
+            background: #E31E24;
+            border-radius: 50%;
+        }
+
+        .transcript-panel {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 800px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        .message-bubble {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 15px 20px;
+            margin: 10px 0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            animation: slide-up 0.3s ease;
+        }
+
+        .message-bubble.assistant {
+            background: rgba(26, 26, 26, 0.95);
+            color: white;
+            margin-left: 50px;
+        }
+
+        .message-bubble.user {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            margin-right: 50px;
+        }
+
+        .message-header {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            opacity: 0.7;
+        }
+
+        .message-text {
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .message-emotion {
+            font-size: 11px;
+            margin-top: 5px;
+            opacity: 0.8;
+            font-style: italic;
+        }
+
+        @keyframes slide-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .status-text {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #333;
+            font-size: 16px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            z-index: 10;
+        }
+
+        .status-text.active {
+            color: #1a1a1a;
+            font-weight: 600;
+        }
+
+        .emotion-indicator {
+            position: absolute;
+            top: 120px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 60px;
+            padding: 15px 25px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .emotion-emoji-large {
+            font-size: 48px;
+        }
+
+        .emotion-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .emotion-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.7;
+        }
+
+        .emotion-name-large {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .test-button {
+            position: absolute;
+            bottom: 300px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: #1a1a1a;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 10;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        #faceVideo {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="voice-container" id="voiceContainer">
+        <div class="logo-container">
+            <div class="logo-dot"></div>
+            <div class="logo-text">iors.ai</div>
+            <div class="logo-dot"></div>
+        </div>
+
+        <canvas id="avatarCanvas"></canvas>
+
+        <div class="emotion-indicator" id="emotionIndicator">
+            <div class="emotion-emoji-large" id="emotionEmojiLarge">😐</div>
+            <div class="emotion-info">
+                <div class="emotion-label">TWOJA EMOCJA</div>
+                <div class="emotion-name-large" id="emotionNameLarge">neutral</div>
+            </div>
+        </div>
+
+        <div class="transcript-panel" id="transcriptPanel"></div>
+
+        <button class="test-button" id="testButton">🎭 TEST ŁAWICY</button>
+        <div class="status-text" id="statusText">Dotknij aby rozpocząć</div>
+    </div>
+
+    <video id="faceVideo" autoplay playsinline></video>
+
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+
+    <script>
+        // ========================================================================
+        // CONFIG
+        // ========================================================================
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = '72577c85-81d4-47b4-99b5-0ca8b6ed7a63';
+
+        const EMOTION_EMOJIS = {
+            happy: '😊', sad: '😢', angry: '😠', disgusted: '🤢',
+            fearful: '😨', surprised: '😲', neutral: '😐'
+        };
+
+        let vapiInstance = null;
+        let isActive = false;
+        let iorsIsSpeaking = false;
+
+        let faceFormation = 0; // 0 = flocking chaos, 1 = organized face
+        let conversationStartTime = null;
+        const FORMATION_DURATION = 600000; // 10 min
+
+        let currentEmotion = 'neutral';
+
+        // ========================================================================
+        // CANVAS
+        // ========================================================================
+        const canvas = document.getElementById('avatarCanvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+        let centerX = width / 2;
+        let centerY = height / 2;
+
+        // ========================================================================
+        // SOUNDWAVES
+        // ========================================================================
+        const soundwaves = [];
+
+        class Soundwave {
+            constructor() {
+                this.x = centerX;
+                this.y = centerY;
+                this.radius = 0;
+                this.maxRadius = Math.max(width, height) * 0.6;
+                this.speed = 12;
+                this.opacity = 1;
+            }
+
+            update() {
+                this.radius += this.speed;
+                this.opacity = 1 - (this.radius / this.maxRadius);
+                return this.radius < this.maxRadius;
+            }
+
+            draw() {
+                ctx.strokeStyle = `rgba(100, 100, 100, ${this.opacity * 0.3})`;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, this.radius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            affectsParticle(px, py) {
+                const dist = Math.sqrt((px - centerX) ** 2 + (py - centerY) ** 2);
+                const waveDist = Math.abs(dist - this.radius);
+                return waveDist < 60;
+            }
+        }
+
+        // ========================================================================
+        // BOIDS/FLOCKING PARTICLES
+        // ========================================================================
+        const particles = [];
+        let userFaceLandmarks = null;
+        let mouthLandmarks = [
+            61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291,
+            308, 324, 318, 402, 317, 14, 87, 178, 88, 95,
+            78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308
+        ];
+
+        // BOIDS parameters - zbalansowane dla widocznego ruchu
+        const BOID_PERCEPTION_RADIUS = 60;
+        const SEPARATION_FORCE = 0.15;
+        const ALIGNMENT_FORCE = 0.12;
+        const COHESION_FORCE = 0.06;
+
+        class Boid {
+            constructor(targetX, targetY, landmarkIndex, isShadow = false) {
+                // Start random position - CAŁKOWICIE LOSOWE (nie symetryczne!)
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.landmarkIndex = landmarkIndex;
+
+                // Velocity - WIDOCZNY szybki ruch (nie za szybko!)
+                this.vx = (Math.random() - 0.5) * 15; // 0-15 (szybko ale widoczne!)
+                this.vy = (Math.random() - 0.5) * 15;
+
+                // Acceleration
+                this.ax = 0;
+                this.ay = 0;
+
+                // Max speed - szybki ale kontrolowany
+                this.maxSpeed = 8 + Math.random() * 12; // 8-20 (szybkie ale widoczne!)
+                // Max force
+                this.maxForce = 0.15 + Math.random() * 0.25; // 0.15-0.4
+
+                // Size - BARDZO ZRÓŻNICOWANE (nie jednolite!)
+                this.size = 0.5 + Math.random() * 2.5; // 0.5-3.0px (duży zakres!)
+
+                // Color: 5 DYSKRETNYCH odcieni szarości (jedna kropka = jeden odcień!)
+                let shadeOptions, blackShadeOptions;
+
+                if (isShadow) {
+                    // CIENIE - tylko ciemne odcienie
+                    shadeOptions = [140, 100, 60, 40, 20]; // ciemniejsze
+                    blackShadeOptions = [30, 20, 15, 10, 5]; // bardzo ciemne
+                } else {
+                    // LINIE - pełny zakres odcieni
+                    shadeOptions = [220, 180, 140, 100, 60];
+                    blackShadeOptions = [50, 40, 30, 20, 10];
+                }
+
+                const randomShadeIndex = Math.floor(Math.random() * shadeOptions.length);
+                const grayShade = shadeOptions[randomShadeIndex];
+                this.currentColor = { r: grayShade, g: grayShade, b: grayShade };
+
+                const blackShade = blackShadeOptions[randomShadeIndex];
+                this.targetColor = { r: blackShade, g: blackShade, b: blackShade };
+
+                this.isMouth = mouthLandmarks.includes(landmarkIndex);
+                this.organization = 0;
+
+                // "ZMYTE" KSZTAŁTY - losowe deformacje
+                this.shapeVariation = Math.random(); // 0-1
+                this.rotationAngle = Math.random() * Math.PI * 2; // losowy obrót
+                this.rotationSpeed = (Math.random() - 0.5) * 0.05; // obraca się
+
+                // Opacity variation
+                this.baseAlpha = 0.4 + Math.random() * 0.5; // 0.4-0.9 (różne przezroczystości!)
+            }
+
+            updateTarget(landmarks) {
+                if (landmarks && landmarks[this.landmarkIndex]) {
+                    const landmark = landmarks[this.landmarkIndex];
+                    this.targetX = centerX + (landmark.x - 0.5) * width * 0.45;
+                    this.targetY = centerY + (landmark.y - 0.5) * height * 0.55;
+                }
+            }
+
+            // BOIDS: Find neighbors - LIMIT do 10 (performance!)
+            getNeighbors(boids) {
+                const neighbors = [];
+                for (let other of boids) {
+                    if (other === this) continue;
+                    if (neighbors.length >= 10) break; // MAX 10 neighbors!
+                    const dx = other.x - this.x;
+                    const dy = other.y - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < BOID_PERCEPTION_RADIUS) {
+                        neighbors.push(other);
+                    }
+                }
+                return neighbors;
+            }
+
+            // BOIDS: Separation (avoid crowding)
+            separate(neighbors) {
+                if (neighbors.length === 0) return { x: 0, y: 0 };
+
+                let steerX = 0;
+                let steerY = 0;
+
+                for (let other of neighbors) {
+                    const dx = this.x - other.x;
+                    const dy = this.y - other.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 0) {
+                        steerX += dx / dist;
+                        steerY += dy / dist;
+                    }
+                }
+
+                if (neighbors.length > 0) {
+                    steerX /= neighbors.length;
+                    steerY /= neighbors.length;
+                }
+
+                return { x: steerX, y: steerY };
+            }
+
+            // BOIDS: Alignment (steer towards average heading)
+            align(neighbors) {
+                if (neighbors.length === 0) return { x: 0, y: 0 };
+
+                let avgVx = 0;
+                let avgVy = 0;
+
+                for (let other of neighbors) {
+                    avgVx += other.vx;
+                    avgVy += other.vy;
+                }
+
+                avgVx /= neighbors.length;
+                avgVy /= neighbors.length;
+
+                return { x: avgVx, y: avgVy };
+            }
+
+            // BOIDS: Cohesion (steer towards center of neighbors)
+            cohere(neighbors) {
+                if (neighbors.length === 0) return { x: 0, y: 0 };
+
+                let centerX = 0;
+                let centerY = 0;
+
+                for (let other of neighbors) {
+                    centerX += other.x;
+                    centerY += other.y;
+                }
+
+                centerX /= neighbors.length;
+                centerY /= neighbors.length;
+
+                return { x: centerX - this.x, y: centerY - this.y };
+            }
+
+            update(time, allBoids) {
+                // Check if hit by soundwave
+                let hitByWave = false;
+                for (let wave of soundwaves) {
+                    if (wave.affectsParticle(this.x, this.y)) {
+                        hitByWave = true;
+                        break;
+                    }
+                }
+
+                if (hitByWave) {
+                    this.organization = Math.min(1, this.organization + 0.04);
+                } else {
+                    this.organization *= 0.99;
+                }
+
+                // Global formation
+                this.organization = Math.max(this.organization, faceFormation);
+
+                const chaos = 1 - this.organization;
+
+                // Color transition
+                const colorProgress = this.organization;
+                this.currentColor.r = 180 - (180 - 26) * colorProgress;
+                this.currentColor.g = 180 - (180 - 26) * colorProgress;
+                this.currentColor.b = 180 - (180 - 26) * colorProgress;
+
+                // Reset acceleration
+                this.ax = 0;
+                this.ay = 0;
+
+                if (chaos > 0.1) {
+                    // FLOCKING BEHAVIOR - ALE BARDZO NIEREGULARNY!
+                    const neighbors = this.getNeighbors(allBoids);
+
+                    const separation = this.separate(neighbors);
+                    const alignment = this.align(neighbors);
+                    const cohesion = this.cohere(neighbors);
+
+                    // Apply forces - JEDNOLITE (nie losowe = nie skacze!)
+                    const separationStrength = SEPARATION_FORCE;
+                    const alignmentStrength = ALIGNMENT_FORCE;
+                    const cohesionStrength = COHESION_FORCE;
+
+                    this.ax += separation.x * separationStrength * chaos;
+                    this.ay += separation.y * separationStrength * chaos;
+
+                    this.ax += alignment.x * alignmentStrength * chaos;
+                    this.ay += alignment.y * alignmentStrength * chaos;
+
+                    this.ax += cohesion.x * cohesionStrength * chaos;
+                    this.ay += cohesion.y * cohesionStrength * chaos;
+
+                    // Obszary nieregularnego porządku - BARDZO RÓŻNE strefy
+                    const toCenterX = centerX - this.x;
+                    const toCenterY = centerY - this.y;
+                    const distToCenter = Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY);
+
+                    // Różne "strefy przyciągania" - nie symetryczne!
+                    const attractionThreshold = 200 + Math.random() * 300; // 200-500 (różne dla każdego!)
+                    if (distToCenter > attractionThreshold) {
+                        const attractionStrength = 0.01 + Math.random() * 0.03;
+                        this.ax += (toCenterX / distToCenter) * attractionStrength * chaos;
+                        this.ay += (toCenterY / distToCenter) * attractionStrength * chaos;
+                    }
+
+                    // BEZ turbulencji (powodują skoki!)
+                    // Usunięte - turbulencje były przyczyną skoków
+                }
+
+                if (this.organization > 0.05) {
+                    // FACE FORMATION - pull toward target
+                    const dx = this.targetX - this.x;
+                    const dy = this.targetY - this.y;
+
+                    const pullStrength = 0.03 + this.organization * 0.08;
+                    this.ax += dx * pullStrength;
+                    this.ay += dy * pullStrength;
+
+                    // Mouth animation
+                    if (this.isMouth && iorsIsSpeaking && this.organization > 0.3) {
+                        const pulse = Math.sin(time * 0.15) * 5;
+                        this.ay += pulse * 0.05;
+                    }
+                }
+
+                // Update velocity
+                this.vx += this.ax;
+                this.vy += this.ay;
+
+                // Limit speed
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (speed > this.maxSpeed) {
+                    this.vx = (this.vx / speed) * this.maxSpeed;
+                    this.vy = (this.vy / speed) * this.maxSpeed;
+                }
+
+                // Damping - PRAWIE ZERO hamowania!
+                this.vx *= 0.995; // BARDZO mało hamowania!
+                this.vy *= 0.995;
+
+                // Update position
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Wrap edges
+                if (this.x < -50) this.x = width + 50;
+                if (this.x > width + 50) this.x = -50;
+                if (this.y < -50) this.y = height + 50;
+                if (this.y > height + 50) this.y = -50;
+            }
+
+            draw() {
+                const r = Math.floor(this.currentColor.r);
+                const g = Math.floor(this.currentColor.g);
+                const b = Math.floor(this.currentColor.b);
+
+                const alpha = this.baseAlpha + this.organization * 0.3;
+
+                // JEDNA KROPKA = JEDEN ODCIEŃ (bez gradientów wewnętrznych!)
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+
+                // PROSTE KSZTAŁTY (performance!)
+                if (this.organization < 0.3) {
+                    // Chaos = proste okręgi
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    // Organized = proste kwadraty
+                    const s = this.size * 1.4;
+                    ctx.fillRect(this.x - s/2, this.y - s/2, s, s);
+                }
+            }
+        }
+
+        // MediaPipe landmark groups
+        const FACE_OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+        const LEFT_EYE = [33,7,163,144,145,153,154,155,133,173,157,158,159,160,161,246];
+        const RIGHT_EYE = [362,382,381,380,374,373,390,249,263,466,388,387,386,385,384,398];
+        const LEFT_EYEBROW = [70,63,105,66,107,55,65,52,53,46];
+        const RIGHT_EYEBROW = [300,293,334,296,336,285,295,282,283,276];
+        const NOSE = [168,6,197,195,5,4,1,19,94,2];
+        const LIPS_UPPER = [61,185,40,39,37,0,267,269,270,409,291];
+        const LIPS_LOWER = [146,91,181,84,17,314,405,321,375,291];
+
+        function initParticles() {
+            particles.length = 0;
+
+            console.log('🚀 INIT: Czekam na Twoją twarz z kamery...');
+
+            // Czekam na detekcję twarzy
+            if (!userFaceLandmarks) {
+                console.log('⏳ Brak landmarks - tworzę tymczasowy placeholder');
+                // Mały placeholder żeby coś było
+                for (let i = 0; i < 50; i++) {
+                    const angle = (i / 50) * Math.PI * 2;
+                    const r = Math.min(width, height) * 0.1;
+                    const targetX = centerX + Math.cos(angle) * r;
+                    const targetY = centerY + Math.sin(angle) * r;
+                    particles.push(new Boid(targetX, targetY, i));
+                }
+                console.log('✅ Placeholder - czekam na Twoją twarz');
+                return;
+            }
+
+            console.log('✅ Mam Twoją twarz! Tworzę STIPPLING effect...');
+
+            // STIPPLING EFFECT - gęstość kropek = cienie!
+            // Więcej kropek = ciemniej, mniej kropek = jasniej
+
+            // Mapowanie landmarks na density (0.0 = jasne, 1.0 = bardzo ciemne)
+            const densityMap = new Array(468).fill(0.3); // default: średnia jasność
+
+            // BARDZO CIEMNE obszary (dużo particles)
+            LEFT_EYE.forEach(idx => densityMap[idx] = 1.0);   // Oczy = najciemniejsze
+            RIGHT_EYE.forEach(idx => densityMap[idx] = 1.0);
+            LIPS_LOWER.forEach(idx => densityMap[idx] = 0.8); // Usta ciemne
+            LIPS_UPPER.forEach(idx => densityMap[idx] = 0.8);
+
+            // CIEMNE obszary (więcej particles)
+            LEFT_EYEBROW.forEach(idx => densityMap[idx] = 0.7); // Brwi
+            RIGHT_EYEBROW.forEach(idx => densityMap[idx] = 0.7);
+            NOSE.forEach(idx => densityMap[idx] = 0.6);         // Nos średnio ciemny
+
+            // JASNE obszary (mało particles) - policzki, czoło
+            // Pozostają na default 0.3
+
+            // WYPEŁNIJ CAŁĄ TWARZ particles z gęstością według mapy!
+            const totalParticles = 3500; // Dużo particles dla stippling effect
+
+            for (let i = 0; i < totalParticles; i++) {
+                // Losowy landmark (punkt na twarzy)
+                const landmarkIndex = Math.floor(Math.random() * userFaceLandmarks.length);
+                const landmark = userFaceLandmarks[landmarkIndex];
+                const density = densityMap[landmarkIndex];
+
+                // Skip some particles w jasnych obszarach (density < threshold)
+                if (Math.random() > density) {
+                    // W jasnych miejscach pomijamy więcej particles
+                    continue;
+                }
+
+                // Pozycja z rozproszeniem wokół landmark
+                const spread = 15 + Math.random() * 25; // Duże rozproszenie
+                const targetX = centerX + (landmark.x - 0.5) * width * 0.5 + (Math.random() - 0.5) * spread;
+                const targetY = centerY + (landmark.y - 0.5) * height * 0.6 + (Math.random() - 0.5) * spread;
+
+                // W bardzo ciemnych obszarach używaj ciemniejszych odcieni
+                const isDark = density > 0.7;
+                particles.push(new Boid(targetX, targetY, landmarkIndex, isDark));
+            }
+
+            // DODATKOWE CIENIE - extra particles w najciemniejszych miejscach
+            // Gałki oczne - BARDZO gęste
+            LEFT_EYE.forEach(idx => {
+                const landmark = userFaceLandmarks[idx];
+                for (let i = 0; i < 15; i++) {
+                    const targetX = centerX + (landmark.x - 0.5) * width * 0.5 + (Math.random() - 0.5) * 12;
+                    const targetY = centerY + (landmark.y - 0.5) * height * 0.6 + (Math.random() - 0.5) * 10;
+                    particles.push(new Boid(targetX, targetY, idx, true));
+                }
+            });
+            RIGHT_EYE.forEach(idx => {
+                const landmark = userFaceLandmarks[idx];
+                for (let i = 0; i < 15; i++) {
+                    const targetX = centerX + (landmark.x - 0.5) * width * 0.5 + (Math.random() - 0.5) * 12;
+                    const targetY = centerY + (landmark.y - 0.5) * height * 0.6 + (Math.random() - 0.5) * 10;
+                    particles.push(new Boid(targetX, targetY, idx, true));
+                }
+            });
+
+            // Pod oczami - cienie
+            LEFT_EYE.forEach(idx => {
+                const landmark = userFaceLandmarks[idx];
+                for (let i = 0; i < 8; i++) {
+                    const targetX = centerX + (landmark.x - 0.5) * width * 0.5 + (Math.random() - 0.5) * 20;
+                    const targetY = centerY + (landmark.y - 0.5) * height * 0.6 + 10 + Math.random() * 15;
+                    particles.push(new Boid(targetX, targetY, idx, true));
+                }
+            });
+            RIGHT_EYE.forEach(idx => {
+                const landmark = userFaceLandmarks[idx];
+                for (let i = 0; i < 8; i++) {
+                    const targetX = centerX + (landmark.x - 0.5) * width * 0.5 + (Math.random() - 0.5) * 20;
+                    const targetY = centerY + (landmark.y - 0.5) * height * 0.6 + 10 + Math.random() * 15;
+                    particles.push(new Boid(targetX, targetY, idx, true));
+                }
+            });
+
+            // Usta - gęste
+            LIPS_UPPER.forEach(idx => {
+                const landmark = userFaceLandmarks[idx];
+                for (let i = 0; i < 10; i++) {
+                    const targetX = centerX + (landmark.x - 0.5) * width * 0.5 + (Math.random() - 0.5) * 8;
+                    const targetY = centerY + (landmark.y - 0.5) * height * 0.6 + (Math.random() - 0.5) * 6;
+                    particles.push(new Boid(targetX, targetY, idx, true));
+                }
+            });
+            LIPS_LOWER.forEach(idx => {
+                const landmark = userFaceLandmarks[idx];
+                for (let i = 0; i < 10; i++) {
+                    const targetX = centerX + (landmark.x - 0.5) * width * 0.5 + (Math.random() - 0.5) * 8;
+                    const targetY = centerY + (landmark.y - 0.5) * height * 0.6 + (Math.random() - 0.5) * 6;
+                    particles.push(new Boid(targetX, targetY, idx, true));
+                }
+            });
+
+            // Nos - średnia gęstość
+            NOSE.forEach(idx => {
+                const landmark = userFaceLandmarks[idx];
+                for (let i = 0; i < 6; i++) {
+                    const targetX = centerX + (landmark.x - 0.5) * width * 0.5 + (Math.random() - 0.5) * 10;
+                    const targetY = centerY + (landmark.y - 0.5) * height * 0.6 + (Math.random() - 0.5) * 10;
+                    particles.push(new Boid(targetX, targetY, idx, false));
+                }
+            });
+
+            console.log(`✅ ${particles.length} particles - STIPPLING effect (gęstość = cienie)`);
+        }
+
+        // ========================================================================
+        // FACE DETECTION (bez audio - eliminuje gwizd!)
+        // ========================================================================
+        async function initFaceDetection() {
+            try {
+                const video = document.getElementById('faceVideo');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: 640, height: 480 },
+                    audio: false // ❌ BEZ AUDIO - eliminuje feedback loop!
+                });
+                video.srcObject = stream;
+
+                const checkMediaPipe = () => {
+                    if (typeof FaceMesh === 'undefined') {
+                        setTimeout(checkMediaPipe, 1000);
+                        return;
+                    }
+
+                    const faceMesh = new FaceMesh({
+                        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`
+                    });
+
+                    faceMesh.setOptions({
+                        maxNumFaces: 1,
+                        refineLandmarks: true,
+                        minDetectionConfidence: 0.5,
+                        minTrackingConfidence: 0.5
+                    });
+
+                    faceMesh.onResults((results) => {
+                        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                            const hadLandmarks = userFaceLandmarks !== null;
+                            userFaceLandmarks = results.multiFaceLandmarks[0];
+
+                            // Jak znajdę twarz PO RAZ PIERWSZY - przebuduj particles!
+                            if (!hadLandmarks && particles.length < 200) {
+                                console.log('🎉 Znalazłem Twoją twarz! Przebuduję particles...');
+                                document.getElementById('statusText').textContent = 'Znalazłem Twoją twarz! Tworzę particles...';
+                                initParticles();
+                                document.getElementById('statusText').textContent = 'Dotknij aby rozpocząć';
+                            }
+
+                            if (particles.length > 0) {
+                                particles.forEach(particle => {
+                                    particle.updateTarget(userFaceLandmarks);
+                                });
+                            }
+                        }
+                    });
+
+                    async function detectFace() {
+                        if (video.readyState === 4) {
+                            await faceMesh.send({ image: video });
+                        }
+                        setTimeout(detectFace, 100);
+                    }
+
+                    video.onloadeddata = () => {
+                        console.log('✅ Face detection ready');
+                        document.getElementById('statusText').textContent = 'Szukam Twojej twarzy...';
+                        detectFace();
+                    };
+                };
+
+                checkMediaPipe();
+            } catch (error) {
+                console.warn('⚠️ Face detection failed:', error);
+            }
+        }
+
+        // ========================================================================
+        // FACE-API.JS EMOTION (bez Web Audio API - bez gwizdu!)
+        // ========================================================================
+        let faceApiReady = false;
+
+        async function initFaceApi() {
+            try {
+                const checkFaceApi = async () => {
+                    if (typeof faceapi === 'undefined') {
+                        setTimeout(checkFaceApi, 1000);
+                        return;
+                    }
+
+                    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
+                    await Promise.all([
+                        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+                    ]);
+
+                    faceApiReady = true;
+                    console.log('✅ Face-api.js ready');
+                    setInterval(detectEmotion, 2000);
+                };
+
+                checkFaceApi();
+            } catch (error) {
+                console.error('❌ Face-api.js failed:', error);
+            }
+        }
+
+        async function detectEmotion() {
+            if (!faceApiReady || !isActive) return;
+
+            const video = document.getElementById('faceVideo');
+            if (video.readyState !== 4) return;
+
+            try {
+                const detection = await faceapi
+                    .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceExpressions();
+
+                if (detection) {
+                    const expressions = detection.expressions;
+                    let maxEmotion = 'neutral';
+                    let maxScore = 0;
+
+                    for (const [emotion, score] of Object.entries(expressions)) {
+                        if (score > maxScore) {
+                            maxScore = score;
+                            maxEmotion = emotion;
+                        }
+                    }
+
+                    if (maxScore > 0.4) {
+                        currentEmotion = maxEmotion;
+                        updateEmotionUI(maxEmotion);
+                        sendEmotionToVAPI(maxEmotion);
+                    }
+                }
+            } catch (error) {
+                // Silent
+            }
+        }
+
+        function updateEmotionUI(emotion) {
+            document.getElementById('emotionEmojiLarge').textContent = EMOTION_EMOJIS[emotion];
+            document.getElementById('emotionNameLarge').textContent = emotion;
+        }
+
+        function sendEmotionToVAPI(emotion) {
+            if (!vapiInstance || !isActive) return;
+
+            try {
+                vapiInstance.send({
+                    type: 'add-message',
+                    message: {
+                        role: 'system',
+                        content: `[USER_EMOTION: ${emotion}]`
+                    }
+                });
+                console.log(`📤 Emotion → IORS: ${emotion}`);
+            } catch (error) {
+                // Silent
+            }
+        }
+
+        // ========================================================================
+        // TRANSCRIPTION
+        // ========================================================================
+        function addMessage(role, text, emotion = null) {
+            const panel = document.getElementById('transcriptPanel');
+            const bubble = document.createElement('div');
+            bubble.className = `message-bubble ${role}`;
+
+            const header = document.createElement('div');
+            header.className = 'message-header';
+            header.textContent = role === 'assistant' ? 'IORS' : 'TY';
+
+            const messageText = document.createElement('div');
+            messageText.className = 'message-text';
+            messageText.textContent = text;
+
+            bubble.appendChild(header);
+            bubble.appendChild(messageText);
+
+            if (emotion && role === 'user') {
+                const emotionTag = document.createElement('div');
+                emotionTag.className = 'message-emotion';
+                emotionTag.textContent = `${EMOTION_EMOJIS[emotion]} ${emotion}`;
+                bubble.appendChild(emotionTag);
+            }
+
+            panel.appendChild(bubble);
+            panel.scrollTop = panel.scrollHeight;
+
+            while (panel.children.length > 10) {
+                panel.removeChild(panel.firstChild);
+            }
+        }
+
+        // ========================================================================
+        // PROGRESS
+        // ========================================================================
+        function updateProgress() {
+            if (!conversationStartTime || !isActive) return;
+
+            const elapsed = Date.now() - conversationStartTime;
+            faceFormation = Math.min(1, elapsed / FORMATION_DURATION);
+        }
+
+        // ========================================================================
+        // ANIMATION
+        // ========================================================================
+        let time = 0;
+        let frameCount = 0;
+        function animate() {
+            ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+            ctx.fillRect(0, 0, width, height);
+
+            time += 2;
+            updateProgress();
+
+            // Debug co 60 frames
+            frameCount++;
+            if (frameCount % 60 === 0 && particles.length > 0) {
+                const speeds = particles.slice(0, 5).map(p =>
+                    Math.sqrt(p.vx * p.vx + p.vy * p.vy).toFixed(1)
+                );
+                console.log('🔍 Prędkości pierwszych 5 particles:', speeds.join(', '));
+            }
+
+            // Soundwaves
+            for (let i = soundwaves.length - 1; i >= 0; i--) {
+                if (!soundwaves[i].update()) {
+                    soundwaves.splice(i, 1);
+                } else {
+                    soundwaves[i].draw();
+                }
+            }
+
+            // Particles with flocking
+            particles.forEach(particle => {
+                particle.update(time, particles);
+            });
+
+            particles.forEach(particle => {
+                particle.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // ========================================================================
+        // VAPI
+        // ========================================================================
+        function initVapi() {
+            const checkVapi = () => {
+                if (typeof window.Vapi === 'undefined') {
+                    setTimeout(checkVapi, 500);
+                    return;
+                }
+
+                vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+                vapiInstance.on('call-start', () => {
+                    isActive = true;
+                    conversationStartTime = Date.now();
+                    document.getElementById('statusText').textContent = 'Słucham...';
+                    document.getElementById('statusText').classList.add('active');
+                });
+
+                vapiInstance.on('call-end', () => {
+                    isActive = false;
+                    iorsIsSpeaking = false;
+                    conversationStartTime = null;
+                    document.getElementById('statusText').textContent = 'Rozmowa zakończona';
+                    document.getElementById('statusText').classList.remove('active');
+                    setTimeout(() => {
+                        document.getElementById('statusText').textContent = 'Dotknij aby rozpocząć';
+                    }, 3000);
+                });
+
+                vapiInstance.on('message', (msg) => {
+                    if (msg.type === 'transcript') {
+                        if (msg.role === 'assistant' && msg.transcriptType === 'final') {
+                            iorsIsSpeaking = true;
+                            soundwaves.push(new Soundwave());
+                            addMessage('assistant', msg.transcript);
+
+                            setTimeout(() => {
+                                iorsIsSpeaking = false;
+                            }, 2000);
+                        } else if (msg.role === 'user' && msg.transcriptType === 'final') {
+                            addMessage('user', msg.transcript, currentEmotion);
+                        }
+                    }
+                });
+
+                vapiInstance.on('error', (error) => {
+                    console.error('❌ VAPI:', error);
+                });
+
+                console.log('✅ VAPI ready');
+            };
+
+            checkVapi();
+        }
+
+        // ========================================================================
+        // TEST
+        // ========================================================================
+        document.getElementById('testButton').addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            if (!conversationStartTime) {
+                // NATYCHMIASTOWY start (nie czekamy 10 min!)
+                conversationStartTime = Date.now() - FORMATION_DURATION + 10000; // skip to 9:50
+                isActive = true;
+
+                document.getElementById('statusText').textContent = 'TEST - Twarz formuje się SZYBKO';
+                document.getElementById('statusText').classList.add('active');
+
+                // Szybkie fale (co 1 sekundę)
+                let testInterval = setInterval(() => {
+                    if (!isActive) {
+                        clearInterval(testInterval);
+                        return;
+                    }
+
+                    soundwaves.push(new Soundwave());
+                    iorsIsSpeaking = true;
+
+                    const messages = [
+                        'Obserwuj jak ławica organizuje się w twarz.',
+                        'Każda fala dźwięku porządkuje cząsteczki.',
+                        'Obszary chaosu i nieregularnego porządku.',
+                        'Jak ptaki na niebie, jak ryby w wodzie.',
+                        'Stopniowo staję się rozpoznawalny.'
+                    ];
+
+                    const msg = messages[Math.floor(Math.random() * messages.length)];
+                    addMessage('assistant', msg);
+
+                    setTimeout(() => {
+                        iorsIsSpeaking = false;
+                    }, 800);
+                }, 1000); // Co 1 sekundę (szybciej!)
+
+                // Pierwsza fala natychmiast
+                soundwaves.push(new Soundwave());
+                iorsIsSpeaking = true;
+                addMessage('assistant', 'Test! Twarz formuje się w 10 sekund.');
+                setTimeout(() => iorsIsSpeaking = false, 800);
+
+            } else {
+                conversationStartTime = null;
+                faceFormation = 0;
+                isActive = false;
+                iorsIsSpeaking = false;
+                document.getElementById('statusText').textContent = 'Dotknij aby rozpocząć';
+                document.getElementById('statusText').classList.remove('active');
+                document.getElementById('transcriptPanel').innerHTML = '';
+                soundwaves.length = 0;
+            }
+        });
+
+        // ========================================================================
+        // CLICK
+        // ========================================================================
+        document.getElementById('voiceContainer').addEventListener('click', (e) => {
+            if (e.target.id === 'testButton') return;
+
+            if (!vapiInstance) {
+                console.warn('VAPI not ready yet');
+                return;
+            }
+
+            if (isActive) {
+                vapiInstance.stop();
+            } else {
+                vapiInstance.start(ASSISTANT_ID);
+            }
+        });
+
+        // ========================================================================
+        // RESPONSIVE
+        // ========================================================================
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            centerX = width / 2;
+            centerY = height / 2;
+            initParticles();
+        });
+
+        // ========================================================================
+        // INIT
+        // ========================================================================
+        window.addEventListener('load', () => {
+            console.log('✅ Starting IORS Flocking Face');
+            initParticles(); // NATYCHMIAST tworzy placeholder
+            animate(); // NATYCHMIAST zaczyna animację
+            initVapi();
+            // Face detection NATYCHMIAST (wykrywa Twoją twarz!)
+            initFaceDetection();
+            initFaceApi();
+        });
+    </script>
+</body>
+</html>

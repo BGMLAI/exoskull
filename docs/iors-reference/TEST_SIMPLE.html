@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Test - Czy działa?</title>
+    <style>
+        body {
+            margin: 0;
+            background: white;
+            font-family: Arial;
+        }
+        #canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h2>TEST CANVAS</h2>
+        <p>Particles: <span id="count">0</span></p>
+        <p>Status: <span id="status">Loading...</span></p>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const particles = [];
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+
+        // Create 100 test particles
+        for (let i = 0; i < 100; i++) {
+            particles.push({
+                x: centerX + (Math.random() - 0.5) * 400,
+                y: centerY + (Math.random() - 0.5) * 400,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2,
+                size: 2 + Math.random() * 4
+            });
+        }
+
+        document.getElementById('count').textContent = particles.length;
+        document.getElementById('status').textContent = 'Animating...';
+
+        function animate() {
+            // Clear
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update and draw particles
+            particles.forEach(p => {
+                // Simple smoke motion
+                p.vx += (Math.random() - 0.5) * 0.1;
+                p.vy += (Math.random() - 0.5) * 0.1;
+
+                p.x += p.vx;
+                p.y += p.vy;
+
+                // Wrap boundaries
+                if (p.x < 0) p.x = canvas.width;
+                if (p.x > canvas.width) p.x = 0;
+                if (p.y < 0) p.y = canvas.height;
+                if (p.y > canvas.height) p.y = 0;
+
+                // Draw
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        console.log('✅ Test animation started!');
+        console.log('Particles:', particles.length);
+    </script>
+</body>
+</html>

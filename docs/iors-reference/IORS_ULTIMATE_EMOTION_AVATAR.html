@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS Ultimate Emotion Avatar</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #ffffff;
+            overflow: hidden;
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .voice-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            cursor: pointer;
+        }
+
+        #avatarCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        .logo-container {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 0.5s;
+        }
+
+        .logo-text {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -1px;
+        }
+
+        .logo-dot {
+            width: 14px;
+            height: 14px;
+            background: #E31E24;
+            border-radius: 50%;
+        }
+
+        .status-text {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #333;
+            font-size: 18px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 1.5s;
+            z-index: 10;
+        }
+
+        .status-text.active {
+            color: #E31E24;
+            font-weight: 600;
+        }
+
+        /* Progress bar for face formation */
+        .progress-container {
+            position: absolute;
+            top: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            text-align: center;
+            z-index: 10;
+        }
+
+        .progress-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0,0,0,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #E31E24, #FF6B6B);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .progress-time {
+            font-size: 10px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        /* Emotion panels */
+        .emotion-panels {
+            position: absolute;
+            top: 200px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 10;
+        }
+
+        .emotion-panel {
+            background: rgba(255,255,255,0.95);
+            border-radius: 12px;
+            padding: 12px;
+            min-width: 180px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 2px solid transparent;
+            transition: border-color 0.3s ease;
+        }
+
+        .emotion-panel.active {
+            border-color: #E31E24;
+        }
+
+        .emotion-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .emotion-panel-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: #333;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .emotion-panel-badge {
+            font-size: 8px;
+            padding: 2px 6px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+
+        .emotion-panel-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .emotion-emoji {
+            font-size: 32px;
+        }
+
+        .emotion-details {
+            flex: 1;
+        }
+
+        .emotion-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 2px;
+        }
+
+        .emotion-confidence {
+            font-size: 11px;
+            color: #999;
+        }
+
+        .consensus-panel {
+            background: rgba(227, 30, 36, 0.95);
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .consensus-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .consensus-emotion {
+            font-size: 36px;
+            margin: 5px 0;
+        }
+
+        .consensus-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .test-button {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: #E31E24;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 10;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .test-button:hover {
+            background: #c41a1f;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .logo-text { font-size: 28px; }
+            .emotion-panels { right: 10px; top: 180px; }
+            .emotion-panel { min-width: 150px; padding: 10px; }
+        }
+
+        /* Hidden video */
+        #faceVideo {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="voice-container" id="voiceContainer">
+        <div class="logo-container">
+            <div class="logo-dot"></div>
+            <div class="logo-text">iors.ai</div>
+            <div class="logo-dot"></div>
+        </div>
+
+        <canvas id="avatarCanvas"></canvas>
+
+        <!-- Progress Bar -->
+        <div class="progress-container">
+            <div class="progress-label">TWORZENIE AWATARA</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-time" id="progressTime">0:00 / 10:00</div>
+        </div>
+
+        <!-- Emotion Panels -->
+        <div class="emotion-panels">
+            <div class="emotion-panel" id="faceApiPanel">
+                <div class="emotion-panel-header">
+                    <span class="emotion-panel-title">Face-api.js</span>
+                    <span class="emotion-panel-badge">FREE</span>
+                </div>
+                <div class="emotion-panel-content">
+                    <div class="emotion-emoji" id="faceApiEmoji">⏳</div>
+                    <div class="emotion-details">
+                        <div class="emotion-name" id="faceApiName">Loading...</div>
+                        <div class="emotion-confidence" id="faceApiConf">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="emotion-panel" id="mediaPipePanel">
+                <div class="emotion-panel-header">
+                    <span class="emotion-panel-title">MediaPipe</span>
+                    <span class="emotion-panel-badge">FREE</span>
+                </div>
+                <div class="emotion-panel-content">
+                    <div class="emotion-emoji" id="mediaPipeEmoji">⏳</div>
+                    <div class="emotion-details">
+                        <div class="emotion-name" id="mediaPipeName">Loading...</div>
+                        <div class="emotion-confidence" id="mediaPipeConf">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="emotion-panel" id="voicePanel">
+                <div class="emotion-panel-header">
+                    <span class="emotion-panel-title">Voice Analysis</span>
+                    <span class="emotion-panel-badge">FREE</span>
+                </div>
+                <div class="emotion-panel-content">
+                    <div class="emotion-emoji" id="voiceEmoji">⏳</div>
+                    <div class="emotion-details">
+                        <div class="emotion-name" id="voiceName">Waiting...</div>
+                        <div class="emotion-confidence" id="voiceConf">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="consensus-panel" id="consensusPanel" style="display: none;">
+                <div class="consensus-label">CONSENSUS</div>
+                <div class="consensus-emotion" id="consensusEmoji">😐</div>
+                <div class="consensus-name" id="consensusName">neutral</div>
+            </div>
+        </div>
+
+        <button class="test-button" id="testButton">🎭 TEST (skip to 10 min)</button>
+        <div class="status-text" id="statusText">Dotknij aby rozpocząć</div>
+    </div>
+
+    <!-- Hidden video for face detection -->
+    <video id="faceVideo" autoplay playsinline></video>
+
+    <!-- CDN Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+
+    <script>
+        // ========================================================================
+        // CONFIGURATION
+        // ========================================================================
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = '72577c85-81d4-47b4-99b5-0ca8b6ed7a63'; // IORS Master
+
+        const EMOTION_EMOJIS = {
+            happy: '😊', sad: '😢', angry: '😠', disgusted: '🤢',
+            fearful: '😨', surprised: '😲', neutral: '😐',
+            // MediaPipe blendshapes mapped
+            joy: '😄', fear: '😰', disgust: '🤮'
+        };
+
+        const EMOTION_COLORS = {
+            happy: { r: 255, g: 215, b: 0 },   // Gold
+            sad: { r: 70, g: 130, b: 180 },    // Steel blue
+            angry: { r: 227, g: 30, b: 36 },   // Red
+            disgusted: { r: 139, g: 195, b: 74 }, // Green
+            fearful: { r: 156, g: 39, b: 176 }, // Purple
+            surprised: { r: 255, g: 152, b: 0 }, // Orange
+            neutral: { r: 120, g: 120, b: 120 }, // Gray
+            joy: { r: 255, g: 215, b: 0 },
+            fear: { r: 156, g: 39, b: 176 },
+            disgust: { r: 139, g: 195, b: 74 }
+        };
+
+        let vapiInstance = null;
+        let isActive = false;
+
+        // Face formation progress (0-1, 0=chaos, 1=full avatar)
+        let faceFormationProgress = 0;
+        let conversationStartTime = null;
+        const FORMATION_DURATION = 600000; // 10 minutes in ms
+
+        // Current emotions from 3 systems
+        let currentEmotions = {
+            faceApi: null,
+            mediaPipe: null,
+            voice: null
+        };
+
+        // ========================================================================
+        // CANVAS SETUP
+        // ========================================================================
+        const canvas = document.getElementById('avatarCanvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+        let centerX = width / 2;
+        let centerY = height / 2;
+
+        // ========================================================================
+        // PARTICLE SYSTEM
+        // ========================================================================
+        const particles = [];
+        let userFaceLandmarks = null;
+
+        class AvatarParticle {
+            constructor(targetX, targetY, size, landmarkIndex) {
+                // Start in chaos
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.size = size;
+                this.landmarkIndex = landmarkIndex;
+
+                // Velocity
+                this.vx = (Math.random() - 0.5) * 3.0;
+                this.vy = (Math.random() - 0.5) * 3.0;
+
+                // Chaos parameters
+                this.noiseOffset1 = Math.random() * 100000;
+                this.noiseOffset2 = Math.random() * 100000;
+                this.speed1 = 0.005 + Math.random() * 0.020;
+                this.speed2 = 0.005 + Math.random() * 0.020;
+                this.chaosMultiplier = 0.5 + Math.random() * 2.5;
+
+                // Emotion color
+                this.currentColor = { r: 227, g: 30, b: 36 }; // Start red (chaos)
+                this.targetColor = { r: 227, g: 30, b: 36 };
+            }
+
+            updateTarget(landmarks) {
+                if (landmarks && landmarks[this.landmarkIndex]) {
+                    const landmark = landmarks[this.landmarkIndex];
+                    this.targetX = centerX + (landmark.x - 0.5) * width * 0.45;
+                    this.targetY = centerY + (landmark.y - 0.5) * height * 0.55;
+                }
+            }
+
+            setEmotionColor(emotionColor) {
+                this.targetColor = emotionColor;
+            }
+
+            update(time) {
+                // Progress-based behavior
+                const chaosLevel = 1 - faceFormationProgress;
+                const organization = faceFormationProgress;
+
+                // Lerp color to emotion color
+                this.currentColor.r += (this.targetColor.r - this.currentColor.r) * 0.05;
+                this.currentColor.g += (this.targetColor.g - this.currentColor.g) * 0.05;
+                this.currentColor.b += (this.targetColor.b - this.currentColor.b) * 0.05;
+
+                if (chaosLevel > 0.3) {
+                    // CHAOS MODE - curl noise
+                    const n1x = Math.sin((this.x + this.noiseOffset1) * 0.005 + time * this.speed1) *
+                               Math.cos((this.y + this.noiseOffset1) * 0.005 + time * this.speed1);
+                    const n1y = Math.cos((this.x + this.noiseOffset1) * 0.005 + time * this.speed1) *
+                               Math.sin((this.y + this.noiseOffset1) * 0.005 + time * this.speed1);
+
+                    this.vx += n1x * this.chaosMultiplier * chaosLevel;
+                    this.vy += n1y * this.chaosMultiplier * chaosLevel;
+
+                    // Brownian motion
+                    this.vx += (Math.random() - 0.5) * 2.0 * chaosLevel;
+                    this.vy += (Math.random() - 0.5) * 2.0 * chaosLevel;
+
+                    // Damping
+                    this.vx *= 0.96;
+                    this.vy *= 0.96;
+
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    // Wrap edges
+                    if (this.x < 0) this.x = width;
+                    if (this.x > width) this.x = 0;
+                    if (this.y < 0) this.y = height;
+                    if (this.y > height) this.y = 0;
+                }
+
+                if (organization > 0.1) {
+                    // ORGANIZATION MODE - pull toward target
+                    const dx = this.targetX - this.x;
+                    const dy = this.targetY - this.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    // Stronger pull as organization increases
+                    const pullStrength = 0.01 + organization * 0.15;
+
+                    this.vx += dx * pullStrength;
+                    this.vy += dy * pullStrength;
+
+                    // Strong damping when organized
+                    this.vx *= 0.85 - organization * 0.15;
+                    this.vy *= 0.85 - organization * 0.15;
+
+                    this.x += this.vx;
+                    this.y += this.vy;
+                }
+            }
+
+            draw() {
+                const alpha = 0.6 + faceFormationProgress * 0.3;
+                const r = Math.floor(this.currentColor.r);
+                const g = Math.floor(this.currentColor.g);
+                const b = Math.floor(this.currentColor.b);
+
+                // Size increases as face forms
+                const finalSize = this.size * (0.6 + faceFormationProgress * 0.8);
+
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, finalSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles.length = 0;
+            const numParticles = 30000; // 30k particles
+
+            if (userFaceLandmarks && userFaceLandmarks.length > 0) {
+                for (let i = 0; i < numParticles; i++) {
+                    const landmarkIndex = Math.floor(Math.random() * userFaceLandmarks.length);
+                    const landmark = userFaceLandmarks[landmarkIndex];
+                    const targetX = centerX + (landmark.x - 0.5) * width * 0.45;
+                    const targetY = centerY + (landmark.y - 0.5) * height * 0.55;
+
+                    const size = 1.0 + Math.random() * 1.5;
+                    particles.push(new AvatarParticle(targetX, targetY, size, landmarkIndex));
+                }
+            } else {
+                // Default: oval
+                const formWidth = Math.min(width, height) * 0.22;
+                const formHeight = Math.min(width, height) * 0.28;
+
+                for (let i = 0; i < numParticles; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const r = Math.random();
+                    const targetX = centerX + Math.cos(angle) * formWidth * r;
+                    const targetY = centerY + Math.sin(angle) * formHeight * r;
+
+                    const size = 1.0 + Math.random() * 1.5;
+                    particles.push(new AvatarParticle(targetX, targetY, size, i % 468));
+                }
+            }
+
+            console.log(`✅ Initialized ${numParticles} particles`);
+        }
+
+        // ========================================================================
+        // FACE DETECTION (MediaPipe Face Mesh)
+        // ========================================================================
+        async function initFaceDetection() {
+            try {
+                const video = document.getElementById('faceVideo');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: 640, height: 480 }
+                });
+                video.srcObject = stream;
+
+                if (typeof FaceMesh === 'undefined') {
+                    setTimeout(initFaceDetection, 1000);
+                    return;
+                }
+
+                const faceMesh = new FaceMesh({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`
+                });
+
+                faceMesh.setOptions({
+                    maxNumFaces: 1,
+                    refineLandmarks: true,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                faceMesh.onResults((results) => {
+                    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                        userFaceLandmarks = results.multiFaceLandmarks[0];
+
+                        // Update particle targets
+                        if (particles.length > 0 && faceFormationProgress > 0.1) {
+                            particles.forEach(particle => {
+                                particle.updateTarget(userFaceLandmarks);
+                            });
+                        }
+
+                        // MediaPipe emotion from blendshapes
+                        if (results.multiFaceBlendshapes && results.multiFaceBlendshapes.length > 0) {
+                            analyzeMediaPipeEmotion(results.multiFaceBlendshapes[0]);
+                        }
+                    }
+                });
+
+                async function detectFace() {
+                    if (video.readyState === 4) {
+                        await faceMesh.send({ image: video });
+                    }
+                    setTimeout(detectFace, 100);
+                }
+
+                video.onloadeddata = () => {
+                    console.log('✅ MediaPipe Face Mesh started');
+                    detectFace();
+                };
+
+            } catch (error) {
+                console.warn('❌ Face detection failed:', error);
+            }
+        }
+
+        function analyzeMediaPipeEmotion(blendshapes) {
+            // Map blendshapes to emotions (simplified)
+            const shapes = {};
+            blendshapes.categories.forEach(cat => {
+                shapes[cat.categoryName] = cat.score;
+            });
+
+            // Simple emotion mapping
+            let emotion = 'neutral';
+            let confidence = 0;
+
+            if (shapes.mouthSmileLeft + shapes.mouthSmileRight > 1.0) {
+                emotion = 'happy';
+                confidence = (shapes.mouthSmileLeft + shapes.mouthSmileRight) / 2;
+            } else if (shapes.eyeSquintLeft + shapes.eyeSquintRight > 1.0) {
+                emotion = 'disgusted';
+                confidence = (shapes.eyeSquintLeft + shapes.eyeSquintRight) / 2;
+            } else if (shapes.browDownLeft + shapes.browDownRight > 1.0) {
+                emotion = 'angry';
+                confidence = (shapes.browDownLeft + shapes.browDownRight) / 2;
+            } else if (shapes.jawOpen > 0.5) {
+                emotion = 'surprised';
+                confidence = shapes.jawOpen;
+            }
+
+            currentEmotions.mediaPipe = { emotion, confidence };
+            updateEmotionPanel('mediaPipe', emotion, confidence);
+        }
+
+        // ========================================================================
+        // FACE-API.JS EMOTION DETECTION
+        // ========================================================================
+        let faceApiReady = false;
+
+        async function initFaceApi() {
+            try {
+                console.log('🎭 Loading Face-api.js models...');
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
+
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+                ]);
+
+                faceApiReady = true;
+                console.log('✅ Face-api.js ready');
+
+                // Start detection loop
+                setInterval(detectFaceApiEmotion, 1000);
+            } catch (error) {
+                console.error('❌ Face-api.js failed:', error);
+            }
+        }
+
+        async function detectFaceApiEmotion() {
+            if (!faceApiReady) return;
+
+            const video = document.getElementById('faceVideo');
+            if (video.readyState !== 4) return;
+
+            try {
+                const detection = await faceapi
+                    .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceExpressions();
+
+                if (detection) {
+                    const expressions = detection.expressions;
+                    let maxEmotion = 'neutral';
+                    let maxScore = 0;
+
+                    for (const [emotion, score] of Object.entries(expressions)) {
+                        if (score > maxScore) {
+                            maxScore = score;
+                            maxEmotion = emotion;
+                        }
+                    }
+
+                    if (maxScore > 0.4) {
+                        currentEmotions.faceApi = { emotion: maxEmotion, confidence: maxScore };
+                        updateEmotionPanel('faceApi', maxEmotion, maxScore);
+                    }
+                }
+            } catch (error) {
+                // Silently fail
+            }
+        }
+
+        // ========================================================================
+        // VOICE ANALYSIS (Web Audio API)
+        // ========================================================================
+        let audioContext = null;
+        let analyser = null;
+        let voiceDataArray = null;
+
+        async function initVoiceAnalysis() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                source.connect(analyser);
+
+                voiceDataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                console.log('✅ Voice analysis ready');
+
+                // Analyze every second
+                setInterval(analyzeVoiceEmotion, 1000);
+            } catch (error) {
+                console.warn('❌ Voice analysis failed:', error);
+            }
+        }
+
+        function analyzeVoiceEmotion() {
+            if (!analyser || !isActive) return;
+
+            analyser.getByteFrequencyData(voiceDataArray);
+
+            // Calculate metrics
+            let sum = 0;
+            let lowSum = 0;
+            let highSum = 0;
+
+            for (let i = 0; i < voiceDataArray.length; i++) {
+                sum += voiceDataArray[i];
+                if (i < voiceDataArray.length / 3) lowSum += voiceDataArray[i];
+                if (i > voiceDataArray.length * 2 / 3) highSum += voiceDataArray[i];
+            }
+
+            const volume = sum / voiceDataArray.length;
+            const lowFreq = lowSum / (voiceDataArray.length / 3);
+            const highFreq = highSum / (voiceDataArray.length / 3);
+
+            // Simple emotion mapping based on voice characteristics
+            let emotion = 'neutral';
+            let confidence = 0;
+
+            if (volume < 20) {
+                emotion = 'neutral';
+                confidence = 0.5;
+            } else if (volume > 80 && highFreq > 60) {
+                emotion = 'angry';
+                confidence = 0.7;
+            } else if (volume > 70 && highFreq > 50) {
+                emotion = 'surprised';
+                confidence = 0.6;
+            } else if (volume > 50 && lowFreq < 30) {
+                emotion = 'happy';
+                confidence = 0.6;
+            } else if (volume < 40 && lowFreq > 40) {
+                emotion = 'sad';
+                confidence = 0.6;
+            } else if (volume > 60) {
+                emotion = 'fearful';
+                confidence = 0.5;
+            }
+
+            if (volume > 15) { // Only update if there's actual voice
+                currentEmotions.voice = { emotion, confidence };
+                updateEmotionPanel('voice', emotion, confidence);
+            }
+        }
+
+        // ========================================================================
+        // EMOTION PANEL UPDATES
+        // ========================================================================
+        function updateEmotionPanel(source, emotion, confidence) {
+            const emoji = EMOTION_EMOJIS[emotion] || '😐';
+            const conf = Math.round(confidence * 100);
+
+            if (source === 'faceApi') {
+                document.getElementById('faceApiEmoji').textContent = emoji;
+                document.getElementById('faceApiName').textContent = emotion;
+                document.getElementById('faceApiConf').textContent = `${conf}%`;
+                document.getElementById('faceApiPanel').classList.add('active');
+                setTimeout(() => document.getElementById('faceApiPanel').classList.remove('active'), 500);
+            } else if (source === 'mediaPipe') {
+                document.getElementById('mediaPipeEmoji').textContent = emoji;
+                document.getElementById('mediaPipeName').textContent = emotion;
+                document.getElementById('mediaPipeConf').textContent = `${conf}%`;
+                document.getElementById('mediaPipePanel').classList.add('active');
+                setTimeout(() => document.getElementById('mediaPipePanel').classList.remove('active'), 500);
+            } else if (source === 'voice') {
+                document.getElementById('voiceEmoji').textContent = emoji;
+                document.getElementById('voiceName').textContent = emotion;
+                document.getElementById('voiceConf').textContent = `${conf}%`;
+                document.getElementById('voicePanel').classList.add('active');
+                setTimeout(() => document.getElementById('voicePanel').classList.remove('active'), 500);
+            }
+
+            // Update consensus
+            updateConsensus();
+
+            // Update particle colors
+            const emotionColor = EMOTION_COLORS[emotion] || EMOTION_COLORS.neutral;
+            particles.forEach(p => p.setEmotionColor(emotionColor));
+        }
+
+        function updateConsensus() {
+            const emotions = [
+                currentEmotions.faceApi?.emotion,
+                currentEmotions.mediaPipe?.emotion,
+                currentEmotions.voice?.emotion
+            ].filter(e => e !== null && e !== undefined);
+
+            if (emotions.length === 0) return;
+
+            // Count occurrences
+            const counts = {};
+            emotions.forEach(e => {
+                counts[e] = (counts[e] || 0) + 1;
+            });
+
+            // Find most common
+            const consensus = Object.entries(counts)
+                .sort((a, b) => b[1] - a[1])[0][0];
+
+            document.getElementById('consensusEmoji').textContent = EMOTION_EMOJIS[consensus] || '😐';
+            document.getElementById('consensusName').textContent = consensus;
+            document.getElementById('consensusPanel').style.display = 'block';
+        }
+
+        // ========================================================================
+        // PROGRESS TRACKING
+        // ========================================================================
+        function updateProgress() {
+            if (!conversationStartTime || !isActive) return;
+
+            const elapsed = Date.now() - conversationStartTime;
+            faceFormationProgress = Math.min(1, elapsed / FORMATION_DURATION);
+
+            // Update progress bar
+            document.getElementById('progressFill').style.width = `${faceFormationProgress * 100}%`;
+
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            document.getElementById('progressTime').textContent =
+                `${minutes}:${seconds.toString().padStart(2, '0')} / 10:00`;
+
+            // Update label
+            if (faceFormationProgress < 0.2) {
+                document.querySelector('.progress-label').textContent = 'CHAOS';
+            } else if (faceFormationProgress < 0.5) {
+                document.querySelector('.progress-label').textContent = 'FORMOWANIE...';
+            } else if (faceFormationProgress < 0.8) {
+                document.querySelector('.progress-label').textContent = 'PRZYBIERANIE KSZTAŁTU...';
+            } else if (faceFormationProgress < 1.0) {
+                document.querySelector('.progress-label').textContent = 'FINALIZACJA...';
+            } else {
+                document.querySelector('.progress-label').textContent = 'AWATAR GOTOWY ✓';
+            }
+        }
+
+        // ========================================================================
+        // ANIMATION LOOP
+        // ========================================================================
+        let time = 0;
+        function animate() {
+            ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+            ctx.fillRect(0, 0, width, height);
+
+            time += 2;
+
+            // Update progress
+            updateProgress();
+
+            // Update & draw particles
+            particles.forEach(particle => {
+                particle.update(time);
+                particle.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // ========================================================================
+        // VAPI INTEGRATION
+        // ========================================================================
+        function initVapi() {
+            if (typeof window.Vapi === 'undefined') {
+                setTimeout(initVapi, 1000);
+                return;
+            }
+
+            vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+            vapiInstance.on('call-start', () => {
+                isActive = true;
+                conversationStartTime = Date.now();
+                document.getElementById('statusText').textContent = 'Słucham...';
+                document.getElementById('statusText').classList.add('active');
+            });
+
+            vapiInstance.on('call-end', () => {
+                isActive = false;
+                conversationStartTime = null;
+                const statusEl = document.getElementById('statusText');
+                statusEl.textContent = 'Rozmowa zakończona';
+                statusEl.classList.remove('active');
+                setTimeout(() => {
+                    statusEl.textContent = 'Dotknij aby rozpocząć';
+                }, 3000);
+            });
+
+            vapiInstance.on('error', (error) => {
+                console.error('VAPI Error:', error);
+                isActive = false;
+            });
+
+            console.log('✅ VAPI initialized');
+        }
+
+        // ========================================================================
+        // TEST BUTTON
+        // ========================================================================
+        document.getElementById('testButton').addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            // Simulate 10 minutes instantly
+            if (!conversationStartTime) {
+                conversationStartTime = Date.now() - FORMATION_DURATION;
+                isActive = true;
+                document.getElementById('statusText').textContent = 'TEST MODE - Awatar w pełni sformowany';
+                document.getElementById('statusText').classList.add('active');
+
+                // Simulate emotions
+                updateEmotionPanel('faceApi', 'happy', 0.85);
+                updateEmotionPanel('mediaPipe', 'happy', 0.78);
+                updateEmotionPanel('voice', 'happy', 0.72);
+            } else {
+                // Reset
+                conversationStartTime = null;
+                faceFormationProgress = 0;
+                isActive = false;
+                document.getElementById('statusText').textContent = 'Dotknij aby rozpocząć';
+                document.getElementById('statusText').classList.remove('active');
+            }
+        });
+
+        // ========================================================================
+        // CLICK TO START/STOP
+        // ========================================================================
+        document.getElementById('voiceContainer').addEventListener('click', (e) => {
+            if (e.target.id === 'testButton') return;
+            if (!vapiInstance) {
+                alert('VAPI nie jest gotowy. Odśwież stronę.');
+                return;
+            }
+
+            if (isActive) {
+                vapiInstance.stop();
+                document.getElementById('statusText').textContent = 'Rozłączanie...';
+            } else {
+                document.getElementById('statusText').textContent = 'Łączenie...';
+                vapiInstance.start(ASSISTANT_ID);
+            }
+        });
+
+        // ========================================================================
+        // RESPONSIVE
+        // ========================================================================
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            centerX = width / 2;
+            centerY = height / 2;
+            initParticles();
+        });
+
+        // ========================================================================
+        // INIT
+        // ========================================================================
+        window.addEventListener('load', () => {
+            initParticles();
+            animate();
+            initVapi();
+            initFaceDetection();
+            initFaceApi();
+            initVoiceAnalysis();
+        });
+    </script>
+</body>
+</html>

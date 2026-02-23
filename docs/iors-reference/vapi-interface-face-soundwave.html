@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS - Voice Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #fafafa;
+            overflow: hidden;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .voice-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            cursor: pointer;
+        }
+
+        #voiceCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        .logo-container {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 0.5s;
+        }
+
+        .logo-text {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -1px;
+        }
+
+        .logo-dot {
+            width: 14px;
+            height: 14px;
+            background: #E31E24;
+            border-radius: 50%;
+            animation: logo-pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes logo-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+        }
+
+        .status-text {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #333;
+            font-size: 18px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 1.5s;
+            z-index: 10;
+        }
+
+        .status-text.active {
+            color: #E31E24;
+            font-weight: 600;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .logo-text { font-size: 28px; }
+            .logo-dot { width: 10px; height: 10px; }
+            .status-text { font-size: 14px; bottom: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="voice-container" id="voiceContainer">
+        <div class="logo-container">
+            <div class="logo-dot"></div>
+            <div class="logo-text">iors.ai</div>
+            <div class="logo-dot"></div>
+        </div>
+
+        <canvas id="voiceCanvas"></canvas>
+
+        <div class="status-text" id="statusText">Dotknij aby rozpocząć</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+
+    <script>
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = 'adf258e0-3a41-444e-b683-38c195bd7954';
+
+        let vapiInstance = null;
+        let isActive = false;
+        let audioLevel = 0; // Poziom głośności (do soundwave)
+
+        const canvas = document.getElementById('voiceCanvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // Particle dla twarzy
+        class FaceParticle {
+            constructor(x, y, size) {
+                this.baseX = x;
+                this.baseY = y;
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.phase = Math.random() * Math.PI * 2;
+            }
+
+            update(breathPhase) {
+                const offset = Math.sin(breathPhase + this.phase) * 2;
+                this.x = this.baseX + offset;
+                this.y = this.baseY + offset;
+            }
+
+            draw() {
+                ctx.fillStyle = isActive ? '#E31E24' : '#1a1a1a';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Soundwave particles (pionowe linie)
+        class SoundwaveParticle {
+            constructor(x, side) {
+                this.x = x;
+                this.side = side; // 'left' or 'right'
+                this.baseY = Math.random() * height;
+                this.y = this.baseY;
+                this.height = Math.random() * 200 + 50;
+                this.speed = Math.random() * 3 + 1;
+                this.size = Math.random() * 1.5 + 0.5;
+                this.opacity = Math.random() * 0.6 + 0.2;
+            }
+
+            update() {
+                // Spadają w dół (jak deszcz)
+                this.y += this.speed * (isActive ? 2 : 1);
+
+                // Reset gdy wyjdą poza ekran
+                if (this.y - this.height > height) {
+                    this.y = -this.height;
+                    this.baseY = -this.height;
+                }
+
+                // Reaguj na audioLevel (szerokość podczas mówienia)
+                this.currentHeight = this.height * (1 + audioLevel * 2);
+            }
+
+            draw() {
+                const gradient = ctx.createLinearGradient(this.x, this.y - this.currentHeight, this.x, this.y);
+
+                if (isActive) {
+                    gradient.addColorStop(0, `rgba(227, 30, 36, 0)`);
+                    gradient.addColorStop(0.5, `rgba(227, 30, 36, ${this.opacity})`);
+                    gradient.addColorStop(1, `rgba(227, 30, 36, 0)`);
+                } else {
+                    gradient.addColorStop(0, `rgba(26, 26, 26, 0)`);
+                    gradient.addColorStop(0.5, `rgba(26, 26, 26, ${this.opacity})`);
+                    gradient.addColorStop(1, `rgba(26, 26, 26, 0)`);
+                }
+
+                // Rysuj jako linię kropek
+                const numDots = Math.floor(this.currentHeight / 5);
+                for (let i = 0; i < numDots; i++) {
+                    const dotY = this.y - (i * this.currentHeight / numDots);
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(this.x, dotY, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        const faceParticles = [];
+        const soundwaveParticles = [];
+
+        // Tworzenie twarzy (abstrakcyjna elipsa)
+        function initFaceParticles() {
+            faceParticles.length = 0;
+
+            const faceRadiusX = Math.min(width, height) * 0.15;
+            const faceRadiusY = Math.min(width, height) * 0.2;
+            const numParticles = 2000;
+
+            for (let i = 0; i < numParticles; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const r = Math.sqrt(Math.random());
+
+                const x = centerX + Math.cos(angle) * faceRadiusX * r;
+                const y = centerY + Math.sin(angle) * faceRadiusY * r;
+
+                const size = Math.random() * 2 + 1;
+
+                faceParticles.push(new FaceParticle(x, y, size));
+            }
+        }
+
+        // Tworzenie soundwave (po bokach)
+        function initSoundwaveParticles() {
+            soundwaveParticles.length = 0;
+
+            const leftEdge = width * 0.1;
+            const rightEdge = width * 0.9;
+            const numLines = 30;
+
+            // Lewa strona
+            for (let i = 0; i < numLines; i++) {
+                const x = leftEdge + Math.random() * (width * 0.15);
+                soundwaveParticles.push(new SoundwaveParticle(x, 'left'));
+            }
+
+            // Prawa strona
+            for (let i = 0; i < numLines; i++) {
+                const x = rightEdge - Math.random() * (width * 0.15);
+                soundwaveParticles.push(new SoundwaveParticle(x, 'right'));
+            }
+        }
+
+        let breathPhase = 0;
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+
+            breathPhase += 0.02;
+
+            // Audio level decay (symulacja głośności)
+            audioLevel *= 0.95;
+
+            // Draw soundwave
+            soundwaveParticles.forEach(particle => {
+                particle.update();
+                particle.draw();
+            });
+
+            // Draw face
+            faceParticles.forEach(particle => {
+                particle.update(breathPhase);
+                particle.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            initFaceParticles();
+            initSoundwaveParticles();
+        });
+
+        function initVapi() {
+            if (typeof window.Vapi === 'undefined') {
+                setTimeout(initVapi, 1000);
+                return;
+            }
+
+            vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+            vapiInstance.on('call-start', () => {
+                isActive = true;
+                document.getElementById('statusText').textContent = 'Słucham...';
+                document.getElementById('statusText').classList.add('active');
+            });
+
+            vapiInstance.on('call-end', () => {
+                isActive = false;
+                const statusEl = document.getElementById('statusText');
+                statusEl.textContent = 'Rozmowa zakończona';
+                statusEl.classList.remove('active');
+                setTimeout(() => {
+                    statusEl.textContent = 'Dotknij aby rozpocząć';
+                }, 3000);
+            });
+
+            vapiInstance.on('speech-start', () => {
+                // User started speaking - increase audio level
+                audioLevel = 1.0;
+            });
+
+            vapiInstance.on('speech-end', () => {
+                // User stopped speaking
+                audioLevel = 0;
+            });
+
+            vapiInstance.on('message', (msg) => {
+                // Simulate audio level on any message
+                if (msg.type === 'transcript') {
+                    audioLevel = Math.random() * 0.8 + 0.2;
+                }
+            });
+
+            vapiInstance.on('error', (error) => {
+                console.error('VAPI Error:', error);
+                isActive = false;
+            });
+
+            console.log('✅ VAPI initialized');
+        }
+
+        document.getElementById('voiceContainer').addEventListener('click', () => {
+            if (!vapiInstance) {
+                alert('VAPI nie jest gotowy. Odśwież stronę.');
+                return;
+            }
+
+            if (isActive) {
+                vapiInstance.stop();
+                document.getElementById('statusText').textContent = 'Rozłączanie...';
+            } else {
+                document.getElementById('statusText').textContent = 'Łączenie...';
+                vapiInstance.start(ASSISTANT_ID);
+            }
+        });
+
+        initFaceParticles();
+        initSoundwaveParticles();
+        animate();
+        window.addEventListener('load', initVapi);
+    </script>
+</body>
+</html>

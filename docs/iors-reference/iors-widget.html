@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS Widget</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .iors-widget {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        /* Voice control button */
+        .iors-voice-button {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #E31E24;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .iors-voice-button:hover {
+            background: #c41a1f;
+            transform: scale(1.05);
+        }
+
+        .iors-voice-button.active {
+            background: #1a1a1a;
+            animation: pulse 2s infinite;
+        }
+
+        .iors-voice-button::after {
+            content: '';
+            width: 30px;
+            height: 30px;
+            background: white;
+            border-radius: 50%;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* Status text */
+        .iors-status {
+            margin-top: 20px;
+            text-align: center;
+            color: #333;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 1px;
+        }
+
+        .iors-status.active {
+            color: #E31E24;
+        }
+
+        /* Hidden video for face tracking */
+        #iorsFaceVideo {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="iors-widget">
+        <button class="iors-voice-button" id="iorsVoiceButton"></button>
+        <div class="iors-status" id="iorsStatus">Kliknij aby rozpocząć</div>
+        <video id="iorsFaceVideo" autoplay playsinline></video>
+    </div>
+
+    <!-- VAPI SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+    <!-- MediaPipe FaceMesh -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+
+    <script>
+        // ============================================
+        // KONFIGURACJA - zmień te wartości
+        // ============================================
+        const IORS_CONFIG = {
+            vapiPublicKey: '4b5abdd4-333f-4914-9549-0fe6576ad301',
+            assistantId: '747ba1d5-42ac-4f9d-9974-a3f7cd8484ac', // IORS Master
+            enableFaceTracking: true
+        };
+
+        // ============================================
+        // IORS WIDGET CLASS
+        // ============================================
+        class IORSWidget {
+            constructor(config) {
+                this.config = config;
+                this.vapiInstance = null;
+                this.faceMesh = null;
+                this.isCallActive = false;
+                this.iorsIsSpeaking = false;
+                this.faceLandmarks = null;
+
+                this.elements = {
+                    button: document.getElementById('iorsVoiceButton'),
+                    status: document.getElementById('iorsStatus'),
+                    video: document.getElementById('iorsFaceVideo')
+                };
+
+                this.eventCallbacks = {
+                    onCallStart: [],
+                    onCallEnd: [],
+                    onIORSSpeaking: [],
+                    onUserSpeaking: [],
+                    onFaceDetected: [],
+                    onFaceLost: [],
+                    onError: []
+                };
+
+                this.init();
+            }
+
+            // ============================================
+            // INICJALIZACJA
+            // ============================================
+            async init() {
+                await this.initVAPI();
+                if (this.config.enableFaceTracking) {
+                    await this.initFaceTracking();
+                }
+                this.setupEventListeners();
+                console.log('✅ IORS Widget initialized');
+            }
+
+            // ============================================
+            // VAPI - VOICE AI
+            // ============================================
+            async initVAPI() {
+                return new Promise((resolve) => {
+                    const checkVAPI = () => {
+                        if (typeof window.Vapi === 'undefined') {
+                            setTimeout(checkVAPI, 100);
+                            return;
+                        }
+
+                        this.vapiInstance = new window.Vapi(this.config.vapiPublicKey);
+
+                        // Call started
+                        this.vapiInstance.on('call-start', () => {
+                            this.isCallActive = true;
+                            this.updateStatus('Słucham...', true);
+                            this.elements.button.classList.add('active');
+                            this.trigger('onCallStart');
+                        });
+
+                        // Call ended
+                        this.vapiInstance.on('call-end', () => {
+                            this.isCallActive = false;
+                            this.iorsIsSpeaking = false;
+                            this.updateStatus('Rozmowa zakończona', false);
+                            this.elements.button.classList.remove('active');
+                            this.trigger('onCallEnd');
+
+                            setTimeout(() => {
+                                this.updateStatus('Kliknij aby rozpocząć', false);
+                            }, 3000);
+                        });
+
+                        // User speaking
+                        this.vapiInstance.on('speech-start', () => {
+                            this.iorsIsSpeaking = false;
+                            this.trigger('onUserSpeaking', { speaking: true });
+                        });
+
+                        this.vapiInstance.on('speech-end', () => {
+                            this.trigger('onUserSpeaking', { speaking: false });
+                        });
+
+                        // IORS (assistant) speaking
+                        this.vapiInstance.on('message', (msg) => {
+                            if (msg.type === 'transcript' && msg.role === 'assistant') {
+                                this.iorsIsSpeaking = true;
+                                this.trigger('onIORSSpeaking', {
+                                    speaking: true,
+                                    text: msg.transcript
+                                });
+                            }
+                        });
+
+                        // Function calls (assistant activity)
+                        this.vapiInstance.on('function-call', (data) => {
+                            this.trigger('onIORSSpeaking', {
+                                speaking: true,
+                                type: 'function',
+                                data
+                            });
+                        });
+
+                        // Errors
+                        this.vapiInstance.on('error', (error) => {
+                            console.error('VAPI Error:', error);
+                            this.isCallActive = false;
+                            this.updateStatus('Błąd połączenia', false);
+                            this.trigger('onError', { source: 'vapi', error });
+                        });
+
+                        console.log('✅ VAPI initialized');
+                        resolve();
+                    };
+                    checkVAPI();
+                });
+            }
+
+            // ============================================
+            // MEDIAPIPE - FACE TRACKING
+            // ============================================
+            async initFaceTracking() {
+                try {
+                    // Get camera access
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'user', width: 640, height: 480 }
+                    });
+                    this.elements.video.srcObject = stream;
+
+                    // Wait for MediaPipe to load
+                    await new Promise((resolve) => {
+                        const checkMediaPipe = () => {
+                            if (typeof FaceMesh === 'undefined') {
+                                setTimeout(checkMediaPipe, 100);
+                                return;
+                            }
+                            resolve();
+                        };
+                        checkMediaPipe();
+                    });
+
+                    // Initialize FaceMesh
+                    this.faceMesh = new FaceMesh({
+                        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`
+                    });
+
+                    this.faceMesh.setOptions({
+                        maxNumFaces: 1,
+                        refineLandmarks: false,
+                        minDetectionConfidence: 0.5,
+                        minTrackingConfidence: 0.5
+                    });
+
+                    // Face detection results
+                    this.faceMesh.onResults((results) => {
+                        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                            const prevLandmarks = this.faceLandmarks;
+                            this.faceLandmarks = results.multiFaceLandmarks[0]; // 468 landmarks
+
+                            // Trigger event if face just appeared
+                            if (!prevLandmarks) {
+                                this.trigger('onFaceDetected', { landmarks: this.faceLandmarks });
+                            }
+
+                            // Always trigger with latest landmarks
+                            this.trigger('onFaceDetected', { landmarks: this.faceLandmarks });
+                        } else {
+                            // Face lost
+                            if (this.faceLandmarks) {
+                                this.trigger('onFaceLost');
+                            }
+                            this.faceLandmarks = null;
+                        }
+                    });
+
+                    // Start detection loop
+                    const detectFace = async () => {
+                        if (this.elements.video.readyState === 4) {
+                            await this.faceMesh.send({ image: this.elements.video });
+                        }
+                        requestAnimationFrame(detectFace);
+                    };
+
+                    this.elements.video.onloadeddata = () => {
+                        console.log('✅ Face tracking started');
+                        detectFace();
+                    };
+
+                } catch (error) {
+                    console.warn('Face tracking failed:', error);
+                    this.trigger('onError', { source: 'faceTracking', error });
+                }
+            }
+
+            // ============================================
+            // EVENT LISTENERS
+            // ============================================
+            setupEventListeners() {
+                this.elements.button.addEventListener('click', () => {
+                    if (!this.vapiInstance) {
+                        alert('VAPI nie jest gotowy. Odśwież stronę.');
+                        return;
+                    }
+
+                    if (this.isCallActive) {
+                        this.stopCall();
+                    } else {
+                        this.startCall();
+                    }
+                });
+            }
+
+            // ============================================
+            // PUBLIC API
+            // ============================================
+
+            startCall() {
+                if (!this.vapiInstance || this.isCallActive) return;
+                this.updateStatus('Łączenie...', false);
+                this.vapiInstance.start(this.config.assistantId);
+            }
+
+            stopCall() {
+                if (!this.vapiInstance || !this.isCallActive) return;
+                this.updateStatus('Rozłączanie...', false);
+                this.vapiInstance.stop();
+            }
+
+            // Get current face landmarks (468 points)
+            getFaceLandmarks() {
+                return this.faceLandmarks;
+            }
+
+            // Check if IORS is currently speaking
+            isIORSSpeaking() {
+                return this.iorsIsSpeaking;
+            }
+
+            // Check if call is active
+            isCallActive() {
+                return this.isCallActive;
+            }
+
+            // Register event callback
+            on(eventName, callback) {
+                if (this.eventCallbacks[eventName]) {
+                    this.eventCallbacks[eventName].push(callback);
+                } else {
+                    console.warn(`Unknown event: ${eventName}`);
+                }
+            }
+
+            // Unregister event callback
+            off(eventName, callback) {
+                if (this.eventCallbacks[eventName]) {
+                    this.eventCallbacks[eventName] = this.eventCallbacks[eventName].filter(cb => cb !== callback);
+                }
+            }
+
+            // ============================================
+            // INTERNAL HELPERS
+            // ============================================
+
+            updateStatus(text, active) {
+                this.elements.status.textContent = text;
+                if (active) {
+                    this.elements.status.classList.add('active');
+                } else {
+                    this.elements.status.classList.remove('active');
+                }
+            }
+
+            trigger(eventName, data = {}) {
+                if (this.eventCallbacks[eventName]) {
+                    this.eventCallbacks[eventName].forEach(callback => {
+                        try {
+                            callback(data);
+                        } catch (error) {
+                            console.error(`Error in ${eventName} callback:`, error);
+                        }
+                    });
+                }
+            }
+        }
+
+        // ============================================
+        // INITIALIZE WIDGET
+        // ============================================
+        let iorsWidget;
+
+        window.addEventListener('load', () => {
+            iorsWidget = new IORSWidget(IORS_CONFIG);
+
+            // Expose to parent window for external control
+            window.IORS = iorsWidget;
+
+            // Example: Listen to events
+            iorsWidget.on('onIORSSpeaking', (data) => {
+                console.log('🗣️ IORS speaking:', data);
+            });
+
+            iorsWidget.on('onFaceDetected', (data) => {
+                // Face landmarks available: data.landmarks
+                // Each landmark has x, y, z coordinates (0-1 normalized)
+            });
+
+            iorsWidget.on('onCallStart', () => {
+                console.log('📞 Call started');
+            });
+
+            iorsWidget.on('onCallEnd', () => {
+                console.log('📞 Call ended');
+            });
+        });
+    </script>
+</body>
+</html>

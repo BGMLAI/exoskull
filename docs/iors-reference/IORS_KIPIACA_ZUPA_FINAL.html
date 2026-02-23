@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS - Kipiąca Zupa Rzeczywistości</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #ffffff;
+            overflow: hidden;
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .voice-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            cursor: pointer;
+        }
+
+        #voiceCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        .logo-container {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 0.5s;
+        }
+
+        .logo-text {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -1px;
+        }
+
+        .logo-dot {
+            width: 14px;
+            height: 14px;
+            background: #E31E24;
+            border-radius: 50%;
+        }
+
+        .status-text {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #333;
+            font-size: 18px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 1.5s;
+            z-index: 10;
+        }
+
+        .status-text.active {
+            color: #E31E24;
+            font-weight: 600;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .logo-text { font-size: 28px; }
+            .logo-dot { width: 10px; height: 10px; }
+            .status-text { font-size: 14px; bottom: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="voice-container" id="voiceContainer">
+        <div class="logo-container">
+            <div class="logo-dot"></div>
+            <div class="logo-text">iors.ai</div>
+            <div class="logo-dot"></div>
+        </div>
+
+        <canvas id="voiceCanvas"></canvas>
+
+        <div class="status-text" id="statusText">Dotknij aby rozpocząć</div>
+    </div>
+
+    <!-- VAPI SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+
+    <!-- MediaPipe Face Detection -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+
+    <!-- Hidden video for face detection -->
+    <video id="faceVideo" style="display:none;" autoplay playsinline></video>
+
+    <script>
+        // KONFIGURACJA
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = 'adf258e0-3a41-444e-b683-38c195bd7954';
+
+        let vapiInstance = null;
+        let isActive = false;
+        let emotionalIntensity = 0; // 0-1, zwiększa się przy emocjonalnych tematach
+
+        // CANVAS SETUP
+        const canvas = document.getElementById('voiceCanvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // SOUNDWAVES
+        const soundwaves = [];
+
+        class Soundwave {
+            constructor() {
+                this.x = centerX;
+                this.radius = 0;
+                this.maxRadius = Math.max(width, height) * 0.8;
+                this.speed = 8;
+                this.opacity = 1;
+            }
+
+            update() {
+                this.radius += this.speed;
+                this.opacity = 1 - (this.radius / this.maxRadius);
+                return this.radius < this.maxRadius;
+            }
+
+            draw() {
+                ctx.strokeStyle = `rgba(227, 30, 36, ${this.opacity * 0.3})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, this.radius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            affectsParticle(px, py) {
+                const dist = Math.sqrt((px - centerX) ** 2 + (py - centerY) ** 2);
+                const waveDist = Math.abs(dist - this.radius);
+                return waveDist < 60;
+            }
+        }
+
+        // KIPIĄCA ZUPA - Particle jak DYM / MAGMA
+        class SmokeParticle {
+            constructor(targetX, targetY, size) {
+                // Random start position (nie galaxy - bardziej spread out)
+                const startAngle = Math.random() * Math.PI * 2;
+                const startDist = Math.random() * Math.min(width, height) * 0.6;
+                this.x = centerX + Math.cos(startAngle) * startDist;
+                this.y = centerY + Math.sin(startAngle) * startDist;
+
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.size = size;
+
+                // Velocity (bardziej random, mniej systematyczne)
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = (Math.random() - 0.5) * 2;
+
+                // Perlin-like noise offsets (3D noise simulation)
+                this.noiseX = Math.random() * 10000;
+                this.noiseY = Math.random() * 10000;
+                this.noiseZ = Math.random() * 10000;
+
+                // Smoke flow parameters
+                this.flowSpeed = 0.002 + Math.random() * 0.003; // Różne prędkości
+                this.swirl = Math.random() * Math.PI * 2; // Wirowy ruch
+                this.swirlSpeed = 0.01 + Math.random() * 0.02;
+
+                // Magma parameters (pionowy ruch jak bąbelki)
+                this.buoyancy = 0.3 + Math.random() * 0.7;
+                this.density = 0.5 + Math.random() * 0.5; // Gęstość "magmy"
+
+                this.organization = 0;
+                this.lifetime = Math.random() * 1000; // Dla dymu - lifetime cycles
+            }
+
+            update(time) {
+                this.lifetime += 1;
+
+                // ==============================================================
+                // GŁÓWNY EFEKT: DYM + MAGMA (nie karpie koi!)
+                // ==============================================================
+
+                // 1. PERLIN-LIKE NOISE (3D) - organiczne pływanie jak dym
+                const noiseScale = 0.003;
+                const nx = this.x * noiseScale + time * 0.0001;
+                const ny = this.y * noiseScale + time * 0.0001;
+                const nz = this.lifetime * 0.001;
+
+                // Simplified Perlin (sin/cos combo dla smooth flow)
+                const noise1 = Math.sin(nx * 3 + Math.cos(ny * 2)) * Math.cos(nz * 1.5);
+                const noise2 = Math.cos(nx * 2 - Math.sin(ny * 3)) * Math.sin(nz * 2);
+                const noise3 = Math.sin(nx * 5) * Math.cos(ny * 4) * Math.sin(nz * 3);
+
+                const flowX = (noise1 + noise2 * 0.5 + noise3 * 0.3) * 0.8;
+                const flowY = (noise2 + noise1 * 0.5 + noise3 * 0.3) * 0.8;
+
+                this.vx += flowX * 0.3;
+                this.vy += flowY * 0.3;
+
+                // 2. MAGMOWE WYPŁYWANIE (vertical buoyancy)
+                const magmaRise = Math.sin(time * 0.001 + this.buoyancy * 10) * this.buoyancy;
+                this.vy -= magmaRise * 0.08; // Pływa w górę jak magma
+
+                // 3. WIROWY RUCH (swirl / vortex)
+                this.swirl += this.swirlSpeed;
+                const swirlX = Math.cos(this.swirl) * 0.5;
+                const swirlY = Math.sin(this.swirl) * 0.5;
+
+                this.vx += swirlX * 0.2;
+                this.vy += swirlY * 0.2;
+
+                // 4. STRUKTURY PRZEMIENIAJĄCE SIĘ (clusters forming/dissolving)
+                // Particles grupują się w losowych miejscach, potem się rozpadają
+                const clusterTime = time * 0.0005;
+                const clusterX = centerX + Math.cos(clusterTime * 0.7) * width * 0.3;
+                const clusterY = centerY + Math.sin(clusterTime * 0.5) * height * 0.3;
+
+                const dxCluster = clusterX - this.x;
+                const dyCluster = clusterY - this.y;
+                const distCluster = Math.sqrt(dxCluster * dxCluster + dyCluster * dyCluster);
+
+                // Cluster attracti on (formowanie się struktur)
+                if (distCluster < 200) {
+                    const clusterForce = (1 - distCluster / 200) * 0.05;
+                    this.vx += (dxCluster / distCluster) * clusterForce;
+                    this.vy += (dyCluster / distCluster) * clusterForce;
+                }
+
+                // Słabe dążenie do twarzy (tylko przy wysokim emotional intensity)
+                if (emotionalIntensity > 0.3) {
+                    const dx = this.targetX - this.x;
+                    const dy = this.targetY - this.y;
+                    const spring = 0.0001 * emotionalIntensity; // Bardzo słabe
+                    this.vx += dx * spring;
+                    this.vy += dy * spring;
+                }
+
+                // Damping (lekkie hamowanie)
+                this.vx *= 0.98;
+                this.vy *= 0.98;
+
+                // Movement
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Boundary wrap (particles wracają z drugiej strony jak dym)
+                if (this.x < -50) this.x = width + 50;
+                if (this.x > width + 50) this.x = -50;
+                if (this.y < -50) this.y = height + 50;
+                if (this.y > height + 50) this.y = -50;
+
+                // Soundwave interaction
+                let affectedByWave = false;
+                for (let wave of soundwaves) {
+                    if (wave.affectsParticle(this.x, this.y)) {
+                        affectedByWave = true;
+                        break;
+                    }
+                }
+
+                if (affectedByWave) {
+                    this.organization = Math.min(1, this.organization + 0.15);
+                } else {
+                    this.organization *= 0.95;
+                }
+            }
+
+            draw() {
+                // Color: black → red when organized
+                const r = Math.floor(26 + this.organization * 201);
+                const g = Math.floor(26 + this.organization * 4);
+                const b = Math.floor(26 + this.organization * 10);
+
+                // Partial transparency (smoke-like)
+                const alpha = 0.4 + this.organization * 0.4;
+
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // PARTICLES INIT
+        const particles = [];
+        let userFaceLandmarks = null;
+
+        function initParticles() {
+            particles.length = 0;
+            const numParticles = 1500;
+
+            if (userFaceLandmarks && userFaceLandmarks.length > 0) {
+                for (let i = 0; i < numParticles; i++) {
+                    const landmark = userFaceLandmarks[Math.floor(Math.random() * userFaceLandmarks.length)];
+                    const targetX = centerX + (landmark.x - 0.5) * width * 0.4;
+                    const targetY = centerY + (landmark.y - 0.5) * height * 0.5;
+
+                    const size = 0.5 + Math.random() * 1.2;
+                    particles.push(new SmokeParticle(targetX, targetY, size));
+                }
+            } else {
+                // Default ellipse targets
+                const formWidth = Math.min(width, height) * 0.25;
+                const formHeight = Math.min(width, height) * 0.3;
+
+                for (let i = 0; i < numParticles; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const r = Math.random();
+
+                    const targetX = centerX + Math.cos(angle) * formWidth * r;
+                    const targetY = centerY + Math.sin(angle) * formHeight * r;
+
+                    const size = 0.5 + Math.random() * 1.2;
+                    particles.push(new SmokeParticle(targetX, targetY, size));
+                }
+            }
+        }
+
+        // FACE DETECTION
+        async function initFaceDetection() {
+            try {
+                const video = document.getElementById('faceVideo');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: 640, height: 480 }
+                });
+                video.srcObject = stream;
+
+                if (typeof FaceMesh === 'undefined') {
+                    setTimeout(initFaceDetection, 1000);
+                    return;
+                }
+
+                const faceMesh = new FaceMesh({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`
+                });
+
+                faceMesh.setOptions({
+                    maxNumFaces: 1,
+                    refineLandmarks: false,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                faceMesh.onResults((results) => {
+                    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                        userFaceLandmarks = results.multiFaceLandmarks[0];
+
+                        if (particles.length > 0) {
+                            particles.forEach((particle, i) => {
+                                const landmark = userFaceLandmarks[i % userFaceLandmarks.length];
+                                particle.targetX = centerX + (landmark.x - 0.5) * width * 0.5;
+                                particle.targetY = centerY + (landmark.y - 0.5) * height * 0.6;
+                            });
+                        }
+                    }
+                });
+
+                async function detectFace() {
+                    if (video.readyState === 4) {
+                        await faceMesh.send({ image: video });
+                    }
+                    setTimeout(detectFace, 100);
+                }
+
+                video.onloadeddata = () => {
+                    console.log('✅ Face detection started');
+                    detectFace();
+                };
+
+            } catch (error) {
+                console.warn('Face detection failed:', error);
+            }
+        }
+
+        // ANIMATION LOOP
+        let time = 0;
+        function animate() {
+            // Heavy motion blur (smoke effect)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.fillRect(0, 0, width, height);
+
+            time += 1;
+
+            // Update soundwaves
+            for (let i = soundwaves.length - 1; i >= 0; i--) {
+                if (!soundwaves[i].update()) {
+                    soundwaves.splice(i, 1);
+                } else {
+                    soundwaves[i].draw();
+                }
+            }
+
+            // Update smoke particles (KIPIĄCA ZUPA)
+            particles.forEach(particle => {
+                particle.update(time);
+                particle.draw();
+            });
+
+            // Slowly decrease emotional intensity
+            emotionalIntensity *= 0.9995;
+
+            requestAnimationFrame(animate);
+        }
+
+        // RESPONSIVE
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            initParticles();
+        });
+
+        // VAPI INTEGRATION
+        function initVapi() {
+            if (typeof window.Vapi === 'undefined') {
+                setTimeout(initVapi, 1000);
+                return;
+            }
+
+            vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+            vapiInstance.on('call-start', () => {
+                isActive = true;
+                document.getElementById('statusText').textContent = 'Słucham...';
+                document.getElementById('statusText').classList.add('active');
+            });
+
+            vapiInstance.on('call-end', () => {
+                isActive = false;
+                const statusEl = document.getElementById('statusText');
+                statusEl.textContent = 'Rozmowa zakończona';
+                statusEl.classList.remove('active');
+                setTimeout(() => {
+                    statusEl.textContent = 'Dotknij aby rozpocząć';
+                }, 3000);
+            });
+
+            // IORS speaking - soundwave + increase emotional intensity randomly
+            vapiInstance.on('message', (msg) => {
+                if (msg.type === 'transcript' && msg.role === 'assistant') {
+                    soundwaves.push(new Soundwave());
+
+                    // Randomly increase emotional intensity (symulacja emocjonalnych tematów)
+                    if (Math.random() < 0.3) {
+                        emotionalIntensity = Math.min(1, emotionalIntensity + 0.2);
+                    }
+                }
+            });
+
+            vapiInstance.on('error', (error) => {
+                console.error('VAPI Error:', error);
+                isActive = false;
+            });
+
+            console.log('✅ VAPI initialized');
+        }
+
+        // CLICK TO START/STOP
+        document.getElementById('voiceContainer').addEventListener('click', () => {
+            if (!vapiInstance) {
+                alert('VAPI nie jest gotowy. Odśwież stronę.');
+                return;
+            }
+
+            if (isActive) {
+                vapiInstance.stop();
+                document.getElementById('statusText').textContent = 'Rozłączanie...';
+            } else {
+                document.getElementById('statusText').textContent = 'Łączenie...';
+                vapiInstance.start(ASSISTANT_ID);
+            }
+        });
+
+        // INIT
+        initParticles();
+        animate();
+        window.addEventListener('load', () => {
+            initVapi();
+            initFaceDetection();
+        });
+    </script>
+</body>
+</html>

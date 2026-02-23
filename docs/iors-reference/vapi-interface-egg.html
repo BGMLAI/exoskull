@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS - Voice Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #ffffff;
+            overflow: hidden;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .voice-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            cursor: pointer;
+        }
+
+        #voiceCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        .logo-container {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 0.5s;
+        }
+
+        .logo-text {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -1px;
+        }
+
+        .logo-dot {
+            width: 14px;
+            height: 14px;
+            background: #E31E24;
+            border-radius: 50%;
+        }
+
+        .status-text {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #333;
+            font-size: 18px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 1.5s;
+            z-index: 10;
+        }
+
+        .status-text.active {
+            color: #E31E24;
+            font-weight: 600;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .logo-text { font-size: 28px; }
+            .logo-dot { width: 10px; height: 10px; }
+            .status-text { font-size: 14px; bottom: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="voice-container" id="voiceContainer">
+        <div class="logo-container">
+            <div class="logo-dot"></div>
+            <div class="logo-text">iors.ai</div>
+            <div class="logo-dot"></div>
+        </div>
+
+        <canvas id="voiceCanvas"></canvas>
+
+        <div class="status-text" id="statusText">Dotknij aby rozpocząć</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+
+    <script>
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = 'adf258e0-3a41-444e-b683-38c195bd7954';
+
+        let vapiInstance = null;
+        let isActive = false;
+        let audioLevel = 0;
+
+        const canvas = document.getElementById('voiceCanvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // Simple particle for egg
+        class EggParticle {
+            constructor(x, y, size) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.phase = Math.random() * Math.PI * 2;
+            }
+
+            update(breathPhase) {
+                // Very subtle vibration when speaking
+                if (isActive && audioLevel > 0) {
+                    const vibration = Math.sin(breathPhase * 3 + this.phase) * audioLevel * 1.5;
+                    this.offsetX = vibration;
+                    this.offsetY = vibration * 0.5;
+                } else {
+                    this.offsetX = 0;
+                    this.offsetY = 0;
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = isActive ? '#E31E24' : '#1a1a1a';
+                ctx.beginPath();
+                ctx.arc(this.x + this.offsetX, this.y + this.offsetY, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        const particles = [];
+
+        // Create egg shape with particles
+        function initEggParticles() {
+            particles.length = 0;
+
+            // Egg dimensions (vertical ellipse, slightly larger at bottom)
+            const eggWidth = Math.min(width, height) * 0.18;
+            const eggHeight = Math.min(width, height) * 0.25;
+            const numParticles = 2500;
+
+            for (let i = 0; i < numParticles; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const r = Math.sqrt(Math.random());
+
+                // Modify ellipse to be egg-shaped (wider at bottom)
+                const normalizedY = Math.sin(angle) * r;
+                const widthMultiplier = 1 + normalizedY * 0.15; // Wider at bottom (negative Y)
+
+                const x = centerX + Math.cos(angle) * eggWidth * r * widthMultiplier;
+                const y = centerY + normalizedY * eggHeight;
+
+                const size = Math.random() * 1.8 + 0.8;
+
+                particles.push(new EggParticle(x, y, size));
+            }
+        }
+
+        let breathPhase = 0;
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+
+            breathPhase += 0.08; // Faster for subtle vibration
+
+            // Audio level decay
+            audioLevel *= 0.92;
+
+            // Draw egg
+            particles.forEach(particle => {
+                particle.update(breathPhase);
+                particle.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            initEggParticles();
+        });
+
+        function initVapi() {
+            if (typeof window.Vapi === 'undefined') {
+                setTimeout(initVapi, 1000);
+                return;
+            }
+
+            vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+            vapiInstance.on('call-start', () => {
+                isActive = true;
+                document.getElementById('statusText').textContent = 'Słucham...';
+                document.getElementById('statusText').classList.add('active');
+            });
+
+            vapiInstance.on('call-end', () => {
+                isActive = false;
+                const statusEl = document.getElementById('statusText');
+                statusEl.textContent = 'Rozmowa zakończona';
+                statusEl.classList.remove('active');
+                setTimeout(() => {
+                    statusEl.textContent = 'Dotknij aby rozpocząć';
+                }, 3000);
+            });
+
+            vapiInstance.on('speech-start', () => {
+                audioLevel = 1.0;
+            });
+
+            vapiInstance.on('speech-end', () => {
+                audioLevel = 0;
+            });
+
+            vapiInstance.on('message', (msg) => {
+                if (msg.type === 'transcript') {
+                    audioLevel = Math.random() * 0.6 + 0.3;
+                }
+            });
+
+            vapiInstance.on('error', (error) => {
+                console.error('VAPI Error:', error);
+                isActive = false;
+            });
+
+            console.log('✅ VAPI initialized');
+        }
+
+        document.getElementById('voiceContainer').addEventListener('click', () => {
+            if (!vapiInstance) {
+                alert('VAPI nie jest gotowy. Odśwież stronę.');
+                return;
+            }
+
+            if (isActive) {
+                vapiInstance.stop();
+                document.getElementById('statusText').textContent = 'Rozłączanie...';
+            } else {
+                document.getElementById('statusText').textContent = 'Łączenie...';
+                vapiInstance.start(ASSISTANT_ID);
+            }
+        });
+
+        initEggParticles();
+        animate();
+        window.addEventListener('load', initVapi);
+    </script>
+</body>
+</html>

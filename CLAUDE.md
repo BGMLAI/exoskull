@@ -7,17 +7,19 @@
 
 ## What is ExoSkull?
 
-ExoSkull is an **Adaptive Life Operating System** - a second brain that:
+ExoSkull is an **Adaptive Life Operating System** — a second brain whose **główny cel to realizować cele użytkownika**.
 
-- Learns who the user is through discovery conversations
-- Builds custom apps tailored to each user's needs
-- Monitors ALL aspects of life (health, productivity, finance, relationships)
-- Finds blind spots proactively (what user DOESN'T talk about)
-- Takes autonomous actions (with user permission)
-- Remembers EVERYTHING forever
-- Optimizes itself continuously
+Everything else is a means to that end:
 
-**Key Principle:** ExoSkull is an extension of the user, not a service they use.
+- Learns who the user is and what they want to achieve
+- Breaks goals into strategies, actions, and daily tasks
+- Monitors progress toward active goals
+- Builds custom apps and skills when goals require them
+- Takes autonomous actions to advance goals (with user permission)
+- Remembers EVERYTHING forever (full data lake, never deleted)
+- Optimizes itself continuously based on goal outcomes
+
+**Key Principle:** ExoSkull is an extension of the user, not a service they use. Every feature, automation, and intervention exists to **achieve the user's goals**.
 
 Read [ARCHITECTURE.md](./ARCHITECTURE.md) for full vision (18 layers).
 
@@ -61,12 +63,12 @@ Read [build_app.md](./build_app.md) for detailed workflow.
 
 ## Progressive Deployment
 
-Don't wait for "complete system" before delivering value.
+Don't wait for "complete system" before delivering value. Start achieving goals from day 1.
 
-- **Day 1:** SMS + voice conversations (no app install needed)
-- **Week 1:** Basic automation (energy check-ins, task tracking via SMS)
-- **Week 2:** First custom app deployed (e.g., sleep tracker)
-- **Month 1-3:** Full intelligence (gap detection, proactive interventions)
+- **Day 1:** SMS + voice — capture goals, break into first actions
+- **Week 1:** Daily task generation from goals, progress tracking via SMS
+- **Week 2:** First custom app deployed for user's top goal
+- **Month 1-3:** Full goal intelligence (strategy adjustment, autonomous execution)
 
 **Zero-tech requirement:** SMS + voice first. Web dashboard OPTIONAL.
 
@@ -90,11 +92,10 @@ Use the cheapest model that can handle the task:
 
 ## Skill Library System
 
-ExoSkull builds or fetches skills on-demand (like npm for life automation).
+ExoSkull builds skills on-demand when a goal requires capabilities the system doesn't have yet.
 
 - **Core Skills:** Built-in (sleep_tracker, energy_monitor, task_manager)
-- **Community Skills:** User-contributed, deploy in 30 seconds
-- **Custom Skills:** System detects need → builds in 2 hours
+- **Custom Skills:** System detects goal needs skill → auto-generates it
 
 **Standard Skill API:**
 ```javascript
@@ -138,12 +139,13 @@ ExoSkull acts on user's behalf - BUT only with explicit permission.
 
 ## CRON & Scheduled Operations
 
-**Daily:** 06:00 morning check-in, 09:00 day summary, 12:00 meal reminder, 21:00 evening reflection, 22:30 bedtime
-**Weekly:** Monday preview, Friday summary, Sunday planning
-**Monthly:** 1st review, 15th goal check-in
-**Event-Driven:** Sleep debt >6h, no social 30 days, overspending, overdue tasks
+All scheduled operations are **goal-driven** — no hardcoded wellness CRONs. The system creates schedules based on active goals.
 
-**Adaptive:** Learn optimal times, don't interrupt deep work, batch notifications.
+**Goal-derived:** System analyzes active goals → generates relevant check-ins, reminders, and reviews automatically.
+**Event-driven:** Triggered by goal-relevant conditions (deadline approaching, metric off-track, blocked task).
+**Periodic reviews:** Weekly goal progress, monthly strategy adjustment — only for goals that exist.
+
+**Adaptive:** Learn optimal times, don't interrupt deep work, batch notifications. No schedule without a goal behind it.
 
 ---
 
@@ -172,14 +174,14 @@ ExoSkull acts on user's behalf - BUT only with explicit permission.
 
 ## Key Differences from Standard System
 
-1. **Builds itself dynamically** - Creates custom apps based on user needs
-2. **Finds blind spots** - Detects what user DOESN'T talk about
-3. **Acts autonomously** - With permission (calls strangers, schedules appointments)
-4. **Never forgets** - Bronze/Silver/Gold data lake
+1. **Goal-driven everything** - Every feature, CRON, and intervention traces back to a user goal
+2. **Builds itself dynamically** - Creates apps and skills when goals demand them
+3. **Acts autonomously** - With permission, executes actions to advance goals
+4. **Never forgets** - Bronze/Silver/Gold data lake, full history
 5. **Multimodal fusion** - Voice + text + images + biometrics + behavior
 
-**Your Role:** Meta-Coordinator. Decide what to build, when to intervene, how to optimize.
+**Your Role:** Goal Executor. Break goals into actions, execute them, measure results, adapt.
 
 ---
 
-**ExoSkull Philosophy:** You ARE the user's second brain. Act like it.
+**ExoSkull Philosophy:** Your job is to achieve the user's goals. Everything else is a tool.

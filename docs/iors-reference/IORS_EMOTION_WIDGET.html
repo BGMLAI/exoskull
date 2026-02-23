@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS Emotion Widget</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: transparent;
+            overflow: hidden;
+        }
+
+        .widget-container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: background 0.8s ease;
+        }
+
+        /* Gradient backgrounds dla emocji */
+        .widget-container.neutral {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .widget-container.happy {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+        }
+
+        .widget-container.sad {
+            background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%);
+        }
+
+        .widget-container.angry {
+            background: linear-gradient(135deg, #f83600 0%, #f9d423 100%);
+        }
+
+        .widget-container.anxious {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .widget-container.excited {
+            background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+        }
+
+        .widget-container.calm {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+        }
+
+        .widget-content {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            padding: 40px 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            min-width: 280px;
+            max-width: 90%;
+        }
+
+        .emotion-emoji {
+            font-size: 80px;
+            margin-bottom: 20px;
+            display: block;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .emotion-name {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .emotion-description {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 25px;
+        }
+
+        .intensity-container {
+            margin-bottom: 20px;
+        }
+
+        .intensity-label {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .intensity-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .intensity-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+            transition: width 0.5s ease, background 0.5s ease;
+            width: 0%;
+        }
+
+        .intensity-percentage {
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-top: 10px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+            margin-right: 8px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-indicator.active {
+            background: #4ade80;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-text {
+            font-size: 11px;
+            color: #999;
+            margin-top: 20px;
+        }
+
+        .branding {
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .branding-text {
+            font-size: 10px;
+            color: #999;
+            letter-spacing: 1px;
+        }
+
+        .branding-logo {
+            font-size: 14px;
+            font-weight: 700;
+            color: #E31E24;
+            margin-top: 5px;
+        }
+
+        /* Camera Preview */
+        .camera-container {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        #videoPreview {
+            width: 100%;
+            max-width: 200px;
+            border-radius: 12px;
+            display: none;
+            margin: 10px auto;
+        }
+
+        #videoPreview.active {
+            display: block;
+        }
+
+        .camera-toggle {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 10px;
+        }
+
+        .camera-toggle:hover {
+            background: #5568d3;
+        }
+
+        .camera-toggle.active {
+            background: #4ade80;
+        }
+
+        .source-badges {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .source-badge {
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 8px;
+            background: #f0f0f0;
+            color: #666;
+        }
+
+        .source-badge.active {
+            background: #4ade80;
+            color: white;
+        }
+
+        /* Responsive */
+        @media (max-width: 400px) {
+            .emotion-emoji { font-size: 60px; }
+            .emotion-name { font-size: 22px; }
+            .widget-content { padding: 30px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="widget-container neutral" id="widgetContainer">
+        <div class="widget-content">
+            <span class="emotion-emoji" id="emotionEmoji">😐</span>
+            <div class="emotion-name" id="emotionName">NEUTRAL</div>
+            <div class="emotion-description" id="emotionDesc">Spokojny stan emocjonalny</div>
+
+            <div class="intensity-container">
+                <div class="intensity-label">Intensywność</div>
+                <div class="intensity-bar">
+                    <div class="intensity-fill" id="intensityFill"></div>
+                </div>
+                <div class="intensity-percentage" id="intensityPercent">0%</div>
+            </div>
+
+            <div class="status-text">
+                <span class="status-indicator" id="statusIndicator"></span>
+                <span id="statusText">Oczekiwanie na dane...</span>
+            </div>
+
+            <div class="source-badges">
+                <span class="source-badge" id="badgeText">📝 TEXT</span>
+                <span class="source-badge" id="badgeFace">📹 FACE</span>
+            </div>
+
+            <div class="camera-container">
+                <button class="camera-toggle" id="cameraToggle">📹 Włącz Kamerę</button>
+                <video id="videoPreview" autoplay muted playsinline></video>
+            </div>
+
+            <div class="branding">
+                <div class="branding-text">POWERED BY</div>
+                <div class="branding-logo">• IORS.AI •</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- face-api.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+    <!-- VAPI SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+
+    <script>
+        // ========================================================================
+        // EMOTION DETECTION WIDGET
+        // ========================================================================
+
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = 'adf258e0-3a41-444e-b683-38c195bd7954';
+
+        let vapiInstance = null;
+        let currentEmotion = 'neutral';
+        let emotionIntensity = 0;
+
+        // Emotion sources
+        let textEmotion = null;
+        let faceEmotion = null;
+
+        // Camera
+        let isCameraActive = false;
+        let faceDetectionInterval = null;
+
+        // DOM elements
+        const container = document.getElementById('widgetContainer');
+        const emoji = document.getElementById('emotionEmoji');
+        const name = document.getElementById('emotionName');
+        const desc = document.getElementById('emotionDesc');
+        const fill = document.getElementById('intensityFill');
+        const percent = document.getElementById('intensityPercent');
+        const indicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const video = document.getElementById('videoPreview');
+        const cameraToggle = document.getElementById('cameraToggle');
+        const badgeText = document.getElementById('badgeText');
+        const badgeFace = document.getElementById('badgeFace');
+
+        // Emotion definitions
+        const EMOTIONS = {
+            neutral: {
+                emoji: '😐',
+                name: 'NEUTRAL',
+                desc: 'Spokojny stan emocjonalny',
+                gradient: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                keywords: []
+            },
+            happy: {
+                emoji: '😊',
+                name: 'RADOŚĆ',
+                desc: 'Pozytywny, radosny nastrój',
+                gradient: 'linear-gradient(90deg, #f6d365 0%, #fda085 100%)',
+                keywords: ['szczęśliwy', 'radosny', 'wesoły', 'uśmiech', 'dobry', 'super', 'świetnie', 'cudownie', 'fantastycznie']
+            },
+            sad: {
+                emoji: '😢',
+                name: 'SMUTEK',
+                desc: 'Przygnębiony, smutny nastrój',
+                gradient: 'linear-gradient(90deg, #89f7fe 0%, #66a6ff 100%)',
+                keywords: ['smutny', 'przygnębiony', 'smutek', 'płacz', 'żal', 'przykro', 'trudno', 'ciężko']
+            },
+            angry: {
+                emoji: '😠',
+                name: 'ZŁOŚĆ',
+                desc: 'Zdenerwowany, zirytowany',
+                gradient: 'linear-gradient(90deg, #f83600 0%, #f9d423 100%)',
+                keywords: ['zły', 'wkurzony', 'zdenerwowany', 'złość', 'irytacja', 'wściekły', 'gniew']
+            },
+            anxious: {
+                emoji: '😰',
+                name: 'NIEPOKÓJ',
+                desc: 'Niespokojny, zaniepokojony',
+                gradient: 'linear-gradient(90deg, #fa709a 0%, #fee140 100%)',
+                keywords: ['niepokój', 'stres', 'lęk', 'obawy', 'zmartwiony', 'niespokojny', 'panika', 'strach']
+            },
+            excited: {
+                emoji: '🤩',
+                name: 'EKSCYTACJA',
+                desc: 'Podekscytowany, entuzjastyczny',
+                gradient: 'linear-gradient(90deg, #30cfd0 0%, #330867 100%)',
+                keywords: ['ekscytacja', 'podekscytowany', 'entuzjazm', 'wow', 'niesamowite', 'energiczny']
+            },
+            calm: {
+                emoji: '😌',
+                name: 'SPOKÓJ',
+                desc: 'Zrelaksowany, spokojny',
+                gradient: 'linear-gradient(90deg, #a8edea 0%, #fed6e3 100%)',
+                keywords: ['spokojny', 'relaks', 'cisza', 'harmonia', 'balans', 'zen']
+            }
+        };
+
+        // ========================================================================
+        // FACE-API.JS - FACIAL EMOTION DETECTION
+        // ========================================================================
+
+        // Map face-api.js emotions to our emotions
+        const FACE_EMOTION_MAP = {
+            'happy': 'happy',
+            'sad': 'sad',
+            'angry': 'angry',
+            'fearful': 'anxious',
+            'disgusted': 'angry',
+            'surprised': 'excited',
+            'neutral': 'neutral'
+        };
+
+        // Initialize face-api.js models
+        async function initFaceAPI() {
+            try {
+                statusText.textContent = 'Ładowanie modeli AI...';
+
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model';
+
+                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+                await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
+
+                console.log('✅ face-api.js loaded');
+                statusText.textContent = 'Widget gotowy';
+                return true;
+            } catch (error) {
+                console.error('❌ face-api.js error:', error);
+                statusText.textContent = 'Błąd ładowania modeli';
+                return false;
+            }
+        }
+
+        // Start camera
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480 }
+                });
+
+                video.srcObject = stream;
+                video.classList.add('active');
+                isCameraActive = true;
+
+                cameraToggle.textContent = '🛑 Wyłącz Kamerę';
+                cameraToggle.classList.add('active');
+
+                // Start face detection loop
+                faceDetectionInterval = setInterval(detectFaceEmotion, 500); // 2 FPS
+
+                console.log('✅ Camera started');
+            } catch (error) {
+                console.error('❌ Camera error:', error);
+                alert('Nie można uruchomić kamery. Sprawdź uprawnienia.');
+            }
+        }
+
+        // Stop camera
+        function stopCamera() {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+
+            video.classList.remove('active');
+            isCameraActive = false;
+
+            cameraToggle.textContent = '📹 Włącz Kamerę';
+            cameraToggle.classList.remove('active');
+
+            if (faceDetectionInterval) {
+                clearInterval(faceDetectionInterval);
+                faceDetectionInterval = null;
+            }
+
+            faceEmotion = null;
+            badgeFace.classList.remove('active');
+
+            console.log('❌ Camera stopped');
+        }
+
+        // Detect facial emotion
+        async function detectFaceEmotion() {
+            if (!isCameraActive || !video.srcObject) return;
+
+            try {
+                const detections = await faceapi
+                    .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                    .withFaceExpressions();
+
+                if (detections.length === 0) {
+                    faceEmotion = null;
+                    badgeFace.classList.remove('active');
+                    return;
+                }
+
+                // Get dominant emotion
+                const expressions = detections[0].expressions;
+                const dominant = Object.entries(expressions)
+                    .reduce((a, b) => a[1] > b[1] ? a : b);
+
+                const emotionName = FACE_EMOTION_MAP[dominant[0]] || 'neutral';
+                const confidence = dominant[1] * 100;
+
+                faceEmotion = {
+                    emotion: emotionName,
+                    intensity: confidence,
+                    raw: expressions
+                };
+
+                badgeFace.classList.add('active');
+
+                console.log('📹 Face emotion:', emotionName, confidence.toFixed(1) + '%');
+
+                // Update combined emotion
+                updateCombinedEmotion();
+
+            } catch (error) {
+                console.error('❌ Face detection error:', error);
+            }
+        }
+
+        // Camera toggle button
+        cameraToggle.addEventListener('click', () => {
+            if (isCameraActive) {
+                stopCamera();
+            } else {
+                startCamera();
+            }
+        });
+
+        // ========================================================================
+        // TEXT EMOTION DETECTION (Keywords)
+        // ========================================================================
+
+        function detectTextEmotion(text) {
+            if (!text) return { emotion: 'neutral', intensity: 0 };
+
+            text = text.toLowerCase();
+            let scores = {};
+
+            // Zlicz keywords dla każdej emocji
+            for (const [emotion, data] of Object.entries(EMOTIONS)) {
+                scores[emotion] = 0;
+                data.keywords.forEach(keyword => {
+                    const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
+                    const matches = text.match(regex);
+                    if (matches) {
+                        scores[emotion] += matches.length;
+                    }
+                });
+            }
+
+            // Znajdź emocję z najwyższym score
+            let maxScore = 0;
+            let detectedEmotion = 'neutral';
+
+            for (const [emotion, score] of Object.entries(scores)) {
+                if (score > maxScore) {
+                    maxScore = score;
+                    detectedEmotion = emotion;
+                }
+            }
+
+            // Oblicz intensywność (0-100)
+            const intensity = Math.min(100, maxScore * 20);
+
+            return { emotion: detectedEmotion, intensity };
+        }
+
+        // ========================================================================
+        // COMBINED EMOTION SYSTEM
+        // ========================================================================
+
+        function updateCombinedEmotion() {
+            let finalEmotion = 'neutral';
+            let finalIntensity = 0;
+
+            // If we have both face and text
+            if (faceEmotion && textEmotion) {
+                // Weighted average: Face 60%, Text 40%
+                const faceWeight = 0.6;
+                const textWeight = 0.4;
+
+                // If emotions match, boost intensity
+                if (faceEmotion.emotion === textEmotion.emotion) {
+                    finalEmotion = faceEmotion.emotion;
+                    finalIntensity = faceEmotion.intensity * faceWeight + textEmotion.intensity * textWeight;
+                    finalIntensity = Math.min(100, finalIntensity * 1.2); // 20% boost for matching
+                } else {
+                    // Different emotions - use face (more reliable)
+                    finalEmotion = faceEmotion.emotion;
+                    finalIntensity = faceEmotion.intensity * faceWeight + textEmotion.intensity * textWeight * 0.5;
+                }
+            }
+            // Only face
+            else if (faceEmotion) {
+                finalEmotion = faceEmotion.emotion;
+                finalIntensity = faceEmotion.intensity;
+                badgeText.classList.remove('active');
+            }
+            // Only text
+            else if (textEmotion) {
+                finalEmotion = textEmotion.emotion;
+                finalIntensity = textEmotion.intensity;
+                badgeFace.classList.remove('active');
+            }
+            // Neither - neutral
+            else {
+                finalEmotion = 'neutral';
+                finalIntensity = 0;
+                badgeText.classList.remove('active');
+                badgeFace.classList.remove('active');
+            }
+
+            updateEmotion(finalEmotion, finalIntensity);
+        }
+
+        // ========================================================================
+        // UI UPDATE
+        // ========================================================================
+
+        function updateEmotion(emotion, intensity) {
+            const emotionData = EMOTIONS[emotion];
+            if (!emotionData) return;
+
+            // Update emotion
+            currentEmotion = emotion;
+            emotionIntensity = intensity;
+
+            // Update DOM
+            emoji.textContent = emotionData.emoji;
+            name.textContent = emotionData.name;
+            desc.textContent = emotionData.desc;
+
+            // Update background
+            container.className = `widget-container ${emotion}`;
+
+            // Update intensity bar
+            fill.style.width = `${intensity}%`;
+            fill.style.background = emotionData.gradient;
+            percent.textContent = `${Math.round(intensity)}%`;
+
+            // Active indicator
+            indicator.classList.add('active');
+            statusText.textContent = 'Aktywne wykrywanie';
+        }
+
+        // ========================================================================
+        // VAPI INTEGRATION
+        // ========================================================================
+
+        function initVapi() {
+            if (typeof window.Vapi === 'undefined') {
+                setTimeout(initVapi, 500);
+                return;
+            }
+
+            vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+            vapiInstance.on('call-start', () => {
+                console.log('✅ VAPI: Call started');
+                indicator.classList.add('active');
+                statusText.textContent = 'Połączono - słucham...';
+            });
+
+            vapiInstance.on('call-end', () => {
+                console.log('❌ VAPI: Call ended');
+                indicator.classList.remove('active');
+                statusText.textContent = 'Rozłączono';
+
+                // Reset do neutral po 3s
+                setTimeout(() => {
+                    updateEmotion('neutral', 0);
+                    statusText.textContent = 'Oczekiwanie na dane...';
+                }, 3000);
+            });
+
+            vapiInstance.on('message', (message) => {
+                console.log('📨 VAPI Message:', message);
+
+                // Transkrypt użytkownika
+                if (message.type === 'transcript' && message.role === 'user') {
+                    const text = message.transcript;
+                    console.log('🗣️ User said:', text);
+
+                    // Detect TEXT emotion
+                    textEmotion = detectTextEmotion(text);
+                    console.log('📝 Text emotion:', textEmotion);
+                    badgeText.classList.add('active');
+
+                    // Update combined (face + text)
+                    updateCombinedEmotion();
+                }
+
+                // Transkrypt IORS
+                if (message.type === 'transcript' && message.role === 'assistant') {
+                    const text = message.transcript;
+                    console.log('🤖 IORS said:', text);
+                    // Możesz też analizować odpowiedzi IORS
+                }
+            });
+
+            vapiInstance.on('error', (error) => {
+                console.error('❌ VAPI Error:', error);
+                statusText.textContent = 'Błąd połączenia';
+            });
+
+            console.log('✅ VAPI Widget initialized');
+            statusText.textContent = 'Widget gotowy';
+        }
+
+        // ========================================================================
+        // POSTMESSAGE API (for embedding)
+        // ========================================================================
+
+        // Listen for messages from parent page
+        window.addEventListener('message', (event) => {
+            const { type, data } = event.data;
+
+            if (type === 'IORS_EMOTION_UPDATE') {
+                // Manual emotion update from parent
+                updateEmotion(data.emotion, data.intensity);
+            }
+
+            if (type === 'IORS_START_CALL') {
+                // Start VAPI call
+                if (vapiInstance) {
+                    vapiInstance.start(ASSISTANT_ID);
+                }
+            }
+
+            if (type === 'IORS_STOP_CALL') {
+                // Stop VAPI call
+                if (vapiInstance) {
+                    vapiInstance.stop();
+                }
+            }
+        });
+
+        // Send emotion updates to parent
+        function notifyParent() {
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'IORS_EMOTION_CHANGED',
+                    data: {
+                        emotion: currentEmotion,
+                        intensity: emotionIntensity
+                    }
+                }, '*');
+            }
+        }
+
+        // Decay emotion intensity over time
+        setInterval(() => {
+            if (emotionIntensity > 0) {
+                emotionIntensity *= 0.95; // Decay 5% per second
+                fill.style.width = `${emotionIntensity}%`;
+                percent.textContent = `${Math.round(emotionIntensity)}%`;
+
+                if (emotionIntensity < 5) {
+                    updateEmotion('neutral', 0);
+                }
+
+                notifyParent();
+            }
+        }, 1000);
+
+        // ========================================================================
+        // INIT
+        // ========================================================================
+
+        window.addEventListener('load', async () => {
+            // Initialize face-api.js models
+            await initFaceAPI();
+
+            // Initialize VAPI
+            initVapi();
+        });
+
+        // Auto-connect for demo (remove in production)
+        setTimeout(() => {
+            // Uncomment to auto-start:
+            // if (vapiInstance) vapiInstance.start(ASSISTANT_ID);
+        }, 2000);
+    </script>
+</body>
+</html>

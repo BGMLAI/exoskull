@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS - Organiczna Forma</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #f5f5f5;
+            overflow: hidden;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .organic-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        #organicCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        /* Logo */
+        .logo-container {
+            position: absolute;
+            top: 40px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 0.5s;
+        }
+
+        .logo-text {
+            font-size: 48px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -2px;
+        }
+
+        .logo-dot {
+            width: 16px;
+            height: 16px;
+            background: #E31E24;
+            border-radius: 50%;
+            animation: logo-pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes logo-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+        }
+
+        /* Status */
+        .status-text {
+            position: absolute;
+            bottom: 80px;
+            text-align: center;
+            color: #1a1a1a;
+            font-size: 20px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 1.5s;
+            z-index: 10;
+        }
+
+        .status-text.active {
+            color: #E31E24;
+            font-weight: 600;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .logo-text { font-size: 32px; }
+            .logo-dot { width: 12px; height: 12px; }
+            .status-text { font-size: 16px; bottom: 60px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="organic-container" id="organicContainer">
+        <div class="logo-container">
+            <div class="logo-dot"></div>
+            <div class="logo-text">iors.ai</div>
+            <div class="logo-dot"></div>
+        </div>
+
+        <canvas id="organicCanvas"></canvas>
+
+        <div class="status-text" id="statusText">Dotknij aby rozpocząć</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+
+    <script>
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = 'adf258e0-3a41-444e-b683-38c195bd7954';
+
+        let vapiInstance = null;
+        let isActive = false;
+
+        const canvas = document.getElementById('organicCanvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        // Particle system - gęste kropki tworzące organiczny kształt
+        class OrganicParticle {
+            constructor(x, y, targetX, targetY, size) {
+                this.x = x;
+                this.y = y;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.size = size;
+                this.velocity = {
+                    x: (Math.random() - 0.5) * 2,
+                    y: (Math.random() - 0.5) * 2
+                };
+                this.phase = Math.random() * Math.PI * 2;
+                this.maxDistance = 30;
+            }
+
+            update(breathPhase, isActive) {
+                // Oddychanie - przesunięcie od target position
+                const breathOffset = Math.sin(breathPhase + this.phase) * 15;
+
+                // Płynne przemieszczanie się do target position z oddychaniem
+                const targetX = this.targetX + breathOffset * Math.cos(this.phase);
+                const targetY = this.targetY + breathOffset * Math.sin(this.phase);
+
+                // Smooth movement
+                this.x += (targetX - this.x) * 0.05;
+                this.y += (targetY - this.y) * 0.05;
+
+                // Dodatkowy chaos podczas active
+                if (isActive) {
+                    this.x += (Math.random() - 0.5) * 2;
+                    this.y += (Math.random() - 0.5) * 2;
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = isActive ? '#E31E24' : '#1a1a1a';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        const particles = [];
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // Tworzenie organicznego kształtu z kropek (elipsa/oko)
+        function initParticles() {
+            particles.length = 0;
+
+            const numParticles = 3000; // Gęste kropki
+            const radiusX = Math.min(width, height) * 0.25;
+            const radiusY = Math.min(width, height) * 0.15;
+
+            // Główny kształt - elipsa (jak oko)
+            for (let i = 0; i < numParticles * 0.7; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const r = Math.sqrt(Math.random()); // Gęściej w środku
+
+                const targetX = centerX + Math.cos(angle) * radiusX * r;
+                const targetY = centerY + Math.sin(angle) * radiusY * r;
+
+                // Random start position (rozproszone)
+                const startX = centerX + (Math.random() - 0.5) * width * 0.8;
+                const startY = centerY + (Math.random() - 0.5) * height * 0.8;
+
+                const size = Math.random() * 2 + 1;
+
+                particles.push(new OrganicParticle(startX, startY, targetX, targetY, size));
+            }
+
+            // Dodatkowe rozproszone kropki (jak na obrazie - rozrzucone wokół)
+            for (let i = 0; i < numParticles * 0.3; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = radiusX * (1 + Math.random() * 0.8);
+
+                const targetX = centerX + Math.cos(angle) * distance;
+                const targetY = centerY + Math.sin(angle) * distance * 0.6;
+
+                const startX = targetX + (Math.random() - 0.5) * 100;
+                const startY = targetY + (Math.random() - 0.5) * 100;
+
+                const size = Math.random() * 1.5 + 0.5;
+
+                particles.push(new OrganicParticle(startX, startY, targetX, targetY, size));
+            }
+        }
+
+        let breathPhase = 0;
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+
+            breathPhase += isActive ? 0.04 : 0.02;
+
+            particles.forEach(particle => {
+                particle.update(breathPhase, isActive);
+                particle.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            initParticles();
+        });
+
+        function initVapi() {
+            if (typeof window.Vapi === 'undefined') {
+                setTimeout(initVapi, 1000);
+                return;
+            }
+
+            vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+            vapiInstance.on('call-start', () => {
+                isActive = true;
+                const statusEl = document.getElementById('statusText');
+                statusEl.textContent = 'Słucham...';
+                statusEl.classList.add('active');
+            });
+
+            vapiInstance.on('call-end', () => {
+                isActive = false;
+                const statusEl = document.getElementById('statusText');
+                statusEl.textContent = 'Rozmowa zakończona';
+                statusEl.classList.remove('active');
+                setTimeout(() => {
+                    statusEl.textContent = 'Dotknij aby rozpocząć';
+                }, 3000);
+            });
+
+            vapiInstance.on('error', (error) => {
+                console.error('VAPI Error:', error);
+                isActive = false;
+            });
+
+            console.log('✅ VAPI initialized');
+        }
+
+        document.getElementById('organicContainer').addEventListener('click', () => {
+            if (!vapiInstance) {
+                alert('VAPI nie jest gotowy. Odśwież stronę.');
+                return;
+            }
+
+            if (isActive) {
+                vapiInstance.stop();
+                document.getElementById('statusText').textContent = 'Rozłączanie...';
+            } else {
+                document.getElementById('statusText').textContent = 'Łączenie...';
+                vapiInstance.start(ASSISTANT_ID);
+            }
+        });
+
+        initParticles();
+        animate();
+        window.addEventListener('load', initVapi);
+    </script>
+</body>
+</html>

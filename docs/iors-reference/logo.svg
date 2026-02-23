@@ -1,0 +1,17 @@
+<svg width="400" height="120" viewBox="0 0 400 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Logo IORS - Nexa font style, kropki nad I czerwone -->
+
+  <!-- Letter I -->
+  <text x="20" y="90" font-family="Montserrat, sans-serif" font-weight="900" font-size="100" fill="#000000">I</text>
+  <!-- Red dot above I -->
+  <circle cx="54" cy="15" r="10" fill="#E31E24"/>
+
+  <!-- Letter O -->
+  <text x="95" y="90" font-family="Montserrat, sans-serif" font-weight="900" font-size="100" fill="#000000">O</text>
+
+  <!-- Letter R -->
+  <text x="205" y="90" font-family="Montserrat, sans-serif" font-weight="900" font-size="100" fill="#000000">R</text>
+
+  <!-- Letter S -->
+  <text x="295" y="90" font-family="Montserrat, sans-serif" font-weight="900" font-size="100" fill="#000000">S</text>
+</svg>

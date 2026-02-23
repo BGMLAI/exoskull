@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS - Chaos Organizing</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #ffffff;
+            overflow: hidden;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .voice-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            cursor: pointer;
+        }
+
+        #voiceCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        .logo-container {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 0.5s;
+        }
+
+        .logo-text {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -1px;
+        }
+
+        .logo-dot {
+            width: 14px;
+            height: 14px;
+            background: #E31E24;
+            border-radius: 50%;
+        }
+
+        .status-text {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #333;
+            font-size: 18px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 1.5s;
+            z-index: 10;
+        }
+
+        .status-text.active {
+            color: #E31E24;
+            font-weight: 600;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .logo-text { font-size: 28px; }
+            .logo-dot { width: 10px; height: 10px; }
+            .status-text { font-size: 14px; bottom: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="voice-container" id="voiceContainer">
+        <div class="logo-container">
+            <div class="logo-dot"></div>
+            <div class="logo-text">iors.ai</div>
+            <div class="logo-dot"></div>
+        </div>
+
+        <canvas id="voiceCanvas"></canvas>
+
+        <div class="status-text" id="statusText">Dotknij aby rozpocząć</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+
+    <script>
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = 'adf258e0-3a41-444e-b683-38c195bd7954';
+
+        let vapiInstance = null;
+        let isActive = false;
+        let audioLevel = 0;
+
+        const canvas = document.getElementById('voiceCanvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // Particle with chaotic movement but pulled toward target position
+        class ChaosParticle {
+            constructor(targetX, targetY, size) {
+                // Start closer to target with some offset
+                const offsetDist = 200;
+                const offsetAngle = Math.random() * Math.PI * 2;
+                this.x = targetX + Math.cos(offsetAngle) * offsetDist * Math.random();
+                this.y = targetY + Math.sin(offsetAngle) * offsetDist * Math.random();
+
+                // Target position (organized form)
+                this.targetX = targetX;
+                this.targetY = targetY;
+
+                this.size = size;
+
+                // Chaotic velocity
+                this.vx = (Math.random() - 0.5) * 4;
+                this.vy = (Math.random() - 0.5) * 4;
+
+                // Random phase for noise
+                this.phase = Math.random() * Math.PI * 2;
+                this.noiseOffset = Math.random() * 1000;
+            }
+
+            update(time) {
+                // Pull toward target (organizing force)
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                // Spring force - MUCH stronger to organize quickly
+                const spring = 0.15;
+                const damping = 0.88;
+
+                this.vx += dx * spring;
+                this.vy += dy * spring;
+
+                // Add chaos/noise
+                const chaosStrength = isActive ? 2.5 : 1.5;
+                const noiseX = Math.sin(time * 0.002 + this.noiseOffset) * chaosStrength;
+                const noiseY = Math.cos(time * 0.003 + this.noiseOffset + this.phase) * chaosStrength;
+
+                this.vx += noiseX * 0.2;
+                this.vy += noiseY * 0.2;
+
+                // Apply damping
+                this.vx *= damping;
+                this.vy *= damping;
+
+                // Move
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Extra chaos when speaking
+                if (isActive && audioLevel > 0.3) {
+                    this.x += (Math.random() - 0.5) * audioLevel * 8;
+                    this.y += (Math.random() - 0.5) * audioLevel * 8;
+                }
+            }
+
+            draw() {
+                const alpha = 0.8;
+                ctx.fillStyle = isActive ? `rgba(227, 30, 36, ${alpha})` : `rgba(26, 26, 26, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        const particles = [];
+
+        // Create target positions forming a face/form
+        function initChaosParticles() {
+            particles.length = 0;
+
+            const formWidth = Math.min(width, height) * 0.25;
+            const formHeight = Math.min(width, height) * 0.3;
+            const numParticles = 3000;
+
+            for (let i = 0; i < numParticles; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const r = Math.sqrt(Math.random());
+
+                // Target positions form ellipse (face)
+                const targetX = centerX + Math.cos(angle) * formWidth * r;
+                const targetY = centerY + Math.sin(angle) * formHeight * r;
+
+                const size = Math.random() * 1.8 + 0.6;
+
+                particles.push(new ChaosParticle(targetX, targetY, size));
+            }
+        }
+
+        let time = 0;
+        function animate() {
+            // Slight motion blur effect (don't clear completely)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.fillRect(0, 0, width, height);
+
+            time += 1;
+
+            // Audio level decay
+            audioLevel *= 0.92;
+
+            // Update and draw all particles
+            particles.forEach(particle => {
+                particle.update(time);
+                particle.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            initChaosParticles();
+        });
+
+        function initVapi() {
+            if (typeof window.Vapi === 'undefined') {
+                setTimeout(initVapi, 1000);
+                return;
+            }
+
+            vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+            vapiInstance.on('call-start', () => {
+                isActive = true;
+                document.getElementById('statusText').textContent = 'Słucham...';
+                document.getElementById('statusText').classList.add('active');
+            });
+
+            vapiInstance.on('call-end', () => {
+                isActive = false;
+                const statusEl = document.getElementById('statusText');
+                statusEl.textContent = 'Rozmowa zakończona';
+                statusEl.classList.remove('active');
+                setTimeout(() => {
+                    statusEl.textContent = 'Dotknij aby rozpocząć';
+                }, 3000);
+            });
+
+            vapiInstance.on('speech-start', () => {
+                audioLevel = 1.0;
+            });
+
+            vapiInstance.on('speech-end', () => {
+                audioLevel = 0;
+            });
+
+            vapiInstance.on('message', (msg) => {
+                if (msg.type === 'transcript') {
+                    audioLevel = Math.random() * 0.7 + 0.3;
+                }
+            });
+
+            vapiInstance.on('error', (error) => {
+                console.error('VAPI Error:', error);
+                isActive = false;
+            });
+
+            console.log('✅ VAPI initialized');
+        }
+
+        document.getElementById('voiceContainer').addEventListener('click', () => {
+            if (!vapiInstance) {
+                alert('VAPI nie jest gotowy. Odśwież stronę.');
+                return;
+            }
+
+            if (isActive) {
+                vapiInstance.stop();
+                document.getElementById('statusText').textContent = 'Rozłączanie...';
+            } else {
+                document.getElementById('statusText').textContent = 'Łączenie...';
+                vapiInstance.start(ASSISTANT_ID);
+            }
+        });
+
+        initChaosParticles();
+
+        // Initial clear
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+
+        animate();
+        window.addEventListener('load', initVapi);
+    </script>
+</body>
+</html>

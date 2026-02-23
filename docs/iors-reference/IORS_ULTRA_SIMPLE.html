@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>IORS - TEST</title>
+    <style>
+        body {
+            margin: 0;
+            background: white;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        #info {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">Loading...</div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const info = document.getElementById('info');
+        info.innerHTML = 'Initializing...';
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        info.innerHTML = `Canvas: ${canvas.width}x${canvas.height}`;
+
+        // Simple particles
+        const particles = [];
+        const NUM = 3000;
+
+        for (let i = 0; i < NUM; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2,
+                size: 1 + Math.random() * 2
+            });
+        }
+
+        info.innerHTML += `<br>Particles: ${particles.length}`;
+
+        let frame = 0;
+
+        function animate() {
+            // Slight fade
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update particles
+            particles.forEach(p => {
+                // Simple noise
+                const angle = Math.sin(p.x * 0.01 + frame * 0.01) * Math.PI;
+
+                p.vx += Math.cos(angle) * 0.1;
+                p.vy += Math.sin(angle) * 0.1;
+
+                p.vx *= 0.95;
+                p.vy *= 0.95;
+
+                p.x += p.vx;
+                p.y += p.vy;
+
+                // Wrap
+                if (p.x < 0) p.x = canvas.width;
+                if (p.x > canvas.width) p.x = 0;
+                if (p.y < 0) p.y = canvas.height;
+                if (p.y > canvas.height) p.y = 0;
+
+                // Draw
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            frame++;
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        info.innerHTML += '<br>Status: RUNNING';
+        console.log('✅ Animation started');
+    </script>
+</body>
+</html>

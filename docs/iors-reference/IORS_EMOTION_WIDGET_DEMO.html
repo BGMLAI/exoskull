@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS Emotion Widget - Demo & Docs</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 36px;
+            color: #1a1a1a;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 40px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            font-size: 24px;
+            color: #1a1a1a;
+            margin-bottom: 20px;
+        }
+
+        .widget-demo {
+            width: 100%;
+            height: 500px;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-primary {
+            background: #E31E24;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-success {
+            background: #4ade80;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #fbbf24;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f87171;
+            color: white;
+        }
+
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        pre {
+            background: #1a1a1a;
+            color: #f0f0f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .embed-section {
+            margin-top: 20px;
+        }
+
+        .embed-option {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .embed-option h3 {
+            font-size: 18px;
+            color: #1a1a1a;
+            margin-bottom: 10px;
+        }
+
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .copy-btn:hover {
+            background: #5568d3;
+        }
+
+        .features {
+            list-style: none;
+        }
+
+        .features li {
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .features li:last-child {
+            border-bottom: none;
+        }
+
+        .features li:before {
+            content: "✓ ";
+            color: #4ade80;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .api-method {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+
+        .api-method code {
+            background: transparent;
+            color: #E31E24;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-live {
+            background: #4ade80;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎭 IORS Emotion Widget</h1>
+        <p class="subtitle">
+            <span class="status-badge status-live">LIVE DEMO</span>
+            Widget wykrywający emocje w czasie rzeczywistym podczas rozmowy z IORS
+        </p>
+
+        <div class="grid">
+            <!-- LIVE WIDGET -->
+            <div class="card">
+                <h2>📱 Live Widget</h2>
+                <iframe
+                    class="widget-demo"
+                    src="IORS_EMOTION_WIDGET.html"
+                    id="emotionWidget"
+                ></iframe>
+
+                <div class="controls">
+                    <button class="btn btn-success" onclick="testEmotion('happy', 80)">😊 Radość</button>
+                    <button class="btn btn-secondary" onclick="testEmotion('sad', 70)">😢 Smutek</button>
+                    <button class="btn btn-danger" onclick="testEmotion('angry', 90)">😠 Złość</button>
+                    <button class="btn btn-warning" onclick="testEmotion('anxious', 60)">😰 Niepokój</button>
+                    <button class="btn btn-primary" onclick="testEmotion('neutral', 0)">😐 Reset</button>
+                </div>
+            </div>
+
+            <!-- FEATURES -->
+            <div class="card">
+                <h2>✨ Funkcje</h2>
+                <ul class="features">
+                    <li><strong>Real-time Emotion Detection</strong> - wykrywanie emocji z transkryptu VAPI</li>
+                    <li><strong>7 Emotions</strong> - neutral, happy, sad, angry, anxious, excited, calm</li>
+                    <li><strong>Intensity Tracking</strong> - poziom intensywności 0-100%</li>
+                    <li><strong>Beautiful Gradients</strong> - kolorowe tła dla każdej emocji</li>
+                    <li><strong>Emoji Representation</strong> - wizualna reprezentacja emocji</li>
+                    <li><strong>Smooth Transitions</strong> - płynne animacje przejść</li>
+                    <li><strong>Responsive Design</strong> - działa na mobile i desktop</li>
+                    <li><strong>Easy Embedding</strong> - łatwe wembedowanie na dowolną stronę</li>
+                    <li><strong>PostMessage API</strong> - komunikacja z parent page</li>
+                    <li><strong>Auto Decay</strong> - automatyczne zanikanie intensywności</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- EMBED CODE -->
+        <div class="card">
+            <h2>🔗 Jak Wembedować</h2>
+
+            <div class="embed-section">
+                <div class="embed-option">
+                    <h3>Opcja 1: IFrame (Najprostsze)</h3>
+                    <pre><code>&lt;!-- Wembeduj widget jako iframe --&gt;
+&lt;iframe
+    src="https://yourdomain.com/IORS_EMOTION_WIDGET.html"
+    width="320"
+    height="600"
+    style="border: none; border-radius: 12px;"
+&gt;&lt;/iframe&gt;</code></pre>
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopiuj</button>
+                </div>
+
+                <div class="embed-option">
+                    <h3>Opcja 2: Responsive IFrame</h3>
+                    <pre><code>&lt;div style="position: relative; width: 100%; max-width: 350px;"&gt;
+    &lt;iframe
+        src="https://yourdomain.com/IORS_EMOTION_WIDGET.html"
+        style="width: 100%; height: 600px; border: none; border-radius: 12px;"
+    &gt;&lt;/iframe&gt;
+&lt;/div&gt;</code></pre>
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopiuj</button>
+                </div>
+
+                <div class="embed-option">
+                    <h3>Opcja 3: Kontrola z JavaScript (PostMessage API)</h3>
+                    <pre><code>&lt;iframe
+    id="emotionWidget"
+    src="https://yourdomain.com/IORS_EMOTION_WIDGET.html"
+    width="320"
+    height="600"
+    style="border: none; border-radius: 12px;"
+&gt;&lt;/iframe&gt;
+
+&lt;script&gt;
+const widget = document.getElementById('emotionWidget');
+
+// Manualna aktualizacja emocji
+function updateEmotion(emotion, intensity) {
+    widget.contentWindow.postMessage({
+        type: 'IORS_EMOTION_UPDATE',
+        data: { emotion, intensity }
+    }, '*');
+}
+
+// Start VAPI call
+function startCall() {
+    widget.contentWindow.postMessage({
+        type: 'IORS_START_CALL'
+    }, '*');
+}
+
+// Stop VAPI call
+function stopCall() {
+    widget.contentWindow.postMessage({
+        type: 'IORS_STOP_CALL'
+    }, '*');
+}
+
+// Listen for emotion changes
+window.addEventListener('message', (event) => {
+    if (event.data.type === 'IORS_EMOTION_CHANGED') {
+        console.log('Emotion:', event.data.data);
+    }
+});
+&lt;/script&gt;</code></pre>
+                    <button class="copy-btn" onclick="copyCode(this)">📋 Kopiuj</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- API DOCUMENTATION -->
+        <div class="card">
+            <h2>📖 PostMessage API</h2>
+
+            <div class="api-method">
+                <h3>📤 IORS_EMOTION_UPDATE</h3>
+                <p>Manualna aktualizacja emocji</p>
+                <pre><code>widget.contentWindow.postMessage({
+    type: 'IORS_EMOTION_UPDATE',
+    data: {
+        emotion: 'happy',  // neutral, happy, sad, angry, anxious, excited, calm
+        intensity: 80      // 0-100
+    }
+}, '*');</code></pre>
+            </div>
+
+            <div class="api-method">
+                <h3>📤 IORS_START_CALL</h3>
+                <p>Start VAPI call (rozpocznij rozmowę)</p>
+                <pre><code>widget.contentWindow.postMessage({
+    type: 'IORS_START_CALL'
+}, '*');</code></pre>
+            </div>
+
+            <div class="api-method">
+                <h3>📤 IORS_STOP_CALL</h3>
+                <p>Stop VAPI call (zakończ rozmowę)</p>
+                <pre><code>widget.contentWindow.postMessage({
+    type: 'IORS_STOP_CALL'
+}, '*');</code></pre>
+            </div>
+
+            <div class="api-method">
+                <h3>📥 IORS_EMOTION_CHANGED</h3>
+                <p>Widget wysyła tę wiadomość przy zmianie emocji</p>
+                <pre><code>window.addEventListener('message', (event) => {
+    if (event.data.type === 'IORS_EMOTION_CHANGED') {
+        const { emotion, intensity } = event.data.data;
+        console.log('Current emotion:', emotion, intensity);
+    }
+});</code></pre>
+            </div>
+        </div>
+
+        <!-- EMOTIONS -->
+        <div class="card">
+            <h2>🎭 Dostępne Emocje</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr style="border-bottom: 2px solid #e0e0e0;">
+                    <th style="padding: 10px; text-align: left;">Emoji</th>
+                    <th style="padding: 10px; text-align: left;">ID</th>
+                    <th style="padding: 10px; text-align: left;">Nazwa</th>
+                    <th style="padding: 10px; text-align: left;">Opis</th>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px; font-size: 24px;">😐</td>
+                    <td style="padding: 10px;"><code>neutral</code></td>
+                    <td style="padding: 10px;">Neutral</td>
+                    <td style="padding: 10px;">Spokojny stan emocjonalny</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px; font-size: 24px;">😊</td>
+                    <td style="padding: 10px;"><code>happy</code></td>
+                    <td style="padding: 10px;">Radość</td>
+                    <td style="padding: 10px;">Pozytywny, radosny nastrój</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px; font-size: 24px;">😢</td>
+                    <td style="padding: 10px;"><code>sad</code></td>
+                    <td style="padding: 10px;">Smutek</td>
+                    <td style="padding: 10px;">Przygnębiony, smutny nastrój</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px; font-size: 24px;">😠</td>
+                    <td style="padding: 10px;"><code>angry</code></td>
+                    <td style="padding: 10px;">Złość</td>
+                    <td style="padding: 10px;">Zdenerwowany, zirytowany</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px; font-size: 24px;">😰</td>
+                    <td style="padding: 10px;"><code>anxious</code></td>
+                    <td style="padding: 10px;">Niepokój</td>
+                    <td style="padding: 10px;">Niespokojny, zaniepokojony</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 10px; font-size: 24px;">🤩</td>
+                    <td style="padding: 10px;"><code>excited</code></td>
+                    <td style="padding: 10px;">Ekscytacja</td>
+                    <td style="padding: 10px;">Podekscytowany, entuzjastyczny</td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; font-size: 24px;">😌</td>
+                    <td style="padding: 10px;"><code>calm</code></td>
+                    <td style="padding: 10px;">Spokój</td>
+                    <td style="padding: 10px;">Zrelaksowany, spokojny</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- FOOTER -->
+        <div style="text-align: center; margin-top: 60px; padding: 30px 0; border-top: 1px solid #e0e0e0;">
+            <div style="font-size: 12px; color: #999; margin-bottom: 10px;">POWERED BY</div>
+            <div style="font-size: 24px; font-weight: 700; color: #E31E24;">• IORS.AI •</div>
+        </div>
+    </div>
+
+    <script>
+        const widget = document.getElementById('emotionWidget');
+
+        // Test emotion function
+        function testEmotion(emotion, intensity) {
+            widget.contentWindow.postMessage({
+                type: 'IORS_EMOTION_UPDATE',
+                data: { emotion, intensity }
+            }, '*');
+        }
+
+        // Listen for emotion changes from widget
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'IORS_EMOTION_CHANGED') {
+                console.log('🎭 Emotion changed:', event.data.data);
+            }
+        });
+
+        // Copy code function
+        function copyCode(btn) {
+            const pre = btn.previousElementSibling;
+            const code = pre.textContent;
+
+            navigator.clipboard.writeText(code).then(() => {
+                btn.textContent = '✓ Skopiowano!';
+                setTimeout(() => {
+                    btn.textContent = '📋 Kopiuj';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

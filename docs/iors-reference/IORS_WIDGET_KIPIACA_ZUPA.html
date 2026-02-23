@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS Widget - Kipiąca Zupa</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #ffffff;
+            overflow: hidden;
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .voice-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            cursor: pointer;
+        }
+
+        #voiceCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        .logo-container {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 0.5s;
+        }
+
+        .logo-text {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -1px;
+        }
+
+        .logo-dot {
+            width: 14px;
+            height: 14px;
+            background: #E31E24;
+            border-radius: 50%;
+        }
+
+        .status-text {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #333;
+            font-size: 18px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 1.5s;
+            z-index: 10;
+        }
+
+        .status-text.active {
+            color: #E31E24;
+            font-weight: 600;
+        }
+
+        .debug-panel {
+            position: absolute;
+            top: 120px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-family: monospace;
+            z-index: 10;
+            min-width: 200px;
+        }
+
+        .debug-panel div {
+            margin: 5px 0;
+        }
+
+        .test-button {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: #E31E24;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 10;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .test-button:hover {
+            background: #c41a1f;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .logo-text { font-size: 28px; }
+            .logo-dot { width: 10px; height: 10px; }
+            .status-text { font-size: 14px; bottom: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="voice-container" id="voiceContainer">
+        <div class="logo-container">
+            <div class="logo-dot"></div>
+            <div class="logo-text">iors.ai</div>
+            <div class="logo-dot"></div>
+        </div>
+
+        <canvas id="voiceCanvas"></canvas>
+
+        <button class="test-button" id="testButton">🌊 TEST EFEKTU</button>
+        <div class="status-text" id="statusText">Dotknij aby rozpocząć</div>
+
+        <!-- Debug Panel -->
+        <div class="debug-panel" id="debugPanel">
+            <div><strong>🔬 Monitor</strong></div>
+            <div>Widoczność twarzy: <span id="debugFaceVis">0%</span></div>
+            <div>Głębokość rozmowy: <span id="debugDepth">0%</span></div>
+            <div>Intensywność emocji: <span id="debugEmotion">0%</span></div>
+            <div>IORS mówi: <span id="debugSpeaking">Nie</span></div>
+            <div>Fale dźwiękowe: <span id="debugWaves">0</span></div>
+        </div>
+    </div>
+
+    <!-- VAPI SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+
+    <!-- MediaPipe Face Detection -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+
+    <!-- Hidden video for face detection -->
+    <video id="faceVideo" style="display:none;" autoplay playsinline></video>
+
+    <script>
+        // ========================================================================
+        // KONFIGURACJA VAPI
+        // ========================================================================
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = 'adf258e0-3a41-444e-b683-38c195bd7954'; // Zmień na swój ID
+
+        let vapiInstance = null;
+        let isActive = false;
+        let iorsIsSpeaking = false;
+
+        // Conversation analysis (for face visibility)
+        let conversationDepth = 0;  // 0-1 (0=simple chat, 1=deep emotional)
+        let emotionalIntensity = 0; // 0-1 (0=neutral, 1=very emotional)
+        let faceVisibility = 0;      // 0-1 (0=invisible, 1=fully visible)
+
+        // ========================================================================
+        // CANVAS SETUP
+        // ========================================================================
+        const canvas = document.getElementById('voiceCanvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        let centerX = width / 2;
+        let centerY = height / 2;
+
+        // ========================================================================
+        // SOUNDWAVES (kiedy IORS mówi)
+        // ========================================================================
+        const soundwaves = [];
+
+        class Soundwave {
+            constructor() {
+                this.x = centerX;
+                this.radius = 0;
+                this.maxRadius = Math.max(width, height) * 0.8;
+                this.speed = 15;  // SZYBKIE fale
+                this.opacity = 1;
+            }
+
+            update() {
+                this.radius += this.speed;
+                this.opacity = 1 - (this.radius / this.maxRadius);
+                return this.radius < this.maxRadius;
+            }
+
+            draw() {
+                // Czerwona fala
+                ctx.strokeStyle = `rgba(227, 30, 36, ${this.opacity * 0.5})`;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, this.radius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            affectsParticle(px, py) {
+                const dist = Math.sqrt((px - centerX) ** 2 + (py - centerY) ** 2);
+                const waveDist = Math.abs(dist - this.radius);
+                return waveDist < 80;  // Szersze fale dla więcej particles
+            }
+        }
+
+        // ========================================================================
+        // CURL NOISE - for fluid, magma-like movement
+        // ========================================================================
+        function curlNoise(x, y, time) {
+            // Większe skale = więcej chaosu
+            const scale1 = 0.005;
+            const scale2 = 0.010;
+            const scale3 = 0.020;
+
+            // Szybsze zmiany w czasie
+            const n1x = Math.sin(x * scale1 + time * 0.0005) * Math.cos(y * scale1 + time * 0.0004);
+            const n1y = Math.cos(x * scale1 + time * 0.0004) * Math.sin(y * scale1 + time * 0.0005);
+
+            const n2x = Math.sin(x * scale2 + time * 0.0008 + 100) * Math.cos(y * scale2 + time * 0.0006 + 100);
+            const n2y = Math.cos(x * scale2 + time * 0.0006 + 100) * Math.sin(y * scale2 + time * 0.0008 + 100);
+
+            const n3x = Math.sin(x * scale3 + time * 0.0010 + 200) * Math.cos(y * scale3 + time * 0.0009 + 200);
+            const n3y = Math.cos(x * scale3 + time * 0.0009 + 200) * Math.sin(y * scale3 + time * 0.0010 + 200);
+
+            // Silniejsze warstwy
+            return {
+                x: n1x * 1.2 + n2x * 0.8 + n3x * 0.5,
+                y: n1y * 1.2 + n2y * 0.8 + n3y * 0.5
+            };
+        }
+
+        function perlinNoise(x, y, time) {
+            const scale = 0.015;  // Większa skala = więcej chaosu
+            return (Math.sin(x * scale + time * 0.0003) * Math.cos(y * scale + time * 0.00035) + 1) / 2;  // Szybsze zmiany
+        }
+
+        // ========================================================================
+        // KIPIĄCA ZUPA - PARTICLES
+        // ========================================================================
+        class ChaosParticle {
+            constructor(targetX, targetY, size) {
+                // UNIFORM distribution - równomierne wypełnienie
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.size = size;
+
+                // Velocity - SZYBKIE startowe
+                this.vx = (Math.random() - 0.5) * (1.5 + Math.random() * 3.0);  // 1.5-4.5
+                this.vy = (Math.random() - 0.5) * (1.5 + Math.random() * 3.0);
+
+                // Multiple noise layers - OGROMNE offsety dla unikalności
+                this.noiseOffset1 = Math.random() * 100000;  // 10x więcej!
+                this.noiseOffset2 = Math.random() * 100000;
+                this.noiseOffset3 = Math.random() * 100000;
+
+                // Random speeds - BARDZO SZYBKIE
+                this.speed1 = 0.005 + Math.random() * 0.030;  // Duży zakres
+                this.speed2 = 0.005 + Math.random() * 0.030;
+                this.speed3 = 0.005 + Math.random() * 0.030;
+
+                // Losowe phase shifts (dodatkowa warstwa różnorodności)
+                this.phaseShift1 = Math.random() * Math.PI * 2;
+                this.phaseShift2 = Math.random() * Math.PI * 2;
+                this.phaseShift3 = Math.random() * Math.PI * 2;
+
+                this.chaosMultiplier = 0.5 + Math.random() * 3.0;  // BARDZO ogromny zakres dla nieregularności
+                this.organization = 0;
+
+                // Fluid dynamics parameters (kipiąca zupa) - każdy unikalny
+                this.fluidOffset = Math.random() * 50000;  // 10x więcej!
+                this.buoyancy = 0.2 + Math.random() * 2.0; // Ogromny zakres
+
+                // Dodatkowe losowe parametry
+                this.turbulenceFreq = 0.01 + Math.random() * 0.08;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.03;  // BARDZO szybka rotacja
+
+                // Unikalne skale dla noise (każdy particle widzi inny wzór)
+                this.noiseScaleX = 0.8 + Math.random() * 0.4;  // 0.8-1.2
+                this.noiseScaleY = 0.8 + Math.random() * 0.4;
+                this.noiseScaleTime = 0.8 + Math.random() * 0.4;
+
+                // Unikalny damping (każdy particle hamuje inaczej)
+                this.baseDamping = 0.95 + Math.random() * 0.03;  // 0.95-0.98
+
+                // Losowe parametry wirów
+                this.vortexFreq = 0.01 + Math.random() * 0.05;
+                this.vortexStrength = 1.0 + Math.random() * 4.0;
+
+                // TEMPORAL DRIFT - BARDZO SZYBKIE zmiany dla nieregularności
+                this.driftSpeed1 = (Math.random() - 0.5) * 1.0;  // Bardzo duża zmienność
+                this.driftSpeed2 = (Math.random() - 0.5) * 1.0;
+                this.driftSpeed3 = (Math.random() - 0.5) * 1.0;
+
+                // UNIQUE RANDOM SEED - wpływa na wszystkie obliczenia
+                this.randomSeed = Math.random() * 10000;
+
+                // BROWNIAN MOTION - DUŻE losowe kroki dla nieregularności
+                this.brownianStrength = 0.3 + Math.random() * 1.0;  // Znacznie większy zakres
+
+                // NOISE FUNCTION VARIANT - każdy particle używa innej kombinacji
+                this.noiseVariant = Math.floor(Math.random() * 3);  // 0=sin/cos, 1=cos/sin, 2=mixed
+            }
+
+            update(time) {
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+
+                // CHECK SOUNDWAVE FIRST
+                let affectedByWave = false;
+                for (let wave of soundwaves) {
+                    if (wave.affectsParticle(this.x, this.y)) {
+                        affectedByWave = true;
+                        break;
+                    }
+                }
+
+                // Update organization (SZYBKO)
+                if (affectedByWave) {
+                    this.organization = Math.min(1, this.organization + 0.08);  // Szybkie uspokajanie
+                } else {
+                    this.organization *= 0.96;  // Szybko wraca do chaosu
+                }
+
+                // CHAOS LEVEL - odwrotne do organization
+                const chaosLevel = 1 - this.organization;  // 1 = max chaos, 0 = spokój
+
+                // TEMPORAL DRIFT - offsety powoli się zmieniają (eliminuje powtarzalność)
+                this.noiseOffset1 += this.driftSpeed1 * chaosLevel;
+                this.noiseOffset2 += this.driftSpeed2 * chaosLevel;
+                this.noiseOffset3 += this.driftSpeed3 * chaosLevel;
+
+                // CURL NOISE - z temporal drift, phase shifts i unique scales
+                // Każdy particle używa innego wariantu funkcji (sin/cos kombinacje)
+                let curlX, curlY;
+                const baseX = (this.x + this.noiseOffset1 + Math.sin(time * this.speed1 + this.phaseShift1 + this.randomSeed) * 100) * this.noiseScaleX;
+                const baseY = (this.y + this.noiseOffset2 + Math.cos(time * this.speed2 + this.phaseShift2 + this.randomSeed) * 100) * this.noiseScaleY;
+                const baseT = time * this.noiseScaleTime + this.randomSeed;
+
+                if (this.noiseVariant === 0) {
+                    // Wariant 1: sin/cos
+                    const curl = curlNoise(baseX, baseY, baseT);
+                    curlX = curl.x;
+                    curlY = curl.y;
+                } else if (this.noiseVariant === 1) {
+                    // Wariant 2: cos/sin (odwrócone)
+                    const curl = curlNoise(baseY, baseX, baseT + 1000);
+                    curlX = curl.y;
+                    curlY = curl.x;
+                } else {
+                    // Wariant 3: mix obu z dodatkową nieliniowością
+                    const curl1 = curlNoise(baseX, baseY, baseT);
+                    const curl2 = curlNoise(baseY * 1.3, baseX * 0.7, baseT * 1.5);
+                    curlX = curl1.x * 0.6 + curl2.y * 0.4;
+                    curlY = curl1.y * 0.6 + curl2.x * 0.4;
+                }
+
+                this.vx += curlX * (1.5 + this.chaosMultiplier * 1.0) * chaosLevel;  // SZYBKIE
+                this.vy += curlY * (1.5 + this.chaosMultiplier * 1.0) * chaosLevel;
+
+                // BROWNIAN MOTION - DUŻE losowe kroki dla nieregularności
+                this.vx += (Math.random() - 0.5) * this.brownianStrength * 4.0 * chaosLevel;  // SZYBKIE
+                this.vy += (Math.random() - 0.5) * this.brownianStrength * 4.0 * chaosLevel;
+
+                // Rotacja (każdy particle obraca się inaczej)
+                const rotation = this.rotationSpeed * chaosLevel;
+                const tempVx = this.vx;
+                this.vx = this.vx * Math.cos(rotation) - this.vy * Math.sin(rotation);
+                this.vy = tempVx * Math.sin(rotation) + this.vy * Math.cos(rotation);
+
+                // Dodatkowa losowa turbulencja (DUŻA nieregularność)
+                if (Math.random() < this.turbulenceFreq * 2.0) {  // Bardzo często
+                    this.vx += (Math.random() - 0.5) * 4.0;  // MOCNE uderzenia
+                    this.vy += (Math.random() - 0.5) * 4.0;
+                }
+
+                // MAGMA BUBBLING - każdy particle inaczej z temporal drift
+                const bubbleNoise = perlinNoise(
+                    this.x + this.fluidOffset + this.noiseOffset1 * 0.3,  // Używamy drifting offset
+                    this.y + this.fluidOffset * 0.7 + this.noiseOffset2 * 0.3,
+                    time + this.phaseShift3 * 1000 + this.randomSeed
+                );
+                const bubbleThreshold = 0.55 + (this.buoyancy * 0.05);  // Każdy particle inny próg
+                if (bubbleNoise > bubbleThreshold && chaosLevel > 0.3) {
+                    const bubbleForce = (bubbleNoise - bubbleThreshold) * this.buoyancy * chaosLevel;
+                    this.vy -= bubbleForce * (2.5 + Math.random() * 3.0);  // SZYBKIE
+                }
+
+                // Eruptions - częste i BARDZO mocne
+                const eruptionChance = 0.004 * chaosLevel * this.buoyancy;  // Bardzo często
+                if (Math.random() < eruptionChance) {
+                    this.vy -= (4.0 + Math.random() * 6.0) * chaosLevel;  // BARDZO mocne
+                    this.vx += (Math.random() - 0.5) * (5.0 + Math.random() * 4.0);  // BARDZO mocne
+                }
+
+                // NIE MA GRAWITACJI DO CENTRUM ani DO TWARZY - particles chodzą nieregularnie
+
+                // Losowe wiry (DUŻE nieregularne zaburzenia)
+                if (Math.random() < this.vortexFreq * 1.5) {  // Bardzo często
+                    const angle = Math.random() * Math.PI * 2;
+                    const force = this.vortexStrength * 2.0 * chaosLevel;  // BARDZO mocna siła
+                    this.vx += Math.cos(angle) * force;
+                    this.vy += Math.sin(angle) * force;
+                }
+
+                // Damping - każdy particle hamuje inaczej
+                const damping = this.baseDamping - this.organization * 0.08;
+                this.vx *= damping;
+                this.vy *= damping;
+
+                // Movement
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Wrap around edges (zamiast gravity) - równomierne wypełnienie
+                if (this.x < 0) this.x = width;
+                if (this.x > width) this.x = 0;
+                if (this.y < 0) this.y = height;
+                if (this.y > height) this.y = 0;
+            }
+
+            draw() {
+                // Color: czerwone BEZ fali (chaos), czarne PO fali (spokój)
+                const chaosLevel = 1 - this.organization;  // 1 = chaos, 0 = peace
+
+                // Chaos (brak fali) = czerwone
+                // Peace (po fali) = czarne
+                const r = Math.floor(26 + chaosLevel * 201);  // 227 w chaosie, 26 w spokoju
+                const g = Math.floor(26 + chaosLevel * 4);    // 30 w chaosie, 26 w spokoju
+                const b = Math.floor(26 + chaosLevel * 10);   // 36 w chaosie, 26 w spokoju
+
+                const alpha = 0.6 + chaosLevel * 0.4;  // Bardziej widoczne w chaosie
+
+                // Dodatkowa losowa wariacja rozmiaru (pulsowanie)
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                const sizePulse = 1.0 + (speed * 0.02) + Math.sin(this.randomSeed + time * 0.01) * 0.15;
+
+                // ROZMIAR: mniejszy w spokoju (gęsta kula), większy w chaosie
+                const chaosSize = 0.3 + chaosLevel * 0.7;  // 0.3x w spokoju, 1.0x w chaosie
+                const finalSize = this.size * sizePulse * chaosSize;
+
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, finalSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // ========================================================================
+        // PARTICLES INITIALIZATION
+        // ========================================================================
+        const particles = [];
+        let userFaceLandmarks = null;
+
+        function initParticles() {
+            particles.length = 0;
+            const numParticles = 50000;  // ZNACZNIE WIĘCEJ!
+
+            if (userFaceLandmarks && userFaceLandmarks.length > 0) {
+                for (let i = 0; i < numParticles; i++) {
+                    const landmark = userFaceLandmarks[Math.floor(Math.random() * userFaceLandmarks.length)];
+                    const targetX = centerX + (landmark.x - 0.5) * width * 0.4;
+                    const targetY = centerY + (landmark.y - 0.5) * height * 0.5;
+
+                    // ŚREDNIE particles (więcej, więc mniejsze)
+                    const size = 1.0 + Math.random() * 1.5;  // 1.0-2.5px
+
+                    particles.push(new ChaosParticle(targetX, targetY, size));
+                }
+            } else {
+                // Default ellipse
+                const formWidth = Math.min(width, height) * 0.22;
+                const formHeight = Math.min(width, height) * 0.28;
+
+                for (let i = 0; i < numParticles; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const r = Math.random();  // Uniform, nie power
+
+                    const targetX = centerX + Math.cos(angle) * formWidth * r;
+                    const targetY = centerY + Math.sin(angle) * formHeight * r;
+
+                    const size = 1.0 + Math.random() * 1.5;  // 1.0-2.5px - ŚREDNIE
+                    particles.push(new ChaosParticle(targetX, targetY, size));
+                }
+            }
+        }
+
+        // ========================================================================
+        // FACE DETECTION
+        // ========================================================================
+        async function initFaceDetection() {
+            try {
+                const video = document.getElementById('faceVideo');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: 640, height: 480 }
+                });
+                video.srcObject = stream;
+
+                if (typeof FaceMesh === 'undefined') {
+                    setTimeout(initFaceDetection, 1000);
+                    return;
+                }
+
+                const faceMesh = new FaceMesh({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`
+                });
+
+                faceMesh.setOptions({
+                    maxNumFaces: 1,
+                    refineLandmarks: false,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                faceMesh.onResults((results) => {
+                    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                        userFaceLandmarks = results.multiFaceLandmarks[0];
+
+                        if (particles.length > 0) {
+                            particles.forEach((particle, i) => {
+                                const landmark = userFaceLandmarks[i % userFaceLandmarks.length];
+                                particle.targetX = centerX + (landmark.x - 0.5) * width * 0.5;
+                                particle.targetY = centerY + (landmark.y - 0.5) * height * 0.6;
+                            });
+                        }
+                    }
+                });
+
+                async function detectFace() {
+                    if (video.readyState === 4) {
+                        await faceMesh.send({ image: video });
+                    }
+                    setTimeout(detectFace, 100);
+                }
+
+                video.onloadeddata = () => {
+                    console.log('✅ Face detection started');
+                    detectFace();
+                };
+
+            } catch (error) {
+                console.warn('Face detection failed:', error);
+            }
+        }
+
+        // ========================================================================
+        // FACE VISIBILITY LOGIC
+        // ========================================================================
+        function updateFaceVisibility() {
+            // Target visibility: show face only in emotional conversations
+            const targetVisibility = (conversationDepth > 0.5 && emotionalIntensity > 0.4) ? 1.0 : 0.0;
+
+            // Smooth interpolation
+            const lerpSpeed = targetVisibility > faceVisibility ? 0.005 : 0.02;
+            faceVisibility += (targetVisibility - faceVisibility) * lerpSpeed;
+
+            // Random flashes (brief glimpses)
+            if (Math.random() < 0.003 && faceVisibility < 0.3) {
+                faceVisibility = Math.min(1.0, faceVisibility + 0.4);
+            }
+
+            // Update debug panel
+            document.getElementById('debugFaceVis').textContent = Math.floor(faceVisibility * 100) + '%';
+            document.getElementById('debugDepth').textContent = Math.floor(conversationDepth * 100) + '%';
+            document.getElementById('debugEmotion').textContent = Math.floor(emotionalIntensity * 100) + '%';
+            document.getElementById('debugSpeaking').textContent = iorsIsSpeaking ? 'TAK' : 'Nie';
+        }
+
+        // ========================================================================
+        // ANIMATION LOOP
+        // ========================================================================
+        let time = 0;
+        function animate() {
+            // Clear canvas (no motion blur) - BIAŁE TŁO
+            ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+            ctx.fillRect(0, 0, width, height);
+
+            time += 2;  // SZYBKIE animacje
+
+            // Update face visibility
+            updateFaceVisibility();
+
+            // Update soundwaves
+            for (let i = soundwaves.length - 1; i >= 0; i--) {
+                if (!soundwaves[i].update()) {
+                    soundwaves.splice(i, 1);
+                } else {
+                    soundwaves[i].draw();
+                }
+            }
+
+            // Update debug
+            document.getElementById('debugWaves').textContent = soundwaves.length;
+
+            // Update particles (KIPIĄCA ZUPA)
+            particles.forEach(particle => {
+                particle.update(time);
+                particle.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // ========================================================================
+        // RESPONSIVE
+        // ========================================================================
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            // Update center after resize
+            centerX = width / 2;
+            centerY = height / 2;
+            initParticles();
+        });
+
+        // ========================================================================
+        // VAPI INTEGRATION
+        // ========================================================================
+        function initVapi() {
+            if (typeof window.Vapi === 'undefined') {
+                setTimeout(initVapi, 1000);
+                return;
+            }
+
+            vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+            vapiInstance.on('call-start', () => {
+                isActive = true;
+                document.getElementById('statusText').textContent = 'Słucham...';
+                document.getElementById('statusText').classList.add('active');
+            });
+
+            vapiInstance.on('call-end', () => {
+                isActive = false;
+                iorsIsSpeaking = false;
+                conversationDepth = 0;
+                emotionalIntensity = 0;
+                const statusEl = document.getElementById('statusText');
+                statusEl.textContent = 'Rozmowa zakończona';
+                statusEl.classList.remove('active');
+                setTimeout(() => {
+                    statusEl.textContent = 'Dotknij aby rozpocząć';
+                }, 3000);
+            });
+
+            vapiInstance.on('speech-start', () => {
+                iorsIsSpeaking = false;
+            });
+
+            vapiInstance.on('speech-end', () => {
+                iorsIsSpeaking = false;
+            });
+
+            // Assistant speaking - CREATE SOUNDWAVE + analyze emotion
+            vapiInstance.on('message', (msg) => {
+                if (msg.type === 'transcript' && msg.role === 'assistant') {
+                    soundwaves.push(new Soundwave());
+                    iorsIsSpeaking = true;
+
+                    // Analyze conversation (simple keyword detection)
+                    const text = msg.text?.toLowerCase() || '';
+                    const emotionalKeywords = ['czuję', 'emocj', 'trudny', 'ciężki', 'boli', 'strach', 'lęk', 'smutek', 'złość', 'gniew', 'stres'];
+                    const deepKeywords = ['dlaczego', 'kim jestem', 'sens', 'wartość', 'cel', 'marzenia', 'przeszłość', 'przyszłość'];
+
+                    if (emotionalKeywords.some(kw => text.includes(kw))) {
+                        emotionalIntensity = Math.min(1, emotionalIntensity + 0.15);
+                    }
+                    if (deepKeywords.some(kw => text.includes(kw))) {
+                        conversationDepth = Math.min(1, conversationDepth + 0.1);
+                    }
+
+                    // Decay over time
+                    setTimeout(() => {
+                        emotionalIntensity *= 0.95;
+                        conversationDepth *= 0.98;
+                    }, 10000);
+                }
+
+                if (msg.type === 'transcript' && msg.role === 'user') {
+                    // Analyze user messages
+                    const text = msg.text?.toLowerCase() || '';
+                    const emotionalKeywords = ['czuję', 'emocj', 'trudny', 'ciężki', 'boli', 'strach', 'lęk', 'smutek', 'złość', 'gniew', 'stres'];
+
+                    if (emotionalKeywords.some(kw => text.includes(kw))) {
+                        emotionalIntensity = Math.min(1, emotionalIntensity + 0.2);
+                    }
+                }
+            });
+
+            vapiInstance.on('function-call', () => {
+                soundwaves.push(new Soundwave());
+            });
+
+            vapiInstance.on('error', (error) => {
+                console.error('VAPI Error:', error);
+                isActive = false;
+            });
+
+            console.log('✅ VAPI initialized');
+        }
+
+        // ========================================================================
+        // TEST BUTTON - simulate emotional conversation
+        // ========================================================================
+        let autoTestInterval = null;
+        document.getElementById('testButton').addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            if (autoTestInterval) {
+                clearInterval(autoTestInterval);
+                autoTestInterval = null;
+                document.getElementById('testButton').textContent = '🌊 TEST EFEKTU';
+                console.log('⏹️ Test zatrzymany');
+
+                // Reset
+                conversationDepth = 0;
+                emotionalIntensity = 0;
+                iorsIsSpeaking = false;
+            } else {
+                // Start auto-test with emotion simulation
+                soundwaves.push(new Soundwave());
+                iorsIsSpeaking = true;
+
+                let testCounter = 0;
+                autoTestInterval = setInterval(() => {
+                    soundwaves.push(new Soundwave());
+                    iorsIsSpeaking = !iorsIsSpeaking;
+
+                    testCounter++;
+                    conversationDepth = Math.min(1, testCounter * 0.05);
+                    emotionalIntensity = Math.min(1, testCounter * 0.06);
+
+                    console.log('🌊 Fala | Głębokość:', conversationDepth.toFixed(2), '| Emocje:', emotionalIntensity.toFixed(2));
+                }, 2000);
+
+                document.getElementById('testButton').textContent = '⏹️ ZATRZYMAJ';
+                console.log('▶️ Test uruchomiony - symulacja emocjonalnej rozmowy');
+            }
+        });
+
+        // ========================================================================
+        // CLICK TO START/STOP
+        // ========================================================================
+        document.getElementById('voiceContainer').addEventListener('click', (e) => {
+            if (e.target.id === 'testButton') return;
+            if (!vapiInstance) {
+                alert('VAPI nie jest gotowy. Odśwież stronę.');
+                return;
+            }
+
+            if (isActive) {
+                vapiInstance.stop();
+                document.getElementById('statusText').textContent = 'Rozłączanie...';
+            } else {
+                document.getElementById('statusText').textContent = 'Łączenie...';
+                vapiInstance.start(ASSISTANT_ID);
+            }
+        });
+
+        // ========================================================================
+        // INIT
+        // ========================================================================
+        initParticles();
+        animate();
+        window.addEventListener('load', () => {
+            initVapi();
+            initFaceDetection();
+        });
+    </script>
+</body>
+</html>

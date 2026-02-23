@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS - Oddychająca Galaktyka</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            overflow: hidden;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        /* Main container */
+        .galaxy-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(ellipse at center, #0f0404 0%, #0a0a0a 70%);
+            cursor: pointer;
+        }
+
+        /* Canvas for particles */
+        #galaxyCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Logo container */
+        .logo-container {
+            position: absolute;
+            top: 40px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 0.5s;
+        }
+
+        .logo-text {
+            font-size: 48px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -2px;
+        }
+
+        .logo-dot {
+            width: 16px;
+            height: 16px;
+            background: #E31E24;
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(227, 30, 36, 0.8);
+            animation: logo-pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes logo-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+        }
+
+        /* Status text */
+        .status-text {
+            position: absolute;
+            bottom: 100px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 20px;
+            font-weight: 300;
+            letter-spacing: 3px;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 1.5s;
+            z-index: 10;
+        }
+
+        .status-text.active {
+            color: rgba(0, 255, 102, 0.9);
+            font-weight: 500;
+            animation: pulse-text 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-text {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 0.7; transform: translateY(0); }
+        }
+
+        /* Mobile optimization */
+        @media (max-width: 768px) {
+            .logo-text {
+                font-size: 32px;
+            }
+
+            .logo-dot {
+                width: 12px;
+                height: 12px;
+            }
+
+            .status-text {
+                font-size: 16px;
+                bottom: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="galaxy-container" id="galaxyContainer">
+        <!-- Logo -->
+        <div class="logo-container">
+            <div class="logo-dot"></div>
+            <div class="logo-text">iors.ai</div>
+            <div class="logo-dot"></div>
+        </div>
+
+        <!-- Canvas for galaxy -->
+        <canvas id="galaxyCanvas"></canvas>
+
+        <!-- Status -->
+        <div class="status-text" id="statusText">Dotknij aby rozpocząć</div>
+    </div>
+
+    <!-- VAPI SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+
+    <!-- Galaxy Animation + VAPI Logic -->
+    <script>
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = 'adf258e0-3a41-444e-b683-38c195bd7954';
+
+        let vapiInstance = null;
+        let isActive = false;
+
+        // Canvas setup
+        const canvas = document.getElementById('galaxyCanvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        // Particle system
+        class Particle {
+            constructor(x, y, size, speed) {
+                this.baseX = x;
+                this.baseY = y;
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.speed = speed;
+                this.angle = Math.random() * Math.PI * 2;
+                this.offset = 0;
+                this.maxOffset = Math.random() * 30 + 20;
+            }
+
+            update(breathPhase, isActive) {
+                // Oddychanie (breath effect)
+                this.offset = Math.sin(breathPhase + this.angle) * this.maxOffset * (isActive ? 1.5 : 1);
+
+                this.x = this.baseX + Math.cos(this.angle) * this.offset;
+                this.y = this.baseY + Math.sin(this.angle) * this.offset;
+
+                // Rotacja galaktyki
+                this.angle += this.speed * (isActive ? 1.5 : 1);
+            }
+
+            draw() {
+                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
+
+                if (isActive) {
+                    // Zielony podczas rozmowy
+                    gradient.addColorStop(0, 'rgba(0, 255, 102, 0.9)');
+                    gradient.addColorStop(0.5, 'rgba(0, 255, 102, 0.5)');
+                    gradient.addColorStop(1, 'rgba(0, 255, 102, 0)');
+                } else {
+                    // Czerwony idle
+                    gradient.addColorStop(0, 'rgba(227, 30, 36, 0.9)');
+                    gradient.addColorStop(0.5, 'rgba(227, 30, 36, 0.5)');
+                    gradient.addColorStop(1, 'rgba(227, 30, 36, 0)');
+                }
+
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Glow effect
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = isActive ? 'rgba(0, 255, 102, 0.5)' : 'rgba(227, 30, 36, 0.5)';
+            }
+        }
+
+        // Create galaxy particles
+        const particles = [];
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const particleCount = 150; // Ilość kropek
+
+        function initParticles() {
+            particles.length = 0;
+
+            for (let i = 0; i < particleCount; i++) {
+                // Rozkład spiralny (galaktyka)
+                const angle = (i / particleCount) * Math.PI * 4;
+                const radius = (i / particleCount) * Math.min(width, height) * 0.35;
+
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+
+                const size = Math.random() * 3 + 2; // Wielkość kropki
+                const speed = (Math.random() * 0.002 + 0.001) * (1 - i / particleCount); // Wolniejsze na zewnątrz
+
+                particles.push(new Particle(x, y, size, speed));
+            }
+
+            // Dodaj kilka większych centralnych kropek
+            for (let i = 0; i < 5; i++) {
+                const angle = (i / 5) * Math.PI * 2;
+                const radius = 50;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+
+                particles.push(new Particle(x, y, 8, 0.003));
+            }
+
+            // Centralna kropka (największa)
+            particles.push(new Particle(centerX, centerY, 15, 0));
+        }
+
+        // Animation loop
+        let breathPhase = 0;
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+
+            breathPhase += isActive ? 0.03 : 0.015; // Szybsze oddychanie podczas rozmowy
+
+            particles.forEach(particle => {
+                particle.update(breathPhase, isActive);
+                particle.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            initParticles();
+        });
+
+        // Initialize VAPI
+        function initVapi() {
+            if (typeof window.Vapi === 'undefined') {
+                console.error('VAPI SDK not loaded');
+                setTimeout(initVapi, 1000);
+                return;
+            }
+
+            vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+            vapiInstance.on('call-start', () => {
+                console.log('Call started');
+                isActive = true;
+                const statusEl = document.getElementById('statusText');
+                statusEl.textContent = 'Połączony - Mów do mnie';
+                statusEl.classList.add('active');
+            });
+
+            vapiInstance.on('call-end', () => {
+                console.log('Call ended');
+                isActive = false;
+                const statusEl = document.getElementById('statusText');
+                statusEl.textContent = 'Rozmowa zakończona';
+                statusEl.classList.remove('active');
+
+                setTimeout(() => {
+                    statusEl.textContent = 'Dotknij aby rozpocząć';
+                }, 3000);
+            });
+
+            vapiInstance.on('error', (error) => {
+                console.error('VAPI Error:', error);
+                const statusEl = document.getElementById('statusText');
+                statusEl.textContent = 'Błąd połączenia';
+                isActive = false;
+            });
+
+            console.log('✅ VAPI initialized');
+        }
+
+        // Handle click
+        document.getElementById('galaxyContainer').addEventListener('click', () => {
+            if (!vapiInstance) {
+                alert('VAPI nie jest gotowy. Odśwież stronę.');
+                return;
+            }
+
+            if (isActive) {
+                vapiInstance.stop();
+                document.getElementById('statusText').textContent = 'Rozłączanie...';
+            } else {
+                document.getElementById('statusText').textContent = 'Łączenie...';
+                vapiInstance.start(ASSISTANT_ID);
+            }
+        });
+
+        // Initialize
+        initParticles();
+        animate();
+        window.addEventListener('load', initVapi);
+    </script>
+</body>
+</html>

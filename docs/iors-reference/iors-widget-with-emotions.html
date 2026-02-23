@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS Widget with Emotion Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .iors-widget {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        /* Voice control button */
+        .iors-voice-button {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #E31E24;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .iors-voice-button:hover {
+            background: #c41a1f;
+            transform: scale(1.05);
+        }
+
+        .iors-voice-button.active {
+            background: #1a1a1a;
+            animation: pulse 2s infinite;
+        }
+
+        .iors-voice-button::after {
+            content: '';
+            width: 30px;
+            height: 30px;
+            background: white;
+            border-radius: 50%;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* Status text */
+        .iors-status {
+            margin-top: 20px;
+            text-align: center;
+            color: #333;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 1px;
+        }
+
+        .iors-status.active {
+            color: #E31E24;
+        }
+
+        /* Emotion display */
+        .iors-emotion {
+            margin-top: 10px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .iors-emotion .emoji {
+            font-size: 24px;
+            margin-right: 8px;
+        }
+
+        .iors-emotion .confidence {
+            font-size: 10px;
+            color: #999;
+            margin-left: 5px;
+        }
+
+        /* Hidden video for face tracking */
+        #iorsFaceVideo {
+            display: none;
+        }
+
+        /* Debug canvas (optional) */
+        #debugCanvas {
+            display: none;
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            border: 2px solid #E31E24;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="iors-widget">
+        <button class="iors-voice-button" id="iorsVoiceButton"></button>
+        <div class="iors-status" id="iorsStatus">Kliknij aby rozpocząć</div>
+        <div class="iors-emotion" id="iorsEmotion"></div>
+        <video id="iorsFaceVideo" autoplay playsinline></video>
+        <canvas id="debugCanvas" width="320" height="240"></canvas>
+    </div>
+
+    <!-- VAPI SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+    <!-- MediaPipe FaceMesh -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+    <!-- Face-api.js for emotion detection -->
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+    <script>
+        // ============================================
+        // KONFIGURACJA
+        // ============================================
+        const IORS_CONFIG = {
+            vapiPublicKey: '4b5abdd4-333f-4914-9549-0fe6576ad301',
+            assistantId: '747ba1d5-42ac-4f9d-9974-a3f7cd8484ac', // IORS Master
+            enableFaceTracking: true,
+            enableEmotionDetection: true, // ← NOWE!
+            emotionDetectionInterval: 1000, // Check emotions every 1 second
+            showDebugCanvas: false // Set to true to see face detection
+        };
+
+        // Emotion emoji mapping
+        const EMOTION_EMOJIS = {
+            happy: '😊',
+            sad: '😢',
+            angry: '😠',
+            disgusted: '🤢',
+            fearful: '😨',
+            surprised: '😲',
+            neutral: '😐'
+        };
+
+        // ============================================
+        // FACIAL EMOTION DETECTOR CLASS
+        // ============================================
+        class FaceEmotionDetector {
+            constructor(videoElement, options = {}) {
+                this.video = videoElement;
+                this.isReady = false;
+                this.currentEmotion = null;
+                this.detectionInterval = options.interval || 1000;
+                this.intervalId = null;
+                this.onEmotionCallback = null;
+                this.debugCanvas = options.debugCanvas || null;
+            }
+
+            async init() {
+                try {
+                    console.log('🎭 Loading emotion detection models...');
+
+                    // Load face-api.js models from CDN
+                    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model';
+
+                    await Promise.all([
+                        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+                    ]);
+
+                    this.isReady = true;
+                    console.log('✅ Emotion detection models loaded');
+                    return true;
+                } catch (error) {
+                    console.error('❌ Failed to load emotion models:', error);
+                    return false;
+                }
+            }
+
+            start() {
+                if (!this.isReady) {
+                    console.warn('Emotion detector not ready');
+                    return;
+                }
+
+                if (this.intervalId) {
+                    return; // Already running
+                }
+
+                console.log('▶️ Starting emotion detection...');
+
+                this.intervalId = setInterval(async () => {
+                    await this.detectEmotion();
+                }, this.detectionInterval);
+            }
+
+            stop() {
+                if (this.intervalId) {
+                    clearInterval(this.intervalId);
+                    this.intervalId = null;
+                    console.log('⏹️ Stopped emotion detection');
+                }
+            }
+
+            async detectEmotion() {
+                if (!this.video.readyState === 4) return;
+
+                try {
+                    // Detect face with expressions
+                    const detection = await faceapi
+                        .detectSingleFace(this.video, new faceapi.TinyFaceDetectorOptions())
+                        .withFaceExpressions();
+
+                    if (detection) {
+                        const expressions = detection.expressions;
+
+                        // Find dominant emotion
+                        let maxEmotion = 'neutral';
+                        let maxScore = 0;
+
+                        for (const [emotion, score] of Object.entries(expressions)) {
+                            if (score > maxScore) {
+                                maxScore = score;
+                                maxEmotion = emotion;
+                            }
+                        }
+
+                        // Only trigger if confidence > 60%
+                        if (maxScore > 0.6) {
+                            this.currentEmotion = {
+                                emotion: maxEmotion,
+                                confidence: maxScore,
+                                all: expressions,
+                                timestamp: Date.now()
+                            };
+
+                            // Callback
+                            if (this.onEmotionCallback) {
+                                this.onEmotionCallback(this.currentEmotion);
+                            }
+                        }
+
+                        // Debug visualization
+                        if (this.debugCanvas) {
+                            const ctx = this.debugCanvas.getContext('2d');
+                            ctx.clearRect(0, 0, this.debugCanvas.width, this.debugCanvas.height);
+
+                            // Draw video frame
+                            ctx.drawImage(this.video, 0, 0, this.debugCanvas.width, this.debugCanvas.height);
+
+                            // Draw detection box
+                            const box = detection.detection.box;
+                            const scale = this.debugCanvas.width / this.video.videoWidth;
+                            ctx.strokeStyle = '#E31E24';
+                            ctx.lineWidth = 2;
+                            ctx.strokeRect(
+                                box.x * scale,
+                                box.y * scale,
+                                box.width * scale,
+                                box.height * scale
+                            );
+                        }
+                    }
+
+                } catch (error) {
+                    // Silently fail - face might not be visible
+                }
+            }
+
+            getCurrentEmotion() {
+                return this.currentEmotion;
+            }
+
+            onEmotion(callback) {
+                this.onEmotionCallback = callback;
+            }
+        }
+
+        // ============================================
+        // IORS WIDGET CLASS (Extended)
+        // ============================================
+        class IORSWidget {
+            constructor(config) {
+                this.config = config;
+                this.vapiInstance = null;
+                this.faceMesh = null;
+                this.emotionDetector = null;
+                this.isCallActive = false;
+                this.iorsIsSpeaking = false;
+                this.faceLandmarks = null;
+
+                this.elements = {
+                    button: document.getElementById('iorsVoiceButton'),
+                    status: document.getElementById('iorsStatus'),
+                    emotion: document.getElementById('iorsEmotion'),
+                    video: document.getElementById('iorsFaceVideo'),
+                    debugCanvas: document.getElementById('debugCanvas')
+                };
+
+                if (config.showDebugCanvas) {
+                    this.elements.debugCanvas.style.display = 'block';
+                }
+
+                this.eventCallbacks = {
+                    onCallStart: [],
+                    onCallEnd: [],
+                    onIORSSpeaking: [],
+                    onUserSpeaking: [],
+                    onFaceDetected: [],
+                    onFaceLost: [],
+                    onEmotionDetected: [], // ← NEW!
+                    onError: []
+                };
+
+                this.init();
+            }
+
+            // ============================================
+            // INICJALIZACJA
+            // ============================================
+            async init() {
+                await this.initVAPI();
+                if (this.config.enableFaceTracking) {
+                    await this.initFaceTracking();
+                }
+                if (this.config.enableEmotionDetection) {
+                    await this.initEmotionDetection();
+                }
+                this.setupEventListeners();
+                console.log('✅ IORS Widget initialized with emotions');
+            }
+
+            // ============================================
+            // EMOTION DETECTION
+            // ============================================
+            async initEmotionDetection() {
+                this.emotionDetector = new FaceEmotionDetector(this.elements.video, {
+                    interval: this.config.emotionDetectionInterval,
+                    debugCanvas: this.config.showDebugCanvas ? this.elements.debugCanvas : null
+                });
+
+                const loaded = await this.emotionDetector.init();
+
+                if (loaded) {
+                    // Wait for video to be ready
+                    this.elements.video.onloadeddata = () => {
+                        this.emotionDetector.start();
+                    };
+
+                    // Emotion callback
+                    this.emotionDetector.onEmotion((emotion) => {
+                        this.displayEmotion(emotion);
+                        this.trigger('onEmotionDetected', emotion);
+                    });
+                }
+            }
+
+            displayEmotion(emotion) {
+                const emoji = EMOTION_EMOJIS[emotion.emotion] || '😐';
+                const confidence = Math.round(emotion.confidence * 100);
+
+                this.elements.emotion.innerHTML = `
+                    <span class="emoji">${emoji}</span>
+                    <span>${emotion.emotion}</span>
+                    <span class="confidence">${confidence}%</span>
+                `;
+            }
+
+            // ============================================
+            // VAPI - VOICE AI
+            // ============================================
+            async initVAPI() {
+                return new Promise((resolve) => {
+                    const checkVAPI = () => {
+                        if (typeof window.Vapi === 'undefined') {
+                            setTimeout(checkVAPI, 100);
+                            return;
+                        }
+
+                        this.vapiInstance = new window.Vapi(this.config.vapiPublicKey);
+
+                        // Call started
+                        this.vapiInstance.on('call-start', () => {
+                            this.isCallActive = true;
+                            this.updateStatus('Słucham...', true);
+                            this.elements.button.classList.add('active');
+                            this.trigger('onCallStart');
+                        });
+
+                        // Call ended
+                        this.vapiInstance.on('call-end', () => {
+                            this.isCallActive = false;
+                            this.iorsIsSpeaking = false;
+                            this.updateStatus('Rozmowa zakończona', false);
+                            this.elements.button.classList.remove('active');
+                            this.trigger('onCallEnd');
+
+                            setTimeout(() => {
+                                this.updateStatus('Kliknij aby rozpocząć', false);
+                            }, 3000);
+                        });
+
+                        // User speaking
+                        this.vapiInstance.on('speech-start', () => {
+                            this.iorsIsSpeaking = false;
+                            this.trigger('onUserSpeaking', { speaking: true });
+                        });
+
+                        this.vapiInstance.on('speech-end', () => {
+                            this.trigger('onUserSpeaking', { speaking: false });
+                        });
+
+                        // IORS (assistant) speaking
+                        this.vapiInstance.on('message', (msg) => {
+                            if (msg.type === 'transcript' && msg.role === 'assistant') {
+                                this.iorsIsSpeaking = true;
+                                this.trigger('onIORSSpeaking', {
+                                    speaking: true,
+                                    text: msg.transcript
+                                });
+                            }
+                        });
+
+                        // Errors
+                        this.vapiInstance.on('error', (error) => {
+                            console.error('VAPI Error:', error);
+                            this.isCallActive = false;
+                            this.updateStatus('Błąd połączenia', false);
+                            this.trigger('onError', { source: 'vapi', error });
+                        });
+
+                        console.log('✅ VAPI initialized');
+                        resolve();
+                    };
+                    checkVAPI();
+                });
+            }
+
+            // ============================================
+            // MEDIAPIPE - FACE TRACKING
+            // ============================================
+            async initFaceTracking() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'user', width: 640, height: 480 }
+                    });
+                    this.elements.video.srcObject = stream;
+
+                    await new Promise((resolve) => {
+                        const checkMediaPipe = () => {
+                            if (typeof FaceMesh === 'undefined') {
+                                setTimeout(checkMediaPipe, 100);
+                                return;
+                            }
+                            resolve();
+                        };
+                        checkMediaPipe();
+                    });
+
+                    this.faceMesh = new FaceMesh({
+                        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`
+                    });
+
+                    this.faceMesh.setOptions({
+                        maxNumFaces: 1,
+                        refineLandmarks: false,
+                        minDetectionConfidence: 0.5,
+                        minTrackingConfidence: 0.5
+                    });
+
+                    this.faceMesh.onResults((results) => {
+                        if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                            const prevLandmarks = this.faceLandmarks;
+                            this.faceLandmarks = results.multiFaceLandmarks[0];
+
+                            if (!prevLandmarks) {
+                                this.trigger('onFaceDetected', { landmarks: this.faceLandmarks });
+                            }
+
+                            this.trigger('onFaceDetected', { landmarks: this.faceLandmarks });
+                        } else {
+                            if (this.faceLandmarks) {
+                                this.trigger('onFaceLost');
+                            }
+                            this.faceLandmarks = null;
+                        }
+                    });
+
+                    const detectFace = async () => {
+                        if (this.elements.video.readyState === 4) {
+                            await this.faceMesh.send({ image: this.elements.video });
+                        }
+                        requestAnimationFrame(detectFace);
+                    };
+
+                    this.elements.video.onloadeddata = () => {
+                        console.log('✅ Face tracking started');
+                        detectFace();
+                    };
+
+                } catch (error) {
+                    console.warn('Face tracking failed:', error);
+                    this.trigger('onError', { source: 'faceTracking', error });
+                }
+            }
+
+            // ============================================
+            // EVENT LISTENERS
+            // ============================================
+            setupEventListeners() {
+                this.elements.button.addEventListener('click', () => {
+                    if (!this.vapiInstance) {
+                        alert('VAPI nie jest gotowy. Odśwież stronę.');
+                        return;
+                    }
+
+                    if (this.isCallActive) {
+                        this.stopCall();
+                    } else {
+                        this.startCall();
+                    }
+                });
+            }
+
+            // ============================================
+            // PUBLIC API
+            // ============================================
+
+            startCall() {
+                if (!this.vapiInstance || this.isCallActive) return;
+                this.updateStatus('Łączenie...', false);
+                this.vapiInstance.start(this.config.assistantId);
+            }
+
+            stopCall() {
+                if (!this.vapiInstance || !this.isCallActive) return;
+                this.updateStatus('Rozłączanie...', false);
+                this.vapiInstance.stop();
+            }
+
+            getFaceLandmarks() {
+                return this.faceLandmarks;
+            }
+
+            getCurrentEmotion() {
+                return this.emotionDetector ? this.emotionDetector.getCurrentEmotion() : null;
+            }
+
+            isIORSSpeaking() {
+                return this.iorsIsSpeaking;
+            }
+
+            isCallActive() {
+                return this.isCallActive;
+            }
+
+            on(eventName, callback) {
+                if (this.eventCallbacks[eventName]) {
+                    this.eventCallbacks[eventName].push(callback);
+                } else {
+                    console.warn(`Unknown event: ${eventName}`);
+                }
+            }
+
+            off(eventName, callback) {
+                if (this.eventCallbacks[eventName]) {
+                    this.eventCallbacks[eventName] = this.eventCallbacks[eventName].filter(cb => cb !== callback);
+                }
+            }
+
+            // ============================================
+            // INTERNAL HELPERS
+            // ============================================
+
+            updateStatus(text, active) {
+                this.elements.status.textContent = text;
+                if (active) {
+                    this.elements.status.classList.add('active');
+                } else {
+                    this.elements.status.classList.remove('active');
+                }
+            }
+
+            trigger(eventName, data = {}) {
+                if (this.eventCallbacks[eventName]) {
+                    this.eventCallbacks[eventName].forEach(callback => {
+                        try {
+                            callback(data);
+                        } catch (error) {
+                            console.error(`Error in ${eventName} callback:`, error);
+                        }
+                    });
+                }
+            }
+        }
+
+        // ============================================
+        // INITIALIZE WIDGET
+        // ============================================
+        let iorsWidget;
+
+        window.addEventListener('load', () => {
+            iorsWidget = new IORSWidget(IORS_CONFIG);
+            window.IORS = iorsWidget;
+
+            // Example: Listen to emotion events
+            iorsWidget.on('onEmotionDetected', (emotion) => {
+                console.log('😊 Emotion:', emotion.emotion, `(${Math.round(emotion.confidence * 100)}%)`);
+
+                // Example: React to strong emotions
+                if (emotion.confidence > 0.8) {
+                    if (emotion.emotion === 'sad') {
+                        console.log('💙 User looks sad - IORS should be empathetic');
+                    } else if (emotion.emotion === 'angry') {
+                        console.log('🔥 User looks angry - IORS should be calming');
+                    } else if (emotion.emotion === 'happy') {
+                        console.log('✨ User is happy - IORS can be more energetic');
+                    }
+                }
+            });
+
+            iorsWidget.on('onCallStart', () => {
+                console.log('📞 Call started - emotion tracking active');
+            });
+
+            iorsWidget.on('onCallEnd', () => {
+                const finalEmotion = iorsWidget.getCurrentEmotion();
+                console.log('📞 Call ended - final emotion:', finalEmotion);
+                // Send to Supabase for analytics
+            });
+        });
+    </script>
+</body>
+</html>

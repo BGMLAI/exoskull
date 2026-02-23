@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IORS - Chaos & Soundwave</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #ffffff;
+            overflow: hidden;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .voice-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            cursor: pointer;
+        }
+
+        #voiceCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+        }
+
+        .logo-container {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 0.5s;
+        }
+
+        .logo-text {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1a1a1a;
+            letter-spacing: -1px;
+        }
+
+        .logo-dot {
+            width: 14px;
+            height: 14px;
+            background: #E31E24;
+            border-radius: 50%;
+        }
+
+        .status-text {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: #333;
+            font-size: 18px;
+            font-weight: 400;
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fade-in 2s ease-in forwards 1.5s;
+            z-index: 10;
+        }
+
+        .status-text.active {
+            color: #E31E24;
+            font-weight: 600;
+        }
+
+        .test-button {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: #E31E24;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 10;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .test-button:hover {
+            background: #c41a1f;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .logo-text { font-size: 28px; }
+            .logo-dot { width: 10px; height: 10px; }
+            .status-text { font-size: 14px; bottom: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="voice-container" id="voiceContainer">
+        <div class="logo-container">
+            <div class="logo-dot"></div>
+            <div class="logo-text">iors.ai</div>
+            <div class="logo-dot"></div>
+        </div>
+
+        <canvas id="voiceCanvas"></canvas>
+
+        <button class="test-button" id="testButton">TEST SOUNDWAVE</button>
+        <div class="status-text" id="statusText">Dotknij aby rozpocząć</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@vapi-ai/web@2.1.0/dist/index.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+
+    <!-- Hidden video for face detection -->
+    <video id="faceVideo" style="display:none;" autoplay playsinline></video>
+
+    <script>
+        const VAPI_PUBLIC_KEY = '4b5abdd4-333f-4914-9549-0fe6576ad301';
+        const ASSISTANT_ID = 'adf258e0-3a41-444e-b683-38c195bd7954';
+
+        let vapiInstance = null;
+        let isActive = false;
+        let iorsIsSpeaking = false; // IORS (assistant) speaking
+
+        const canvas = document.getElementById('voiceCanvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        const centerX = width / 2;
+        const centerY = height / 2;
+
+        // Soundwaves (when IORS speaks)
+        const soundwaves = [];
+
+        class Soundwave {
+            constructor() {
+                this.x = centerX;
+                this.radius = 0;
+                this.maxRadius = Math.max(width, height) * 0.8;
+                this.speed = 8;
+                this.opacity = 1;
+            }
+
+            update() {
+                this.radius += this.speed;
+                this.opacity = 1 - (this.radius / this.maxRadius);
+                return this.radius < this.maxRadius;
+            }
+
+            draw() {
+                ctx.strokeStyle = `rgba(227, 30, 36, ${this.opacity * 0.3})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, this.radius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Check if particle is near this soundwave
+            affectsParticle(px, py) {
+                const dist = Math.sqrt((px - centerX) ** 2 + (py - centerY) ** 2);
+                const waveDist = Math.abs(dist - this.radius);
+                return waveDist < 60; // Soundwave "thickness"
+            }
+        }
+
+        // Chaotic particle that SLOWLY organizes into face over time
+        class ChaosParticle {
+            constructor(targetX, targetY, size) {
+                // Start near center (galaxy-like distribution)
+                const startAngle = Math.random() * Math.PI * 2;
+                const startDist = Math.pow(Math.random(), 0.6) * Math.min(width, height) * 0.45; // Power curve = more in center
+                this.x = centerX + Math.cos(startAngle) * startDist;
+                this.y = centerY + Math.sin(startAngle) * startDist;
+
+                // Target position (face shape) - VERY slow pull
+                this.targetX = targetX;
+                this.targetY = targetY;
+
+                this.size = size;
+
+                // Chaotic velocity (subtle)
+                this.vx = (Math.random() - 0.5) * 0.5;
+                this.vy = (Math.random() - 0.5) * 0.5;
+
+                // Multiple random offsets for different chaos frequencies
+                this.noiseOffset1 = Math.random() * 10000;
+                this.noiseOffset2 = Math.random() * 10000;
+                this.noiseOffset3 = Math.random() * 10000;
+
+                // Random speeds for each particle (breaks synchronization)
+                this.speed1 = 0.001 + Math.random() * 0.002;
+                this.speed2 = 0.0015 + Math.random() * 0.003;
+                this.speed3 = 0.0012 + Math.random() * 0.0025;
+
+                // Random strength multipliers
+                this.chaosMultiplier = 0.5 + Math.random() * 0.5;
+
+                // Organization level (0 = chaos, 1 = organized)
+                this.organization = 0;
+            }
+
+            update(time) {
+                // VERY weak pull toward target (takes hundreds of minutes)
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+
+                // Extremely weak spring - 0.0001 means it takes ~600+ minutes to organize
+                const spring = 0.0003;
+                const damping = 0.95; // Większy damping = spokojniejszy ruch
+
+                this.vx += dx * spring;
+                this.vy += dy * spring;
+
+                // Multiple layers of chaos with different frequencies (subtle)
+                const noise1X = Math.sin(time * this.speed1 + this.noiseOffset1) * 0.8;
+                const noise1Y = Math.cos(time * this.speed1 + this.noiseOffset1) * 0.8;
+
+                const noise2X = Math.sin(time * this.speed2 + this.noiseOffset2) * 0.5;
+                const noise2Y = Math.cos(time * this.speed2 + this.noiseOffset2) * 0.5;
+
+                const noise3X = Math.sin(time * this.speed3 + this.noiseOffset3) * 0.3;
+                const noise3Y = Math.cos(time * this.speed3 + this.noiseOffset3) * 0.3;
+
+                // Combine all chaos layers
+                const totalNoiseX = (noise1X + noise2X + noise3X) * this.chaosMultiplier;
+                const totalNoiseY = (noise1Y + noise2Y + noise3Y) * this.chaosMultiplier;
+
+                this.vx += totalNoiseX * 0.2;
+                this.vy += totalNoiseY * 0.2;
+
+                // Very rare turbulence (subtle)
+                if (Math.random() < 0.02) {
+                    this.vx += (Math.random() - 0.5) * 0.5;
+                    this.vy += (Math.random() - 0.5) * 0.5;
+                }
+
+                // Apply damping
+                this.vx *= damping;
+                this.vy *= damping;
+
+                // Move
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Check if affected by soundwave
+                let affectedByWave = false;
+                for (let wave of soundwaves) {
+                    if (wave.affectsParticle(this.x, this.y)) {
+                        affectedByWave = true;
+                        break;
+                    }
+                }
+
+                // If in soundwave, temporarily organize (create "peace")
+                if (affectedByWave) {
+                    this.organization = Math.min(1, this.organization + 0.15);
+                } else {
+                    this.organization *= 0.95; // Return to chaos
+                }
+
+                // When organized, pull stronger toward target
+                if (this.organization > 0.1) {
+                    const tempPull = this.organization * 0.08;
+                    this.vx += dx * tempPull;
+                    this.vy += dy * tempPull;
+                }
+
+                // Soft gravity toward center (keeps galaxy-like concentration)
+                const distFromCenter = Math.sqrt((this.x - centerX) ** 2 + (this.y - centerY) ** 2);
+                const maxDist = Math.min(width, height) * 0.5;
+
+                if (distFromCenter > maxDist * 0.7) {
+                    const gravityStrength = (distFromCenter - maxDist * 0.7) / (maxDist * 0.3);
+                    const angleToCenter = Math.atan2(centerY - this.y, centerX - this.x);
+                    this.vx += Math.cos(angleToCenter) * gravityStrength * 0.5;
+                    this.vy += Math.sin(angleToCenter) * gravityStrength * 0.5;
+                }
+            }
+
+            draw() {
+                // More red when organized, black when chaotic
+                const r = Math.floor(26 + this.organization * 201); // 26 -> 227
+                const g = Math.floor(26 + this.organization * 4);   // 26 -> 30
+                const b = Math.floor(26 + this.organization * 10);  // 26 -> 36
+
+                // Semi-transparent (makes it more ethereal)
+                const alpha = 0.6 + this.organization * 0.4; // 0.6 -> 1.0
+
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        const particles = [];
+        let userFaceLandmarks = null;
+
+        // Create particles with face targets
+        function initParticles() {
+            particles.length = 0;
+
+            const numParticles = 1500; // Galaktyka - nie za gęsta
+
+            // If we have user face, use it; otherwise use default ellipse
+            if (userFaceLandmarks && userFaceLandmarks.length > 0) {
+                // Map particles to face landmarks (galaxy distribution)
+                for (let i = 0; i < numParticles; i++) {
+                    const landmark = userFaceLandmarks[Math.floor(Math.random() * userFaceLandmarks.length)];
+                    const targetX = centerX + (landmark.x - 0.5) * width * 0.4;
+                    const targetY = centerY + (landmark.y - 0.5) * height * 0.5;
+
+                    // Smaller particles in center, slightly larger on edges
+                    const distFromCenter = Math.sqrt((targetX - centerX) ** 2 + (targetY - centerY) ** 2);
+                    const normalizedDist = distFromCenter / (Math.min(width, height) * 0.3);
+                    const size = 0.4 + normalizedDist * 0.8 + Math.random() * 0.4;
+
+                    particles.push(new ChaosParticle(targetX, targetY, size));
+                }
+            } else {
+                // Default ellipse until face detected (galaxy distribution)
+                const formWidth = Math.min(width, height) * 0.22;
+                const formHeight = Math.min(width, height) * 0.28;
+
+                for (let i = 0; i < numParticles; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    // Power distribution - more particles in center
+                    const r = Math.pow(Math.random(), 0.7);
+
+                    const targetX = centerX + Math.cos(angle) * formWidth * r;
+                    const targetY = centerY + Math.sin(angle) * formHeight * r;
+
+                    // Smaller particles in center
+                    const size = 0.4 + r * 0.8 + Math.random() * 0.4;
+                    particles.push(new ChaosParticle(targetX, targetY, size));
+                }
+            }
+        }
+
+        // Camera & Face Detection
+        async function initFaceDetection() {
+            try {
+                const video = document.getElementById('faceVideo');
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: 640, height: 480 }
+                });
+                video.srcObject = stream;
+
+                // Wait for MediaPipe to load
+                if (typeof FaceMesh === 'undefined') {
+                    console.log('MediaPipe not loaded yet, retrying...');
+                    setTimeout(initFaceDetection, 1000);
+                    return;
+                }
+
+                const faceMesh = new FaceMesh({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/${file}`
+                });
+
+                faceMesh.setOptions({
+                    maxNumFaces: 1,
+                    refineLandmarks: false,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                faceMesh.onResults((results) => {
+                    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                        userFaceLandmarks = results.multiFaceLandmarks[0];
+
+                        // Update particle targets with face shape
+                        if (particles.length > 0) {
+                            particles.forEach((particle, i) => {
+                                const landmark = userFaceLandmarks[i % userFaceLandmarks.length];
+                                particle.targetX = centerX + (landmark.x - 0.5) * width * 0.5;
+                                particle.targetY = centerY + (landmark.y - 0.5) * height * 0.6;
+                            });
+                        }
+                    }
+                });
+
+                // Process face detection
+                async function detectFace() {
+                    if (video.readyState === 4) {
+                        await faceMesh.send({ image: video });
+                    }
+                    setTimeout(detectFace, 100); // Check every 100ms
+                }
+
+                video.onloadeddata = () => {
+                    console.log('✅ Face detection started');
+                    detectFace();
+                };
+
+            } catch (error) {
+                console.warn('Face detection failed:', error);
+                // Continue without face detection
+            }
+        }
+
+        let time = 0;
+        function animate() {
+            // Motion blur - nie czyścimy całkowicie (breathing universe effect)
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+            ctx.fillRect(0, 0, width, height);
+
+            time += 1;
+
+            // Update and draw soundwaves
+            for (let i = soundwaves.length - 1; i >= 0; i--) {
+                if (!soundwaves[i].update()) {
+                    soundwaves.splice(i, 1);
+                } else {
+                    soundwaves[i].draw();
+                }
+            }
+
+            // Update and draw particles
+            particles.forEach(particle => {
+                particle.update(time);
+                particle.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            initParticles();
+        });
+
+        function initVapi() {
+            if (typeof window.Vapi === 'undefined') {
+                setTimeout(initVapi, 1000);
+                return;
+            }
+
+            vapiInstance = new window.Vapi(VAPI_PUBLIC_KEY);
+
+            vapiInstance.on('call-start', () => {
+                isActive = true;
+                document.getElementById('statusText').textContent = 'Słucham...';
+                document.getElementById('statusText').classList.add('active');
+            });
+
+            vapiInstance.on('call-end', () => {
+                isActive = false;
+                iorsIsSpeaking = false;
+                const statusEl = document.getElementById('statusText');
+                statusEl.textContent = 'Rozmowa zakończona';
+                statusEl.classList.remove('active');
+                setTimeout(() => {
+                    statusEl.textContent = 'Dotknij aby rozpocząć';
+                }, 3000);
+            });
+
+            // User speaking
+            vapiInstance.on('speech-start', () => {
+                iorsIsSpeaking = false;
+            });
+
+            vapiInstance.on('speech-end', () => {
+                iorsIsSpeaking = false;
+            });
+
+            // Assistant (IORS) speaking
+            vapiInstance.on('message', (msg) => {
+                if (msg.type === 'transcript' && msg.role === 'assistant') {
+                    // IORS is speaking - create soundwave!
+                    soundwaves.push(new Soundwave());
+                    iorsIsSpeaking = true;
+                }
+            });
+
+            // Also listen to function calls (assistant activity)
+            vapiInstance.on('function-call', () => {
+                soundwaves.push(new Soundwave());
+            });
+
+            vapiInstance.on('error', (error) => {
+                console.error('VAPI Error:', error);
+                isActive = false;
+            });
+
+            console.log('✅ VAPI initialized');
+        }
+
+        // Test button - trigger soundwave manually + start auto-test mode
+        let autoTestInterval = null;
+        document.getElementById('testButton').addEventListener('click', (e) => {
+            e.stopPropagation(); // Don't trigger container click
+
+            if (autoTestInterval) {
+                // Stop auto-test
+                clearInterval(autoTestInterval);
+                autoTestInterval = null;
+                document.getElementById('testButton').textContent = 'TEST SOUNDWAVE';
+                console.log('⏹️ Auto-test stopped');
+            } else {
+                // Start auto-test - soundwave every 2 seconds
+                soundwaves.push(new Soundwave());
+                autoTestInterval = setInterval(() => {
+                    soundwaves.push(new Soundwave());
+                    console.log('🌊 Auto soundwave');
+                }, 2000);
+                document.getElementById('testButton').textContent = 'STOP TEST';
+                console.log('▶️ Auto-test started');
+            }
+        });
+
+        document.getElementById('voiceContainer').addEventListener('click', (e) => {
+            // Don't trigger if clicking test button
+            if (e.target.id === 'testButton') return;
+
+            if (!vapiInstance) {
+                alert('VAPI nie jest gotowy. Odśwież stronę.');
+                return;
+            }
+
+            if (isActive) {
+                vapiInstance.stop();
+                document.getElementById('statusText').textContent = 'Rozłączanie...';
+            } else {
+                document.getElementById('statusText').textContent = 'Łączenie...';
+                vapiInstance.start(ASSISTANT_ID);
+            }
+        });
+
+        initParticles();
+        animate();
+        window.addEventListener('load', () => {
+            initVapi();
+            initFaceDetection(); // Start observing user's face
+        });
+    </script>
+</body>
+</html>
