@@ -4,6 +4,26 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-23] MAPE-K "Detect → Solve" Instead of "Detect → Notify"
+
+### Why
+MAPE-K detected gaps and issues but responded almost exclusively with `send_notification` — a message saved to DB that nobody sees. Result: 500+ interventions generated, 0 seen by user, same "Blind spot: health" repeated hundreds of times.
+
+### What
+- **Gap actions upgraded**: health gap → `build_app` (auto-generate sleep logger), social gap → `trigger_checkin`, integrations gap → `create_task`
+- **Issue actions upgraded**: `sleep_debt` → `trigger_checkin` (sleep), `task_overload` → `create_task` (meta-task), `productivity_drop` → `trigger_checkin` (energy)
+- **24h dedup**: Before proposing intervention, checks if same tenant + type + title exists in last 24h. Prevents "Cold start" ×33, "Blind spot: health" ×hundreds
+- **New default grants**: `build_app:*` (limit: 2/day), `goal_strategy:*` (limit: 3/day)
+
+### Files Changed (3)
+| File | Change |
+|------|--------|
+| `lib/autonomy/mape-k-loop.ts` | Gap loop → `planInterventionForGap()` mapping; dedup check in execute phase |
+| `lib/autonomy/mape-k-analyze.ts` | `sleep_debt`, `task_overload`, `productivity_drop` → solving actions |
+| `lib/autonomy/default-grants.ts` | Added `build_app:*` and `goal_strategy:*` grants |
+
+---
+
 ## [2026-02-21] Production Security Hardening + Build Fix
 
 ### Why
