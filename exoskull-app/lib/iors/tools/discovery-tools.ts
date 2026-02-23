@@ -6,7 +6,7 @@
  */
 
 import type { ToolDefinition } from "./shared";
-import { IORS_EXTENSION_TOOLS } from "./index";
+import { getRegisteredTools } from "./shared";
 import { getDynamicToolsForTenant } from "./dynamic-handler";
 import { logger } from "@/lib/logger";
 
@@ -47,7 +47,7 @@ export const discoveryTools: ToolDefinition[] = [
         score: number;
       }> = [];
 
-      for (const tool of IORS_EXTENSION_TOOLS) {
+      for (const tool of getRegisteredTools()) {
         const name = tool.definition.name.toLowerCase();
         const desc = (tool.definition.description || "").toLowerCase();
 
