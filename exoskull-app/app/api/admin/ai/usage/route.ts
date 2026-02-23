@@ -18,7 +18,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
     // Total usage by model
     const { data: byModel } = await db
       .from("exo_ai_usage")
-      .select("model_used, tier, estimated_cost, total_tokens, success")
+      .select("model, tier, estimated_cost, total_tokens, success")
       .gte("created_at", since);
 
     // Aggregate by model
@@ -35,7 +35,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
     >();
 
     for (const row of byModel || []) {
-      const key = row.model_used || "unknown";
+      const key = row.model || "unknown";
       if (!modelStats.has(key)) {
         modelStats.set(key, {
           model: key,

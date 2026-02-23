@@ -330,7 +330,7 @@ export class ModelRouter {
   }
 
   /**
-   * Log usage (can be extended to write to database)
+   * Log usage to database for admin dashboard tracking
    */
   private logUsage(options: AIRequestOptions, response: AIResponse): void {
     logger.info("[ModelRouter] Usage:", {
@@ -341,6 +341,28 @@ export class ModelRouter {
       cost: `$${response.usage.estimatedCost.toFixed(6)}`,
       latencyMs: response.latencyMs,
       tenantId: options.tenantId,
+    });
+
+    // Write to exo_ai_usage table (fire-and-forget)
+    import("@/lib/supabase/service").then(({ getServiceSupabase }) => {
+      const db = getServiceSupabase();
+      db.from("exo_ai_usage")
+        .insert({
+          tenant_id: options.tenantId || null,
+          model: response.model,
+          tier: response.tier,
+          provider: response.provider || "unknown",
+          task_category: options.taskCategory || null,
+          input_tokens: response.usage.inputTokens,
+          output_tokens: response.usage.outputTokens,
+          estimated_cost: response.usage.estimatedCost,
+          latency_ms: response.latencyMs,
+          success: true,
+        })
+        .then(({ error }) => {
+          if (error)
+            logger.warn("[ModelRouter] Failed to log usage:", error.message);
+        });
     });
   }
 

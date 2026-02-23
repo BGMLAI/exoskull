@@ -643,6 +643,28 @@ export async function runExoSkullAgent(
     contextMs,
   });
 
+  // Log AI usage to database for admin dashboard tracking
+  try {
+    const db = getServiceSupabase();
+    await db.from("exo_ai_usage").insert({
+      tenant_id: req.tenantId,
+      model: config.model,
+      tier: config.model.includes("haiku") ? 2 : 3,
+      provider: "anthropic",
+      task_category: req.channel,
+      input_tokens: totalInputTokens,
+      output_tokens: totalOutputTokens,
+      estimated_cost: costUsd,
+      latency_ms: durationMs,
+      success: !toolsUsed.includes("emergency_fallback"),
+      request_metadata: { channel: req.channel, numTurns, toolsUsed },
+    });
+  } catch (logErr) {
+    logger.warn("[ExoSkullAgent] Failed to log AI usage:", {
+      error: logErr instanceof Error ? logErr.message : logErr,
+    });
+  }
+
   return {
     text: finalText,
     toolsUsed,
