@@ -1,5 +1,45 @@
 # Session Log
 
+## [2026-02-23] Fix 5 Critical Chat Bugs — Routing, Spam, Noise, Timeouts
+
+### Tasks
+
+- Bug analysis (query today's messages from Supabase, identify 5 bugs): **SUCCESS**
+- Plan mode (architecture analysis of all 4 affected files): **SUCCESS**
+- Fix 1: Upload routing exclusion + extension whitelist: **SUCCESS**
+- Fix 2: Proactive message rate limit + 6h dedup + remove double execution: **SUCCESS**
+- Fix 3: Noise filter in chat stream + expanded hallucination patterns: **SUCCESS**
+- Fix 4: Repetition detection tuning (edge cases: "Halo?", "Oczywiście nie"): **SUCCESS**
+- TypeScript compilation (`tsc --noEmit`): **SUCCESS** (0 errors)
+- Hallucination test suite (16/17 → 17/17 after fixes): **SUCCESS**
+- Git commit + push: **SUCCESS** (`c13dccb`)
+- Vercel deploy: **SUCCESS** (production https://exoskull.xyz)
+- Production verification (5 curl tests via authenticated API): **SUCCESS** (all 5 pass)
+
+### Root Cause Analysis
+
+| Bug               | Root Cause                                                                                | Impact                        |
+| ----------------- | ----------------------------------------------------------------------------------------- | ----------------------------- |
+| Files not visible | "plik" in upload confirmation matched CODE_KEYWORDS → VPS (no knowledge)                  | Bot says "nie widzę pliku"    |
+| Project names     | `/\.\w{1,4}$/` matched `.pro`, `.com`, `.io` → VPS                                        | Bot thinks Qt .pro file       |
+| Proactive spam    | No dedup in `sendProactiveMessage()` + double execution (impulse + intervention-executor) | Same message every 30 min     |
+| Noise messages    | `isHallucination()` only in voice endpoint, not chat stream                               | YouTube garbage as real input |
+| Timeouts          | Wrong routing + noise = heavy pipeline for simple/garbage messages                        | 55s Vercel timeout            |
+
+### Retries
+
+- "Halo?" false positive: 1 retry — changed pattern from `+` to `{3,}` quantifier
+- "Oczywiście nie" repetition miss: 1 retry — lowered word filter `>2` → `>1`, threshold `>0.6` → `>=0.5`
+
+### Key Decisions
+
+- Extension whitelist (40+ exts) over blacklist — prevents future false positives from `.com`, `.io`, `.app` etc.
+- Centralized dedup in `sendProactiveMessage()` — all callers get protection, not just impulse
+- Removed `checkPendingInterventions()` entirely — `intervention-executor` CRON already does this every 15 min
+- Reused `isHallucination()` from voice pipeline in chat stream — single source of truth for noise detection
+
+---
+
 ## [2026-02-20] Autonomy Pipeline Activation — Closed-Loop Goal Optimization
 
 ### Tasks

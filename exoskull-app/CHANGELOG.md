@@ -4,6 +4,69 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-23] Fix 5 Critical Chat Bugs — Routing, Spam, Noise, Timeouts
+
+### Bug 1: Bot doesn't see uploaded files
+
+- **Root cause:** Upload confirmation `[Wgrałem plik: ...]` contains "plik" → matched `CODE_KEYWORDS` → routed to VPS executor which has zero knowledge base access
+- **Fix:** Added early return in `isCodeRelatedMessage()` for upload pattern before keyword check
+- **File:** `app/api/chat/stream/route.ts`
+
+### Bug 2: Bot doesn't recognize project names (e.g. "dokoncz lumpx.pro")
+
+- **Root cause:** Generic regex `/\.\w{1,4}$/` matched `.pro` as code file extension → routed to VPS
+- **Fix:** Replaced with explicit whitelist of 40+ actual code file extensions (`.ts`, `.py`, `.rs`, etc.)
+- **File:** `app/api/chat/stream/route.ts`
+
+### Bug 3: Proactive "blind spot" messages repeat every 30 minutes
+
+- **Root cause:** Two overlapping systems:
+  1. `sendProactiveMessage()` in `tenant-utils.ts` had NO rate limiting or dedup
+  2. `impulse` CRON duplicated `intervention-executor` CRON's work via `checkPendingInterventions()`
+- **Fix:**
+  - Added 2 gates in `sendProactiveMessage()`: daily rate limit (8/day via `canSendProactive`) + per-trigger dedup (same `trigger_type` within 6 hours)
+  - Removed `checkPendingInterventions()` from impulse CRON (~76 lines deleted)
+- **Files:** `lib/cron/tenant-utils.ts`, `app/api/cron/impulse/route.ts`
+
+### Bug 4: Voice/noise garbage processed as real input
+
+- **Root cause:** YouTube transcription fragments ("Dziękuję za oglądanie", "Praca na farmie w Danii") arrived as web_chat messages. `isHallucination()` existed in voice pipeline but not in chat stream.
+- **Fix:**
+  - Added noise filter in chat stream POST handler — returns instant "OK." for hallucinated messages
+  - Expanded `isHallucination()` with 10 new YouTube/noise patterns
+  - Fixed repetition detection: word filter `>1` char (was `>2`), threshold `>=0.5` (was `>0.6`), min 4 words
+- **Files:** `app/api/chat/stream/route.ts`, `lib/voice/transcribe-voice-note.ts`
+
+### Bug 5: Timeout on simple messages
+
+- **Root cause:** Symptom of bugs 1-4 — wrong routing caused unnecessary VPS calls; noise messages triggered full AI pipeline
+- **Fix:** Mitigated by fixes 1-4 (correct routing = faster path, noise filter = instant response)
+
+### Production Verification (https://exoskull.xyz)
+
+| Test           | Message                       | Expected              | Result                                            |
+| -------------- | ----------------------------- | --------------------- | ------------------------------------------------- |
+| Normal chat    | "Jaki mam plan na dzisiaj?"   | Local gateway + tools | Local, used `list_tasks` + `list_calendar_events` |
+| Noise filter   | "Dziękuję za oglądanie..."    | Instant "OK."         | Instant "OK."                                     |
+| Upload routing | "[Wgrałem plik: test.pdf...]" | Local gateway         | Local, used `search_knowledge`                    |
+| Project name   | "dokoncz lumpx.pro"           | Local gateway         | Local (no VPS `sessionId`)                        |
+| Code message   | "napraw bug w route.ts"       | VPS routing           | VPS (`workspaceDir: /root/projects/exoskull`)     |
+
+### Files Modified
+
+| File                                 | Lines   | What                                                      |
+| ------------------------------------ | ------- | --------------------------------------------------------- |
+| `app/api/chat/stream/route.ts`       | +30, -5 | Upload exclusion, extension whitelist, noise filter       |
+| `lib/voice/transcribe-voice-note.ts` | +15, -5 | 10 new hallucination patterns, fixed repetition detection |
+| `lib/cron/tenant-utils.ts`           | +25, -2 | Rate limit + 6h dedup in `sendProactiveMessage()`         |
+| `app/api/cron/impulse/route.ts`      | +2, -80 | Removed `checkPendingInterventions()` + its call          |
+
+### Commit
+
+`c13dccb` — fix: chat routing, proactive spam dedup, noise filter, hallucination detection
+
+---
+
 ## [2026-02-23] Goal-Driven Architecture Rebuild (4 Phases)
 
 ### Phase 1: Goal Feedback Loops

@@ -63,6 +63,31 @@
 - 3D scenes need: `--enable-webgl --use-gl=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist`
 - Without these flags, 3D canvas renders "Ładowanie..." indefinitely.
 
+## Chat Routing Classifier: Whitelists > Blacklists (2026-02-23)
+
+- Generic file extension regex `/\.\w{1,4}$/` causes false positives (`.pro`, `.com`, `.io`, `.app` all match)
+- **Solution:** Explicit whitelist of 40+ known code extensions. Misses nothing real, blocks all false positives.
+- Polish word "plik" (file) in CODE_KEYWORDS is fine, but upload confirmations `[Wgrałem plik: ...]` need explicit exclusion before keyword check.
+- Lesson: Message classifiers need negative patterns (what NOT to match) as much as positive ones.
+
+## Proactive Message Dedup: Centralize, Don't Distribute (2026-02-23)
+
+- 5+ separate CRONs call `sendProactiveMessage()` — adding dedup to each caller is fragile and incomplete.
+- **Solution:** Put rate limit + per-trigger dedup INSIDE `sendProactiveMessage()` itself. All callers protected automatically.
+- 6-hour window per trigger_type prevents repeat spam. Daily cap (8 msgs) prevents overall flood.
+- Watch for double execution: `impulse` and `intervention-executor` CRONs both processed pending interventions → removed from impulse.
+
+## Whisper Hallucination Patterns in Polish (2026-02-23)
+
+- Whisper generates YouTube outro phrases on silence/noise: "Dziękuję za oglądanie", "Praca na farmie w Danii", "Nie zapomnijcie zasubskrybować"
+- These arrive as real messages in web_chat (not just voice pipeline)
+- **Solution:** Share `isHallucination()` between voice transcription AND chat stream — single source of truth
+- Repetition detection gotchas:
+  - Short words ("nie", "to") must be counted (filter `>1` char, not `>2`)
+  - Punctuation must be stripped before word splitting
+  - Threshold `>=0.5` catches "word word word other" (3/4 = 75%)
+  - Single "Halo?" is legitimate — require `{3,}` repetitions for short greetings
+
 ## Bash in Claude Code on Windows
 
 - Many commands return exit code 1 with no output — use dedicated tools (Glob, Read, Grep) when possible.
