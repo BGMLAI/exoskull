@@ -32,12 +32,9 @@ export const discoveryTools: ToolDefinition[] = [
         required: ["query"],
       },
     },
-    handler: async (
-      input: { query: string; limit?: number },
-      context: { tenantId: string },
-    ) => {
-      const query = (input.query || "").toLowerCase().trim();
-      const limit = input.limit || 10;
+    execute: async (input: Record<string, unknown>, tenantId: string) => {
+      const query = ((input.query as string) || "").toLowerCase().trim();
+      const limit = (input.limit as number) || 10;
 
       if (!query) {
         return "Podaj słowo kluczowe, np. 'email', 'calendar', 'code'.";
@@ -78,7 +75,7 @@ export const discoveryTools: ToolDefinition[] = [
 
       // Search dynamic tools
       try {
-        const dynamicTools = await getDynamicToolsForTenant(context.tenantId);
+        const dynamicTools = await getDynamicToolsForTenant(tenantId);
         for (const tool of dynamicTools) {
           const name = tool.definition.name.toLowerCase();
           const desc = (tool.definition.description || "").toLowerCase();
