@@ -215,7 +215,7 @@ function parseVote(
   const confidenceMatch = text.match(/CONFIDENCE:\s*([\d.]+)/i);
   const confidence = confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.5;
 
-  const reasoningMatch = text.match(/REASONING:\s*(.+)/is);
+  const reasoningMatch = text.match(/REASONING:\s*([\s\S]+)/i);
   const reasoning = reasoningMatch
     ? reasoningMatch[1].trim().slice(0, 300)
     : "No reasoning provided.";
