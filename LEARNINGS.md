@@ -1,5 +1,20 @@
 # ExoSkull Learnings
 
+## Async Seeding Creates Race Conditions (2026-02-23)
+**Pattern:** Fire-and-forget DB seeding means concurrent requests during first user check get inconsistent results (some granted, some denied).
+**Solution:** Deduplicate with `Map<string, Promise>` — first call creates, others await same promise. After: invalidate cache → re-check DB → fallback to in-memory.
+**Lesson:** "Seed on first use" needs: dedup guard + await + cache invalidation + DB re-check before fallback.
+
+## Dynamic Imports Break Circular Dependencies (2026-02-23)
+**Pattern:** Static imports between autonomy ↔ tasks create circular deps even when indirect.
+**Solution:** `const { fn } = await import("@/lib/module")` at the call site. Use on the less-frequently-called side.
+**Lesson:** Standard Next.js pattern. Already 5+ instances in codebase. Zero runtime cost after first call (module cached).
+
+## Dual-Write Failures Must Be Visible (2026-02-23)
+**Pattern:** `dualWriteTask()` returns `dual_write_success: false` but callers only checked `id` — silent partial failures.
+**Solution:** `logger.warn` when `id` exists but `dual_write_success` is false, in both task-service and action-executor.
+**Lesson:** Any dual-write system must surface partial failures. Silent degradation masks data inconsistency.
+
 ## Sentry Wrapper Causes Build OOM (2026-02-21)
 **Pattern:** `withSentryConfig()` wrapping `nextConfig` causes JS heap OOM (~1.5GB) during `next build`, even when no Sentry auth token is set.
 **Solution:** Conditionally apply `withSentryConfig` only when `SENTRY_AUTH_TOKEN` is present. Also increase Node heap to 4GB in build script.

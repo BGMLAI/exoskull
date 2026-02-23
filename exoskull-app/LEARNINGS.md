@@ -1,5 +1,24 @@
 # ExoSkull Learnings
 
+## Async Seeding Creates Race Conditions (2026-02-23)
+
+- Fire-and-forget DB seeding (`seedDefaultGrants().catch(...)`) means concurrent requests during first user check get inconsistent results.
+- Some requests see in-memory fallback (granted), others hit empty DB (denied), others hit partially-seeded DB (inconsistent).
+- **Solution:** Deduplicate concurrent seeds with `Map<string, Promise>` — first call creates the promise, subsequent calls await the same promise. After resolution: invalidate cache, re-check DB, then fall back to in-memory.
+- **Pattern:** Any "seed on first use" system needs: (1) dedup guard, (2) await completion, (3) cache invalidation, (4) DB re-check before fallback.
+
+## Dynamic Imports Break Circular Dependencies (2026-02-23)
+
+- Static `import { createTask } from "@/lib/tasks/task-service"` in autonomy modules creates circular deps when task-service also imports from autonomy (even indirectly).
+- **Solution:** `const { createTask } = await import("@/lib/tasks/task-service")` at the call site. Already standard pattern in the codebase (5+ instances).
+- **When to use:** Any cross-module dependency where A→B and B→A (directly or transitively). Dynamic import on the less-frequently-called side.
+
+## Dual-Write Failures Must Be Visible (2026-02-23)
+
+- `dualWriteTask()` returns `{ id, dual_write_success, error }` but callers only checked `id` — partial failures (written to one store but not the other) were completely silent.
+- **Solution:** `logger.warn` whenever `id` exists but `dual_write_success` is false. Added in both `task-service.ts` (generic) and `action-executor.ts` (autonomy-specific).
+- **Lesson:** Any dual-write/dual-read system must surface partial failures. Silent degradation prevents debugging and masks data inconsistency.
+
 ## Middleware Auth: Cookie + Bearer in One Place (2026-02-23)
 
 - Next.js middleware runs BEFORE route handlers. If it only checks cookies, all API/mobile clients get 401 — even if the route handler has its own Bearer auth.

@@ -4,6 +4,46 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-23] Fix 4 Critical Architecture Issues in Autonomy System
+
+### DI Support for Autonomy Singletons
+
+- **Added** optional `SupabaseClient` parameter to `PermissionModel`, `ActionExecutor`, and `seedDefaultGrants()`
+- Enables dependency injection for testing and reuse of existing clients
+- Fully backward-compatible — existing callers unchanged (param is optional)
+
+### Circular Dependency Fix (autonomy → tasks)
+
+- **Replaced** static `import { createTask, completeTask }` in `action-executor.ts` with dynamic `await import()`
+- **Replaced** static `import { getTasks, updateTask }` in `custom-action-registry.ts` with dynamic `await import()`
+- Eliminates circular dependency: `autonomy/action-executor` ↔ `tasks/task-service`
+
+### Dual-Write Partial Failure Logging
+
+- **Added** `logger.warn` in `task-service.ts` when `createTask()` succeeds but `dual_write_success` is `false`
+- **Added** `logger.warn` in `action-executor.ts` `handleCreateTask()` for the same condition
+- Previously: dual-write failures were silent — task created in one store but not the other with no visibility
+
+### Permission Race Condition Fix
+
+- **Fixed** concurrent seed deduplication: `seedingInProgress` Map prevents multiple simultaneous `seedDefaultGrants()` calls per user
+- **Changed** from fire-and-forget seed to `await` seed completion before re-checking DB
+- **Added** cache invalidation after seed completes
+- **Added** DB re-check after seed before falling back to in-memory defaults
+- Previously: first concurrent requests for a new user could get inconsistent results (some granted via in-memory, some denied because DB seed hadn't completed)
+
+### Files Changed
+
+| File                                     | Changes                                                 |
+| ---------------------------------------- | ------------------------------------------------------- |
+| `lib/autonomy/action-executor.ts`        | DI constructor, dynamic imports, dual-write warning     |
+| `lib/autonomy/custom-action-registry.ts` | Dynamic import for task-service                         |
+| `lib/autonomy/permission-model.ts`       | DI constructor, seed dedup + await + cache invalidation |
+| `lib/autonomy/default-grants.ts`         | Optional SupabaseClient param                           |
+| `lib/tasks/task-service.ts`              | Dual-write failure logging                              |
+
+---
+
 ## [2026-02-23] Auth Fixes + E2E Testing — Bearer Token Support + Polish Classifier
 
 ### Bearer Token Auth in Middleware (lib/supabase/middleware.ts)

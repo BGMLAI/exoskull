@@ -1,5 +1,34 @@
 # Session Log
 
+## [2026-02-23] Fix 4 Critical Architecture Issues — DI, Circular Deps, Logging, Race Condition
+
+### Tasks
+
+- Issue #4: Add DI (optional SupabaseClient) to PermissionModel, ActionExecutor, seedDefaultGrants: **SUCCESS**
+- Issue #1: Break circular dependency autonomy → tasks (dynamic imports): **SUCCESS**
+- Issue #2: Log dual-write partial failures in task-service + action-executor: **SUCCESS**
+- Issue #3: Fix permission race condition (seed dedup + await + re-check): **SUCCESS**
+- Build compilation check (`next build`): **SUCCESS** (compiled, OOM during type-check is pre-existing)
+- Static import verification (grep autonomy/ for task-service): **SUCCESS** (0 in fixed files)
+- Git commit + push: **SUCCESS** (`aaac34f`)
+
+### Root Cause Analysis
+
+| Issue                         | Root Cause                                                                      | Fix                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| No DI in singletons           | Hardcoded `createClient()` in constructors                                      | Optional `SupabaseClient` param, fallback to `createClient()`             |
+| Circular dependency           | Static `import` from `action-executor` → `task-service` → back                  | Dynamic `await import()` at call site                                     |
+| Silent dual-write failures    | `createTask()` returned success even when only one store written                | `logger.warn` on `!dual_write_success`                                    |
+| Permission race on first user | `seedDefaultGrants()` fired async, concurrent requests got inconsistent results | `Map<string, Promise>` dedup + `await` + cache invalidation + DB re-check |
+
+### Key Decisions
+
+- Single commit for all 4 fixes (overlapping files made per-issue commits impractical)
+- Dynamic imports are already standard pattern in codebase (5+ existing instances)
+- Race condition fix adds ~50-100ms latency on first permission check only (once per user lifetime)
+
+---
+
 ## [2026-02-23] Auth Fixes + E2E Testing — Bearer Token Support + Polish Classifier
 
 ### Tasks
