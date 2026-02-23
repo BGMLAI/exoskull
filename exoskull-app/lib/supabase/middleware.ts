@@ -55,9 +55,30 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: { id: string } | null = null;
+
+  // Method 1: Cookie-based auth (web browser)
+  const { data: cookieAuth } = await supabase.auth.getUser();
+  user = cookieAuth.user;
+
+  // Method 2: Bearer token auth (mobile, API clients)
+  if (!user) {
+    const authHeader = request.headers.get("authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      try {
+        const { createClient } = await import("@supabase/supabase-js");
+        const directClient = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        );
+        const { data: tokenAuth } = await directClient.auth.getUser(token);
+        user = tokenAuth.user;
+      } catch {
+        // Invalid token — user stays null
+      }
+    }
+  }
 
   const pathname = request.nextUrl.pathname;
 
