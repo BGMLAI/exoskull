@@ -137,9 +137,11 @@ export async function analyzeRecentOutcomes(
     if (
       intervention.intervention_type === "goal_nudge" ||
       intervention.intervention_type === "gap_detection" ||
-      actionPayload?.params?.goal_id
+      actionPayload?.params?.goal_id ||
+      actionPayload?.params?.goalId
     ) {
-      const goalId = actionPayload?.params?.goal_id;
+      const goalId =
+        actionPayload?.params?.goal_id || actionPayload?.params?.goalId;
       if (goalId) {
         const { data: checkpoints } = await supabase
           .from("exo_goal_checkpoints")
@@ -171,6 +173,23 @@ export async function analyzeRecentOutcomes(
           };
           outcomes.push(outcome);
           await recordOutcome(outcome);
+
+          // Persist trajectory + last_checkpoint_at to exo_user_goals
+          await supabase
+            .from("exo_user_goals")
+            .update({
+              trajectory: cp.trajectory,
+              last_checkpoint_at: new Date().toISOString(),
+            })
+            .eq("id", goalId)
+            .then(({ error }) => {
+              if (error)
+                logger.warn(
+                  "[OutcomeTracker] Goal trajectory update failed:",
+                  error.message,
+                );
+            });
+
           continue;
         }
       }

@@ -48,12 +48,13 @@ Respond with ONLY a JSON object (no markdown):
 }
 
 Evaluation priorities (check in order):
-1. Overdue tasks → remind + offer to reschedule
-2. Undelivered insights → send immediately
-3. Pending interventions → notify about them
-4. No recent contact (>6h during waking hours) → warm check-in
-5. Goals behind schedule → suggest corrective actions
-6. Patterns detected → share insights proactively
+1. Goals off-track → HIGHEST PRIORITY — suggest corrective actions
+2. Overdue tasks → remind + offer to reschedule
+3. Undelivered insights → send immediately
+4. Pending interventions → notify about them
+5. No recent contact (>6h during waking hours) → warm check-in
+6. Goals at-risk → nudge toward progress
+7. Patterns detected → share insights proactively
 
 Rules:
 - "proactive": send a message (ALWAYS include message field)
@@ -131,6 +132,38 @@ async function handler(req: NextRequest) {
           breaker.isAllowed()
         ) {
           try {
+            // Fetch goal context for eval (lightweight query)
+            let goalContext: {
+              active: number;
+              off_track: number;
+              at_risk: number;
+            } = {
+              active: 0,
+              off_track: 0,
+              at_risk: 0,
+            };
+            try {
+              const { getServiceSupabase } =
+                await import("@/lib/supabase/service");
+              const sb = getServiceSupabase();
+              const { data: goals } = await sb
+                .from("exo_user_goals")
+                .select("trajectory")
+                .eq("tenant_id", tenant.tenant_id)
+                .eq("is_active", true);
+              if (goals) {
+                goalContext.active = goals.length;
+                goalContext.off_track = goals.filter(
+                  (g) => g.trajectory === "off_track",
+                ).length;
+                goalContext.at_risk = goals.filter(
+                  (g) => g.trajectory === "at_risk",
+                ).length;
+              }
+            } catch {
+              /* non-critical */
+            }
+
             const response = await router.route({
               messages: [
                 {
@@ -145,6 +178,9 @@ async function handler(req: NextRequest) {
                     activity_class: activityClass,
                     current_hour: currentHour,
                     cycles_today: tenant.cycles_today || 0,
+                    active_goals: goalContext.active,
+                    goals_off_track: goalContext.off_track,
+                    goals_at_risk: goalContext.at_risk,
                   }),
                 },
               ],
@@ -295,33 +331,68 @@ async function handler(req: NextRequest) {
       }
     }
 
-    // Step 4: Ralph Loop — autonomous development cycle (1 per run)
-    let ralphResult = null;
-    if (Date.now() - startTime < TIMEOUT_MS - 15_000 && tenants.length > 0) {
+    // Step 4: Goal Orchestration — unified goal-driven cycle
+    // Replaces separate Ralph + MAPE-K with goal-driven orchestration.
+    // MAPE-K and Ralph still run internally when the orchestrator needs them.
+    let goalOrchResult = null;
+    const activeTenantForGoals = evaluationResults.find(
+      (r) => r.action !== "sleep",
+    );
+    if (activeTenantForGoals && Date.now() - startTime < TIMEOUT_MS - 15_000) {
       try {
-        const { runRalphCycle } = await import("@/lib/iors/ralph-loop");
+        const { runGoalOrchestration } =
+          await import("@/lib/goals/goal-orchestrator");
         const remainingMs = TIMEOUT_MS - (Date.now() - startTime);
-        // Run for first tenant that had activity (not sleeping)
-        const activeTenant = evaluationResults.find(
-          (r) => r.action !== "sleep",
+        goalOrchResult = await runGoalOrchestration(
+          activeTenantForGoals.tenantId,
+          Math.min(remainingMs - 5000, 25_000),
         );
-        if (activeTenant) {
-          ralphResult = await runRalphCycle(
-            activeTenant.tenantId,
-            Math.min(remainingMs - 5000, 20_000),
-          );
-        }
-      } catch (ralphErr) {
-        logger.error("[Loop15] Ralph cycle failed:", {
-          error: ralphErr instanceof Error ? ralphErr.message : ralphErr,
+        logger.info("[Loop15] Goal orchestration completed:", {
+          tenantId: activeTenantForGoals.tenantId,
+          goalsEvaluated: goalOrchResult.goalsEvaluated,
+          actionsExecuted: goalOrchResult.actionsExecuted,
+          durationMs: goalOrchResult.durationMs,
+        });
+      } catch (orchErr) {
+        logger.error("[Loop15] Goal orchestration failed:", {
+          error: orchErr instanceof Error ? orchErr.message : orchErr,
         });
       }
     }
 
-    // Step 5: MAPE-K cycle — run for tenants that had "observation" action
+    // Step 5: Baseline Monitor — suggest goals for tenants with <3 goals
+    let baselineResult = null;
+    if (activeTenantForGoals && Date.now() - startTime < TIMEOUT_MS - 8_000) {
+      try {
+        const { getServiceSupabase } = await import("@/lib/supabase/service");
+        const sb = getServiceSupabase();
+        const { count } = await sb
+          .from("exo_user_goals")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", activeTenantForGoals.tenantId)
+          .eq("is_active", true);
+
+        if ((count || 0) < 3) {
+          const { runBaselineMonitor } =
+            await import("@/lib/goals/baseline-monitor");
+          baselineResult = await runBaselineMonitor(
+            activeTenantForGoals.tenantId,
+          );
+        }
+      } catch (baselineErr) {
+        logger.error("[Loop15] Baseline monitor failed:", {
+          error:
+            baselineErr instanceof Error ? baselineErr.message : baselineErr,
+        });
+      }
+    }
+
+    // Step 6: MAPE-K fallback — run for observation tenants not covered by orchestrator
     let mapekResult = null;
     const observationTenants = evaluationResults.filter(
-      (r) => r.action === "observation",
+      (r) =>
+        r.action === "observation" &&
+        r.tenantId !== activeTenantForGoals?.tenantId,
     );
     if (
       observationTenants.length > 0 &&
@@ -329,7 +400,6 @@ async function handler(req: NextRequest) {
     ) {
       try {
         const { runAutonomyCycle } = await import("@/lib/autonomy/mape-k-loop");
-        // Run MAPE-K for first observation tenant (budget: 1 per loop-15)
         mapekResult = await runAutonomyCycle(
           observationTenants[0].tenantId,
           "cron",
@@ -352,12 +422,19 @@ async function handler(req: NextRequest) {
       ok: true,
       evaluated,
       workProcessed,
-      ralph: ralphResult
+      goalOrchestration: goalOrchResult
         ? {
-            outcome: ralphResult.outcome,
-            action: ralphResult.action.type,
-            description: ralphResult.action.description,
-            durationMs: ralphResult.durationMs,
+            tenantId: goalOrchResult.tenantId,
+            goalsEvaluated: goalOrchResult.goalsEvaluated,
+            actionsExecuted: goalOrchResult.actionsExecuted,
+            outcomes: goalOrchResult.outcomes.length,
+            durationMs: goalOrchResult.durationMs,
+          }
+        : null,
+      baseline: baselineResult
+        ? {
+            suggestions: baselineResult.suggestions.length,
+            notified: baselineResult.notified,
           }
         : null,
       mapek: mapekResult

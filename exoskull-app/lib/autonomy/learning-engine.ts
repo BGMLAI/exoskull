@@ -109,6 +109,9 @@ export async function learnFromOutcomes(
     // 5. Learn preferred channel
     await learnPreferredChannel(tenantId, result);
 
+    // 6. Learn goal strategy patterns
+    await learnGoalStrategyPatterns(tenantId, result);
+
     logger.info("[LearningEngine] Cycle complete:", {
       tenantId,
       ...result,
@@ -225,6 +228,95 @@ async function learnPreferredChannel(
   );
   result.preferences_updated++;
   result.insights.push(`Preferred channel: ${bestChannel}`);
+}
+
+/**
+ * Learn which strategy step types work best per goal category.
+ * Analyzes completed/abandoned strategies to find patterns.
+ */
+async function learnGoalStrategyPatterns(
+  tenantId: string,
+  result: LearningResult,
+): Promise<void> {
+  const supabase = getServiceSupabase();
+
+  // Get strategies from last 60 days
+  const { data: strategies } = await supabase
+    .from("exo_goal_strategies")
+    .select("goal_id, status, steps, confidence")
+    .eq("tenant_id", tenantId)
+    .gte("created_at", new Date(Date.now() - 60 * 86400000).toISOString());
+
+  if (!strategies || strategies.length < 3) return;
+
+  // Get goal categories for each strategy
+  const goalIds = [...new Set(strategies.map((s) => s.goal_id))];
+  const { data: goals } = await supabase
+    .from("exo_user_goals")
+    .select("id, category")
+    .in("id", goalIds);
+
+  if (!goals) return;
+
+  const goalCategoryMap = new Map(goals.map((g) => [g.id, g.category]));
+
+  // Analyze which step types correlate with successful strategies
+  const stepTypeStats = new Map<
+    string,
+    { completed: number; failed: number; category: string }
+  >();
+
+  for (const strategy of strategies) {
+    const category = goalCategoryMap.get(strategy.goal_id) || "unknown";
+    const steps =
+      (strategy.steps as Array<{ type: string; status: string }>) || [];
+
+    for (const step of steps) {
+      const key = `${category}:${step.type}`;
+      const stats = stepTypeStats.get(key) || {
+        completed: 0,
+        failed: 0,
+        category,
+      };
+      if (step.status === "completed") stats.completed++;
+      else if (step.status === "failed") stats.failed++;
+      stepTypeStats.set(key, stats);
+    }
+  }
+
+  // Find best step type per category
+  const bestByCategory = new Map<
+    string,
+    { type: string; successRate: number }
+  >();
+  for (const [key, stats] of stepTypeStats) {
+    const total = stats.completed + stats.failed;
+    if (total < 2) continue;
+    const successRate = stats.completed / total;
+    const [category, stepType] = key.split(":");
+
+    const current = bestByCategory.get(category);
+    if (!current || successRate > current.successRate) {
+      bestByCategory.set(category, { type: stepType, successRate });
+    }
+  }
+
+  // Store best step types as preferences
+  for (const [category, best] of bestByCategory) {
+    if (best.successRate >= 0.5) {
+      await upsertPreference(
+        tenantId,
+        `best_goal_step_type:${category}`,
+        best.type,
+        Math.min(best.successRate, 0.9),
+        "behavior",
+      );
+      result.preferences_updated++;
+      result.insights.push(
+        `Best step type for ${category} goals: ${best.type} (${Math.round(best.successRate * 100)}% success)`,
+      );
+    }
+  }
 }
 
 // ============================================================================

@@ -20,7 +20,12 @@ export type GoalFrequency = "daily" | "weekly" | "monthly";
 
 export type Momentum = "up" | "down" | "stable";
 
-export type Trajectory = "on_track" | "at_risk" | "off_track" | "completed";
+export type Trajectory =
+  | "on_track"
+  | "at_risk"
+  | "off_track"
+  | "completed"
+  | "unknown";
 
 export interface MeasurableProxy {
   source: string; // table name: "activity_entries", "sleep_entries", "mood_entries", etc.

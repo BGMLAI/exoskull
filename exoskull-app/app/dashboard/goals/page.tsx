@@ -117,6 +117,11 @@ const TRAJECTORY_CONFIG: Record<
     color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
     barColor: "[&>div]:bg-blue-500",
   },
+  unknown: {
+    label: "Brak danych",
+    color: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
+    barColor: "[&>div]:bg-gray-500",
+  },
 };
 
 const CATEGORY_CONFIG: Record<string, { label: string; emoji: string }> = {

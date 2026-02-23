@@ -52,7 +52,66 @@ interface ActionResult {
 }
 
 /**
- * A. Overdue Tasks — remind user about tasks past due date.
+ * 0. Goals Off-Track — highest priority. Alert user about goals that are off-track.
+ */
+async function checkGoalsOffTrack(
+  tenantId: string,
+  canMessage: boolean,
+): Promise<ActionResult> {
+  const result: ActionResult = {
+    type: "goal_off_track",
+    count: 0,
+    messagesSent: 0,
+  };
+
+  try {
+    const supabase = getServiceSupabase();
+    const { data: offTrack } = await supabase
+      .from("exo_user_goals")
+      .select("id, name, trajectory, current_value, target_value, target_date")
+      .eq("tenant_id", tenantId)
+      .eq("is_active", true)
+      .eq("trajectory", "off_track")
+      .limit(5);
+
+    if (!offTrack || offTrack.length === 0) return result;
+    result.count = offTrack.length;
+
+    if (!canMessage) return result;
+
+    const goalList = offTrack
+      .map((g) => {
+        const progress = g.target_value
+          ? Math.round(((g.current_value || 0) / g.target_value) * 100)
+          : 0;
+        return `- ${g.name} (${progress}%)`;
+      })
+      .join("\n");
+
+    const message =
+      offTrack.length === 1
+        ? `Cel "${offTrack[0].name}" wypadl z toru. Chcesz omowic nowa strategie?`
+        : `${offTrack.length} celow wymaga uwagi:\n${goalList}\n\nChcesz omowic plan naprawczy?`;
+
+    const sent = await sendProactiveMessage(
+      tenantId,
+      message,
+      "goal_off_track",
+      "impulse",
+    );
+    if (sent.success) result.messagesSent = 1;
+  } catch (error) {
+    logger.error("[Impulse] checkGoalsOffTrack error:", {
+      tenantId,
+      error: error instanceof Error ? error.message : error,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * A. Overdue Tasks — remind user about tasks past due date (prioritize goal-related tasks).
  */
 async function checkOverdueTasks(
   tenantId: string,
@@ -805,6 +864,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     tenantsProcessed: 0,
     tenantsSkippedQuiet: 0,
     actions: {
+      goal_off_track: 0,
       overdue_reminder: 0,
       insight_delivery: 0,
       goal_warning: 0,
@@ -848,6 +908,15 @@ async function handler(request: NextRequest): Promise<NextResponse> {
       try {
         let messagesThisCycle = 0;
         const canMessage = await canSendProactive(tenant.id);
+
+        // 0. Goals Off-Track (HIGHEST PRIORITY)
+        const offTrackResult = await checkGoalsOffTrack(
+          tenant.id,
+          canMessage && messagesThisCycle < MAX_ACTIONS_PER_TENANT,
+        );
+        totals.actions.goal_off_track += offTrackResult.count;
+        messagesThisCycle += offTrackResult.messagesSent;
+        totals.totalMessagesSent += offTrackResult.messagesSent;
 
         // A. Overdue Tasks
         const overdueResult = await checkOverdueTasks(

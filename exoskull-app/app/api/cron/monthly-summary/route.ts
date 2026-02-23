@@ -57,9 +57,22 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   // Enqueue one async task per tenant (lightweight — just DB inserts)
   const enqueued: string[] = [];
   const errors: string[] = [];
+  let skippedNoGoals = 0;
 
   for (const tenant of activeTenants) {
     try {
+      // Guard: skip tenants with no active goals — monthly summary is goal-focused
+      const { count: goalCount } = await supabase
+        .from("exo_user_goals")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenant.id)
+        .eq("is_active", true);
+
+      if (!goalCount || goalCount === 0) {
+        skippedNoGoals++;
+        continue;
+      }
+
       const taskId = await createTask({
         tenantId: tenant.id,
         channel: "web_chat",
@@ -92,6 +105,7 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     timestamp: new Date().toISOString(),
     duration_ms: durationMs,
     tenants_enqueued: enqueued.length,
+    skipped_no_goals: skippedNoGoals,
     task_ids: enqueued,
     errors: errors.length > 0 ? errors : undefined,
   });

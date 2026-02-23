@@ -302,3 +302,82 @@ function buildGapReasoning(gap: GapAnalysis, skillDesc: string): string {
   const severity = gap.severity === "severe" ? "significant" : "moderate";
   return `${severity} gap detected in ${gap.area.name || gap.area.slug}. ${gap.suggestedIntervention || `No activity tracked in ${gap.area.slug} area.`} Suggested: ${skillDesc}`;
 }
+
+// =====================================================
+// GOAL → SKILL BRIDGE
+// =====================================================
+
+/**
+ * Bridge goals to skill suggestions.
+ * For goals without measurable_proxies or tracking data,
+ * suggest tracker skills at higher confidence (0.85) than gap-detected (0.7).
+ * Goal-driven = more intentional.
+ */
+export async function bridgeGoalsToSuggestions(
+  context: DetectionContext,
+): Promise<SkillSuggestion[]> {
+  try {
+    const supabase = createServiceClient();
+    const suggestions: SkillSuggestion[] = [];
+
+    // Get active goals
+    const { data: goals } = await supabase
+      .from("exo_user_goals")
+      .select("id, name, category, measurable_proxies")
+      .eq("tenant_id", context.tenant_id)
+      .eq("is_active", true);
+
+    if (!goals || goals.length === 0) return [];
+
+    // Check recent checkpoints for each goal
+    for (const goal of goals) {
+      const category = goal.category || "health";
+      const skillMappings = GAP_SKILL_MAP[category];
+      if (!skillMappings) continue;
+
+      // Check if goal has data coming in
+      const { count: checkpointCount } = await supabase
+        .from("exo_goal_checkpoints")
+        .select("id", { count: "exact", head: true })
+        .eq("goal_id", goal.id)
+        .gte(
+          "checkpoint_date",
+          new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split("T")[0],
+        );
+
+      // Skip goals that already have data flowing
+      if (checkpointCount && checkpointCount >= 3) continue;
+
+      // Suggest first matching skill not already present
+      for (const mapping of skillMappings) {
+        const isInstalled = context.installed_mods.includes(mapping.slug);
+        const isExisting = context.existing_skills.includes(mapping.slug);
+
+        if (isInstalled || isExisting) continue;
+
+        suggestions.push({
+          tenant_id: context.tenant_id,
+          source: "goal_driven",
+          description: `${mapping.description} (for goal: ${goal.name})`,
+          suggested_slug: mapping.slug,
+          life_area: category,
+          confidence: 0.85, // Higher than gap-detected (0.6-0.8)
+          reasoning: `Goal "${goal.name}" needs tracking data but has no automatic data source. Suggesting ${mapping.description} to enable progress tracking.`,
+          status: "pending",
+        });
+
+        break; // One suggestion per goal
+      }
+    }
+
+    return suggestions;
+  } catch (error) {
+    logger.error("[GapBridge:Goals] Error:", {
+      error: error instanceof Error ? error.message : error,
+      tenant_id: context.tenant_id,
+    });
+    return [];
+  }
+}

@@ -1,7 +1,8 @@
 /**
- * IORS Google Fit Tools
+ * IORS Health Data Tools
  *
  * 4 tools: get_health_data (expanded), log_weight, log_workout, log_water
+ * Data sourced from exo_health_metrics (Oura, Health Connect, manual input).
  */
 
 import type { ToolDefinition } from "./shared";
@@ -23,7 +24,7 @@ export const googleFitTools: ToolDefinition[] = [
     definition: {
       name: "get_health_data",
       description:
-        "Pobierz dane zdrowotne z Google Fit: kroki, tętno, sen, kalorie, wagę, ciśnienie, glukozę.",
+        "Pobierz dane zdrowotne (kroki, tętno, sen, kalorie, wagę, ciśnienie, glukozę). Dane z Oura Ring, Health Connect lub ręcznego wpisu.",
       input_schema: {
         type: "object" as const,
         properties: {
@@ -58,7 +59,7 @@ export const googleFitTools: ToolDefinition[] = [
         if (dataType === "summary" || !dataType) {
           const result = await getHealthSummary(tenantId, daysBack);
           if (!result.ok)
-            return result.error || "Nie udało się pobrać danych z Google Fit.";
+            return result.error || "Nie udało się pobrać danych zdrowotnych.";
           return result.summary!;
         }
 
@@ -105,14 +106,14 @@ export const googleFitTools: ToolDefinition[] = [
 
         return "Nieznany typ danych. Użyj: summary, steps, heart_rate, sleep, weight, blood_pressure, blood_glucose.";
       } catch (err) {
-        return `Błąd Google Fit: ${err instanceof Error ? err.message : err}`;
+        return `Błąd danych zdrowotnych: ${err instanceof Error ? err.message : err}`;
       }
     },
   },
   {
     definition: {
       name: "log_weight",
-      description: "Zapisz pomiar wagi w Google Fit.",
+      description: "Zapisz pomiar wagi w danych zdrowotnych.",
       input_schema: {
         type: "object" as const,
         properties: {
@@ -137,7 +138,7 @@ export const googleFitTools: ToolDefinition[] = [
   {
     definition: {
       name: "log_workout",
-      description: "Zapisz trening w Google Fit.",
+      description: "Zapisz trening w danych zdrowotnych.",
       input_schema: {
         type: "object" as const,
         properties: {
@@ -177,7 +178,7 @@ export const googleFitTools: ToolDefinition[] = [
   {
     definition: {
       name: "log_water",
-      description: "Zapisz spożycie wody w Google Fit.",
+      description: "Zapisz spożycie wody w danych zdrowotnych.",
       input_schema: {
         type: "object" as const,
         properties: {

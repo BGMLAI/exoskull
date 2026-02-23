@@ -160,12 +160,15 @@ async function handler(req: NextRequest) {
         const googleData = googleRes;
         const healthMetrics = healthRes.data || [];
 
-        // Generate daily goal actions (creates tasks + returns briefing section)
-        let dailyActionsBriefing = "";
+        // Generate daily goal actions SILENTLY (creates tasks, no SMS)
         try {
           if (Date.now() - startTime < TIMEOUT_MS - 20_000) {
             const dailyPlan = await planDailyActions(tenant.id);
-            dailyActionsBriefing = dailyPlan.briefingSection;
+            logger.info("[MorningBriefing] Daily actions planned silently:", {
+              tenantId: tenant.id,
+              tasksCreated: dailyPlan.tasksCreated,
+              goalsProcessed: dailyPlan.goalsProcessed,
+            });
           }
         } catch (err) {
           logger.warn("[MorningBriefing] Daily action planning failed:", {
@@ -174,77 +177,34 @@ async function handler(req: NextRequest) {
           });
         }
 
-        // Build health summary from metrics
-        const healthSummary: Record<string, { value: number; unit: string }> =
-          {};
-        for (const m of healthMetrics) {
-          if (!healthSummary[m.metric_type]) {
-            healthSummary[m.metric_type] = { value: m.value, unit: m.unit };
-          }
-        }
+        // Check if any goal is at-risk/off-track or has deadline today → only then notify
+        const { data: urgentGoals } = await supabase
+          .from("exo_user_goals")
+          .select("name, trajectory, target_date")
+          .eq("tenant_id", tenant.id)
+          .eq("is_active", true)
+          .or(
+            `trajectory.in.(off_track,at_risk),target_date.eq.${new Date().toISOString().split("T")[0]}`,
+          );
 
-        // Format briefing with AI (Tier 1 — Gemini Flash)
-        const contextData = JSON.stringify({
-          name: tenant.name || "User",
-          tasks: tasks.map((t: any) => ({
-            title: t.title,
-            priority: t.priority,
-            due: t.due_date,
-          })),
-          goals: goals.map((g: any) => ({
-            title: g.name || g.title,
-            deadline: g.target_date,
-          })),
-          pending_insights: pendingInsights,
-          overnight_actions: overnightActions.length,
-          calendar:
-            googleData?.events?.map((e: any) => ({
-              time: e.start?.dateTime || e.start?.date,
-              title: e.summary,
-            })) || [],
-          unread_emails: googleData?.unreadEmails || 0,
-          health: {
-            steps: healthSummary.steps?.value || null,
-            heart_rate: healthSummary.heart_rate?.value || null,
-            sleep_min: healthSummary.sleep?.value || null,
-            calories: healthSummary.calories?.value || null,
-          },
-          goal_actions: dailyActionsBriefing || null,
-          language: tenant.language || "pl",
-        });
+        if (urgentGoals && urgentGoals.length > 0) {
+          // Send goal-relevant alert only
+          const alertLines = urgentGoals.map((g: any) => {
+            if (g.target_date === new Date().toISOString().split("T")[0]) {
+              return `Dziś termin: "${g.name}"`;
+            }
+            return `"${g.name}" wymaga uwagi (${g.trajectory === "off_track" ? "wypadł z toru" : "zagrożony"})`;
+          });
 
-        const response = await router.route({
-          messages: [
-            {
-              role: "system",
-              content: `You are IORS — the user's intelligent life assistant. Generate a concise morning briefing in ${tenant.language || "pl"} language. Be warm but direct. Use short sentences. Include: today's calendar, health summary (steps/sleep/HR if available), top priorities, unread emails count. If goal_actions are provided, include them as "Dziś dla celów:" section. Max 600 chars (SMS-friendly).`,
-            },
-            {
-              role: "user",
-              content: `Generate morning briefing based on:\n${contextData}`,
-            },
-          ],
-          taskCategory: "simple_response",
-          tenantId: tenant.id,
-          maxTokens: 300,
-          temperature: 0.5,
-        });
-
-        const briefingMessage = response.content.trim();
-
-        // Send via preferred channel
-        const sendResult = await sendProactiveMessage(
-          tenant.id,
-          briefingMessage,
-          "morning_briefing",
-          "MorningBriefing",
-        );
-
-        if (sendResult.success) {
+          await sendProactiveMessage(
+            tenant.id,
+            alertLines.join("\n"),
+            "goal_morning_alert",
+            "MorningBriefing",
+          );
           results.briefings_sent++;
-        } else {
-          results.errors.push(`${tenant.id}: dispatch failed`);
         }
+        // No fixed morning SMS — daily actions created silently
       } catch (error) {
         const msg = error instanceof Error ? error.message : "Unknown";
         results.errors.push(`${tenant.id}: ${msg}`);

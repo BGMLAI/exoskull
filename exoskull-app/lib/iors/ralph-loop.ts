@@ -556,14 +556,27 @@ async function observe(tenantId: string): Promise<RalphObservation> {
     }
   }
 
-  return {
-    failurePatterns,
-    pendingPlans: (pendingPlansResult.data || []).map((p) => ({
-      id: p.id,
-      title: p.title,
-      details: p.details as Record<string, unknown>,
-    })),
-    detectedGaps: (gapsResult.data || []).map((g) => ({
+  // Enrich detected gaps with goal-capability gaps (top-down from goals)
+  const goalCapabilityGaps: DetectedGap[] = [];
+  try {
+    const { analyzeAllGoalCapabilities } =
+      await import("@/lib/goals/capability-analyzer");
+    const capReports = await analyzeAllGoalCapabilities(tenantId);
+    for (const report of capReports) {
+      for (const mc of report.missingCapabilities.slice(0, 2)) {
+        goalCapabilityGaps.push({
+          id: `goal-cap:${report.goalId}:${mc.type}`,
+          gap_type: `goal_${mc.type}`,
+          description: `${mc.description} → ${mc.suggestedAction}`,
+        });
+      }
+    }
+  } catch {
+    // Non-critical — continue without goal-capability gaps
+  }
+
+  const allGaps = [
+    ...(gapsResult.data || []).map((g) => ({
       id: g.id,
       gap_type:
         (g.trigger_type as string)?.replace("auto_build:", "") || "unknown",
@@ -571,6 +584,17 @@ async function observe(tenantId: string): Promise<RalphObservation> {
         ((g.metadata as Record<string, unknown>)?.description as string) ||
         (g.trigger_type as string),
     })),
+    ...goalCapabilityGaps,
+  ];
+
+  return {
+    failurePatterns,
+    pendingPlans: (pendingPlansResult.data || []).map((p) => ({
+      id: p.id,
+      title: p.title,
+      details: p.details as Record<string, unknown>,
+    })),
+    detectedGaps: allGaps,
     unusedApps,
     userPriorities,
     gotchaContext,

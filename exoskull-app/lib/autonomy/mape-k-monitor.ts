@@ -3,13 +3,14 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
-import { MonitorData } from "./types";
+import { MonitorData, GoalStatusSummary } from "./types";
 import { collectSystemMetrics } from "../optimization/system-metrics";
 import { logger } from "@/lib/logger";
 import { getTasks, getOverdueTasks } from "@/lib/tasks/task-service";
 import type { Task } from "@/lib/tasks/task-service";
 import { ensureFreshToken } from "@/lib/rigs/oauth";
 import { createGoogleClient } from "@/lib/rigs/google/client";
+import { getGoalStatus } from "@/lib/goals/engine";
 
 /**
  * Collect monitor data for a tenant (M phase of MAPE-K).
@@ -232,6 +233,42 @@ export async function collectMonitorData(
     }
   }
 
+  // Collect goal statuses (non-blocking)
+  let goalStatuses: GoalStatusSummary[] = [];
+  try {
+    const statuses = await getGoalStatus(tenantId);
+    goalStatuses = await Promise.all(
+      statuses.map(async (s) => {
+        // Check if goal has active strategy
+        let hasStrategy = false;
+        try {
+          const { getActiveStrategy } =
+            await import("@/lib/goals/strategy-store");
+          hasStrategy = !!(await getActiveStrategy(s.goal.id));
+        } catch {
+          /* non-critical */
+        }
+
+        return {
+          goalId: s.goal.id,
+          name: s.goal.name,
+          category: s.goal.category,
+          trajectory: s.trajectory,
+          momentum: s.momentum,
+          progressPercent: s.progress_percent,
+          daysRemaining: s.days_remaining,
+          hasStrategy,
+          wellbeingWeight: s.goal.wellbeing_weight,
+        };
+      }),
+    );
+  } catch (err) {
+    logger.warn(
+      "[MAPE-K] Goal status collection failed:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+
   // Collect system metrics (non-blocking)
   let systemMetrics;
   try {
@@ -280,6 +317,11 @@ export async function collectMonitorData(
     yesterdaySleepMinutes: healthByType.sleep ?? null,
     yesterdayCalories: healthByType.calories ?? null,
     lastHeartRate: healthByType.heart_rate ?? null,
+    goalStatuses: goalStatuses.length > 0 ? goalStatuses : undefined,
+    activeGoalCount: goalStatuses.length,
+    goalsOffTrack: goalStatuses.filter((g) => g.trajectory === "off_track")
+      .length,
+    goalsAtRisk: goalStatuses.filter((g) => g.trajectory === "at_risk").length,
     connectedRigs: rigsResult.data?.map((r) => r.rig_slug) || [],
     lastSyncTimes,
     systemMetrics,

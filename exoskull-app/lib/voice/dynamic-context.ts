@@ -158,8 +158,12 @@ export async function buildDynamicContext(
       .from("exo_user_documents")
       .select("status", { count: "planned" })
       .eq("tenant_id", tenantId),
-    // 8. (Removed — Composio integration removed)
-    Promise.resolve([]),
+    // 8. Connected rigs (integrations)
+    supabase
+      .from("exo_rig_connections")
+      .select("rig_slug, sync_status, sync_error, last_sync_at")
+      .eq("tenant_id", tenantId)
+      .not("access_token", "is", null),
     // 9. Generated apps (self-awareness)
     supabase
       .from("exo_generated_apps")
@@ -246,10 +250,15 @@ export async function buildDynamicContext(
         }>)
       : [];
   const docsData = docsResult.status === "fulfilled" ? docsResult.value : null;
-  const connections =
+  const rigConnections =
     connectionsResult.status === "fulfilled"
-      ? (connectionsResult.value as Array<{ toolkit: string; status: string }>)
-      : [];
+      ? (connectionsResult.value.data as Array<{
+          rig_slug: string;
+          sync_status: string | null;
+          sync_error: string | null;
+          last_sync_at: string | null;
+        }> | null)
+      : null;
   const apps =
     appsResult.status === "fulfilled"
       ? (appsResult.value.data as Array<{
@@ -320,6 +329,34 @@ export async function buildDynamicContext(
     context += `- Zainstalowane trackery: ${modList}\n`;
   }
 
+  // Connected integrations (rigs)
+  if (rigConnections && rigConnections.length > 0) {
+    context += `\n## POŁĄCZONE INTEGRACJE\n`;
+    for (const rig of rigConnections) {
+      const statusLabel =
+        rig.sync_status === "success"
+          ? "OK"
+          : rig.sync_status === "error"
+            ? "BŁĄD"
+            : rig.sync_status === "syncing"
+              ? "synchronizacja..."
+              : "oczekuje";
+      const lastSync = rig.last_sync_at
+        ? new Date(rig.last_sync_at).toLocaleString("pl-PL", {
+            day: "numeric",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "nigdy";
+      const errorNote =
+        rig.sync_status === "error" && rig.sync_error
+          ? ` (${rig.sync_error.slice(0, 60)})`
+          : "";
+      context += `- ${rig.rig_slug}: [${statusLabel}] ostatni sync: ${lastSync}${errorNote}\n`;
+    }
+  }
+
   // IORS Personality + Custom Instructions + Behavior Presets
   try {
     const {
@@ -365,7 +402,10 @@ export async function buildDynamicContext(
 
   // Goals
   if (goalStatuses.length > 0) {
-    context += `\n## CELE UŻYTKOWNIKA\n`;
+    const offTrack = goalStatuses.filter(
+      (s) => s.trajectory === "off_track" || s.trajectory === "at_risk",
+    );
+    context += `\n## CELE UŻYTKOWNIKA (${goalStatuses.length} aktywnych${offTrack.length > 0 ? `, ${offTrack.length} wymaga uwagi` : ""})\n`;
     for (const s of goalStatuses) {
       const status =
         s.trajectory === "on_track"
@@ -374,11 +414,17 @@ export async function buildDynamicContext(
             ? "ZAGROŻONY"
             : s.trajectory === "completed"
               ? "OSIĄGNIĘTY"
-              : "WYMAGA UWAGI";
+              : s.trajectory === "off_track"
+                ? "WYMAGA UWAGI"
+                : "brak danych";
       const days = s.days_remaining !== null ? `, ${s.days_remaining} dni` : "";
-      context += `- ${s.goal.name}: ${Math.round(s.progress_percent)}% [${status}]${days}\n`;
+      const momentum =
+        s.momentum === "up" ? " ↑" : s.momentum === "down" ? " ↓" : "";
+      context += `- ${s.goal.name}: ${Math.round(s.progress_percent)}% [${status}]${days}${momentum}\n`;
     }
-    context += `Gdy user pyta o cele, użyj "check_goals". Gdy raportuje postęp, użyj "log_goal_progress".\n`;
+    context += `PRIORYTET: cele zagrożone > cele na dobrej drodze. Proaktywnie proponuj akcje dla celów off-track.\n`;
+    context += `Komendy: "check_goals" (status), "log_goal_progress" (postęp), "define_goal" (nowy cel).\n`;
+    context += `User może: "wstrzymaj cel X", "zmień termin celu", "pokaż strategię celu X".\n`;
   }
 
   // Knowledge base — ALWAYS mention tools exist
@@ -566,22 +612,33 @@ export async function buildVoiceContext(
   const supabase = getServiceSupabase();
   const startTime = Date.now();
 
-  // 4 queries (vs 14 in full context) — added thread summary + highlights
-  const [tenantResult, taskResult, threadSummaryResult, voiceHighlightsResult] =
-    await Promise.allSettled([
-      supabase
-        .from("exo_tenants")
-        .select(
-          "name, preferred_name, communication_style, iors_personality, iors_name, iors_custom_instructions, iors_ai_config",
-        )
-        .eq("id", tenantId)
-        .single(),
-      // Pending tasks count (via task-service: dual-read Tyrolka first, legacy fallback)
-      getTaskStats(tenantId, supabase).then((s) => ({ count: s.pending })),
-      getThreadSummary(tenantId),
-      // Top 5 highlights for voice context (+20ms, within budget)
-      getUserHighlights(supabase, tenantId, 5).catch(() => []),
-    ]);
+  // 5 queries (vs 15 in full context) — added thread summary + highlights + rigs
+  const [
+    tenantResult,
+    taskResult,
+    threadSummaryResult,
+    voiceHighlightsResult,
+    voiceRigsResult,
+  ] = await Promise.allSettled([
+    supabase
+      .from("exo_tenants")
+      .select(
+        "name, preferred_name, communication_style, iors_personality, iors_name, iors_custom_instructions, iors_ai_config",
+      )
+      .eq("id", tenantId)
+      .single(),
+    // Pending tasks count (via task-service: dual-read Tyrolka first, legacy fallback)
+    getTaskStats(tenantId, supabase).then((s) => ({ count: s.pending })),
+    getThreadSummary(tenantId),
+    // Top 5 highlights for voice context (+20ms, within budget)
+    getUserHighlights(supabase, tenantId, 5).catch(() => []),
+    // Connected rig slugs (minimal — just names)
+    supabase
+      .from("exo_rig_connections")
+      .select("rig_slug")
+      .eq("tenant_id", tenantId)
+      .not("access_token", "is", null),
+  ]);
 
   const tenant =
     tenantResult.status === "fulfilled" ? tenantResult.value.data : null;
@@ -615,6 +672,15 @@ export async function buildVoiceContext(
       : null;
   if (threadSummary && threadSummary !== "Brak historii rozmow.") {
     context += `- Historia: ${threadSummary}\n`;
+  }
+
+  // Connected integrations (minimal list for voice)
+  const voiceRigs =
+    voiceRigsResult.status === "fulfilled"
+      ? (voiceRigsResult.value.data as Array<{ rig_slug: string }> | null)
+      : null;
+  if (voiceRigs && voiceRigs.length > 0) {
+    context += `- Integracje: ${voiceRigs.map((r) => r.rig_slug).join(", ")}\n`;
   }
 
   context += `- Kanal: ROZMOWA GLOSOWA. Odpowiadaj KROTKO (1-2 zdania). Unikaj list, markdown, emoji.\n`;

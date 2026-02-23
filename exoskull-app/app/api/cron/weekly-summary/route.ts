@@ -49,6 +49,18 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     results.processed++;
 
     try {
+      // Guard: skip tenants with no active goals
+      const { data: goalCount } = await supabase
+        .from("exo_user_goals")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenant.id)
+        .eq("is_active", true);
+
+      if (!goalCount || (goalCount as unknown as number) === 0) {
+        results.skipped_empty++;
+        continue;
+      }
+
       const summary = await generateWeeklySummary(tenant.id);
 
       if (!summary) {

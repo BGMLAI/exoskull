@@ -148,40 +148,49 @@ export async function analyzeMonitorData(
     );
   }
 
-  // 8. Goal progress analysis (L9 data)
-  try {
-    const { data: atRiskGoals } = await supabase
-      .from("exo_user_goals")
-      .select("id, title, trajectory, wellbeing_weight, category")
-      .eq("tenant_id", tenantId)
-      .eq("status", "active")
-      .in("trajectory", ["off_track", "at_risk"]);
+  // 8. Goal progress analysis (from monitorData — no extra DB call)
+  if (monitorData.goalStatuses && monitorData.goalStatuses.length > 0) {
+    for (const gs of monitorData.goalStatuses) {
+      if (gs.trajectory === "off_track" || gs.trajectory === "at_risk") {
+        // Correlate with detected issues: sleep_debt + health goal → escalate
+        const relatedSleepIssue =
+          gs.category === "health" &&
+          issues.some((i) => i.type === "sleep_debt");
+        const baseSeverity =
+          gs.trajectory === "off_track"
+            ? gs.wellbeingWeight > 2
+              ? "high"
+              : "medium"
+            : "low";
+        const severity =
+          relatedSleepIssue && baseSeverity === "medium"
+            ? "high"
+            : baseSeverity;
 
-    if (atRiskGoals && atRiskGoals.length > 0) {
-      for (const goal of atRiskGoals) {
         issues.push({
           type: "missed_goal",
-          severity:
-            goal.trajectory === "off_track"
-              ? (goal.wellbeing_weight || 0) > 7
-                ? "high"
-                : "medium"
-              : "low",
-          description: `Goal "${goal.title}" is ${goal.trajectory === "off_track" ? "off track" : "at risk"}`,
+          severity: severity as "low" | "medium" | "high",
+          description: `Goal "${gs.name}" is ${gs.trajectory === "off_track" ? "off track" : "at risk"} (${Math.round(gs.progressPercent)}%)`,
           data: {
-            goalId: (goal as Record<string, unknown>).id,
-            goalTitle: goal.title,
-            trajectory: goal.trajectory,
-            category: goal.category,
+            goalId: gs.goalId,
+            goalTitle: gs.name,
+            trajectory: gs.trajectory,
+            category: gs.category,
+            progressPercent: gs.progressPercent,
+            hasStrategy: gs.hasStrategy,
+            needsStrategy: !gs.hasStrategy,
+            relatedGoalId: gs.goalId,
           },
         });
       }
+
+      // Detect goals with no strategy and off-track
+      if (gs.trajectory === "off_track" && !gs.hasStrategy) {
+        recommendations.push(
+          `Goal "${gs.name}" needs a strategy — it's off track with no plan`,
+        );
+      }
     }
-  } catch (err) {
-    logger.warn(
-      "[MAPE-K] Goal data fetch failed:",
-      err instanceof Error ? err.message : err,
-    );
   }
 
   // 9. Productivity drop detection
@@ -314,13 +323,15 @@ export function planInterventionForIssue(
             goalTitle: issue.data?.goalTitle,
             trajectory: issue.data?.trajectory,
             category: issue.data?.category,
-            phase: "auto", // auto-detect: generate, execute, or regenerate
+            needsStrategy: issue.data?.needsStrategy || false,
+            phase: issue.data?.needsStrategy ? "generate" : "auto",
           },
         },
         priority: issue.severity === "high" ? "high" : "medium",
-        requiresApproval: false, // Strategy engine handles user approval internally
-        reasoning:
-          "Goal off-track — generating/executing realization strategy instead of just nudging",
+        requiresApproval: false,
+        reasoning: issue.data?.needsStrategy
+          ? "Goal off-track with NO strategy — trigger strategy generation"
+          : "Goal off-track — generating/executing realization strategy",
       };
 
     case "productivity_drop":

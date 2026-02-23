@@ -339,25 +339,28 @@ async function handler(req: NextRequest) {
           continue;
         }
 
-        // Gather day data
-        const snapshot = await gatherDayData(tenant.id);
+        // Run daily action review (closes feedback loop)
+        const { reviewDailyActions } =
+          await import("@/lib/goals/daily-action-planner");
+        const reviewResult = await reviewDailyActions(tenant.id);
 
-        // Detect language from tenant preferences
-        const language = tenant.timezone?.startsWith("Europe/Warsaw")
-          ? "pl"
-          : "en";
+        // Only send evening message if there's goal-relevant news
+        // (milestones hit, trajectory changed, or significant progress)
+        if (reviewResult.total === 0) {
+          results.skipped_rate++;
+          continue; // No goal actions today → no message
+        }
 
-        // Generate reflection message via Gemini Flash
-        const message = await formatReflectionMessage(
-          tenant.name || "",
-          language,
-          snapshot,
-        );
-
-        // Send via unified proactive message
-        await sendProactiveMessage(tenant.id, message, "evening_reflection");
-
-        results.sent++;
+        // Send concise goal progress summary instead of generic reflection
+        if (reviewResult.completed > 0) {
+          await sendProactiveMessage(
+            tenant.id,
+            reviewResult.summary,
+            "evening_goal_review",
+          );
+          results.sent++;
+        }
+        // If all actions missed → let MAPE-K handle it (no guilt messages)
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";

@@ -4,6 +4,48 @@ All notable changes to this project.
 
 ---
 
+## [2026-02-23] Goal-Driven Architecture Rebuild (4 Phases)
+
+### Phase 1: Goal Feedback Loops
+
+- **Goal Events** (`lib/goals/goal-events.ts`) — New event system: `task_completed`, `checkpoint_logged`, `strategy_adjusted`, `goal_achieved`, `goal_off_track`
+- **Goal Feedback** (`lib/goals/goal-feedback.ts`) — Recalculates trajectory on task completion & checkpoint events
+- **MAPE-K Monitor** — Now includes goal trajectory in monitoring data
+- **MAPE-K Analyze** — Detects off-track goals as problems, triggers strategy regeneration
+- **Outcome Tracker** — Records goal trajectory changes as learning events
+- **Learning Engine** — Tracks goal-related patterns for strategy optimization
+- **Trajectory type** — Added `'unknown'` variant for goals without data
+- **Goals Dashboard** — Added `unknown` trajectory styling (gray, "Brak danych")
+
+### Phase 2: On-Demand Communication + Goal-Aware CRONs
+
+- **Morning Briefing** — Goal-guard: skip tenants with no active goals
+- **Evening Reflection** — Goal-guard: skip tenants with no active goals
+- **Weekly Summary** — Goal-guard: skip tenants with no active goals
+- **Monthly Summary** — Goal-guard: skip tenants with no active goals
+- **Goal Progress CRON** — Goal-guard: skip tenants with no active goals
+- **Impulse CRON** — Added `checkGoalsOffTrack()` as highest-priority action
+- **Daily Summary** — Removed fixed SMS send; kept data lake generation; communication now via goal-events
+- **Rig Sync** — Goal-guard: skip tenants with no active goals
+
+### Phase 3: Unified Goal Orchestrator
+
+- **Goal Orchestrator** (`lib/goals/goal-orchestrator.ts`) — Unified entry point replacing separate Ralph + MAPE-K cycles. Priority-based action planning per goal trajectory.
+- **Baseline Monitor** (`lib/goals/baseline-monitor.ts`) — Suggests new goals from existing data patterns and conversation topics
+- **Loop-15** — Replaced separate Ralph/MAPE-K with goal orchestration + baseline monitor
+- **Conductor Engine** — Added `goal_orchestration` to work catalog (30min cooldown)
+
+### Phase 4: Goal-Triggered Capability Building
+
+- **Capability Analyzer** (`lib/goals/capability-analyzer.ts`) — Detects missing data sources, tracking apps, skills, and integrations per goal
+- **Strategy Engine** — Capability gaps injected into AI prompt; generates `build_app`/`run_skill` action steps
+- **Ralph Loop** — Observe enriched with goal-capability gaps
+- **Gap Bridge** — `bridgeGoalsToSuggestions()` for goal-driven skill detection (0.85 confidence)
+- **Goal Onboarding** (`lib/goals/onboarding.ts`) — Natural language → goals → capabilities → auto-build flow
+- **DetectionSource type** — Added `"goal_driven"` variant
+
+---
+
 ## [2026-02-19] UI Audit — Fix All Broken/Dead Cockpit Elements
 
 ### Fixed

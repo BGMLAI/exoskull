@@ -36,8 +36,18 @@ export async function updateTask(
   updates: Partial<TaskInput>,
   supabase?: SupabaseClient,
 ): Promise<{ success: boolean; error?: string }> {
+  // Check if this is a completion event with a goal_id
+  const isCompletion =
+    updates.status === "done" || updates.status === "completed";
+
   const result = await dualUpdateTask(taskId, tenantId, updates, supabase);
   invalidateContextCache(tenantId);
+
+  // Fire goal feedback loop (non-blocking)
+  if (isCompletion && result.success) {
+    fireGoalFeedback(tenantId, taskId, supabase).catch(() => {});
+  }
+
   return result;
 }
 
@@ -46,7 +56,19 @@ export async function completeTask(
   tenantId: string,
   supabase?: SupabaseClient,
 ): Promise<{ success: boolean; error?: string }> {
-  return dualUpdateTask(taskId, tenantId, { status: "done" }, supabase);
+  const result = await dualUpdateTask(
+    taskId,
+    tenantId,
+    { status: "done" },
+    supabase,
+  );
+
+  // Fire goal feedback loop (non-blocking)
+  if (result.success) {
+    fireGoalFeedback(tenantId, taskId, supabase).catch(() => {});
+  }
+
+  return result;
 }
 
 // ============================================================================
@@ -115,6 +137,34 @@ export async function findTaskByTitle(
   }
 
   return null;
+}
+
+// ============================================================================
+// GOAL FEEDBACK HELPER
+// ============================================================================
+
+async function fireGoalFeedback(
+  tenantId: string,
+  taskId: string,
+  supabase?: SupabaseClient,
+): Promise<void> {
+  try {
+    const sb = supabase || getServiceSupabase();
+    // Check if task has a goal_id in context
+    const { data: task } = await sb
+      .from("exo_tasks")
+      .select("context")
+      .eq("id", taskId)
+      .single();
+
+    const goalId = task?.context?.goal_id;
+    if (!goalId) return;
+
+    const { onTaskCompleted } = await import("@/lib/goals/goal-feedback");
+    await onTaskCompleted(tenantId, goalId, taskId);
+  } catch {
+    // Non-blocking — goal feedback is best-effort
+  }
 }
 
 export async function getTaskStats(

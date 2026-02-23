@@ -66,6 +66,51 @@ export const WORK_CATALOG: WorkCatalogEntry[] = [
   // ── USER FACING (Priority 100) ─────────────────────────────────
 
   {
+    id: "goal_orchestration",
+    name: "Goal Orchestration",
+    category: "user_facing",
+    costTier: "cheap",
+    estimatedCostCents: 2,
+    maxDurationMs: 30_000,
+    cooldownMinutes: 30,
+    perTenant: true,
+    isEligible: async (ctx) => {
+      const { getServiceSupabase } = await import("@/lib/supabase/service");
+      const { count } = await getServiceSupabase()
+        .from("exo_user_goals")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", ctx.tenantId!)
+        .eq("is_active", true);
+      return (count || 0) > 0;
+    },
+    execute: async (ctx) => {
+      try {
+        const { runGoalOrchestration } =
+          await import("@/lib/goals/goal-orchestrator");
+        const result = await runGoalOrchestration(
+          ctx.tenantId!,
+          Math.min(ctx.timeRemainingMs - 5_000, 25_000),
+        );
+        return {
+          success: true,
+          costCents: 2,
+          result: {
+            goalsEvaluated: result.goalsEvaluated,
+            actionsExecuted: result.actionsExecuted,
+            outcomes: result.outcomes.length,
+          },
+        };
+      } catch (err) {
+        return {
+          success: false,
+          costCents: 1,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    },
+  },
+
+  {
     id: "proactive_message_check",
     name: "Proactive Message Check",
     category: "user_facing",

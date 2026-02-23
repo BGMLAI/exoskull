@@ -2,9 +2,8 @@
  * Daily Summary CRON Handler
  *
  * Runs at 21:00 to:
- * - Generate daily summaries for all tenants
- * - Send summary via SMS with option to discuss/correct
- * - User can respond with corrections
+ * - Generate daily summaries for all tenants (data lake — always created)
+ * - NO fixed SMS send — communication is event-driven via goal-events
  *
  * Schedule: daily at 21:00 UTC (22:00/23:00 in Poland depending on DST)
  */
@@ -185,8 +184,6 @@ async function getHandler(request: NextRequest) {
   const results = {
     processed: 0,
     summaries_created: 0,
-    sms_sent: 0,
-    skipped_no_conversations: 0,
     skipped_wrong_time: 0,
     errors: [] as string[],
   };
@@ -205,7 +202,7 @@ async function getHandler(request: NextRequest) {
           continue;
         }
 
-        // Generate summary (even without conversations — proactive daily report)
+        // Generate summary for data lake (always — no SMS send)
         const summary = await createDailySummary(tenant.id);
         if (!summary) {
           results.errors.push(`${tenant.id}: Failed to create summary`);
@@ -213,28 +210,9 @@ async function getHandler(request: NextRequest) {
         }
         results.summaries_created++;
 
-        // Get formatted text for SMS
-        const displayText = await getSummaryForDisplay(tenant.id);
-        if (!displayText) {
-          results.errors.push(`${tenant.id}: Failed to format summary`);
-          continue;
-        }
-
-        // Prepare SMS message
-        const smsMessage = `📋 Podsumowanie dnia:\n\n${displayText}\n\n💬 Odpowiedz żeby dodać korekty lub napisz "zadzwoń" żeby porozmawiać.`;
-
-        // Send SMS
-        const smsResult = await sendSummarySmS(
-          tenant.id,
-          tenant.phone,
-          smsMessage,
-        );
-
-        if (smsResult.success) {
-          results.sms_sent++;
-        } else {
-          results.errors.push(`${tenant.id}: SMS failed - ${smsResult.error}`);
-        }
+        // NO fixed SMS send — communication is event-driven via goal-events.
+        // Daily summaries are stored in the data lake for analysis and
+        // on-demand retrieval (user can ask "how was my day?").
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";

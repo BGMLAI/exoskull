@@ -263,19 +263,55 @@ export async function reviewDailyActions(
   ).length;
   const total = tasks.length;
 
-  // Track consecutive days of failure per goal
-  if (completed < total) {
-    const failedGoalIds = tasks
-      .filter((t) => t.status !== "completed" && t.status !== "done")
-      .map((t) => t.context?.goal_id)
-      .filter(Boolean);
+  // Track per-goal completion and log progress
+  const goalIdCounts = new Map<string, { completed: number; total: number }>();
+  for (const t of tasks) {
+    const goalId = t.context?.goal_id;
+    if (!goalId) continue;
+    const counts = goalIdCounts.get(goalId) || { completed: 0, total: 0 };
+    counts.total++;
+    if (t.status === "completed" || t.status === "done") counts.completed++;
+    goalIdCounts.set(goalId, counts);
+  }
 
-    // Record for learning engine
-    for (const goalId of new Set(failedGoalIds)) {
+  // Log progress for completed goal-tasks + record learning events
+  for (const [goalId, counts] of goalIdCounts) {
+    if (counts.completed > 0) {
+      try {
+        const { logProgress } = await import("@/lib/goals/engine");
+        await logProgress(
+          tenantId,
+          goalId,
+          counts.completed,
+          "daily_action_review",
+          `${counts.completed}/${counts.total} daily actions completed`,
+        );
+      } catch {
+        // Non-blocking
+      }
+
+      await supabase.from("learning_events").insert({
+        tenant_id: tenantId,
+        event_type: "goal_action_completed",
+        data: {
+          goal_id: goalId,
+          completed: counts.completed,
+          total: counts.total,
+          date: today,
+        },
+        agent_id: "daily-action-planner",
+      });
+    }
+
+    if (counts.completed < counts.total) {
       await supabase.from("learning_events").insert({
         tenant_id: tenantId,
         event_type: "goal_action_missed",
-        data: { goal_id: goalId, date: today },
+        data: {
+          goal_id: goalId,
+          missed: counts.total - counts.completed,
+          date: today,
+        },
         agent_id: "daily-action-planner",
       });
     }

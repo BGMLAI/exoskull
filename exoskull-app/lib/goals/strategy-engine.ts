@@ -68,6 +68,42 @@ export async function generateGoalStrategy(
     (previousStrategy.status === "abandoned" ||
       previousStrategy.status === "completed");
 
+  // Collect existing skills/apps so AI knows what's available
+  const [skillsResult, appsResult] = await Promise.all([
+    supabase
+      .from("exo_skill_suggestions")
+      .select("suggested_slug, description")
+      .eq("tenant_id", tenantId)
+      .eq("status", "generated")
+      .limit(10),
+    supabase
+      .from("exo_generated_apps")
+      .select("name, category, status")
+      .eq("tenant_id", tenantId)
+      .eq("status", "active")
+      .limit(10),
+  ]);
+
+  const existingCapabilities = {
+    skills: (skillsResult.data || []).map(
+      (s) => `${s.suggested_slug}: ${s.description}`,
+    ),
+    apps: (appsResult.data || []).map((a) => `${a.name} (${a.category})`),
+  };
+
+  // Capability analysis — detect what's missing for this goal
+  let capabilityGaps: string | undefined;
+  try {
+    const { analyzeGoalCapabilities, summarizeCapabilityGaps } =
+      await import("./capability-analyzer");
+    const capReport = await analyzeGoalCapabilities(tenantId, goal as UserGoal);
+    if (capReport.missingCapabilities.length > 0) {
+      capabilityGaps = summarizeCapabilityGaps([capReport]);
+    }
+  } catch {
+    // Non-critical — continue without capability analysis
+  }
+
   // Generate strategy via AI
   const strategyData = await generateStrategyWithAI(
     goal as UserGoal,
@@ -76,6 +112,8 @@ export async function generateGoalStrategy(
     relatedSignals,
     existingKnowledge,
     previousStrategy,
+    existingCapabilities,
+    capabilityGaps,
   );
 
   // Persist
@@ -311,8 +349,78 @@ async function executeStep(
         : `Blocked: ${modResult.blockedReason || modResult.error}`;
     }
 
-    case "run_skill":
-    case "build_app":
+    case "run_skill": {
+      // Create a skill suggestion, then trigger auto-generator
+      try {
+        const supabase = getServiceSupabase();
+        await supabase.from("exo_skill_suggestions").insert({
+          tenant_id: tenantId,
+          source: "goal_strategy",
+          description: (step.params.description as string) || step.title,
+          suggested_slug: `goal-${strategy.goalId.slice(0, 8)}-skill`,
+          life_area: "other",
+          confidence: 0.85,
+          reasoning: `Auto-suggested from goal strategy: ${step.title}`,
+          status: "pending",
+        });
+        // Trigger auto-generator for this tenant
+        const { autoGenerateSkills } =
+          await import("@/lib/skills/auto-generator");
+        const genResult = await autoGenerateSkills(tenantId);
+        return genResult.generated > 0
+          ? `Skill wygenerowany: ${step.title}`
+          : `Skill suggestion created: ${step.title}`;
+      } catch (err) {
+        // Fallback to task creation
+        const result = await executor.execute({
+          type: "create_task",
+          tenantId,
+          params: {
+            title: `[Cel] ${step.title}`,
+            description: `Typ: run_skill\n${JSON.stringify(step.params, null, 2)}`,
+            priority: "high",
+            labels: ["goal-strategy", strategy.goalId],
+          },
+          skipPermissionCheck: true,
+        });
+        return result.success
+          ? `Zadanie utworzone (skill fallback): ${step.title}`
+          : `Błąd: ${result.error}`;
+      }
+    }
+
+    case "build_app": {
+      // Route to app generator with goal context
+      try {
+        const { generateApp } =
+          await import("@/lib/apps/generator/app-generator");
+        const appResult = await generateApp({
+          tenant_id: tenantId,
+          description: (step.params.description as string) || step.title,
+          source: "iors_suggestion",
+        });
+        return appResult.success
+          ? `App wygenerowana: ${step.title}`
+          : `App generation failed: ${appResult.error}`;
+      } catch (err) {
+        // Fallback to task creation
+        const result = await executor.execute({
+          type: "create_task",
+          tenantId,
+          params: {
+            title: `[Cel] ${step.title}`,
+            description: `Typ: build_app\n${JSON.stringify(step.params, null, 2)}`,
+            priority: "high",
+            labels: ["goal-strategy", strategy.goalId],
+          },
+          skipPermissionCheck: true,
+        });
+        return result.success
+          ? `Zadanie utworzone (app fallback): ${step.title}`
+          : `Błąd: ${result.error}`;
+      }
+    }
+
     case "delegate":
     case "connect_people":
     case "acquire_tool": {
@@ -588,6 +696,8 @@ async function generateStrategyWithAI(
   relatedSignals: Record<string, unknown>[],
   knowledge: string[],
   previousStrategy: GoalStrategy | null,
+  existingCapabilities?: { skills: string[]; apps: string[] },
+  capabilityGaps?: string,
 ): Promise<StrategyAIResult> {
   const previousContext = previousStrategy
     ? `\n\nPOPRZEDNIA STRATEGIA (v${previousStrategy.version}, status: ${previousStrategy.status}):
@@ -604,6 +714,13 @@ Powód zmiany: strategia nie zadziałała — ZNAJDŹ INNĄ DROGĘ.`
   const knowledgeContext =
     knowledge.length > 0
       ? `\nWIEDZA O UŻYTKOWNIKU:\n${knowledge.join("\n")}`
+      : "";
+
+  const capabilitiesContext =
+    existingCapabilities &&
+    (existingCapabilities.skills.length > 0 ||
+      existingCapabilities.apps.length > 0)
+      ? `\nDOSTĘPNE NARZĘDZIA:\nSkille: ${existingCapabilities.skills.join(", ") || "brak"}\nAplikacje: ${existingCapabilities.apps.join(", ") || "brak"}`
       : "";
 
   const response = await aiChat(
@@ -651,7 +768,7 @@ Termin: ${goal.target_date || "brak"}
 Kierunek: ${goal.direction}
 
 KONTEKST UŻYTKOWNIKA: ${userContext.summary}
-HISTORIA CELU: ${goalHistory.summary}${previousContext}${signalsContext}${knowledgeContext}
+HISTORIA CELU: ${goalHistory.summary}${previousContext}${signalsContext}${knowledgeContext}${capabilitiesContext}${capabilityGaps ? `\n\nBRAKUJĄCE ZDOLNOŚCI:\n${capabilityGaps}\nUWAGA: Jeśli brakuje źródła danych lub trackera — DODAJ krok "build_app" lub "run_skill" na początku strategii, aby najpierw zbudować potrzebne narzędzie.` : ""}
 
 Wygeneruj plan realizacji tego celu.`,
       },

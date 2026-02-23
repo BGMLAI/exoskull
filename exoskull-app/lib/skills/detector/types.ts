@@ -5,7 +5,8 @@
 export type DetectionSource =
   | "request_parse"
   | "pattern_match"
-  | "gap_detection";
+  | "gap_detection"
+  | "goal_driven";
 
 export type SuggestionStatus =
   | "pending"

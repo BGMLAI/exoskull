@@ -19,6 +19,12 @@ import { getActiveStrategy } from "@/lib/goals/strategy-store";
 import type { UserGoal, MeasurableProxy } from "@/lib/goals/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  emitMilestoneReached,
+  emitTrajectoryChanged,
+  emitDeadlineApproaching,
+  emitGoalCompleted,
+} from "@/lib/goals/goal-events";
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -66,7 +72,11 @@ async function handler(req: NextRequest) {
             goal as unknown as UserGoal,
           );
 
-          if (value === null) continue; // No data to collect
+          // Handle null data: create missing-data checkpoint instead of skipping
+          if (value === null) {
+            await handleMissingData(supabase, tenantId, goal);
+            continue;
+          }
 
           const checkpoint = await logProgress(
             tenantId,
@@ -77,21 +87,66 @@ async function handler(req: NextRequest) {
 
           checkpointsCreated++;
 
-          // Milestone detection (25%, 50%, 75%, 100%) → notify user
+          // Persist trajectory to exo_user_goals for quick access
+          await supabase
+            .from("exo_user_goals")
+            .update({
+              trajectory: checkpoint.trajectory,
+              last_checkpoint_at: new Date().toISOString(),
+            })
+            .eq("id", goal.id);
+
+          // Milestone detection + goal events
           const pct = checkpoint.progress_percent ?? 0;
           if (pct > 0) {
             const milestones = [25, 50, 75, 100];
             for (const m of milestones) {
               if (pct >= m && pct < m + 5) {
                 milestonesHit++;
-                const emoji = m === 100 ? "!!!" : m >= 75 ? "!!" : "!";
-                await sendProactiveMessage(
-                  tenantId,
-                  `Cel "${goal.name}": ${m}% ukończone${emoji} ${m === 100 ? "Gratulacje, cel osiągnięty!" : "Tak trzymaj!"}`,
-                  "goal_milestone",
-                  "goal-progress-cron",
-                );
+                await emitMilestoneReached(tenantId, goal.id, goal.name, m);
+                if (m === 100) {
+                  await emitGoalCompleted(tenantId, goal.id, goal.name);
+                }
               }
+            }
+          }
+
+          // Trajectory change detection → emit event
+          const { data: prevCheckpoint } = await supabase
+            .from("exo_goal_checkpoints")
+            .select("trajectory")
+            .eq("goal_id", goal.id)
+            .neq("checkpoint_date", new Date().toISOString().split("T")[0])
+            .order("checkpoint_date", { ascending: false })
+            .limit(1)
+            .single();
+
+          if (
+            prevCheckpoint &&
+            prevCheckpoint.trajectory !== checkpoint.trajectory
+          ) {
+            await emitTrajectoryChanged(
+              tenantId,
+              goal.id,
+              goal.name,
+              prevCheckpoint.trajectory,
+              checkpoint.trajectory,
+            );
+          }
+
+          // Deadline approaching detection
+          if (goal.target_date) {
+            const daysRemaining = Math.ceil(
+              (new Date(goal.target_date).getTime() - Date.now()) / 86400000,
+            );
+            if ([7, 3, 1].includes(daysRemaining)) {
+              await emitDeadlineApproaching(
+                tenantId,
+                goal.id,
+                goal.name,
+                daysRemaining,
+                pct,
+              );
             }
           }
 
@@ -167,6 +222,27 @@ async function handler(req: NextRequest) {
       }
     }
 
+    // Strategy execution sweep: execute pending steps for ALL tenants
+    for (const [tenantId] of byTenant) {
+      if (Date.now() - startTime > 50_000) break; // Safety timeout
+      try {
+        const { reviewAllStrategies } =
+          await import("@/lib/goals/strategy-engine");
+        const reviewResult = await reviewAllStrategies(tenantId);
+        if (reviewResult.stepsExecuted > 0 || reviewResult.regenerated > 0) {
+          logger.info("[GoalProgress] Strategy sweep:", {
+            tenantId,
+            ...reviewResult,
+          });
+        }
+      } catch (err) {
+        logger.warn("[GoalProgress] Strategy sweep failed:", {
+          tenantId,
+          error: err instanceof Error ? err.message : err,
+        });
+      }
+    }
+
     const duration = Date.now() - startTime;
 
     logger.info("[GoalProgress] Cron complete:", {
@@ -194,6 +270,80 @@ async function handler(req: NextRequest) {
       { status: "failed", error: errorMsg },
       { status: 500 },
     );
+  }
+}
+
+// =====================================================
+// MISSING DATA HANDLING
+// =====================================================
+
+async function handleMissingData(
+  supabase: SupabaseClient,
+  tenantId: string,
+  goal: { id: string; name: string },
+): Promise<void> {
+  const today = new Date().toISOString().split("T")[0];
+
+  // Create checkpoint with unknown trajectory
+  await supabase
+    .from("exo_goal_checkpoints")
+    .upsert(
+      {
+        tenant_id: tenantId,
+        goal_id: goal.id,
+        checkpoint_date: today,
+        value: 0,
+        data_source: "auto_cron_missing",
+        progress_percent: null,
+        momentum: "stable",
+        trajectory: "unknown",
+        notes: "No data source available for automatic collection",
+      },
+      { onConflict: "goal_id,checkpoint_date" },
+    )
+    .then(({ error }) => {
+      if (error)
+        logger.warn(
+          "[GoalProgress] Missing data checkpoint failed:",
+          error.message,
+        );
+    });
+
+  // Check consecutive missing-data checkpoints
+  const { data: recentCheckpoints } = await supabase
+    .from("exo_goal_checkpoints")
+    .select("data_source")
+    .eq("goal_id", goal.id)
+    .order("checkpoint_date", { ascending: false })
+    .limit(3);
+
+  const consecutiveMissing = (recentCheckpoints || []).filter(
+    (c) => c.data_source === "auto_cron_missing",
+  ).length;
+
+  // After 3 consecutive missing-data checkpoints → propose intervention
+  if (consecutiveMissing >= 3) {
+    try {
+      await supabase.rpc("propose_intervention", {
+        p_tenant_id: tenantId,
+        p_type: "gap_detection",
+        p_title: `Brak danych dla celu: ${goal.name}`,
+        p_description: `Cel "${goal.name}" nie ma źródła danych od 3+ dni. Potrzebuję integracji lub skilla do śledzenia postępu.`,
+        p_action_payload: {
+          action: "build_app",
+          params: {
+            goalId: goal.id,
+            goalName: goal.name,
+            reason: "missing_data_source",
+          },
+        },
+        p_priority: "medium",
+        p_source_agent: "goal-progress-cron",
+        p_requires_approval: true,
+      });
+    } catch {
+      // Non-blocking
+    }
   }
 }
 

@@ -130,6 +130,18 @@ export interface ProposeInterventionParams {
 // MAPE-K LOOP
 // ============================================================================
 
+export interface GoalStatusSummary {
+  goalId: string;
+  name: string;
+  category: string;
+  trajectory: string;
+  momentum: string;
+  progressPercent: number;
+  daysRemaining: number | null;
+  hasStrategy: boolean;
+  wellbeingWeight: number;
+}
+
 export interface MonitorData {
   // Recent activity
   conversationsLast24h: number;
@@ -162,6 +174,12 @@ export interface MonitorData {
   yesterdaySleepMinutes?: number | null;
   yesterdayCalories?: number | null;
   lastHeartRate?: number | null;
+
+  // Goals
+  goalStatuses?: GoalStatusSummary[];
+  activeGoalCount?: number;
+  goalsOffTrack?: number;
+  goalsAtRisk?: number;
 
   // Integrations
   connectedRigs: string[];

@@ -773,7 +773,7 @@ export function getMAPEKLoop(): MAPEKLoop {
 // ============================================================================
 
 /**
- * Run a MAPE-K cycle
+ * Run a MAPE-K cycle (convenience wrapper)
  */
 export async function runAutonomyCycle(
   tenantId: string,
@@ -783,3 +783,8 @@ export async function runAutonomyCycle(
   const loop = getMAPEKLoop();
   return loop.runCycle(tenantId, trigger, triggerEvent);
 }
+
+/**
+ * Run a MAPE-K cycle (direct export for orchestrator use).
+ */
+export const runMapeKCycle = runAutonomyCycle;

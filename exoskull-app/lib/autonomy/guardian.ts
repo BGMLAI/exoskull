@@ -640,28 +640,45 @@ export class AlignmentGuardian {
     ).toISOString();
 
     // Parallel data collection
-    const [conversations, doneTasks, interventions] = await Promise.all([
-      this.supabase
-        .from("exo_conversations")
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .gte("created_at", yesterday),
-      getTasks(tenantId, { status: "done" }, this.supabase),
-      this.supabase
-        .from("exo_interventions")
-        .select("*", { count: "exact", head: true })
-        .eq("tenant_id", tenantId)
-        .gte("created_at", now.toISOString().split("T")[0] + "T00:00:00Z"),
-    ]);
+    const [conversations, doneTasks, interventions, goalStats] =
+      await Promise.all([
+        this.supabase
+          .from("exo_conversations")
+          .select("*", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
+          .gte("created_at", yesterday),
+        getTasks(tenantId, { status: "done" }, this.supabase),
+        this.supabase
+          .from("exo_interventions")
+          .select("*", { count: "exact", head: true })
+          .eq("tenant_id", tenantId)
+          .gte("created_at", now.toISOString().split("T")[0] + "T00:00:00Z"),
+        this.supabase
+          .from("exo_user_goals")
+          .select("trajectory")
+          .eq("tenant_id", tenantId)
+          .eq("is_active", true),
+      ]);
 
     const tasksCompleted24h = doneTasks.filter(
       (t) => t.completed_at && new Date(t.completed_at) >= new Date(yesterday),
+    ).length;
+
+    const goals = goalStats.data || [];
+    const goalsOnTrack = goals.filter(
+      (g) => g.trajectory === "on_track" || g.trajectory === "completed",
+    ).length;
+    const goalsOffTrack = goals.filter(
+      (g) => g.trajectory === "off_track" || g.trajectory === "at_risk",
     ).length;
 
     return {
       conversations_24h: conversations.count || 0,
       tasks_completed_24h: tasksCompleted24h,
       interventions_today: interventions.count || 0,
+      goals_on_track: goalsOnTrack,
+      goals_off_track: goalsOffTrack,
+      avg_goal_progress: 0, // Calculated from checkpoints if needed
       timestamp: now.getTime(),
     };
   }
@@ -687,6 +704,14 @@ export class AlignmentGuardian {
     const tasksBefore = before.tasks_completed_24h || 0;
     const tasksAfter = after.tasks_completed_24h || 0;
     if (tasksAfter > tasksBefore) score += 0.5;
+
+    // Goal progress: improved → +1.0, worsened → -0.5
+    const goalsOnBefore = before.goals_on_track || 0;
+    const goalsOnAfter = after.goals_on_track || 0;
+    const goalsOffBefore = before.goals_off_track || 0;
+    const goalsOffAfter = after.goals_off_track || 0;
+    if (goalsOnAfter > goalsOnBefore) score += 1.0;
+    if (goalsOffAfter > goalsOffBefore) score -= 0.5;
 
     return Math.max(0, Math.min(10, score));
   }
