@@ -11,8 +11,6 @@ import { OutlookMessage } from "./microsoft-365/client";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export interface EmailIngestionResult {
   ingested: number;
@@ -29,12 +27,24 @@ async function isEmailAlreadyIngested(
 ): Promise<boolean> {
   const supabase = getServiceSupabase();
 
-  const { count } = await supabase
+  const { count, error } = await supabase
     .from("exo_unified_messages")
     .select("*", { count: "exact", head: true })
     .eq("tenant_id", tenantId)
     .eq("channel", "email")
     .eq("source_id", emailId);
+
+  if (error) {
+    logger.error(
+      "[EmailIngest] Dedup check failed, assuming already ingested:",
+      {
+        tenantId,
+        emailId,
+        error: error.message,
+      },
+    );
+    return true; // Safe default: skip rather than duplicate
+  }
 
   return (count || 0) > 0;
 }

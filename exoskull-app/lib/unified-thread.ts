@@ -159,11 +159,24 @@ export async function appendMessage(
     .single();
 
   if (error) {
+    // Unique constraint violation on email dedup index = harmless duplicate, not a real error
+    if (
+      error.code === "23505" &&
+      params.channel === "email" &&
+      params.source_id
+    ) {
+      logger.debug("[UnifiedThread] Email dedup: duplicate source_id skipped", {
+        tenantId,
+        source_id: params.source_id,
+      });
+      return "duplicate";
+    }
     logger.error("[UnifiedThread] Error appending message:", {
       tenantId,
       channel: params.channel,
       role: params.role,
       error: error.message,
+      code: error.code,
     });
     throw new Error(`Failed to append unified message: ${error.message}`);
   }
