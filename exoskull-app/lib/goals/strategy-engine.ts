@@ -52,13 +52,14 @@ export async function generateGoalStrategy(
 
   if (!goal) throw new Error(`Goal not found: ${goalId}`);
 
-  // Collect context in parallel
-  const [userContext, goalHistory, relatedSignals, existingKnowledge] =
+  // Collect context in parallel (including learned preferences)
+  const [userContext, goalHistory, relatedSignals, existingKnowledge, learnedPreferences] =
     await Promise.all([
       collectUserContext(supabase, tenantId),
       collectGoalHistory(supabase, goalId),
       collectRelatedSignals(supabase, tenantId, goal as UserGoal),
       collectKnowledge(supabase, tenantId, goal as UserGoal),
+      collectLearnedPreferences(tenantId, (goal as UserGoal).category),
     ]);
 
   // Check for previous failed strategies
@@ -114,6 +115,7 @@ export async function generateGoalStrategy(
     previousStrategy,
     existingCapabilities,
     capabilityGaps,
+    learnedPreferences,
   );
 
   // Persist
@@ -421,24 +423,142 @@ async function executeStep(
       }
     }
 
-    case "delegate":
-    case "connect_people":
-    case "acquire_tool": {
-      // These are complex — create tasks for them and notify user
-      const result = await executor.execute({
+    case "delegate": {
+      // Try to actually delegate: find contact and reach out
+      const person = (step.params.person || step.params.to || step.params.name) as string | undefined;
+      const instruction = (step.params.instruction || step.params.message || step.title) as string;
+
+      if (person) {
+        try {
+          const supabase = getServiceSupabase();
+          // Search knowledge/contacts for the person
+          const { data: contacts } = await supabase
+            .from("exo_knowledge_chunks")
+            .select("content, metadata")
+            .eq("tenant_id", tenantId)
+            .or(`content.ilike.%${person}%`)
+            .limit(3);
+
+          // Try to find phone/email in contacts or knowledge
+          const contactInfo = contacts?.find((c) =>
+            c.metadata?.phone || c.metadata?.email
+          );
+
+          if (contactInfo?.metadata?.phone) {
+            await sendProactiveMessage(
+              tenantId,
+              `Potrzebuję delegować zadanie: "${step.title}" do ${person}.\n` +
+                `Znalazłem numer: ${contactInfo.metadata.phone}.\n` +
+                `Instrukcja: ${instruction}\n\nMam zadzwonić?`,
+              "goal_delegate_approval",
+              "strategy-engine",
+            );
+            return `Propozycja delegacji do ${person} — czekam na potwierdzenie`;
+          } else if (contactInfo?.metadata?.email) {
+            const emailResult = await executor.execute({
+              type: "send_email",
+              tenantId,
+              params: {
+                to: contactInfo.metadata.email,
+                subject: `Prośba: ${step.title}`,
+                body: instruction,
+              },
+              skipPermissionCheck: true,
+            });
+            return emailResult.success
+              ? `Email wysłany do ${person} (${contactInfo.metadata.email})`
+              : `Błąd delegacji: ${emailResult.error}`;
+          }
+        } catch {
+          // Fall through to message-based delegation
+        }
+
+        // Fallback: send proactive message asking user to delegate
+        await sendProactiveMessage(
+          tenantId,
+          `Dla realizacji celu: "${step.title}"\n` +
+            `Potrzebuję delegować do: ${person}\n` +
+            `Instrukcja: ${instruction}\n\n` +
+            `Podaj kontakt do ${person} (nr tel lub email), a wykonam to za Ciebie.`,
+          "goal_delegate_request",
+          "strategy-engine",
+        );
+        return `Zapytanie o kontakt do ${person} wysłane`;
+      }
+
+      // No person specified — create task
+      const taskResult = await executor.execute({
         type: "create_task",
         tenantId,
         params: {
-          title: `[Cel] ${step.title}`,
-          description: `Typ: ${step.type}\n${JSON.stringify(step.params, null, 2)}`,
+          title: `[Deleguj] ${step.title}`,
+          description: instruction,
           priority: "high",
-          labels: ["goal-strategy", strategy.goalId],
+          labels: ["goal-strategy", strategy.goalId, "delegate"],
         },
         skipPermissionCheck: true,
       });
-      return result.success
-        ? `Zadanie złożone utworzone: ${step.title}`
-        : `Błąd: ${result.error}`;
+      return taskResult.success
+        ? `Zadanie delegacji utworzone: ${step.title}`
+        : `Błąd: ${taskResult.error}`;
+    }
+
+    case "connect_people": {
+      // Proactively facilitate connection
+      const people = (step.params.people || []) as string[];
+      const purpose = (step.params.purpose || step.title) as string;
+
+      await sendProactiveMessage(
+        tenantId,
+        `Dla celu: "${step.title}"\n` +
+          `Proponuję połączyć: ${people.length > 0 ? people.join(", ") : "odpowiednie osoby"}\n` +
+          `Cel połączenia: ${purpose}\n\n` +
+          `Chcesz, żebym przygotował wiadomość/email do wysłania?`,
+        "goal_connect_people",
+        "strategy-engine",
+      );
+      return `Propozycja połączenia osób wysłana`;
+    }
+
+    case "acquire_tool": {
+      // Research and recommend tools, or build one
+      const toolDescription = (step.params.description || step.params.tool || step.title) as string;
+
+      // First, try to research the best tool
+      const researchResult = await conductResearch(
+        tenantId,
+        `Najlepsze narzędzie: ${toolDescription}`,
+        `Użytkownik potrzebuje narzędzia: ${toolDescription}. Znajdź konkretne opcje (darmowe jeśli możliwe) z linkami.`,
+      );
+
+      // Check if we should build an app instead
+      const shouldBuild = toolDescription.toLowerCase().includes("tracker") ||
+        toolDescription.toLowerCase().includes("app") ||
+        toolDescription.toLowerCase().includes("narzędzie");
+
+      if (shouldBuild) {
+        try {
+          const { generateApp } = await import("@/lib/apps/generator/app-generator");
+          const appResult = await generateApp({
+            tenant_id: tenantId,
+            description: toolDescription,
+            source: "iors_suggestion",
+          });
+          if (appResult.success) {
+            return `Narzędzie zbudowane: ${toolDescription}. Research: ${researchResult.slice(0, 200)}`;
+          }
+        } catch {
+          // Fall through to task creation
+        }
+      }
+
+      await sendProactiveMessage(
+        tenantId,
+        `Zbadałem narzędzia dla: "${step.title}":\n\n${researchResult.slice(0, 500)}\n\nChcesz, żebym skonfigurował któreś z nich?`,
+        "goal_tool_research",
+        "strategy-engine",
+      );
+      return `Research narzędzi wykonany i wysłany`;
     }
 
     default:
@@ -659,6 +779,113 @@ async function collectRelatedSignals(
   return data || [];
 }
 
+/**
+ * Collect learned preferences relevant to strategy generation.
+ * Closes the loop: Learning Engine → Strategy Engine.
+ */
+async function collectLearnedPreferences(
+  tenantId: string,
+  goalCategory: string,
+): Promise<{ summary: string; data: Record<string, unknown> }> {
+  try {
+    const { getAllPreferences, getPreference } = await import(
+      "@/lib/autonomy/learning-engine"
+    );
+
+    const [allPrefs, bestStepType, worstIntervention, bestHour, outcomeStats] =
+      await Promise.all([
+        getAllPreferences(tenantId),
+        getPreference(tenantId, `best_goal_step_type:${goalCategory}`),
+        getPreference(tenantId, "worst_intervention_type"),
+        getPreference(tenantId, "best_contact_hour"),
+        getGoalCategorySuccessRate(tenantId, goalCategory),
+      ]);
+
+    const insights: string[] = [];
+    const data: Record<string, unknown> = {};
+
+    if (bestStepType) {
+      insights.push(
+        `Najskuteczniejszy typ kroku dla celów ${goalCategory}: ${bestStepType.value} (pewność: ${Math.round(bestStepType.confidence * 100)}%)`,
+      );
+      data.preferredStepType = bestStepType.value;
+    }
+
+    if (worstIntervention) {
+      insights.push(
+        `Unikaj interwencji typu: ${worstIntervention.value}`,
+      );
+      data.avoidInterventionType = worstIntervention.value;
+    }
+
+    if (bestHour) {
+      insights.push(
+        `Najlepsza godzina kontaktu: ${bestHour.value}:00`,
+      );
+      data.bestContactHour = bestHour.value;
+    }
+
+    if (outcomeStats !== null) {
+      insights.push(
+        `Historyczny success rate dla celów ${goalCategory}: ${Math.round(outcomeStats * 100)}%`,
+      );
+      data.categorySuccessRate = outcomeStats;
+    }
+
+    const summary =
+      insights.length > 0
+        ? `WYUCZONE PREFERENCJE:\n${insights.join("\n")}`
+        : "";
+
+    return { summary, data };
+  } catch {
+    return { summary: "", data: {} };
+  }
+}
+
+/**
+ * Get historical success rate for a goal category.
+ */
+async function getGoalCategorySuccessRate(
+  tenantId: string,
+  category: string,
+): Promise<number | null> {
+  try {
+    const supabase = getServiceSupabase();
+    const { data: strategies } = await supabase
+      .from("exo_goal_strategies")
+      .select("status, goal_id")
+      .eq("tenant_id", tenantId)
+      .gte("created_at", new Date(Date.now() - 90 * 86400000).toISOString());
+
+    if (!strategies || strategies.length < 3) return null;
+
+    // Get goal categories
+    const goalIds = [...new Set(strategies.map((s) => s.goal_id))];
+    const { data: goals } = await supabase
+      .from("exo_user_goals")
+      .select("id, category")
+      .in("id", goalIds)
+      .eq("category", category);
+
+    if (!goals || goals.length === 0) return null;
+
+    const categoryGoalIds = new Set(goals.map((g) => g.id));
+    const categoryStrategies = strategies.filter((s) =>
+      categoryGoalIds.has(s.goal_id),
+    );
+
+    if (categoryStrategies.length < 2) return null;
+
+    const completed = categoryStrategies.filter(
+      (s) => s.status === "completed",
+    ).length;
+    return completed / categoryStrategies.length;
+  } catch {
+    return null;
+  }
+}
+
 async function collectKnowledge(
   supabase: ReturnType<typeof getServiceSupabase>,
   tenantId: string,
@@ -698,6 +925,7 @@ async function generateStrategyWithAI(
   previousStrategy: GoalStrategy | null,
   existingCapabilities?: { skills: string[]; apps: string[] },
   capabilityGaps?: string,
+  learnedPreferences?: { summary: string; data: Record<string, unknown> },
 ): Promise<StrategyAIResult> {
   const previousContext = previousStrategy
     ? `\n\nPOPRZEDNIA STRATEGIA (v${previousStrategy.version}, status: ${previousStrategy.status}):
@@ -770,7 +998,7 @@ Kierunek: ${goal.direction}
 KONTEKST UŻYTKOWNIKA: ${userContext.summary}
 HISTORIA CELU: ${goalHistory.summary}${previousContext}${signalsContext}${knowledgeContext}${capabilitiesContext}${capabilityGaps ? `\n\nBRAKUJĄCE ZDOLNOŚCI:\n${capabilityGaps}\nUWAGA: Jeśli brakuje źródła danych lub trackera — DODAJ krok "build_app" lub "run_skill" na początku strategii, aby najpierw zbudować potrzebne narzędzie.` : ""}
 
-Wygeneruj plan realizacji tego celu.`,
+Wygeneruj plan realizacji tego celu.${learnedPreferences?.summary ? `\n\n${learnedPreferences.summary}\nUWAGA: Uwzględnij powyższe preferencje — używaj typów kroków które historycznie działają, unikaj tych które nie działały. Planuj kontakt na najlepszą godzinę.` : ""}`,
       },
     ],
     {

@@ -112,6 +112,9 @@ export async function learnFromOutcomes(
     // 6. Learn goal strategy patterns
     await learnGoalStrategyPatterns(tenantId, result);
 
+    // 7. Learn triage classification accuracy (closed-loop feedback)
+    await learnTriageAccuracy(tenantId, result);
+
     logger.info("[LearningEngine] Cycle complete:", {
       tenantId,
       ...result,
@@ -314,6 +317,88 @@ async function learnGoalStrategyPatterns(
       result.preferences_updated++;
       result.insights.push(
         `Best step type for ${category} goals: ${best.type} (${Math.round(best.successRate * 100)}% success)`,
+      );
+    }
+  }
+}
+
+/**
+ * Learn from triage classification accuracy.
+ * Analyzes which signal types the user acts on vs dismisses,
+ * to improve future classification.
+ */
+async function learnTriageAccuracy(
+  tenantId: string,
+  result: LearningResult,
+): Promise<void> {
+  const supabase = getServiceSupabase();
+
+  // Get triaged signals from last 30 days with their outcomes
+  const { data: signals } = await supabase
+    .from("exo_signal_triage")
+    .select("signal_type, classification, proposed_action, user_action, created_at")
+    .eq("tenant_id", tenantId)
+    .gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString());
+
+  if (!signals || signals.length < 10) return;
+
+  // Calculate accuracy per signal type: did user follow the proposed action?
+  const typeStats = new Map<
+    string,
+    { actedOn: number; dismissed: number; total: number }
+  >();
+
+  for (const sig of signals) {
+    const key = `${sig.signal_type}:${sig.classification}`;
+    const stats = typeStats.get(key) || { actedOn: 0, dismissed: 0, total: 0 };
+    stats.total++;
+
+    if (sig.user_action === "approved" || sig.user_action === "acted") {
+      stats.actedOn++;
+    } else if (
+      sig.user_action === "dismissed" ||
+      sig.user_action === "ignored"
+    ) {
+      stats.dismissed++;
+    }
+
+    typeStats.set(key, stats);
+  }
+
+  // Find classifications the user consistently ignores → mark as overclassified
+  for (const [key, stats] of typeStats) {
+    if (stats.total < 5) continue;
+
+    const dismissRate = stats.dismissed / stats.total;
+    const [signalType, classification] = key.split(":");
+
+    if (dismissRate > 0.7 && classification !== "noise") {
+      // This signal type is consistently ignored — it's probably noise
+      await upsertPreference(
+        tenantId,
+        `triage_overclassified:${key}`,
+        { signalType, classification, dismissRate, sampleCount: stats.total },
+        Math.min(stats.total / 20, 0.85),
+        "behavior",
+      );
+      result.preferences_updated++;
+      result.insights.push(
+        `Triage: ${signalType}/${classification} dismissed ${Math.round(dismissRate * 100)}% — consider downgrading`,
+      );
+    }
+
+    if (stats.actedOn / stats.total > 0.8 && classification === "routine") {
+      // User consistently acts on "routine" items — they may be underclassified
+      await upsertPreference(
+        tenantId,
+        `triage_underclassified:${key}`,
+        { signalType, classification, actRate: stats.actedOn / stats.total },
+        Math.min(stats.total / 20, 0.85),
+        "behavior",
+      );
+      result.preferences_updated++;
+      result.insights.push(
+        `Triage: ${signalType}/routine acted on ${Math.round((stats.actedOn / stats.total) * 100)}% — consider upgrading to important`,
       );
     }
   }

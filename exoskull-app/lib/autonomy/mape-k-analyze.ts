@@ -9,6 +9,7 @@ import {
   PlanResult,
   InterventionPriority,
 } from "./types";
+import { getPersonalizedThresholds } from "./personalized-thresholds";
 import { logger } from "@/lib/logger";
 
 /**
@@ -24,17 +25,20 @@ export async function analyzeMonitorData(
   const recommendations: string[] = [];
   const gaps: AnalyzeResult["gaps"] = [];
 
-  // 1. Analyze sleep
+  // Load personalized thresholds (goal-aware, personal-baseline, or population defaults)
+  const thresholds = await getPersonalizedThresholds(tenantId);
+
+  // 1. Analyze sleep (personalized thresholds)
   if (monitorData.sleepHoursLast7d.length > 0) {
     const avgSleep =
       monitorData.sleepHoursLast7d.reduce((a, b) => a + b, 0) /
       monitorData.sleepHoursLast7d.length;
-    if (avgSleep < 6) {
+    if (avgSleep < thresholds.minSleepHours.value) {
       issues.push({
         type: "sleep_debt",
-        severity: avgSleep < 5 ? "high" : "medium",
-        description: `Average sleep is ${avgSleep.toFixed(1)}h/night - below recommended 7-8h`,
-        data: { avgSleep, sleepHoursLast7d: monitorData.sleepHoursLast7d },
+        severity: avgSleep < thresholds.criticalSleepHours.value ? "high" : "medium",
+        description: `Average sleep is ${avgSleep.toFixed(1)}h/night - below ${thresholds.minSleepHours.source === "goal_target" ? "your goal" : "recommended"} threshold (${thresholds.minSleepHours.value}h)`,
+        data: { avgSleep, sleepHoursLast7d: monitorData.sleepHoursLast7d, thresholdSource: thresholds.minSleepHours.source },
       });
       recommendations.push(
         "Consider earlier bedtime or reducing screen time before sleep",
@@ -50,13 +54,13 @@ export async function analyzeMonitorData(
     });
   }
 
-  // 2. Analyze task overload
-  if (monitorData.tasksOverdue > 5) {
+  // 2. Analyze task overload (personalized thresholds)
+  if (monitorData.tasksOverdue > thresholds.maxOverdueTasks.value) {
     issues.push({
       type: "task_overload",
-      severity: monitorData.tasksOverdue > 10 ? "high" : "medium",
-      description: `${monitorData.tasksOverdue} overdue tasks need attention`,
-      data: { overdueCount: monitorData.tasksOverdue },
+      severity: monitorData.tasksOverdue > thresholds.criticalOverdueTasks.value ? "high" : "medium",
+      description: `${monitorData.tasksOverdue} overdue tasks need attention (threshold: ${thresholds.maxOverdueTasks.value})`,
+      data: { overdueCount: monitorData.tasksOverdue, thresholdSource: thresholds.maxOverdueTasks.source },
     });
     recommendations.push(
       "Review and prioritize overdue tasks, consider delegating or rescheduling",
@@ -68,11 +72,11 @@ export async function analyzeMonitorData(
     const avgActivity =
       monitorData.activityMinutesLast7d.reduce((a, b) => a + b, 0) /
       monitorData.activityMinutesLast7d.length;
-    if (avgActivity < 30) {
+    if (avgActivity < thresholds.minActivityMinutes.value) {
       issues.push({
         type: "health_concern",
         severity: "low",
-        description: `Average daily activity is ${avgActivity.toFixed(0)} minutes - below 30 min recommendation`,
+        description: `Average daily activity is ${avgActivity.toFixed(0)} minutes - below ${thresholds.minActivityMinutes.source === "goal_target" ? "your goal" : "recommended"} threshold (${thresholds.minActivityMinutes.value} min)`,
       });
     }
   }

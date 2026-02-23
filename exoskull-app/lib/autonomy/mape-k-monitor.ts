@@ -233,6 +233,26 @@ export async function collectMonitorData(
     }
   }
 
+  // Proactive rig-sync: if connected rigs have stale data, trigger on-demand sync
+  try {
+    if (rigsResult.data && rigsResult.data.length > 0) {
+      const STALE_THRESHOLD_MS = 45 * 60 * 1000; // 45 min (CRON runs every 30 min + buffer)
+      const staleRigs = rigsResult.data.filter((r) => {
+        if (!r.last_sync_at) return true; // Never synced
+        return Date.now() - new Date(r.last_sync_at).getTime() > STALE_THRESHOLD_MS;
+      });
+
+      if (staleRigs.length > 0) {
+        // Trigger on-demand sync for stale rigs (non-blocking, fire-and-forget)
+        triggerOnDemandRigSync(supabase, tenantId, staleRigs).catch((err) =>
+          logger.warn("[MAPE-K] On-demand rig sync failed:", err instanceof Error ? err.message : err),
+        );
+      }
+    }
+  } catch {
+    // Non-critical — monitor continues without sync
+  }
+
   // Collect goal statuses (non-blocking)
   let goalStatuses: GoalStatusSummary[] = [];
   try {
@@ -326,6 +346,56 @@ export async function collectMonitorData(
     lastSyncTimes,
     systemMetrics,
   };
+}
+
+/**
+ * Trigger on-demand sync for stale rigs.
+ * Runs in the background (fire-and-forget) to refresh data for the current MAPE-K cycle.
+ */
+async function triggerOnDemandRigSync(
+  supabase: SupabaseClient,
+  tenantId: string,
+  staleRigs: Array<{ rig_slug: string; last_sync_at: string | null }>,
+): Promise<void> {
+  const { syncRig, CRON_SYNCABLE_SLUGS } = await import("@/lib/rigs/rig-syncer");
+  const { ensureFreshToken } = await import("@/lib/rigs/oauth");
+
+  for (const rig of staleRigs.slice(0, 3)) {
+    // Only sync CRON-syncable rigs
+    if (!CRON_SYNCABLE_SLUGS.has(rig.rig_slug)) continue;
+
+    try {
+      // Get full connection record
+      const { data: conn } = await supabase
+        .from("exo_rig_connections")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("rig_slug", rig.rig_slug)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (!conn) continue;
+
+      // Refresh token if needed
+      if (conn.refresh_token) {
+        const freshToken = await ensureFreshToken(conn);
+        if (freshToken !== conn.access_token) {
+          conn.access_token = freshToken;
+        }
+      }
+
+      await syncRig(conn, supabase);
+
+      logger.info("[MAPE-K] On-demand rig sync completed:", {
+        tenantId,
+        rigSlug: rig.rig_slug,
+      });
+    } catch (err) {
+      logger.warn(`[MAPE-K] On-demand sync failed for ${rig.rig_slug}:`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
 }
 
 export function calculateHrvTrend(

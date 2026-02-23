@@ -360,13 +360,18 @@ async function collectGoalValue(
 
   // If goal has explicit measurable proxies, use them
   if (goal.measurable_proxies && goal.measurable_proxies.length > 0) {
-    return collectFromProxies(
+    const proxyResult = await collectFromProxies(
       supabase,
       tenantId,
       goal.measurable_proxies,
       goal.frequency,
     );
+    if (proxyResult !== null) return proxyResult;
   }
+
+  // Try auto-fetch from connected rig data (exo_health_metrics)
+  const rigValue = await collectFromRigData(supabase, tenantId, goal);
+  if (rigValue !== null) return rigValue;
 
   // Auto-detect data source by category
   switch (goal.category) {
@@ -383,6 +388,103 @@ async function collectGoalValue(
   }
 }
 
+/**
+ * Auto-fetch goal progress from connected rig data (Oura, Google Fit, etc.)
+ * Maps goal name/unit/category to known metric types in exo_health_metrics.
+ */
+async function collectFromRigData(
+  supabase: SupabaseClient,
+  tenantId: string,
+  goal: UserGoal,
+): Promise<number | null> {
+  const unit = (goal.target_unit || "").toLowerCase();
+  const name = (goal.name || "").toLowerCase();
+  const since = getFrequencyStart(goal.frequency);
+
+  // Map goal attributes to health metric types
+  const metricMapping: Array<{
+    match: (u: string, n: string, cat: string) => boolean;
+    metricType: string;
+    transform: (value: number) => number;
+    aggregation: "avg" | "sum" | "latest";
+  }> = [
+    {
+      match: (u, n) =>
+        u.includes("hour") || u.includes("godzin") || n.includes("sleep") || n.includes("sen") || n.includes("śpi"),
+      metricType: "sleep_duration_hours",
+      transform: (v) => v,
+      aggregation: "avg",
+    },
+    {
+      match: (u, n) =>
+        u.includes("krok") || u.includes("step") || n.includes("krok") || n.includes("step"),
+      metricType: "steps",
+      transform: (v) => v,
+      aggregation: "avg",
+    },
+    {
+      match: (u, n) =>
+        u.includes("kalori") || u.includes("calor") || u.includes("kcal"),
+      metricType: "calories",
+      transform: (v) => v,
+      aggregation: "avg",
+    },
+    {
+      match: (u, n) =>
+        n.includes("heart") || n.includes("puls") || n.includes("tętno") || n.includes("hrv"),
+      metricType: "heart_rate",
+      transform: (v) => v,
+      aggregation: "avg",
+    },
+    {
+      match: (u, n, cat) =>
+        (u.includes("min") || u.includes("minut")) && cat === "health",
+      metricType: "active_minutes",
+      transform: (v) => v,
+      aggregation: "sum",
+    },
+    {
+      match: (u, n) =>
+        n.includes("wag") || n.includes("weight") || u.includes("kg"),
+      metricType: "weight",
+      transform: (v) => v,
+      aggregation: "latest",
+    },
+  ];
+
+  for (const mapping of metricMapping) {
+    if (!mapping.match(unit, name, goal.category)) continue;
+
+    try {
+      const { data: metrics } = await supabase
+        .from("exo_health_metrics")
+        .select("value, recorded_at")
+        .eq("tenant_id", tenantId)
+        .eq("metric_type", mapping.metricType)
+        .gte("recorded_at", since)
+        .order("recorded_at", { ascending: false });
+
+      if (!metrics || metrics.length === 0) continue;
+
+      const values = metrics.map((m) => mapping.transform(Number(m.value))).filter((v) => !isNaN(v));
+      if (values.length === 0) continue;
+
+      switch (mapping.aggregation) {
+        case "avg":
+          return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10;
+        case "sum":
+          return values.reduce((a, b) => a + b, 0);
+        case "latest":
+          return values[0];
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
 async function collectFromProxies(
   supabase: SupabaseClient,
   tenantId: string,
@@ -396,6 +498,7 @@ async function collectFromProxies(
     habit_completions: "exo_habit_completions",
     tasks: "exo_tasks",
     transactions: "exo_transactions",
+    health_metrics: "exo_health_metrics",
   };
 
   for (const proxy of proxies) {

@@ -94,49 +94,68 @@ export async function planDailyActions(
       }
     }
 
-    // 3. Filter goals that need attention (off_track, at_risk, or no checkpoint)
-    const goalsNeedingAction = goals.filter((g: any) => {
-      const status = statusMap.get(g.id);
-      if (!status) return true; // No checkpoint = needs action
-      return (
-        status.trajectory === "off_track" || status.trajectory === "at_risk"
-      );
-    });
+    // 3. Categorize goals by action type: recovery, correction, and acceleration
+    const goalsByActionType: Array<{
+      goal: any;
+      actionType: "recovery" | "correction" | "acceleration";
+      status: { trajectory: Trajectory; momentum: string; progress: number } | undefined;
+    }> = [];
 
-    if (goalsNeedingAction.length === 0) {
-      // All goals on track — still generate a brief summary
+    for (const g of goals) {
+      const status = statusMap.get(g.id);
+      if (!status) {
+        // No checkpoint = needs action
+        goalsByActionType.push({ goal: g, actionType: "recovery", status });
+        continue;
+      }
+      if (status.trajectory === "off_track") {
+        goalsByActionType.push({ goal: g, actionType: "recovery", status });
+      } else if (status.trajectory === "at_risk") {
+        goalsByActionType.push({ goal: g, actionType: "correction", status });
+      } else if (
+        status.trajectory === "on_track" &&
+        status.progress > 0 &&
+        status.progress < 80
+      ) {
+        // On-track but not yet close to completion → acceleration opportunity
+        goalsByActionType.push({ goal: g, actionType: "acceleration", status });
+      }
+    }
+
+    if (goalsByActionType.length === 0) {
+      // All goals on track and near completion — generate a brief summary
       result.briefingSection = formatOnTrackSummary(goals, statusMap);
       return result;
     }
 
-    result.goalsProcessed = goalsNeedingAction.length;
+    result.goalsProcessed = goalsByActionType.length;
 
     // 4. Generate daily actions via AI (Tier 1 — cheap)
     const router = new ModelRouter();
-    const goalsContext = goalsNeedingAction.map((g: any) => {
-      const status = statusMap.get(g.id);
-      return {
-        name: g.name || g.title,
-        category: g.category,
-        target: g.target_value
-          ? `${g.target_value} ${g.target_unit || ""}`
-          : null,
-        trajectory: status?.trajectory || "unknown",
-        momentum: status?.momentum || "unknown",
-        progress: status ? `${status.progress}%` : "no data",
-        deadline: g.target_date,
-      };
-    });
+    const goalsContext = goalsByActionType.map(({ goal: g, actionType, status }) => ({
+      name: g.name || g.title,
+      category: g.category,
+      target: g.target_value
+        ? `${g.target_value} ${g.target_unit || ""}`
+        : null,
+      trajectory: status?.trajectory || "unknown",
+      momentum: status?.momentum || "unknown",
+      progress: status ? `${status.progress}%` : "no data",
+      deadline: g.target_date,
+      actionType,
+    }));
 
     const response = await router.route({
       messages: [
         {
           role: "system",
-          content: `You generate CONCRETE daily actions for goals that are off-track or at-risk.
+          content: `You generate CONCRETE daily actions for goals based on their action type.
 Rules:
-- Max 2 actions per goal, max 5 actions total
+- "recovery" goals (off-track): 2-3 intensive actions to get back on track
+- "correction" goals (at-risk): 1-2 corrective actions
+- "acceleration" goals (on-track): 1 optional action to speed up progress (e.g., "double effort since you're close")
+- Max 5 actions total, prioritize recovery > correction > acceleration
 - Each action must be specific and achievable TODAY
-- Focus on the highest-impact action first
 - Return JSON array: [{ "goalName": "...", "action": "...", "priority": "high|medium|low" }]
 - Use the user's language (likely Polish)
 - Keep actions under 80 chars`,
@@ -148,7 +167,7 @@ Rules:
       ],
       taskCategory: "simple_response",
       tenantId,
-      maxTokens: 400,
+      maxTokens: 500,
       temperature: 0.3,
     });
 
@@ -161,16 +180,16 @@ Rules:
       if (Array.isArray(parsed)) {
         actions = parsed.slice(0, 5).map((a: any) => ({
           goalId:
-            goalsNeedingAction.find(
-              (g: any) => (g.name || g.title) === a.goalName,
-            )?.id || "",
+            goalsByActionType.find(
+              ({ goal: g }) => (g.name || g.title) === a.goalName,
+            )?.goal?.id || "",
           goalName: a.goalName || "",
           action: a.action || "",
           priority: a.priority || "medium",
           category:
-            goalsNeedingAction.find(
-              (g: any) => (g.name || g.title) === a.goalName,
-            )?.category || "productivity",
+            goalsByActionType.find(
+              ({ goal: g }) => (g.name || g.title) === a.goalName,
+            )?.goal?.category || "productivity",
         }));
       }
     } catch {

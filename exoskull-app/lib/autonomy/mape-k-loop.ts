@@ -25,6 +25,7 @@ import { analyzeMonitorData, planInterventionForIssue } from "./mape-k-analyze";
 
 import { analyzeRecentOutcomes } from "./outcome-tracker";
 import { learnFromOutcomes } from "./learning-engine";
+import { findOptimalDeliveryTime } from "./timing-optimizer";
 import { logger } from "@/lib/logger";
 
 // ============================================================================
@@ -287,6 +288,26 @@ export class MAPEKLoop {
           continue;
         }
 
+        // Determine optimal delivery time
+        let scheduledFor: string | null = null;
+        if (planned.requiresApproval) {
+          scheduledFor = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // auto-approve after 30min
+        } else {
+          try {
+            const timing = await findOptimalDeliveryTime(tenantId, planned.priority);
+            if (timing.delayed) {
+              scheduledFor = timing.deliverAt.toISOString();
+              logger.info("[MAPE-K] Intervention timing optimized:", {
+                type: planned.type,
+                reason: timing.reason,
+                deliverAt: scheduledFor,
+              });
+            }
+          } catch {
+            // Non-critical — deliver immediately if timing fails
+          }
+        }
+
         // Create intervention record
         const { data: intervention, error: createError } =
           await this.supabase.rpc("propose_intervention", {
@@ -298,9 +319,7 @@ export class MAPEKLoop {
             p_priority: planned.priority,
             p_source_agent: "mape-k-loop",
             p_requires_approval: planned.requiresApproval,
-            p_scheduled_for: planned.requiresApproval
-              ? new Date(Date.now() + 30 * 60 * 1000).toISOString() // auto-approve after 30min
-              : null,
+            p_scheduled_for: scheduledFor,
           });
 
         if (createError) {
@@ -576,6 +595,40 @@ export class MAPEKLoop {
       );
     }
 
+    // 5b. Guardian opportunity detection (positive suggestions, not just problems)
+    try {
+      const guardian = getAlignmentGuardian();
+      // Get goal statuses from most recent monitor data if available
+      const goalStatuses = await this.getRecentGoalStatuses(tenantId);
+      const opportunities = await guardian.suggestOpportunities(tenantId, goalStatuses);
+
+      if (opportunities.length > 0) {
+        patternsDetected += opportunities.length;
+        for (const opp of opportunities) {
+          learnings.push(`[Opportunity] ${opp.title}: ${opp.suggestedAction}`);
+        }
+
+        // Send top opportunity as a proactive message (max 1 per cycle to avoid spam)
+        const topOpp = opportunities[0];
+        try {
+          const { sendProactiveMessage } = await import("@/lib/cron/tenant-utils");
+          await sendProactiveMessage(
+            tenantId,
+            `💡 ${topOpp.title}\n${topOpp.description}\n\n${topOpp.suggestedAction}`,
+            "opportunity_detected",
+            "guardian",
+          );
+        } catch {
+          // Non-critical
+        }
+      }
+    } catch (err) {
+      logger.warn(
+        "[MAPE-K] Opportunity detection failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+
     // 6. Log learning event
     await this.supabase.from("learning_events").insert({
       tenant_id: tenantId,
@@ -599,6 +652,38 @@ export class MAPEKLoop {
       feedbackProcessed,
       learnings,
     };
+  }
+
+  // ============================================================================
+  // HELPERS
+  // ============================================================================
+
+  private async getRecentGoalStatuses(
+    tenantId: string,
+  ): Promise<
+    Array<{
+      goalId: string;
+      name: string;
+      category: string;
+      trajectory: string;
+      progressPercent: number;
+      momentum: string;
+    }>
+  > {
+    try {
+      const { getGoalStatus } = await import("@/lib/goals/engine");
+      const statuses = await getGoalStatus(tenantId);
+      return statuses.map((s) => ({
+        goalId: s.goal.id,
+        name: s.goal.name,
+        category: s.goal.category,
+        trajectory: s.trajectory,
+        progressPercent: s.progress_percent,
+        momentum: s.momentum,
+      }));
+    } catch {
+      return [];
+    }
   }
 }
 

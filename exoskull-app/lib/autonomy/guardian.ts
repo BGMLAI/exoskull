@@ -481,6 +481,117 @@ export class AlignmentGuardian {
   }
 
   // ==========================================================================
+  // OPPORTUNITY DETECTION: Proactive positive suggestions
+  // ==========================================================================
+
+  /**
+   * Detect positive opportunities from goals/metrics instead of only detecting problems.
+   * Called from MAPE-K Knowledge phase to suggest acceleration actions.
+   */
+  async suggestOpportunities(
+    tenantId: string,
+    goalStatuses?: Array<{
+      goalId: string;
+      name: string;
+      category: string;
+      trajectory: string;
+      progressPercent: number;
+      momentum: string;
+    }>,
+  ): Promise<
+    Array<{
+      type: "streak" | "momentum" | "milestone_close" | "cross_goal_synergy";
+      title: string;
+      description: string;
+      suggestedAction: string;
+    }>
+  > {
+    const opportunities: Array<{
+      type: "streak" | "momentum" | "milestone_close" | "cross_goal_synergy";
+      title: string;
+      description: string;
+      suggestedAction: string;
+    }> = [];
+
+    if (!goalStatuses || goalStatuses.length === 0) return opportunities;
+
+    // 1. Detect goals with positive momentum → suggest acceleration
+    const accelerating = goalStatuses.filter(
+      (g) => g.momentum === "accelerating" && g.trajectory === "on_track",
+    );
+    for (const g of accelerating.slice(0, 2)) {
+      opportunities.push({
+        type: "momentum",
+        title: `Cel "${g.name}" nabiera rozpędu!`,
+        description: `Postęp: ${Math.round(g.progressPercent)}%, momentum: przyspieszający`,
+        suggestedAction: `Rozważ zwiększenie celu lub dodanie ambitniejszego kroku`,
+      });
+    }
+
+    // 2. Detect goals near milestones (within 5% of 25/50/75/100%)
+    for (const g of goalStatuses) {
+      const milestones = [25, 50, 75, 100];
+      for (const m of milestones) {
+        const diff = m - g.progressPercent;
+        if (diff > 0 && diff <= 5) {
+          opportunities.push({
+            type: "milestone_close",
+            title: `Cel "${g.name}" blisko kamienia milowego ${m}%!`,
+            description: `Jeszcze ${diff.toFixed(1)}% do ${m}%`,
+            suggestedAction: `Ostatni wysiłek dzisiaj może przesunąć ten cel do ${m}%`,
+          });
+          break; // Only report closest milestone
+        }
+      }
+    }
+
+    // 3. Detect task completion streaks
+    try {
+      const { data: recentCompleted } = await this.supabase
+        .from("exo_tasks")
+        .select("completed_at")
+        .eq("tenant_id", tenantId)
+        .eq("status", "done")
+        .order("completed_at", { ascending: false })
+        .limit(10);
+
+      if (recentCompleted && recentCompleted.length >= 5) {
+        // Check if 5+ tasks completed in last 48h
+        const twoDaysAgo = Date.now() - 48 * 60 * 60 * 1000;
+        const recentCount = recentCompleted.filter(
+          (t) => t.completed_at && new Date(t.completed_at).getTime() > twoDaysAgo,
+        ).length;
+
+        if (recentCount >= 5) {
+          opportunities.push({
+            type: "streak",
+            title: `Seria produktywności: ${recentCount} zadań w 48h!`,
+            description: `Utrzymujesz świetne tempo`,
+            suggestedAction: `Wykorzystaj momentum — może czas na ambitniejsze cele?`,
+          });
+        }
+      }
+    } catch {
+      // Non-critical
+    }
+
+    // 4. Cross-goal synergy detection
+    const healthGoals = goalStatuses.filter((g) => g.category === "health" && g.trajectory === "on_track");
+    const productivityGoals = goalStatuses.filter((g) => g.category === "productivity" && g.trajectory === "on_track");
+
+    if (healthGoals.length > 0 && productivityGoals.length > 0) {
+      opportunities.push({
+        type: "cross_goal_synergy",
+        title: `Synergia: zdrowie + produktywność`,
+        description: `Oba obszary na dobrej drodze — mogą się wzajemnie wzmacniać`,
+        suggestedAction: `Połącz ćwiczenia z czasem planowania (spacer + brainstorm)`,
+      });
+    }
+
+    return opportunities;
+  }
+
+  // ==========================================================================
   // PRIVATE HELPERS
   // ==========================================================================
 
