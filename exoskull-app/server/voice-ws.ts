@@ -48,8 +48,8 @@ const PORT = parseInt(process.env.VOICE_WS_PORT || "8080", 10);
 // TYPES
 // ============================================================================
 
-/** Silence timeout — disconnect after 2s of no speech */
-const SILENCE_DISCONNECT_MS = 2000;
+/** Silence timeout — disconnect after 15s of no speech (2s was too aggressive) */
+const SILENCE_DISCONNECT_MS = 15_000;
 
 /** Per-connection session state */
 interface WSSession {
@@ -292,6 +292,14 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
   const startTime = Date.now();
   logger.info("[VoiceWS] User:", userText);
 
+  // Send brief audio acknowledgment immediately so the user hears feedback
+  // while the agent loads context + waits for Claude's first token (3-8s).
+  // This is a complete utterance (last:true) — the real response follows as
+  // a separate utterance via streaming tokens.
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "text", token: "Hmm...", last: true }));
+  }
+
   try {
     // Persist user message to unified thread BEFORE agent runs
     // so getThreadContext() inside the agent includes this turn
@@ -378,7 +386,7 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
       wsSession.silenceTimer = setTimeout(() => {
         if (ws.readyState === WebSocket.OPEN) {
           logger.info(
-            "[VoiceWS] Silence timeout (2s) — ending call:",
+            "[VoiceWS] Silence timeout (15s) — ending call:",
             wsSession.callSid,
           );
           ws.send(
