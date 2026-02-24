@@ -139,6 +139,12 @@ export default async function LandingPage() {
             >
               Opinie
             </a>
+            <Link
+              href="/download"
+              className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium"
+            >
+              Pobierz Desktop
+            </Link>
           </div>
           <Link
             href="/login"
@@ -391,6 +397,12 @@ export default async function LandingPage() {
 
             {/* Center: Links */}
             <div className="flex gap-6">
+              <Link
+                href="/download"
+                className="text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Desktop App
+              </Link>
               <Link
                 href="/privacy"
                 className="text-slate-500 hover:text-slate-300 transition-colors"
