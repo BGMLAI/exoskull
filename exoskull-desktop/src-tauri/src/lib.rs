@@ -11,9 +11,31 @@ use tauri::{
     Manager,
 };
 
+fn init_logging() {
+    // Log to file on Windows (console hidden in release)
+    let log_path = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".exoskull")
+        .join("exoskull.log");
+    let _ = std::fs::create_dir_all(log_path.parent().unwrap());
+
+    if let Ok(file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+    {
+        env_logger::Builder::from_default_env()
+            .target(env_logger::Target::Pipe(Box::new(file)))
+            .filter_level(log::LevelFilter::Info)
+            .init();
+    } else {
+        env_logger::init();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    env_logger::init();
+    init_logging();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
