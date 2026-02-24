@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 const BASE_URL: &str = "https://exoskull.xyz";
+const SUPABASE_URL: &str = "https://uvupnwvkzreikurymncs.supabase.co";
+const SUPABASE_ANON_KEY: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2dXBud3ZrenJlaWt1cnltbmNzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk5NTYyODMsImV4cCI6MjA4NTUzMjI4M30.PXSMO4Dwq7s-Iywi1lYcPz0eyDpAHxIM47jLOP9y_Zo";
 
 pub struct ExoSkullApi {
     client: Client,
@@ -19,6 +21,19 @@ pub struct LoginRequest {
 pub struct LoginResponse {
     pub token: String,
     pub tenant_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SupabaseAuthResponse {
+    access_token: String,
+    refresh_token: Option<String>,
+    user: SupabaseUser,
+}
+
+#[derive(Debug, Deserialize)]
+struct SupabaseUser {
+    id: String,
+    email: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -75,7 +90,9 @@ impl ExoSkullApi {
     pub async fn login(&self, email: &str, password: &str) -> Result<LoginResponse, String> {
         let resp = self
             .client
-            .post(format!("{}/api/auth/login", BASE_URL))
+            .post(format!("{}/auth/v1/token?grant_type=password", SUPABASE_URL))
+            .header("apikey", SUPABASE_ANON_KEY)
+            .header("Content-Type", "application/json")
             .json(&LoginRequest {
                 email: email.to_string(),
                 password: password.to_string(),
@@ -90,9 +107,15 @@ impl ExoSkullApi {
             return Err(format!("Login failed ({}): {}", status, body));
         }
 
-        resp.json::<LoginResponse>()
+        let auth: SupabaseAuthResponse = resp
+            .json()
             .await
-            .map_err(|e| format!("Parse error: {}", e))
+            .map_err(|e| format!("Parse error: {}", e))?;
+
+        Ok(LoginResponse {
+            token: auth.access_token,
+            tenant_id: auth.user.id,
+        })
     }
 
     pub async fn get_goals(&self) -> Result<Vec<Goal>, String> {

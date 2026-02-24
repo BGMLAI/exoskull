@@ -20,7 +20,8 @@ pub fn initialize(db_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let conn = Connection::open(db_path)?;
 
     // Enable WAL mode for better concurrent access
-    conn.execute_batch("PRAGMA journal_mode=WAL;")?;
+    // journal_mode returns a row, so use query_row instead of execute/pragma_update
+    let _: String = conn.query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))?;
     conn.execute_batch("PRAGMA foreign_keys=ON;")?;
 
     // Run migrations
@@ -32,7 +33,7 @@ pub fn initialize(db_path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
 
 pub fn open(db_path: &PathBuf) -> Result<Connection, rusqlite::Error> {
     let conn = Connection::open(db_path)?;
-    conn.execute_batch("PRAGMA journal_mode=WAL;")?;
+    let _: String = conn.query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))?;
     conn.execute_batch("PRAGMA foreign_keys=ON;")?;
     Ok(conn)
 }

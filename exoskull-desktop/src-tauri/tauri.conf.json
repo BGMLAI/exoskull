@@ -54,13 +54,7 @@
       "open": true
     },
     "fs": {
-      "scope": {
-        "allow": ["$HOME/.exoskull/**", "$APPDATA/**", "$DOWNLOAD/**"],
-        "deny": []
-      }
-    },
-    "notification": {
-      "all": true
+      "requireLiteralLeadingDot": false
     }
   }
 }

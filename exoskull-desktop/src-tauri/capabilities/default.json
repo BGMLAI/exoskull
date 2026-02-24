@@ -10,6 +10,22 @@
     "os:default",
     "process:default",
     "opener:default",
-    "fs:default"
+    "fs:default",
+    {
+      "identifier": "fs:allow-read",
+      "allow": [
+        { "path": "$HOME/.exoskull/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$DOWNLOAD/**" }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write",
+      "allow": [
+        { "path": "$HOME/.exoskull/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$DOWNLOAD/**" }
+      ]
+    }
   ]
 }
