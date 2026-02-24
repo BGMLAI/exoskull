@@ -35,7 +35,7 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 
 ---
 
-## 📊 IMPLEMENTATION STATUS (as of 2026-02-18)
+## 📊 IMPLEMENTATION STATUS (as of 2026-02-24)
 
 | Component | Status | Details |
 |-----------|--------|---------|
@@ -65,6 +65,9 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 | **Dynamic Skills** | ✅ Live | Full 6-stage pipeline: detector → generator → validator → sandbox → approval → registry. App approval gate (pending + SMS + explicit consent). 15s skill execution timeout |
 | **Goals System** | ✅ Live | AI-assisted goal extraction, strategy engine, auto-progress tracking, momentum/trajectory detection, milestone notifications (25/50/75/100%), voice tools, dashboard |
 | **Observability** | ✅ Live | Structured logger (1222 calls migrated), withApiLog on 170 routes, request ID tracking, circuit breakers, data freshness indicators |
+| **Desktop App** | 🟡 Beta | Tauri v2 (Rust + React). Recall (screenshots+OCR), dictation, TTS, cloud file sync, full chat. Builds: Windows (.exe/.msi), macOS (.dmg universal), Linux (.deb/.rpm/.AppImage). CI: GitHub Actions. Release: v0.1.0 |
+| **Download Page** | ✅ Live | `/download` — OS auto-detection, all platform links to GitHub Releases |
+| **Desktop CI** | ✅ Live | GitHub Actions workflow_dispatch: Windows + macOS parallel builds, auto-upload to release |
 | **Claude Code** | ✅ Live | Built-in coding agent in main chat (always-on, 25 turns), file change SSE events, code sidebar with file browser |
 | **Gap Detection** | ✅ Live | Weekly CRON (Sun 09:00), 7 life domains, skill suggestions, auto-expire 14d |
 | **Emotion Intel** | ✅ Live | Crisis detection (3-layer + fail-safe), 5 adaptive response modes, VAD model, text + voice fusion analyzer, prosody extraction (Deepgram), emotion trends dashboard. Phase 3: pitch/energy, facial analysis |

@@ -4,6 +4,35 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-24] ExoSkull Desktop v0.1.0 + Download Page + CI Pipeline
+
+### Why
+ExoSkull needed a native desktop client for features that can't run in browser: screen capture (Recall), global mouse hooks (dictation/TTS), local file watching, and system tray background operation.
+
+### What
+- **Desktop App (Tauri v2)**: Rust backend + React frontend. Modules: Recall (xcap screenshots + OCR), Dictation (cpal audio → Whisper API), TTS (system + ElevenLabs), Cloud Sync (notify file watcher → R2 upload), full Chat
+- **Download Page**: `/download` with OS auto-detection, platform cards (Windows/macOS/Linux), feature list, system requirements
+- **CI Pipeline**: GitHub Actions `workflow_dispatch` — parallel Windows + macOS builds, auto-upload to GitHub Release
+- **Release v0.1.0**: 6 artifacts — .exe, .msi, .dmg (universal), .AppImage, .deb, .rpm
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `exoskull-desktop/` | New — full Tauri v2 desktop app (69 files) |
+| `exoskull-app/app/download/page.tsx` | New — download page with platform cards |
+| `exoskull-app/app/download/DownloadButton.tsx` | New — OS auto-detect download button |
+| `exoskull-app/app/page.tsx` | Added "Pobierz Desktop" nav + footer links |
+| `.github/workflows/desktop-build.yml` | New — Windows + macOS CI builds |
+
+### Fixes Applied
+- ICO format: PNG renamed to .ico → Pillow RGBA 32-bit proper ICO
+- Router: BrowserRouter → HashRouter (Tauri has no HTTP server)
+- Window: `visible: false` → `visible: true` (was relying on show() in setup)
+- Logging: file-based crash.log for Windows (console hidden in release mode)
+- CI: `permissions: contents: write` for release upload
+
+---
+
 ## [2026-02-23] MAPE-K "Detect → Solve" Instead of "Detect → Notify"
 
 ### Why

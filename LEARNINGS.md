@@ -1,5 +1,25 @@
 # ExoSkull Learnings
 
+## Tauri ICO Files Must Be Proper Format (2026-02-24)
+**Pattern:** Renaming PNG to `.ico` works on Linux Tauri build but fails on Windows with `error RC2175: resource file not in 3.00 format` or `Unsupported PNG bit depth: One`.
+**Solution:** Use Pillow (`PIL`) to generate proper ICO with RGBA 32-bit depth: `img.convert('RGBA').save('icon.ico', format='ICO', sizes=[...])`. ImageMagick `convert` produces 1-bit colormap PNGs inside ICO.
+**Lesson:** Always validate icon format with `file` command. Tauri Windows expects standard ICO with 8-bit/color RGBA PNGs inside.
+
+## Tauri Requires HashRouter, Not BrowserRouter (2026-02-24)
+**Pattern:** Desktop app shows blank white window. No errors, no console output.
+**Solution:** `BrowserRouter` → `HashRouter` in React app. Tauri serves files via `tauri://` protocol, not HTTP — no server to handle client-side routing fallback.
+**Lesson:** All Tauri/Electron/Capacitor apps must use `HashRouter` (or `MemoryRouter`). `BrowserRouter` only works with HTTP servers.
+
+## GitHub Actions Release Upload Needs permissions: contents: write (2026-02-24)
+**Pattern:** `softprops/action-gh-release@v2` fails with "Resource not accessible by integration" even though release exists.
+**Solution:** Add `permissions: contents: write` at workflow level.
+**Lesson:** Default `GITHUB_TOKEN` in Actions has read-only contents permission. Release upload = write.
+
+## Windows Release Builds Hide Crashes (2026-02-24)
+**Pattern:** `#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]` in Rust hides console in release mode. App crashes produce no visible output — no stderr, no dialog, nothing.
+**Solution:** Add `std::panic::set_hook` + file-based crash log at the very start of `main()`, BEFORE any initialization. Write to `~/.exoskull/crash.log`.
+**Lesson:** Windows GUI subsystem apps need explicit crash logging. Always add panic hook that writes to file in release mode.
+
 ## Async Seeding Creates Race Conditions (2026-02-23)
 **Pattern:** Fire-and-forget DB seeding means concurrent requests during first user check get inconsistent results (some granted, some denied).
 **Solution:** Deduplicate with `Map<string, Promise>` — first call creates, others await same promise. After: invalidate cache → re-check DB → fallback to in-memory.
