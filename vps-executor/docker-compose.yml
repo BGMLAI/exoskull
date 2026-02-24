@@ -20,6 +20,7 @@ services:
     environment:
       - VPS_EXECUTOR_SECRET=${VPS_EXECUTOR_SECRET}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - EXOSKULL_API_URL=${EXOSKULL_API_URL:-https://exoskull.xyz}
       - PORT=3500
     restart: unless-stopped
     networks:

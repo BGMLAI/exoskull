@@ -18,6 +18,7 @@ import { checkRateLimit, incrementUsage } from "@/lib/business/rate-limiter";
 import { appendMessage } from "@/lib/unified-thread";
 import { isHallucination } from "@/lib/voice/transcribe-voice-note";
 
+import { searchDocuments } from "@/lib/knowledge/document-processor";
 import { logger } from "@/lib/logger";
 import { withApiLog } from "@/lib/api/request-logger";
 export const dynamic = "force-dynamic";
@@ -554,8 +555,31 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
     }
 
     // Route coding messages to VPS agent, conversational to local gateway
-    const vpsResponse = isCodeRelatedMessage(message)
-      ? await tryVpsProxy(message, tenantId, conversationId)
+    const isCodeMsg = isCodeRelatedMessage(message);
+
+    // Phase 1: Pre-fetch knowledge context for VPS messages
+    let vpsMessage = message;
+    if (isCodeMsg) {
+      try {
+        const knowledgeResults = await searchDocuments(tenantId, message, 3);
+        if (knowledgeResults.length > 0) {
+          const context = knowledgeResults
+            .map((r) => `[${r.filename}] ${r.content.slice(0, 500)}`)
+            .join("\n---\n");
+          vpsMessage = `[KNOWLEDGE CONTEXT]\n${context}\n[/KNOWLEDGE CONTEXT]\n\n${message}`;
+        }
+      } catch (err) {
+        logger.debug(
+          "[ChatStream] Knowledge pre-fetch failed (non-blocking):",
+          {
+            error: err instanceof Error ? err.message : String(err),
+          },
+        );
+      }
+    }
+
+    const vpsResponse = isCodeMsg
+      ? await tryVpsProxy(vpsMessage, tenantId, conversationId)
       : null;
 
     if (vpsResponse) {
@@ -586,9 +610,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
 
     // --- Local gateway pipeline (conversational or VPS fallback) ---
     logger.info("[ChatStream] Using local gateway", {
-      reason: isCodeRelatedMessage(message)
-        ? "vps_unavailable"
-        : "conversational",
+      reason: isCodeMsg ? "vps_unavailable" : "conversational",
     });
     const stream = createLocalStream(message, tenantId, conversationId);
 

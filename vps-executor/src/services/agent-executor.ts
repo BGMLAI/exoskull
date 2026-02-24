@@ -214,6 +214,26 @@ const AGENT_TOOLS: Anthropic.Tool[] = [
       required: ["url"],
     },
   },
+  {
+    name: "search_knowledge",
+    description: "Search the user's uploaded knowledge base (documents, notes, PDFs). Returns relevant chunks with similarity scores.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Search query" },
+        limit: { type: "number", description: "Max results (default 5)" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "list_documents",
+    description: "List the user's uploaded documents in the knowledge base.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
 ];
 
 // ============================================================================
@@ -309,11 +329,15 @@ function computeDiffHunks(before: string, after: string): Array<{
   return hunks;
 }
 
+const EXOSKULL_API_URL = process.env.EXOSKULL_API_URL || "https://exoskull.xyz";
+const VPS_AGENT_SECRET = process.env.VPS_EXECUTOR_SECRET;
+
 async function executeTool(
   name: string,
   input: Record<string, unknown>,
   workspaceDir: string,
   emit: SSECallback,
+  tenantId?: string,
 ): Promise<{ result: string; isError: boolean }> {
   try {
     const resolve = (p: string) => {
@@ -419,6 +443,38 @@ async function executeTool(
         return { result: content, isError: false };
       }
 
+      case "search_knowledge": {
+        if (!tenantId) return { result: "No tenant context available", isError: true };
+        const res = await fetch(`${EXOSKULL_API_URL}/api/internal/knowledge-search`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${VPS_AGENT_SECRET}`,
+          },
+          body: JSON.stringify({
+            tenantId,
+            query: input.query as string,
+            limit: (input.limit as number) || 5,
+          }),
+        });
+        if (!res.ok) return { result: `Knowledge search failed: HTTP ${res.status}`, isError: true };
+        const data = (await res.json()) as { results?: unknown[] };
+        return { result: JSON.stringify(data.results || [], null, 2), isError: false };
+      }
+
+      case "list_documents": {
+        if (!tenantId) return { result: "No tenant context available", isError: true };
+        const res = await fetch(
+          `${EXOSKULL_API_URL}/api/internal/knowledge-documents?tenantId=${encodeURIComponent(tenantId)}`,
+          {
+            headers: { Authorization: `Bearer ${VPS_AGENT_SECRET}` },
+          },
+        );
+        if (!res.ok) return { result: `Document list failed: HTTP ${res.status}`, isError: true };
+        const data = (await res.json()) as { documents?: unknown[] };
+        return { result: JSON.stringify(data.documents || [], null, 2), isError: false };
+      }
+
       default:
         return { result: `Unknown tool: ${name}`, isError: true };
     }
@@ -455,7 +511,9 @@ You can read, write, and edit files, run bash commands, search code, use git, an
 - grep: Search file contents
 - git: Git operations
 - tree: Show directory structure
-- fetch_url: Fetch web content`;
+- fetch_url: Fetch web content
+- search_knowledge: Search user's uploaded documents/notes (use when user asks about their files)
+- list_documents: List user's uploaded documents in knowledge base`;
 }
 
 // ============================================================================
@@ -568,6 +626,7 @@ export async function runAgentCode(
             toolUse.input as Record<string, unknown>,
             workspaceDir,
             emit,
+            req.tenantId,
           );
 
           const durationMs = Date.now() - startMs;
