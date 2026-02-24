@@ -1,0 +1,83 @@
+name: Build ExoSkull Desktop
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag to upload assets to (e.g. v0.1.0)"
+        required: true
+        default: "v0.1.0"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: exoskull-desktop/src-tauri
+
+      - name: Install frontend deps
+        working-directory: exoskull-desktop
+        run: npm ci
+
+      - name: Build Tauri (Windows)
+        working-directory: exoskull-desktop
+        run: npx tauri build
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.version }}
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: |
+            exoskull-desktop/src-tauri/target/release/bundle/nsis/ExoSkull_0.1.0_x64-setup.exe
+            exoskull-desktop/src-tauri/target/release/bundle/msi/ExoSkull_0.1.0_x64_en-US.msi
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: exoskull-desktop/src-tauri
+
+      - name: Install frontend deps
+        working-directory: exoskull-desktop
+        run: npm ci
+
+      - name: Build Tauri (macOS universal)
+        working-directory: exoskull-desktop
+        run: npx tauri build --target universal-apple-darwin
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.version }}
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: |
+            exoskull-desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg/ExoSkull_0.1.0_universal.dmg
