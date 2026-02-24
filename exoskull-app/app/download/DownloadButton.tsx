@@ -21,7 +21,7 @@ function detectOS(): string {
 }
 
 const DOWNLOAD_BASE =
-  "https://github.com/exoskull-ai/exoskull-desktop/releases/latest/download";
+  "https://github.com/BGMLAI/exoskull/releases/latest/download";
 
 export function DownloadButton({
   platforms,
