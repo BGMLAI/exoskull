@@ -62,9 +62,9 @@ pub async fn login(email: String, password: String) -> Result<AuthState, String>
 
     let conn = db::open(&db_path).map_err(|e| format!("DB error: {}", e))?;
     conn.execute(
-        "INSERT OR REPLACE INTO auth (id, token, tenant_id, user_email, updated_at)
-         VALUES (1, ?1, ?2, ?3, datetime('now'))",
-        params![response.token, response.tenant_id, email],
+        "INSERT OR REPLACE INTO auth (id, token, refresh_token, tenant_id, user_email, updated_at)
+         VALUES (1, ?1, ?2, ?3, ?4, datetime('now'))",
+        params![response.token, response.refresh_token, response.tenant_id, email],
     )
     .map_err(|e| format!("Save auth failed: {}", e))?;
 
@@ -151,11 +151,11 @@ pub async fn get_goals() -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-pub async fn create_goal(title: String, description: Option<String>) -> Result<serde_json::Value, String> {
+pub async fn create_goal(name: String, description: Option<String>) -> Result<serde_json::Value, String> {
     let db_path = get_db_path();
     let token = get_token(&db_path)?.ok_or("Not authenticated")?;
     let api = ExoSkullApi::new(Some(token));
-    let goal = api.create_goal(&title, description.as_deref()).await?;
+    let goal = api.create_goal(&name, description.as_deref()).await?;
     serde_json::to_value(&goal).map_err(|e| format!("Serialize error: {}", e))
 }
 

@@ -4,11 +4,13 @@ import { Target, Plus, Loader2 } from "lucide-react";
 
 interface Goal {
   id: string;
-  title: string;
+  name: string;
+  category?: string;
   description?: string;
-  status: string;
-  progress?: number;
-  created_at: string;
+  current_value?: number;
+  target_value?: number;
+  is_active?: boolean;
+  created_at?: string;
 }
 
 export default function GoalsPage() {
@@ -40,7 +42,7 @@ export default function GoalsPage() {
     setCreating(true);
     try {
       await invoke("create_goal", {
-        title: newTitle,
+        name: newTitle,
         description: newDesc || null,
       });
       setNewTitle("");
@@ -54,17 +56,14 @@ export default function GoalsPage() {
     }
   };
 
-  const statusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-500/10 text-green-500";
-      case "completed":
-        return "bg-blue-500/10 text-blue-500";
-      case "paused":
-        return "bg-yellow-500/10 text-yellow-500";
-      default:
-        return "bg-muted text-muted-foreground";
+  const statusInfo = (goal: Goal) => {
+    if (goal.is_active === false) {
+      return { label: "inactive", classes: "bg-muted text-muted-foreground" };
     }
+    if (goal.target_value && goal.current_value && goal.current_value >= goal.target_value) {
+      return { label: "completed", classes: "bg-blue-500/10 text-blue-500" };
+    }
+    return { label: "active", classes: "bg-green-500/10 text-green-500" };
   };
 
   return (
@@ -145,7 +144,7 @@ export default function GoalsPage() {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="font-medium">{goal.title}</h3>
+                    <h3 className="font-medium">{goal.name}</h3>
                     {goal.description && (
                       <p className="mt-1 text-sm text-muted-foreground">
                         {goal.description}
@@ -153,21 +152,26 @@ export default function GoalsPage() {
                     )}
                   </div>
                   <span
-                    className={`ml-3 rounded-full px-2 py-1 text-xs font-medium ${statusColor(goal.status)}`}
+                    className={`ml-3 rounded-full px-2 py-1 text-xs font-medium ${statusInfo(goal).classes}`}
                   >
-                    {goal.status}
+                    {statusInfo(goal).label}
                   </span>
                 </div>
-                {goal.progress != null && (
+                {goal.category && (
+                  <span className="mt-1 inline-block rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                    {goal.category}
+                  </span>
+                )}
+                {goal.target_value != null && (
                   <div className="mt-3">
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
                       <div
                         className="h-full rounded-full bg-primary transition-all"
-                        style={{ width: `${goal.progress * 100}%` }}
+                        style={{ width: `${Math.min(100, ((goal.current_value || 0) / goal.target_value) * 100)}%` }}
                       />
                     </div>
                     <span className="mt-1 text-xs text-muted-foreground">
-                      {Math.round(goal.progress * 100)}%
+                      {goal.current_value || 0} / {goal.target_value}
                     </span>
                   </div>
                 )}

@@ -20,6 +20,7 @@ pub struct LoginRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginResponse {
     pub token: String,
+    pub refresh_token: String,
     pub tenant_id: String,
 }
 
@@ -39,20 +40,23 @@ struct SupabaseUser {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Goal {
     pub id: String,
-    pub title: String,
+    pub name: String,
+    pub category: Option<String>,
     pub description: Option<String>,
-    pub status: String,
-    pub progress: Option<f64>,
-    pub created_at: String,
+    pub current_value: Option<f64>,
+    pub target_value: Option<f64>,
+    pub is_active: Option<bool>,
+    pub created_at: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Task {
     pub id: String,
     pub title: String,
-    pub status: String,
-    pub priority: Option<String>,
+    pub status: Option<String>,
+    pub priority: Option<i32>,
     pub due_date: Option<String>,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -114,6 +118,7 @@ impl ExoSkullApi {
 
         Ok(LoginResponse {
             token: auth.access_token,
+            refresh_token: auth.refresh_token.unwrap_or_default(),
             tenant_id: auth.user.id,
         })
     }
@@ -122,59 +127,102 @@ impl ExoSkullApi {
         let token = self.auth_header().ok_or("Not authenticated")?;
         let resp = self
             .client
-            .get(format!("{}/api/goals", BASE_URL))
-            .header("Authorization", token)
+            .get(format!("{}/rest/v1/exo_user_goals", SUPABASE_URL))
+            .header("apikey", SUPABASE_ANON_KEY)
+            .header("Authorization", &token)
+            .query(&[("select", "*"), ("order", "created_at.desc")])
             .send()
             .await
             .map_err(|e| format!("Network error: {}", e))?;
 
         if !resp.status().is_success() {
-            return Err(format!("Failed to fetch goals: {}", resp.status()));
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("Failed to fetch goals ({}): {}", status, body));
         }
 
         resp.json().await.map_err(|e| format!("Parse error: {}", e))
     }
 
-    pub async fn create_goal(&self, title: &str, description: Option<&str>) -> Result<Goal, String> {
+    pub async fn create_goal(&self, name: &str, description: Option<&str>) -> Result<Goal, String> {
         let token = self.auth_header().ok_or("Not authenticated")?;
 
         #[derive(Serialize)]
         struct CreateGoalReq<'a> {
-            title: &'a str,
+            name: &'a str,
             description: Option<&'a str>,
         }
 
         let resp = self
             .client
-            .post(format!("{}/api/goals", BASE_URL))
-            .header("Authorization", token)
-            .json(&CreateGoalReq { title, description })
+            .post(format!("{}/rest/v1/exo_user_goals", SUPABASE_URL))
+            .header("apikey", SUPABASE_ANON_KEY)
+            .header("Authorization", &token)
+            .header("Prefer", "return=representation")
+            .json(&CreateGoalReq { name, description })
             .send()
             .await
             .map_err(|e| format!("Network error: {}", e))?;
 
         if !resp.status().is_success() {
-            return Err(format!("Failed to create goal: {}", resp.status()));
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("Failed to create goal ({}): {}", status, body));
         }
 
-        resp.json().await.map_err(|e| format!("Parse error: {}", e))
+        // PostgREST returns an array
+        let goals: Vec<Goal> = resp.json().await.map_err(|e| format!("Parse error: {}", e))?;
+        goals.into_iter().next().ok_or("No goal returned".to_string())
     }
 
     pub async fn get_tasks(&self) -> Result<Vec<Task>, String> {
         let token = self.auth_header().ok_or("Not authenticated")?;
         let resp = self
             .client
-            .get(format!("{}/api/canvas/data/tasks", BASE_URL))
-            .header("Authorization", token)
+            .get(format!("{}/rest/v1/exo_tasks", SUPABASE_URL))
+            .header("apikey", SUPABASE_ANON_KEY)
+            .header("Authorization", &token)
+            .query(&[("select", "*"), ("order", "created_at.desc")])
             .send()
             .await
             .map_err(|e| format!("Network error: {}", e))?;
 
         if !resp.status().is_success() {
-            return Err(format!("Failed to fetch tasks: {}", resp.status()));
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("Failed to fetch tasks ({}): {}", status, body));
         }
 
         resp.json().await.map_err(|e| format!("Parse error: {}", e))
+    }
+
+    pub async fn refresh_auth(&self, refresh_token: &str) -> Result<LoginResponse, String> {
+        let resp = self
+            .client
+            .post(format!("{}/auth/v1/token?grant_type=refresh_token", SUPABASE_URL))
+            .header("apikey", SUPABASE_ANON_KEY)
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({ "refresh_token": refresh_token }))
+            .send()
+            .await
+            .map_err(|e| format!("Network error: {}", e))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("Token refresh failed ({}): {}", status, body));
+        }
+
+        let auth: SupabaseAuthResponse = resp
+            .json()
+            .await
+            .map_err(|e| format!("Parse error: {}", e))?;
+
+        Ok(LoginResponse {
+            token: auth.access_token,
+            refresh_token: auth.refresh_token.unwrap_or_default(),
+            tenant_id: auth.user.id,
+        })
     }
 
     pub async fn upload_file(&self, file_path: &str, file_name: &str, data: Vec<u8>) -> Result<(), String> {

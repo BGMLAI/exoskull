@@ -11,19 +11,22 @@ export interface AuthState {
 
 export interface Goal {
   id: string;
-  title: string;
+  name: string;
+  category?: string;
   description?: string;
-  status: string;
-  progress?: number;
-  created_at: string;
+  current_value?: number;
+  target_value?: number;
+  is_active?: boolean;
+  created_at?: string;
 }
 
 export interface Task {
   id: string;
   title: string;
-  status: string;
-  priority?: string;
+  status?: string;
+  priority?: number;
   due_date?: string;
+  description?: string;
 }
 
 export interface RecallSettings {
@@ -61,8 +64,8 @@ export const sendChatMessage = (message: string) =>
 
 // Goals
 export const getGoals = () => invoke<Goal[]>("get_goals");
-export const createGoal = (title: string, description?: string) =>
-  invoke<Goal>("create_goal", { title, description });
+export const createGoal = (name: string, description?: string) =>
+  invoke<Goal>("create_goal", { name, description });
 
 // Tasks
 export const getTasks = () => invoke<Task[]>("get_tasks");

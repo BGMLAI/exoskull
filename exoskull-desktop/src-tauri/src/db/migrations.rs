@@ -100,6 +100,10 @@ pub fn run(conn: &Connection) -> Result<(), rusqlite::Error> {
     for migration in MIGRATIONS {
         conn.execute_batch(migration)?;
     }
+
+    // V2: Add refresh_token column (ignore if already exists)
+    let _ = conn.execute_batch("ALTER TABLE auth ADD COLUMN refresh_token TEXT;");
+
     log::info!("Database migrations complete");
     Ok(())
 }

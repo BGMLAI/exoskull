@@ -5,10 +5,18 @@ import { CheckSquare, Loader2, Circle, CheckCircle2 } from "lucide-react";
 interface Task {
   id: string;
   title: string;
-  status: string;
-  priority?: string;
+  status?: string;
+  priority?: number;
   due_date?: string;
+  description?: string;
 }
+
+const priorityLabel = (p?: number) => {
+  if (p == null) return null;
+  if (p >= 3) return { label: "high", color: "text-red-500" };
+  if (p === 2) return { label: "medium", color: "text-yellow-500" };
+  return { label: "low", color: "text-green-500" };
+};
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -20,19 +28,6 @@ export default function TasksPage() {
       .catch((err) => console.error("Failed to load tasks:", err))
       .finally(() => setLoading(false));
   }, []);
-
-  const priorityColor = (priority?: string) => {
-    switch (priority) {
-      case "high":
-        return "text-red-500";
-      case "medium":
-        return "text-yellow-500";
-      case "low":
-        return "text-green-500";
-      default:
-        return "text-muted-foreground";
-    }
-  };
 
   return (
     <div className="h-full overflow-y-auto">
@@ -79,11 +74,11 @@ export default function TasksPage() {
                     </span>
                   )}
                 </div>
-                {task.priority && (
+                {priorityLabel(task.priority) && (
                   <span
-                    className={`text-xs font-medium ${priorityColor(task.priority)}`}
+                    className={`text-xs font-medium ${priorityLabel(task.priority)!.color}`}
                   >
-                    {task.priority}
+                    {priorityLabel(task.priority)!.label}
                   </span>
                 )}
               </div>
