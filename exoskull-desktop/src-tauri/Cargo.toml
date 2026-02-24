@@ -1,0 +1,84 @@
+[package]
+name = "exoskull-desktop"
+version = "0.1.0"
+description = "ExoSkull Desktop — Adaptive Life Operating System"
+authors = ["ExoSkull"]
+edition = "2021"
+
+[lib]
+name = "exoskull_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-os = "2"
+tauri-plugin-process = "2"
+tauri-plugin-opener = "2"
+
+# Screen capture
+xcap = "0.8"
+
+# Global input
+rdev = "0.5"
+
+# Audio
+cpal = "0.15"
+hound = "3.5"
+
+# Keyboard simulation
+enigo = "0.2"
+
+# Clipboard
+arboard = "3"
+
+# SQLite (bundled-full includes FTS5)
+rusqlite = { version = "0.31", features = ["bundled-full"] }
+
+# Async
+tokio = { version = "1", features = ["full"] }
+
+# File watching
+notify = "7"
+
+# Image processing
+image = "0.25"
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+# Chrono for timestamps
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID
+uuid = { version = "1", features = ["v4"] }
+
+# Directories
+dirs = "5"
+
+# SHA256 for image hashing
+sha2 = "0.10"
+
+# Base64
+base64 = "0.22"
+
+# Lazy static
+lazy_static = "1"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
