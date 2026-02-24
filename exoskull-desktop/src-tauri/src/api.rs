@@ -67,10 +67,33 @@ pub struct ChatMessage {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KnowledgeSearchResult {
-    pub id: String,
-    pub title: String,
     pub content: String,
-    pub score: f64,
+    pub filename: Option<String>,
+    pub category: Option<String>,
+    pub similarity: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct KnowledgeSearchResponse {
+    results: Vec<KnowledgeSearchResult>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct KnowledgeDocument {
+    pub id: String,
+    pub original_name: String,
+    pub file_type: Option<String>,
+    pub file_size: Option<i64>,
+    pub category: Option<String>,
+    pub status: Option<String>,
+    pub summary: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct KnowledgeListResponse {
+    pub documents: Vec<KnowledgeDocument>,
 }
 
 impl ExoSkullApi {
@@ -225,6 +248,30 @@ impl ExoSkullApi {
         })
     }
 
+    pub async fn get_documents(&self) -> Result<Vec<KnowledgeDocument>, String> {
+        let token = self.auth_header().ok_or("Not authenticated")?;
+        let resp = self
+            .client
+            .get(format!("{}/api/knowledge", BASE_URL))
+            .header("Authorization", &token)
+            .send()
+            .await
+            .map_err(|e| format!("Network error: {}", e))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("Failed to fetch documents ({}): {}", status, body));
+        }
+
+        let list: KnowledgeListResponse = resp
+            .json()
+            .await
+            .map_err(|e| format!("Parse error: {}", e))?;
+
+        Ok(list.documents)
+    }
+
     pub async fn upload_file(&self, file_path: &str, file_name: &str, data: Vec<u8>) -> Result<(), String> {
         let token = self.auth_header().ok_or("Not authenticated")?;
 
@@ -255,18 +302,28 @@ impl ExoSkullApi {
         let token = self.auth_header().ok_or("Not authenticated")?;
         let resp = self
             .client
-            .get(format!("{}/api/knowledge/search", BASE_URL))
-            .header("Authorization", token)
-            .query(&[("q", query)])
+            .post(format!("{}/api/knowledge/search", BASE_URL))
+            .header("Authorization", &token)
+            .json(&serde_json::json!({
+                "query": query,
+                "limit": 20
+            }))
             .send()
             .await
             .map_err(|e| format!("Network error: {}", e))?;
 
         if !resp.status().is_success() {
-            return Err(format!("Search failed: {}", resp.status()));
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("Search failed ({}): {}", status, body));
         }
 
-        resp.json().await.map_err(|e| format!("Parse error: {}", e))
+        let result: KnowledgeSearchResponse = resp
+            .json()
+            .await
+            .map_err(|e| format!("Parse error: {}", e))?;
+
+        Ok(result.results)
     }
 
     pub async fn transcribe_audio(&self, audio_data: Vec<u8>) -> Result<String, String> {

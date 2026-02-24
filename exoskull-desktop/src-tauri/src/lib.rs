@@ -111,6 +111,7 @@ pub fn run() {
             // Tasks
             commands::get_tasks,
             // Knowledge
+            commands::get_documents,
             commands::upload_file,
             commands::search_knowledge,
             // Recall

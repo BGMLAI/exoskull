@@ -52,6 +52,101 @@ fn get_token(db_path: &PathBuf) -> Result<Option<String>, String> {
     Ok(token)
 }
 
+fn is_jwt_expired(token: &str) -> bool {
+    // Decode JWT payload (base64 middle part) to check exp
+    let parts: Vec<&str> = token.split('.').collect();
+    if parts.len() != 3 {
+        return true;
+    }
+    // base64url decode
+    let payload = parts[1];
+    let padded = match payload.len() % 4 {
+        2 => format!("{}==", payload),
+        3 => format!("{}=", payload),
+        _ => payload.to_string(),
+    };
+    let decoded = padded.replace('-', "+").replace('_', "/");
+    if let Ok(bytes) = base64_decode(&decoded) {
+        if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+            if let Some(exp) = json.get("exp").and_then(|v| v.as_i64()) {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs() as i64;
+                // Refresh 60s before actual expiry
+                return now >= (exp - 60);
+            }
+        }
+    }
+    true
+}
+
+fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
+    use std::collections::HashMap;
+    let chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let map: HashMap<u8, u8> = chars.bytes().enumerate().map(|(i, c)| (c, i as u8)).collect();
+    let mut out = Vec::new();
+    let bytes: Vec<u8> = input.bytes().filter(|&b| b != b'=').collect();
+    for chunk in bytes.chunks(4) {
+        let mut buf = 0u32;
+        let mut count = 0;
+        for &b in chunk {
+            if let Some(&val) = map.get(&b) {
+                buf = (buf << 6) | val as u32;
+                count += 1;
+            }
+        }
+        buf <<= (4 - count) * 6;
+        if count >= 2 { out.push((buf >> 16) as u8); }
+        if count >= 3 { out.push((buf >> 8) as u8); }
+        if count >= 4 { out.push(buf as u8); }
+    }
+    Ok(out)
+}
+
+async fn get_valid_token(db_path: &PathBuf) -> Result<Option<String>, String> {
+    let conn = db::open(db_path).map_err(|e| format!("DB error: {}", e))?;
+    let auth_row: Option<(String, Option<String>)> = conn
+        .query_row(
+            "SELECT token, refresh_token FROM auth WHERE id = 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .ok();
+
+    match auth_row {
+        None => Ok(None),
+        Some((token, refresh_token)) => {
+            if !is_jwt_expired(&token) {
+                return Ok(Some(token));
+            }
+            // Token expired — try refresh
+            let rt = match refresh_token {
+                Some(rt) if !rt.is_empty() => rt,
+                _ => return Ok(None), // No refresh token, must re-login
+            };
+            log::info!("JWT expired, refreshing token...");
+            let api = ExoSkullApi::new(None);
+            match api.refresh_auth(&rt).await {
+                Ok(response) => {
+                    // Update stored tokens
+                    let conn2 = db::open(db_path).map_err(|e| format!("DB error: {}", e))?;
+                    conn2.execute(
+                        "UPDATE auth SET token = ?1, refresh_token = ?2, updated_at = datetime('now') WHERE id = 1",
+                        params![response.token, response.refresh_token],
+                    ).map_err(|e| format!("Update token failed: {}", e))?;
+                    log::info!("Token refreshed successfully");
+                    Ok(Some(response.token))
+                }
+                Err(e) => {
+                    log::error!("Token refresh failed: {}", e);
+                    Ok(None) // Force re-login
+                }
+            }
+        }
+    }
+}
+
 // ========== Auth Commands ==========
 
 #[tauri::command]
@@ -119,24 +214,37 @@ pub async fn get_auth_status() -> Result<AuthState, String> {
 #[tauri::command]
 pub async fn send_chat_message(message: String) -> Result<String, String> {
     let db_path = get_db_path();
-    let token = get_token(&db_path)?.ok_or("Not authenticated")?;
-    let api = ExoSkullApi::new(Some(token));
+    let token = get_valid_token(&db_path).await?.ok_or("Not authenticated — please log in again")?;
 
-    // For MVP, use non-streaming chat. SSE streaming will be added later.
     let client = reqwest::Client::new();
     let resp = client
-        .post("https://exoskull.xyz/api/chat/stream")
-        .header("Authorization", format!("Bearer {}", api.auth_header().unwrap_or_default()))
+        .post("https://exoskull.xyz/api/chat/send")
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
         .json(&serde_json::json!({
-            "messages": [{"role": "user", "content": message}],
-            "stream": false,
+            "message": message,
         }))
         .send()
         .await
         .map_err(|e| format!("Chat error: {}", e))?;
 
-    let body = resp.text().await.map_err(|e| format!("Read error: {}", e))?;
-    Ok(body)
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("Chat failed ({}): {}", status, body));
+    }
+
+    #[derive(serde::Deserialize)]
+    struct ChatResponse {
+        text: Option<String>,
+        error: Option<String>,
+    }
+
+    let result: ChatResponse = resp.json().await.map_err(|e| format!("Parse error: {}", e))?;
+    if let Some(err) = result.error {
+        return Err(err);
+    }
+    Ok(result.text.unwrap_or_default())
 }
 
 // ========== Goals Commands ==========
@@ -144,7 +252,7 @@ pub async fn send_chat_message(message: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn get_goals() -> Result<serde_json::Value, String> {
     let db_path = get_db_path();
-    let token = get_token(&db_path)?.ok_or("Not authenticated")?;
+    let token = get_valid_token(&db_path).await?.ok_or("Not authenticated — please log in again")?;
     let api = ExoSkullApi::new(Some(token));
     let goals = api.get_goals().await?;
     serde_json::to_value(&goals).map_err(|e| format!("Serialize error: {}", e))
@@ -153,7 +261,7 @@ pub async fn get_goals() -> Result<serde_json::Value, String> {
 #[tauri::command]
 pub async fn create_goal(name: String, description: Option<String>) -> Result<serde_json::Value, String> {
     let db_path = get_db_path();
-    let token = get_token(&db_path)?.ok_or("Not authenticated")?;
+    let token = get_valid_token(&db_path).await?.ok_or("Not authenticated — please log in again")?;
     let api = ExoSkullApi::new(Some(token));
     let goal = api.create_goal(&name, description.as_deref()).await?;
     serde_json::to_value(&goal).map_err(|e| format!("Serialize error: {}", e))
@@ -164,7 +272,7 @@ pub async fn create_goal(name: String, description: Option<String>) -> Result<se
 #[tauri::command]
 pub async fn get_tasks() -> Result<serde_json::Value, String> {
     let db_path = get_db_path();
-    let token = get_token(&db_path)?.ok_or("Not authenticated")?;
+    let token = get_valid_token(&db_path).await?.ok_or("Not authenticated — please log in again")?;
     let api = ExoSkullApi::new(Some(token));
     let tasks = api.get_tasks().await?;
     serde_json::to_value(&tasks).map_err(|e| format!("Serialize error: {}", e))
@@ -173,9 +281,18 @@ pub async fn get_tasks() -> Result<serde_json::Value, String> {
 // ========== Knowledge Commands ==========
 
 #[tauri::command]
+pub async fn get_documents() -> Result<serde_json::Value, String> {
+    let db_path = get_db_path();
+    let token = get_valid_token(&db_path).await?.ok_or("Not authenticated — please log in again")?;
+    let api = ExoSkullApi::new(Some(token));
+    let docs = api.get_documents().await?;
+    serde_json::to_value(&docs).map_err(|e| format!("Serialize error: {}", e))
+}
+
+#[tauri::command]
 pub async fn upload_file(file_path: String) -> Result<(), String> {
     let db_path = get_db_path();
-    let token = get_token(&db_path)?.ok_or("Not authenticated")?;
+    let token = get_valid_token(&db_path).await?.ok_or("Not authenticated — please log in again")?;
     let api = ExoSkullApi::new(Some(token));
 
     let file_name = std::path::Path::new(&file_path)
@@ -190,7 +307,7 @@ pub async fn upload_file(file_path: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn search_knowledge(query: String) -> Result<serde_json::Value, String> {
     let db_path = get_db_path();
-    let token = get_token(&db_path)?.ok_or("Not authenticated")?;
+    let token = get_valid_token(&db_path).await?.ok_or("Not authenticated — please log in again")?;
     let api = ExoSkullApi::new(Some(token));
     let results = api.search_knowledge(&query).await?;
     serde_json::to_value(&results).map_err(|e| format!("Serialize error: {}", e))
@@ -322,7 +439,7 @@ pub async fn stop_dictation() -> Result<String, String> {
 
     // Send to transcription API
     let db_path = get_db_path();
-    let token = get_token(&db_path)?.ok_or("Not authenticated")?;
+    let token = get_valid_token(&db_path).await?.ok_or("Not authenticated — please log in again")?;
     let api = ExoSkullApi::new(Some(token));
     api.transcribe_audio(wav_data).await
 }
@@ -331,7 +448,7 @@ pub async fn stop_dictation() -> Result<String, String> {
 pub async fn speak_text(text: String) -> Result<(), String> {
     let db_path = get_db_path();
     let provider = get_setting(&db_path, "tts_provider").unwrap_or_else(|_| "system".to_string());
-    let token = get_token(&db_path)?.unwrap_or_default();
+    let token = get_valid_token(&db_path).await?.unwrap_or_default();
 
     let engine = TtsEngine::new(&provider);
     engine.speak(&text, Some(&token)).await

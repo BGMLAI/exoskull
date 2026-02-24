@@ -71,6 +71,7 @@ export const createGoal = (name: string, description?: string) =>
 export const getTasks = () => invoke<Task[]>("get_tasks");
 
 // Knowledge
+export const getDocuments = () => invoke("get_documents");
 export const uploadFile = (filePath: string) =>
   invoke("upload_file", { filePath });
 
