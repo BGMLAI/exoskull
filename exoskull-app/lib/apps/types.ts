@@ -170,7 +170,11 @@ export interface GeneratedApp {
 export interface AppGenerationRequest {
   tenant_id: string;
   description: string;
-  source: "user_request" | "iors_suggestion" | "chat_command";
+  source:
+    | "user_request"
+    | "iors_suggestion"
+    | "chat_command"
+    | "auto_detection";
 }
 
 /** Result of app generation */

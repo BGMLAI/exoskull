@@ -4,7 +4,7 @@
 // =====================================================
 
 import type { ToolDefinition } from "./shared";
-import { generateApp } from "@/lib/apps/generator/app-generator";
+import { generateApp, activateApp } from "@/lib/apps/generator/app-generator";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const appBuilderTools: ToolDefinition[] = [
@@ -175,6 +175,52 @@ export const appBuilderTools: ToolDefinition[] = [
         .eq("slug", appSlug);
 
       return `Zapisano dane w "${app.name}"!`;
+    },
+  },
+  {
+    definition: {
+      name: "approve_app",
+      description:
+        "Approve and activate a pending app. Creates the database table, adds the widget to the dashboard, " +
+        "and marks the app as active. Use when user says 'zatwierdź aplikację X' or 'approve app X'.",
+      input_schema: {
+        type: "object" as const,
+        required: ["app_slug"],
+        properties: {
+          app_slug: {
+            type: "string",
+            description: "The slug of the pending app to approve",
+          },
+        },
+      },
+    },
+    execute: async (input, tenantId) => {
+      const appSlug = input.app_slug as string;
+      const supabase = getServiceSupabase();
+
+      // Find the pending app
+      const { data: app, error } = await supabase
+        .from("exo_generated_apps")
+        .select("id, slug, name, approval_status, status")
+        .eq("tenant_id", tenantId)
+        .eq("slug", appSlug)
+        .single();
+
+      if (error || !app) {
+        return `Nie znaleziono aplikacji "${appSlug}". Sprawdź listę aplikacji (list_apps).`;
+      }
+
+      if (app.approval_status === "approved" && app.status === "active") {
+        return `Aplikacja "${app.name}" jest już aktywna. Znajdziesz ją na dashboardzie.`;
+      }
+
+      const result = await activateApp(app.id, tenantId);
+
+      if (!result.success) {
+        return `Nie udało się aktywować "${app.name}": ${result.error}`;
+      }
+
+      return `Aplikacja "${app.name}" zatwierdzona i aktywowana! Widget dodany do dashboardu. Odśwież stronę.`;
     },
   },
   {

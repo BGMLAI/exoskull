@@ -34,7 +34,7 @@ export const POST = withApiLog(
       const result = await generateApp({
         tenant_id: tenantId,
         description: description.trim(),
-        source: "user_request",
+        source: "chat_command",
       });
 
       if (!result.success) {

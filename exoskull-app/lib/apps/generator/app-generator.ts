@@ -58,10 +58,11 @@ export async function generateApp(
         .maybeSingle();
 
       if (existing) {
-        lastError = `App with slug "${spec.slug}" already exists`;
-        // Append random suffix to try again
-        spec.slug = `${spec.slug}-${Date.now().toString(36).slice(-4)}`;
+        // Generate a unique slug by appending random suffix
+        const suffix = Math.random().toString(36).slice(2, 6);
+        spec.slug = `${spec.slug}-${suffix}`;
         spec.table_name = `exo_app_${spec.slug.replace(/-/g, "_")}`;
+        logger.info(`[AppGenerator] Slug conflict, using: ${spec.slug}`);
       }
 
       // Step 4: Build the schema SQL for reference (table NOT created yet)
@@ -98,13 +99,10 @@ export async function generateApp(
         };
       }
 
-      // Step 6: Auto-activate when built from chat or safe autonomous sources
-      const autoActivateSources = [
-        "chat_command", // User explicitly requested
-        "iors_suggestion", // IORS detected need (Ralph Loop)
-        "auto_detection", // Pattern detection (3+ mentions)
-      ];
-      if (autoActivateSources.includes(request.source) && app) {
+      // Step 6: Auto-activate ALL sources — apps should be usable immediately.
+      // Previously only chat_command/iors_suggestion auto-activated,
+      // leaving user_request apps stuck in pending_approval forever (no approval UI existed).
+      if (app) {
         const activation = await activateApp(app.id, tenant_id);
         if (activation.success) {
           logger.info(
@@ -324,16 +322,27 @@ export async function activateApp(
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = getServiceSupabase();
 
-  // Fetch pending app
+  // Fetch app (pending OR failed — allow retry)
   const { data: app, error: fetchError } = await supabase
     .from("exo_generated_apps")
     .select("*")
     .eq("id", appId)
     .eq("tenant_id", tenantId)
-    .eq("approval_status", "pending")
+    .in("approval_status", ["pending", "rejected"])
     .single();
 
   if (fetchError || !app) {
+    // Check if already approved
+    const { data: existing } = await supabase
+      .from("exo_generated_apps")
+      .select("slug, status")
+      .eq("id", appId)
+      .eq("tenant_id", tenantId)
+      .single();
+
+    if (existing?.status === "active") {
+      return { success: true }; // Already active — idempotent
+    }
     return { success: false, error: "App not found or already approved" };
   }
 
