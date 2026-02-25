@@ -61,6 +61,7 @@ export type InterventionType =
   | "gap_detection"
   | "automation_trigger"
   | "health_prediction"
+  | "build_app"
   | "custom";
 
 export type InterventionStatus =
