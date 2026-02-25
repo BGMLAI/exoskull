@@ -298,6 +298,7 @@ export type ActionType =
   | "log_health"
   | "trigger_checkin"
   | "run_automation"
+  | "build_app"
   | "modify_source"
   | "custom";
 

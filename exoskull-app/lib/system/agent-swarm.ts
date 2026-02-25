@@ -122,7 +122,7 @@ Respond with JSON: { "action": "code|modify|create", "files": [...], "summary": 
 Respond with JSON: { "action": "test|verify|report", "results": [...], "bugs": [...], "passed": boolean }`,
   },
   lateral: {
-    model: "kimi-k2.5",
+    model: "claude-sonnet-4-5",
     maxIterations: 5,
     systemPrompt: `You are the Lateral Thinker agent. Your role:
 - Generate unconventional solutions when other agents are stuck

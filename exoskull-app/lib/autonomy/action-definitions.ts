@@ -86,6 +86,15 @@ export const ACTION_DEFINITIONS: Record<ActionType, ActionDefinition> = {
     category: "other",
     riskLevel: "high",
   },
+  build_app: {
+    type: "build_app",
+    name: "Build App",
+    description: "Build a custom app from description",
+    requiredParams: [],
+    optionalParams: ["description", "appType", "reason", "suggestedFeatures"],
+    category: "other",
+    riskLevel: "medium",
+  },
   modify_source: {
     type: "modify_source",
     name: "Modify Source Code",

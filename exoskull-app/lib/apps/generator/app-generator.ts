@@ -92,6 +92,17 @@ export async function generateApp(
         .single();
 
       if (insertError) {
+        // Handle race condition: slug was unique at check time but taken by insert time
+        if (insertError.message?.includes("duplicate key")) {
+          const retrySuffix = Math.random().toString(36).slice(2, 8);
+          spec.slug = `${spec.slug}-${retrySuffix}`;
+          spec.table_name = `exo_app_${spec.slug.replace(/-/g, "_")}`;
+          logger.info(
+            `[AppGenerator] Duplicate key race condition, retrying with: ${spec.slug}`,
+          );
+          lastError = "Duplicate slug (race condition), retrying";
+          continue;
+        }
         logger.error("[AppGenerator] DB insert error:", insertError);
         return {
           success: false,

@@ -166,6 +166,8 @@ export class ActionExecutor {
         return this.handleTriggerCheckin(request);
       case "run_automation":
         return this.handleRunAutomation(request);
+      case "build_app":
+        return this.handleBuildApp(request);
       case "custom":
         return this.handleCustomAction(request);
       default:
@@ -752,6 +754,58 @@ export class ActionExecutor {
         success: false,
         actionType: "run_automation",
         error: errorMessage,
+        durationMs: Date.now() - startTime,
+      };
+    }
+  }
+
+  private async handleBuildApp(request: ActionRequest): Promise<ActionResult> {
+    const startTime = Date.now();
+    const { appType, reason, description, suggestedFeatures } =
+      request.params as {
+        appType?: string;
+        reason?: string;
+        description?: string;
+        suggestedFeatures?: string[];
+      };
+
+    const appDescription =
+      description || reason || appType || "Custom app requested by autonomy";
+
+    try {
+      const { generateApp } =
+        await import("@/lib/apps/generator/app-generator");
+      const result = await generateApp({
+        tenant_id: request.tenantId,
+        description: appDescription,
+        source: "auto_detection",
+      });
+
+      if (!result.success) {
+        return {
+          success: false,
+          actionType: "build_app" as ActionType,
+          error: result.error || "App generation failed",
+          durationMs: Date.now() - startTime,
+        };
+      }
+
+      return {
+        success: true,
+        actionType: "build_app" as ActionType,
+        data: {
+          appId: result.app?.id,
+          slug: result.app?.slug,
+          name: result.app?.name,
+          status: result.app?.status,
+        },
+        durationMs: Date.now() - startTime,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        actionType: "build_app" as ActionType,
+        error: error instanceof Error ? error.message : "Build app failed",
         durationMs: Date.now() - startTime,
       };
     }
