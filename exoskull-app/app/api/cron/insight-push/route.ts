@@ -45,8 +45,8 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   };
 
   for (const tenant of activeTenants) {
-    // Safety: bail before Vercel timeout
-    if (Date.now() - startTime > 100_000) {
+    // Safety: bail before cron-guard timeout (55s) — leave 10s buffer
+    if (Date.now() - startTime > 45_000) {
       logger.warn("[InsightPush] Approaching timeout, stopping early", {
         processed: results.processed,
         remaining: activeTenants.length - results.processed,

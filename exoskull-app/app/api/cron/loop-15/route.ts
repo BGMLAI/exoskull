@@ -86,6 +86,11 @@ async function handler(req: NextRequest) {
   const workerId = `loop15-${Date.now()}`;
   const router = new ModelRouter();
 
+  /** Milliseconds remaining before timeout */
+  const remaining = () => TIMEOUT_MS - (Date.now() - startTime);
+  /** True if at least `ms` milliseconds remain */
+  const hasTime = (ms: number) => remaining() > ms;
+
   let evaluated = 0;
   let workProcessed = 0;
   const evaluationResults: Array<{
@@ -95,12 +100,12 @@ async function handler(req: NextRequest) {
   }> = [];
 
   try {
-    // Step 1: Get tenants due for evaluation (max 5)
-    const tenants = await getTenantsDueForEval(5);
+    // Step 1: Get tenants due for evaluation (max 3 — keep fast under 50s budget)
+    const tenants = await getTenantsDueForEval(3);
 
-    // Step 2: Evaluate each tenant
+    // Step 2: Evaluate each tenant (bail with 18s remaining for Steps 3-6)
     for (const tenant of tenants) {
-      if (Date.now() - startTime > TIMEOUT_MS) break;
+      if (!hasTime(18_000)) break;
 
       try {
         // 2a. Classify activity
@@ -248,10 +253,7 @@ async function handler(req: NextRequest) {
         // 2d. Coaching Engine — rule-based triage (free, no AI cost)
         let coachingAction = "none";
         try {
-          if (
-            action === "none" &&
-            Date.now() - startTime < TIMEOUT_MS - 15_000
-          ) {
+          if (action === "none" && hasTime(20_000)) {
             const signals = await collectCoachingSignals(tenant.tenant_id);
             const decision = triageCoachingDecision(signals);
 
@@ -320,7 +322,7 @@ async function handler(req: NextRequest) {
     }
 
     // Step 3: Process one queued P2/P3 work item if time allows
-    if (Date.now() - startTime < TIMEOUT_MS - 10_000) {
+    if (hasTime(15_000)) {
       const workItem = await claimQueuedWork(workerId, [
         "proactive",
         "observation",
@@ -332,20 +334,19 @@ async function handler(req: NextRequest) {
     }
 
     // Step 4: Goal Orchestration — unified goal-driven cycle
-    // Replaces separate Ralph + MAPE-K with goal-driven orchestration.
-    // MAPE-K and Ralph still run internally when the orchestrator needs them.
+    // Cap at 12s to leave room for Steps 5-6 and response serialization.
     let goalOrchResult = null;
     const activeTenantForGoals = evaluationResults.find(
       (r) => r.action !== "sleep",
     );
-    if (activeTenantForGoals && Date.now() - startTime < TIMEOUT_MS - 15_000) {
+    if (activeTenantForGoals && hasTime(20_000)) {
       try {
         const { runGoalOrchestration } =
           await import("@/lib/goals/goal-orchestrator");
-        const remainingMs = TIMEOUT_MS - (Date.now() - startTime);
+        const orchBudget = Math.min(remaining() - 8_000, 12_000);
         goalOrchResult = await runGoalOrchestration(
           activeTenantForGoals.tenantId,
-          Math.min(remainingMs - 5000, 25_000),
+          orchBudget,
         );
         logger.info("[Loop15] Goal orchestration completed:", {
           tenantId: activeTenantForGoals.tenantId,
@@ -361,8 +362,9 @@ async function handler(req: NextRequest) {
     }
 
     // Step 5: Baseline Monitor — suggest goals for tenants with <3 goals
+    // Only run if genuinely enough time (non-critical, can skip)
     let baselineResult = null;
-    if (activeTenantForGoals && Date.now() - startTime < TIMEOUT_MS - 8_000) {
+    if (activeTenantForGoals && hasTime(12_000)) {
       try {
         const { getServiceSupabase } = await import("@/lib/supabase/service");
         const sb = getServiceSupabase();
@@ -387,17 +389,15 @@ async function handler(req: NextRequest) {
       }
     }
 
-    // Step 6: MAPE-K fallback — run for observation tenants not covered by orchestrator
+    // Step 6: MAPE-K fallback — only for observation tenants if significant time remains
+    // This is expensive (multiple AI calls), skip aggressively to prevent timeout.
     let mapekResult = null;
     const observationTenants = evaluationResults.filter(
       (r) =>
         r.action === "observation" &&
         r.tenantId !== activeTenantForGoals?.tenantId,
     );
-    if (
-      observationTenants.length > 0 &&
-      Date.now() - startTime < TIMEOUT_MS - 10_000
-    ) {
+    if (observationTenants.length > 0 && hasTime(15_000)) {
       try {
         const { runAutonomyCycle } = await import("@/lib/autonomy/mape-k-loop");
         mapekResult = await runAutonomyCycle(
