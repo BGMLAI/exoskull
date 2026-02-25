@@ -1,5 +1,32 @@
 # ExoSkull Learnings
 
+## WSL Git on NTFS Needs Local User Config (2026-02-25)
+**Pattern:** `git commit` fails with "Author identity unknown" even though previous commits exist.
+**Solution:** `git config user.name "X" && git config user.email "x@y"` per-repo. WSL doesn't inherit Windows git global config.
+**Lesson:** Always check `git config user.name` before first commit in WSL repo.
+
+## WSL HTTPS Git Push Needs Windows Credential Helper (2026-02-25)
+**Pattern:** `git push` to HTTPS remote fails with "could not read Username" in WSL.
+**Solution:** `git config credential.helper "/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe"` — use Windows Git credential manager from WSL.
+**Lesson:** WSL doesn't have its own credential store. Bridge to Windows GCM for HTTPS repos.
+
+## Symlinks vs Copy for Shared Config (2026-02-25)
+**Pattern:** User wants same skills/plugins in project .claude/ as in global ~/.claude/.
+**Solution:** `ln -s ~/.claude/skills project/.claude/skills` — symlink, not copy. Zero duplication, auto-sync.
+**Lesson:** Prefer symlinks for shared config across directories. Copies drift immediately.
+
+## CLAUDE.md 200-Line Limit (2026-02-25)
+**Pattern:** MEMORY.md and CLAUDE.md are truncated after 200 lines in context.
+**Solution:** Compress aggressively — merge sections, inline code blocks, remove empty lines. Use progressive disclosure (Level 2 in references/).
+**Lesson:** Budget lines carefully. Every line in CLAUDE.md costs context. Move details to references/.
+
+## Disk Full Kills Git Operations on NTFS/WSL (2026-02-25)
+**Pattern:** `git add` fails with "unable to write loose object file: Input/output error" — disk at 100%.
+**Solution:** Free space first. npm cache (782MB), node_modules, .tmp screenshots. Then retry git ops.
+**Lesson:** Check `df -h /mnt/c/` before large git operations on WSL. NTFS I/O errors are misleading — often just disk full.
+
+---
+
 ## Tauri ICO Files Must Be Proper Format (2026-02-24)
 **Pattern:** Renaming PNG to `.ico` works on Linux Tauri build but fails on Windows with `error RC2175: resource file not in 3.00 format` or `Unsupported PNG bit depth: One`.
 **Solution:** Use Pillow (`PIL`) to generate proper ICO with RGBA 32-bit depth: `img.convert('RGBA').save('icon.ico', format='ICO', sizes=[...])`. ImageMagick `convert` produces 1-bit colormap PNGs inside ICO.

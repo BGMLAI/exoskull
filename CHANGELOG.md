@@ -4,6 +4,37 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-25] CLAUDE.md v017 — Frameworks, Dev Commands, Config Sync
+
+### Why
+Claude Code sessions lacked structured development methodology. Planning was ad-hoc, no deep research before proposals, no mandatory agent teams, no standardized testing workflow. Global and project configs were out of sync (plugins, skills).
+
+### What
+- **Global CLAUDE.md v016→v017**: Added 4 frameworks (ATLAS, BMAD, CLAWS, BGML), Ralph Loop execution mode, Playwright headless testing, agent-factory auto-generation
+- **Exoskull CLAUDE.md**: Real dev commands (exoskull-app, exoskull-desktop, supabase), monorepo structure map, framework references, workflow definition
+- **Config sync**: Skills/plugins symlinked from global to exoskull, firebase plugin added, all 21 plugins aligned
+- **~/.claude git init**: Version control for global Claude config (102 files, local commit)
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `CLAUDE.md` | Rebuilt — dev commands, monorepo map, frameworks, workflow |
+| `~/.claude/CLAUDE.md` | v017 — MODES, AGENTS (BGML), FRAMEWORKS, TESTING |
+| `~/.claude/settings.json` | 10→21 enabled plugins |
+| `.claude/settings.json` | +firebase plugin |
+| `.claude/skills` | Symlink → `~/.claude/skills/` |
+| `.claude/plugins` | Symlink → `~/.claude/plugins/` |
+
+### Frameworks Added
+| Framework | Purpose |
+|-----------|---------|
+| ATLAS | App building: Architect→Trace→Link→Assemble→Stress-test |
+| BMAD | Agile AI dev: PRD→Architecture→Sprint→Code→Review |
+| CLAWS | Agent building: Connect→Listen→Archive→Wire→Sense |
+| BGML | Quality: DIPPER (3 parallel)→MoA (synthesis)→RPI (critique) |
+
+---
+
 ## [2026-02-24] ExoSkull Desktop v0.1.0 + Download Page + CI Pipeline
 
 ### Why
