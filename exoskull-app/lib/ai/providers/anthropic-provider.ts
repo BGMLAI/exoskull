@@ -18,6 +18,7 @@ import {
   AIProviderError,
 } from "../types";
 import { calculateCost, getModelConfig } from "../config";
+import { withRetry } from "@/lib/utils/fetch-retry";
 
 import { logger } from "@/lib/logger";
 // Map our model IDs to Anthropic's model names
@@ -91,13 +92,17 @@ export class AnthropicProvider implements IAIProvider {
 
       const config = getModelConfig(model);
 
-      const response = await client.messages.create({
-        model: anthropicModel,
-        max_tokens: options.maxTokens ?? config.maxTokens,
-        system: systemMessage,
-        messages,
-        ...(tools && tools.length > 0 ? { tools } : {}),
-      });
+      const response = await withRetry(
+        () =>
+          client.messages.create({
+            model: anthropicModel,
+            max_tokens: options.maxTokens ?? config.maxTokens,
+            system: systemMessage,
+            messages,
+            ...(tools && tools.length > 0 ? { tools } : {}),
+          }),
+        { maxRetries: 3, delayMs: 1500, label: `AnthropicProvider.${model}` },
+      );
 
       const latencyMs = Date.now() - startTime;
 

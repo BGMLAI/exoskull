@@ -23,6 +23,7 @@ import {
 import { extractSSEDirective } from "@/lib/iors/tools/dashboard-tools";
 import { buildDynamicContext } from "@/lib/voice/dynamic-context";
 import { STATIC_SYSTEM_PROMPT } from "@/lib/voice/system-prompt";
+import { withRetry } from "@/lib/utils/fetch-retry";
 import { analyzeEmotion } from "@/lib/emotion";
 import { detectCrisis } from "@/lib/emotion/crisis-detector";
 import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
@@ -593,23 +594,28 @@ export async function runExoSkullAgent(
     while (numTurns < config.maxTurns) {
       numTurns++;
 
-      const stream = client.messages.stream(
-        {
-          model: config.model,
-          max_tokens: req.maxTokens || 4096,
-          system: systemPrompt,
-          messages,
-          ...(anthropicTools.length > 0 ? { tools: anthropicTools } : {}),
+      const response = await withRetry(
+        async () => {
+          const stream = client.messages.stream(
+            {
+              model: config.model,
+              max_tokens: req.maxTokens || 4096,
+              system: systemPrompt,
+              messages,
+              ...(anthropicTools.length > 0 ? { tools: anthropicTools } : {}),
+            },
+            { signal: abortController.signal },
+          );
+
+          // Stream text deltas to SSE callback
+          if (req.onTextDelta) {
+            stream.on("text", (text) => req.onTextDelta!(text));
+          }
+
+          return stream.finalMessage();
         },
-        { signal: abortController.signal },
+        { maxRetries: 3, delayMs: 1500, label: "ExoSkullAgent.stream" },
       );
-
-      // Stream text deltas to SSE callback
-      if (req.onTextDelta) {
-        stream.on("text", (text) => req.onTextDelta!(text));
-      }
-
-      const response = await stream.finalMessage();
 
       // Track token usage
       totalInputTokens += response.usage.input_tokens;
