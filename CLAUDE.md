@@ -23,41 +23,94 @@ Everything else is a means to that end:
 
 Read [ARCHITECTURE.md](./ARCHITECTURE.md) for full vision (18 layers).
 
----
-
-## Dev Commands
-
-<!-- TODO: Fill in actual commands when project scaffolding is set up -->
-```bash
-# Setup
-# npm install / pnpm install
-
-# Dev server
-# npm run dev
-
-# Tests
-# npm test
-
-# Database
-# supabase start / supabase db push
-
-# Deploy
-# vercel deploy
+### Monorepo Structure
+```
+exoskull/
+├── exoskull-app/        # Next.js web app (main product, deployed on Railway)
+│   ├── app/             # Next.js app router (pages, API routes)
+│   ├── components/      # React components
+│   ├── lib/             # Business logic, system (atlas-pipeline, gotcha-engine)
+│   └── middleware.ts     # Auth, routing
+├── exoskull-desktop/    # Vite + Tauri desktop app
+│   ├── src/             # React frontend
+│   └── src-tauri/       # Rust Tauri backend
+├── supabase/            # Database migrations
+├── local-agent/         # Node.js CLI daemon (file sync → Knowledge Base)
+├── vps-executor/        # VPS Code Execution (8 IORS tools)
+├── android/             # Android integration (planned)
+├── infrastructure/      # Infra config
+├── goals/               # GOTCHA: process definitions
+├── tools/               # GOTCHA: execution scripts
+├── args/                # GOTCHA: behavior settings
+├── context/             # GOTCHA: domain knowledge
+└── hardprompts/         # GOTCHA: reusable instruction templates
 ```
 
 ---
 
-## ATLAS Workflow (Building Apps)
+## Dev Commands
 
-**A - Architect:** Define problem, users, success metrics
-**T - Trace:** Data schema, integrations, tech stack
-**L - Link:** Validate ALL connections before building
-**A - Assemble:** Build (database → backend → frontend)
-**S - Stress-test:** Test functionality, edge cases, user acceptance
+### exoskull-app (Next.js — web app)
+```bash
+cd exoskull-app
+npm install                    # Install dependencies
+npm run dev                    # Dev server (Next.js)
+npm run build                  # Production build (NODE_OPTIONS='--max-old-space-size=4096')
+npm test                       # Vitest run
+npm run test:watch             # Vitest watch mode
+npm run test:coverage          # Vitest coverage
+npm run lint                   # ESLint
+npm run test:routes            # Smoke test all routes (requires dev server on :3000)
+npm run supabase:gen-types     # Regenerate Supabase types → lib/database.types.ts
+```
 
-Read [build_app.md](./build_app.md) for detailed workflow.
+### exoskull-desktop (Vite + Tauri — desktop app)
+```bash
+cd exoskull-desktop
+npm install                    # Install dependencies
+npm run dev                    # Vite dev server
+npm run build                  # TypeScript + Vite build
+npm run tauri                  # Tauri commands (dev/build/etc)
+```
 
-**Critical:** NEVER build UI for data structures that don't exist yet. Always: DB schema first → API routes second → UI last.
+### Supabase
+```bash
+cd supabase
+supabase db push               # Push migrations
+supabase gen types typescript --project-id uvupnwvkzreikurymncs > ../exoskull-app/lib/database.types.ts
+```
+
+---
+
+## Frameworks (inherited from global — see `~/.claude/CLAUDE.md` §4)
+
+### ATLAS (primary app-building workflow)
+`Architect → Trace → Link → Assemble → Stress-test` (+V-Validate +M-Monitor)
+- Full spec: [build_app.md](./build_app.md) | Implementation: `exoskull-app/lib/system/atlas-pipeline.ts`
+- **Critical:** NEVER build UI for data structures that don't exist yet. Always: DB schema → API routes → UI.
+- Model routing: Opus (Architect, Trace) → Sonnet (Assemble) → Haiku (Link, Stress-test)
+
+### BMAD (process management)
+PRD → Architecture → Sprint → Code → Review. Role-based sub-agents.
+- Stack: Next.js + Supabase + Vercel (ograniczony, sprawdzony)
+- PRD-driven: dokumentacja wymagań ZANIM kod
+
+### CLAWS (agent building)
+Connect → Listen → Archive → Wire → Sense
+- Użyj do budowania nowych integracji, modów, rigów, local-agent features
+
+### BGML Optimization (quality)
+- DIPPER: 3 agenty równolegle → synteza (ZAWSZE)
+- RPI: Generate → Critique → Refine (dla krytycznych decyzji)
+- Domain Frameworks: First Principles (arch), 5 Whys (debug), SWOT (decisions)
+- Brak agenta? → `Skill(agent-factory)` → wygeneruj, zainstaluj, użyj
+
+### Workflow
+```
+1. PLANNING: Deep research → dopytaj → plan → "Akceptujesz?"
+2. EXECUTION: Agent teams (BGML DIPPER) → Ralph Loop → aż DONE
+3. TESTING: Playwright headless → screenshot → PASS/FAIL
+```
 
 ---
 
