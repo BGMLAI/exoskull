@@ -636,6 +636,25 @@ export async function runExoSkullAgent(
       // If Claude finished (no tool calls), capture final text and exit
       if (response.stop_reason !== "tool_use" || toolUseBlocks.length === 0) {
         finalText = textParts.join("");
+
+        // Anti-hallucination guard: detect action-promising text without tool calls
+        const actionPatterns =
+          /\b(buduję|tworzę|piszę kod|konfiguruję|instaluję|wdrażam|deployuję|importuję|integruję|publikuję)\b/i;
+        if (
+          finalText &&
+          actionPatterns.test(finalText) &&
+          toolsUsed.length === 0 &&
+          numTurns === 1
+        ) {
+          logger.warn(
+            "[ExoSkullAgent] Anti-hallucination: action text without tool calls detected",
+            {
+              textSnippet: finalText.slice(0, 200),
+              toolsUsed,
+            },
+          );
+        }
+
         break;
       }
 
