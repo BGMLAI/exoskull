@@ -51,7 +51,7 @@ const VALIDATORS: ValidatorConfig[] = [
   },
   {
     name: "Ethics & Safety",
-    model: "claude-sonnet-4-5-20250929",
+    model: "claude-sonnet-4-6",
     provider: "anthropic",
     role: "You are an ethics and safety reviewer. Focus on user consent, privacy, legal implications, and potential harm.",
   },

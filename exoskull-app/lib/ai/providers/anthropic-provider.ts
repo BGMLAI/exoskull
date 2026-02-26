@@ -24,9 +24,11 @@ import { logger } from "@/lib/logger";
 // Map our model IDs to Anthropic's model names
 const MODEL_MAP: Record<string, string> = {
   "claude-3-5-haiku": "claude-3-5-haiku-20241022",
-  "claude-sonnet-4-5": "claude-sonnet-4-5-20250929",
-  "claude-opus-4-5": "claude-opus-4-5-20251101",
-  "claude-opus-4-6": "claude-opus-4-6-20260201",
+  "claude-haiku-4-5": "claude-haiku-4-5-20251001",
+  "claude-sonnet-4-5": "claude-sonnet-4-6",
+  "claude-sonnet-4-6": "claude-sonnet-4-6",
+  "claude-opus-4-5": "claude-opus-4-6",
+  "claude-opus-4-6": "claude-opus-4-6",
 };
 
 export class AnthropicProvider implements IAIProvider {

@@ -110,25 +110,25 @@ export interface AgentResponse {
 const WEB_CONFIG = {
   maxTurns: 10,
   timeoutMs: 55_000,
-  model: "claude-sonnet-4-5-20250929" as const,
+  model: "claude-sonnet-4-6" as const,
 };
 
 const VOICE_CONFIG = {
   maxTurns: 6,
   timeoutMs: 40_000,
-  model: "claude-sonnet-4-5-20250929" as const, // Upgraded from Haiku for better quality
+  model: "claude-sonnet-4-6" as const, // Upgraded from Haiku for better quality
 };
 
 const ASYNC_CONFIG = {
   maxTurns: 15,
   timeoutMs: 50_000,
-  model: "claude-sonnet-4-5-20250929" as const,
+  model: "claude-sonnet-4-6" as const,
 };
 
 const CODING_CONFIG = {
   maxTurns: 25,
   timeoutMs: 120_000,
-  model: "claude-sonnet-4-5-20250929" as const,
+  model: "claude-sonnet-4-6" as const,
 };
 
 /** Max tool result size (50KB) to prevent hitting API limits */

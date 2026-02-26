@@ -70,7 +70,7 @@ providers:
 
   llm:
     name: "Claude"
-    model: "claude-sonnet-4-20250514"
+    model: "claude-sonnet-4-6"
     env_key: "ANTHROPIC_API_KEY"
     max_tokens: 200
     notes: "Fast + capable for voice. Shared between both transport modes."

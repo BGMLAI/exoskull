@@ -244,8 +244,8 @@ export const agentFactoryTools: ToolDefinition[] = [
         const modelMap: Record<number, string> = {
           1: "claude-haiku-4-5-20251001",
           2: "claude-haiku-4-5-20251001",
-          3: "claude-sonnet-4-5-20250929",
-          4: "claude-sonnet-4-5-20250929",
+          3: "claude-sonnet-4-6",
+          4: "claude-sonnet-4-6",
         };
 
         const response = await client.messages.create({

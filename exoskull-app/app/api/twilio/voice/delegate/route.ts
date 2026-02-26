@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
 // CONFIGURATION
 // ============================================================================
 
-const CLAUDE_MODEL = "claude-sonnet-4-20250514";
+const CLAUDE_MODEL = "claude-sonnet-4-6";
 
 function getAppUrl() {
   return process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";

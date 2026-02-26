@@ -86,9 +86,7 @@ export async function runMoA(
   // Choose synthesis model based on criticality
   const synthesisModel =
     options?.synthesisModel ||
-    (options?.useCriticalSynthesis
-      ? "claude-opus-4-20250514"
-      : "claude-sonnet-4-5-20250929");
+    (options?.useCriticalSynthesis ? "claude-opus-4-6" : "claude-sonnet-4-6");
 
   let synthesis = "";
   let synthesisTokens = 0;

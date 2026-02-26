@@ -65,7 +65,7 @@ const PERSPECTIVE_INSTRUCTIONS: Record<Perspective, string> = {
 /** Default model per perspective for cognitive diversity */
 const DEFAULT_MODELS: Record<Perspective, string> = {
   analytical: "gemini-2.0-flash", // Gemini — fast, strong at data/reasoning
-  creative: "claude-sonnet-4-5-20250929", // Claude Sonnet — best creative/narrative
+  creative: "claude-sonnet-4-6", // Claude Sonnet — best creative/narrative
   practical: "claude-haiku-4-5-20251001", // Haiku — fast, practical
 };
 

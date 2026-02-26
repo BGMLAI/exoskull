@@ -54,8 +54,8 @@ const CHAT_MODEL_MAP: Record<string, string> = {
   "gemini-3-pro": "gemini-3-pro-preview", // Tier 2: analysis, reasoning
   "gemini-2.5-flash": "gemini-2.5-flash", // Thinking model (slower, smarter)
   haiku: "claude-3-5-haiku-20241022",
-  sonnet: "claude-sonnet-4-20250514",
-  opus: "claude-opus-4-6-20260201", // Opus 4.6 (was 4.5)
+  sonnet: "claude-sonnet-4-6",
+  opus: "claude-opus-4-6",
 };
 
 /** Check if a resolved model ID is a Gemini model */
