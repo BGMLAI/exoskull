@@ -227,20 +227,24 @@ async function planActions(
 
 async function isStrategyStuck(goalId: string): Promise<boolean> {
   try {
-    const supabase = getServiceSupabase();
-    const threeDaysAgo = new Date(
-      Date.now() - 3 * 24 * 60 * 60 * 1000,
-    ).toISOString();
+    const { getActiveStrategy } = await import("./strategy-store");
+    const strategy = await getActiveStrategy(goalId);
+    if (!strategy) return true;
 
-    const { data } = await supabase
-      .from("exo_goal_strategy_steps")
-      .select("completed_at")
-      .eq("goal_id", goalId)
-      .eq("status", "completed")
-      .gte("completed_at", threeDaysAgo)
-      .limit(1);
+    // Check if any step was completed in last 3 days
+    const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    const hasRecentProgress = strategy.lastReviewedAt
+      ? new Date(strategy.lastReviewedAt).getTime() > threeDaysAgo &&
+        strategy.steps.some((s) => s.status === "completed")
+      : false;
 
-    return !data || data.length === 0;
+    // Stuck = no completed steps at all, or created 3+ days ago with zero progress
+    if (strategy.steps.every((s) => s.status === "pending")) {
+      const createdAt = new Date(strategy.createdAt).getTime();
+      return createdAt < threeDaysAgo;
+    }
+
+    return !hasRecentProgress;
   } catch {
     return false;
   }

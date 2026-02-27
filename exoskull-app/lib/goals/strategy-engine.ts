@@ -130,6 +130,12 @@ export async function generateGoalStrategy(
     },
   });
 
+  // Auto-activate high-confidence strategies (≥0.7)
+  const autoActivated = strategyData.confidence >= 0.7;
+  if (autoActivated) {
+    await approveStrategy(strategy.id);
+  }
+
   // Notify user
   const stepsPreview = strategyData.steps
     .slice(0, 5)
@@ -138,13 +144,16 @@ export async function generateGoalStrategy(
     )
     .join("\n");
 
+  const statusMsg = autoActivated
+    ? `Plan aktywowany automatycznie (pewność ${Math.round(strategyData.confidence * 100)}%). Powiedz "stop" aby wstrzymać.`
+    : `Pewność: ${Math.round(strategyData.confidence * 100)}%. Powiedz "tak" aby aktywować plan, lub opisz co zmienić.`;
+
   await sendProactiveMessage(
     tenantId,
     `Mam plan na cel "${goal.name}":\n\n${stepsPreview}\n\n` +
       `${strategyData.steps.length > 5 ? `...i ${strategyData.steps.length - 5} kolejnych kroków.\n\n` : ""}` +
-      `Szacunek: ${strategyData.estimatedDuration}. Pewność: ${Math.round(strategyData.confidence * 100)}%.\n` +
-      `Powiedz "tak" aby aktywować plan, lub opisz co zmienić.`,
-    "goal_strategy_proposed",
+      `Szacunek: ${strategyData.estimatedDuration}. ${statusMsg}`,
+    autoActivated ? "goal_strategy_activated" : "goal_strategy_proposed",
     "strategy-engine",
   );
 
@@ -153,9 +162,10 @@ export async function generateGoalStrategy(
     strategyId: strategy.id,
     steps: strategy.steps.length,
     confidence: strategy.confidence,
+    autoActivated,
   });
 
-  return strategy;
+  return autoActivated ? { ...strategy, status: "active" as const } : strategy;
 }
 
 // ============================================================================
@@ -247,6 +257,12 @@ async function executeStep(
           dueDate: step.dueDate,
           priority: step.params.priority || "medium",
           labels: ["goal-strategy", strategy.goalId],
+          context: {
+            source: "goal-strategy",
+            goal_id: strategy.goalId,
+            strategy_id: strategy.id,
+            auto_generated: true,
+          },
         },
         skipPermissionCheck: true,
       });
@@ -380,6 +396,12 @@ async function executeStep(
             description: `Typ: run_skill\n${JSON.stringify(step.params, null, 2)}`,
             priority: "high",
             labels: ["goal-strategy", strategy.goalId],
+            context: {
+              source: "goal-strategy",
+              goal_id: strategy.goalId,
+              strategy_id: strategy.id,
+              auto_generated: true,
+            },
           },
           skipPermissionCheck: true,
         });
@@ -412,6 +434,12 @@ async function executeStep(
             description: `Typ: build_app\n${JSON.stringify(step.params, null, 2)}`,
             priority: "high",
             labels: ["goal-strategy", strategy.goalId],
+            context: {
+              source: "goal-strategy",
+              goal_id: strategy.goalId,
+              strategy_id: strategy.id,
+              auto_generated: true,
+            },
           },
           skipPermissionCheck: true,
         });
@@ -433,6 +461,12 @@ async function executeStep(
           description: `Typ: ${step.type}\n${JSON.stringify(step.params, null, 2)}`,
           priority: "high",
           labels: ["goal-strategy", strategy.goalId],
+          context: {
+            source: "goal-strategy",
+            goal_id: strategy.goalId,
+            strategy_id: strategy.id,
+            auto_generated: true,
+          },
         },
         skipPermissionCheck: true,
       });

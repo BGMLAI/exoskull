@@ -58,6 +58,7 @@ import { outboundTools } from "./outbound-tools";
 import { codeExecutionTools } from "./code-execution-tools";
 import { mcpBridgeTools } from "./mcp-bridge-tools";
 import { agentFactoryTools } from "./agent-factory-tools";
+import { goalStrategyTools } from "./goal-strategy-tools";
 
 // Phase 3 — Google & Meta Full Integration
 import { googleCalendarTools } from "./google-calendar-tools";
@@ -122,6 +123,8 @@ export const IORS_EXTENSION_TOOLS = [
   ...threadsTools,
   // Discovery tools — available on ALL channels
   ...discoveryTools,
+  // Goal strategy tools — view/approve/pause strategies via chat
+  ...goalStrategyTools,
 ];
 
 // Register tools and dynamic resolver in the shared registry so
