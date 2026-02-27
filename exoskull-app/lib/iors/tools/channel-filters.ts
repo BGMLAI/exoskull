@@ -254,7 +254,11 @@ const KEYWORD_TO_PACK: Record<string, string[]> = {
   values: ["values"],
   quest: ["quests"],
   app: ["apps"],
-  build: ["apps", "code"],
+  build: ["apps"],
+  zbuduj: ["apps"],
+  zrób: ["apps"],
+  stwórz: ["apps"],
+  tracker: ["apps"],
   plan: ["planning"],
   delegate: ["planning"],
   // Polish
@@ -357,7 +361,7 @@ export function getToolFilterForChannel(
       "email",
       "calendar",
       "contacts",
-      "code",
+      // "code" removed — activated only by explicit code keywords (bug, deploy, etc.)
       "knowledge",
       "mcp_bridge",
       "apps",

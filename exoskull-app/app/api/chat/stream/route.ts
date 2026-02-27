@@ -103,6 +103,14 @@ function recordVpsFailure(): void {
 const CODE_KEYWORDS =
   /\b(kod|code|plik|file|bug|fix|deploy|build|test|commit|push|merge|branch|refactor|implement|endpoint|api|component|function|class|import|export|npm|git|docker|server|database|schema|migration|route|webpack|typescript|javascript|python|css|html|react|next|supabase|vercel|error|stack\s*trace|exception|compile|lint|debug|PR|pull\s*request)\b/i;
 
+// App-building requests should go to local gateway (has build_app tool), NOT VPS
+const APP_BUILDING_PATTERN =
+  /\b(zbuduj|zr[oó]b|stw[oó]rz|utw[oó]rz|make|create|build)\s.{0,30}\b(app|appk[ęa]|aplikacj[ęa]|tracker|narz[eę]dzi|dashboard|logger|monitor|crm|formularz)/i;
+
+// Strong code indicators that override app-building detection → still route to VPS
+const STRONG_CODE_INDICATORS =
+  /\b(endpoint|api|route|component|function|class|migration|schema|docker)\b/i;
+
 const CONVERSATIONAL_PATTERNS =
   /^(hej|hey|hi|hello|cześć|czesc|siema|yo|co tam|jak sytuacja|jak idzie|co słychać|co slychac|dzień dobry|dzien dobry|dobry|dobranoc|dzięki|dzieki|thanks|ok|okej|okay|tak|nie|super|fajnie|git|spoko|no i co|status|jak jest|co nowego|elo|witam|witaj|pozdrawiam|bye|papa|nara|na razie|do zobaczenia).{0,20}$/i;
 
@@ -118,6 +126,15 @@ function isCodeRelatedMessage(message: string): boolean {
 
   // Short casual messages → never code
   if (trimmed.length < 40 && CONVERSATIONAL_PATTERNS.test(trimmed)) {
+    return false;
+  }
+
+  // App-building requests → local gateway (has build_app tool), NOT VPS
+  // Unless message contains strong code indicators (endpoint, api, schema, etc.)
+  if (
+    APP_BUILDING_PATTERN.test(trimmed) &&
+    !STRONG_CODE_INDICATORS.test(trimmed)
+  ) {
     return false;
   }
 

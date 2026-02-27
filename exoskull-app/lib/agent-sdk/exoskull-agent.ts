@@ -469,8 +469,14 @@ export async function runExoSkullAgent(
     parts.push(effectiveSystemPrompt);
     parts.push(dynamicContext);
     if (adaptive.mode !== "neutral") parts.push(adaptive.instruction);
-    // Add coding workspace context for web channels
-    if (req.channel !== "voice") {
+    // Add coding workspace context ONLY when code tools are actually loaded
+    const hasCodeTools = filteredTools.some(
+      (t) =>
+        t.definition.name.startsWith("code_") ||
+        t.definition.name === "generate_fullstack_app" ||
+        t.definition.name === "execute_code",
+    );
+    if (req.channel !== "voice" && hasCodeTools) {
       parts.push(
         `You have full coding capabilities via VPS tools.\n` +
           `Admin workspace: /root/projects/exoskull/\n` +
@@ -637,9 +643,9 @@ export async function runExoSkullAgent(
       if (response.stop_reason !== "tool_use" || toolUseBlocks.length === 0) {
         finalText = textParts.join("");
 
-        // Anti-hallucination guard: detect action-promising text without tool calls
+        // Anti-hallucination guard: BLOCK action-promising text without tool calls
         const actionPatterns =
-          /\b(buduję|tworzę|piszę kod|konfiguruję|instaluję|wdrażam|deployuję|importuję|integruję|publikuję)\b/i;
+          /\b(buduję|tworzę|piszę kod|konfiguruję|instaluję|wdrażam|deployuję|importuję|integruję|publikuję|koduję|generuję|implementuję)\b/i;
         if (
           finalText &&
           actionPatterns.test(finalText) &&
@@ -647,12 +653,27 @@ export async function runExoSkullAgent(
           numTurns === 1
         ) {
           logger.warn(
-            "[ExoSkullAgent] Anti-hallucination: action text without tool calls detected",
+            "[ExoSkullAgent] Anti-hallucination: BLOCKED action text without tool calls",
             {
               textSnippet: finalText.slice(0, 200),
               toolsUsed,
             },
           );
+          // Replace hallucinated response with honest admission + retry with tool instruction
+          messages.push(
+            { role: "assistant", content: finalText },
+            {
+              role: "user",
+              content:
+                "[SYSTEM] Twoja odpowiedź opisuje działanie, ale NIE wywołałeś żadnego narzędzia. " +
+                "NIGDY nie opisuj budowania/tworzenia bez wywołania tool_use. " +
+                "Wywołaj odpowiednie narzędzie TERAZ albo powiedz szczerze co możesz zrobić.",
+            },
+          );
+          toolsUsed.push("anti_hallucination_retry");
+          finalText = "";
+          numTurns++;
+          continue; // Re-enter the loop for a corrected response
         }
 
         break;

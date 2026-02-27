@@ -111,8 +111,16 @@ const INTENT_TOOL_MAP: Record<string, { tools: string[]; keywords: string[] }> =
       keywords: ["facebook", "instagram", "threads", "post", "social"],
     },
     app_building: {
-      tools: ["build_app", "generate_fullstack_app", "deploy_app"],
-      keywords: ["zbuduj", "build", "app", "aplikacja"],
+      tools: ["build_app", "list_apps", "app_log_data"],
+      keywords: [
+        "zbuduj",
+        "build",
+        "app",
+        "aplikacja",
+        "tracker",
+        "zrób",
+        "stwórz",
+      ],
     },
     health: {
       tools: ["log_mod_data", "get_mod_data", "log_weight", "log_workout"],
