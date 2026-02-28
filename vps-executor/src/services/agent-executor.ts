@@ -1,15 +1,16 @@
 /**
  * Agent Executor — VPS-native coding agent runner
  *
- * Mirrors exoskull-app/lib/agent-sdk/exoskull-agent.ts pattern but:
+ * Uses DeepSeek V3 (primary) + Groq Llama 3.3 70B (fallback)
+ * via OpenAI-compatible API. No Anthropic dependency.
+ *
  * - Tools call local filesystem functions directly (zero network overhead)
  * - Emits SSE events for file_change, diff_view
  * - In-memory session store for multi-turn conversations
  *
- * Config: claude-sonnet-4-5-20250929, 25 turns, 120s timeout
+ * Config: deepseek-chat (primary), 15 turns, 120s timeout
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import {
   readFile,
   writeFile,
@@ -21,7 +22,6 @@ import {
   getTree,
 } from "./code-executor";
 
-// Local fetchUrl — VPS code-executor.ts doesn't export one
 async function fetchUrl(url: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -48,8 +48,34 @@ export interface SSEEvent {
 
 export type SSECallback = (event: SSEEvent) => void;
 
+// OpenAI-compatible message types
+interface ChatMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content?: string | null;
+  tool_calls?: ToolCallMessage[];
+  tool_call_id?: string;
+}
+
+interface ToolCallMessage {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+interface FunctionTool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
 interface SessionState {
-  messages: Anthropic.MessageParam[];
+  messages: ChatMessage[];
   workspaceDir: string;
   createdAt: number;
   lastActiveAt: number;
@@ -60,13 +86,30 @@ interface SessionState {
 // ============================================================================
 
 const CODING_CONFIG = {
-  maxTurns: 25,
+  maxTurns: 15,
   timeoutMs: 120_000,
-  model: "claude-sonnet-4-5-20250929" as const,
   maxTokens: 8192,
 };
 
 const MAX_TOOL_RESULT_LENGTH = 50_000;
+
+// Provider cascade: DeepSeek V3 (primary) → Groq (fallback)
+const PROVIDERS = [
+  {
+    name: "deepseek",
+    baseUrl: "https://api.deepseek.com/v1",
+    model: "deepseek-chat",
+    envKey: "DEEPSEEK_API_KEY",
+    timeoutMs: 90_000,
+  },
+  {
+    name: "groq",
+    baseUrl: "https://api.groq.com/openai/v1",
+    model: "llama-3.3-70b-versatile",
+    envKey: "GROQ_API_KEY",
+    timeoutMs: 30_000,
+  },
+] as const;
 
 // ============================================================================
 // SESSION STORE (in-memory)
@@ -102,136 +145,169 @@ export function ensureWorkspaceDir(dir: string): void {
 }
 
 // ============================================================================
-// TOOL DEFINITIONS (Anthropic API format)
+// TOOL DEFINITIONS (OpenAI function calling format)
 // ============================================================================
 
-const AGENT_TOOLS: Anthropic.Tool[] = [
+const AGENT_TOOLS: FunctionTool[] = [
   {
-    name: "read_file",
-    description: "Read a file from the workspace. Returns content with line numbers.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        file_path: { type: "string", description: "Path relative to workspace root" },
-        offset: { type: "number", description: "Start line (0-indexed)" },
-        limit: { type: "number", description: "Number of lines to read" },
-      },
-      required: ["file_path"],
-    },
-  },
-  {
-    name: "write_file",
-    description: "Write or create a file in the workspace.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        file_path: { type: "string", description: "Path relative to workspace root" },
-        content: { type: "string", description: "File content to write" },
-      },
-      required: ["file_path", "content"],
-    },
-  },
-  {
-    name: "edit_file",
-    description: "Edit a file by replacing old_string with new_string. The old_string must be unique in the file.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        file_path: { type: "string", description: "Path relative to workspace root" },
-        old_string: { type: "string", description: "Exact string to find and replace" },
-        new_string: { type: "string", description: "Replacement string" },
-        replace_all: { type: "boolean", description: "Replace all occurrences (default: false)" },
-      },
-      required: ["file_path", "old_string", "new_string"],
-    },
-  },
-  {
-    name: "bash",
-    description: "Execute a bash command in the workspace directory.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        command: { type: "string", description: "The bash command to execute" },
-        timeout_ms: { type: "number", description: "Timeout in ms (max 60000)" },
-      },
-      required: ["command"],
-    },
-  },
-  {
-    name: "glob",
-    description: "Search for files by name pattern in the workspace.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        pattern: { type: "string", description: "File name pattern (e.g. *.ts, *.tsx)" },
-      },
-      required: ["pattern"],
-    },
-  },
-  {
-    name: "grep",
-    description: "Search file contents by regex pattern in the workspace.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        pattern: { type: "string", description: "Regex pattern to search for" },
-        ignore_case: { type: "boolean", description: "Case insensitive search" },
-        max_results: { type: "number", description: "Max results (default 100)" },
-      },
-      required: ["pattern"],
-    },
-  },
-  {
-    name: "git",
-    description: "Run a git operation in the workspace (status, diff, log, add, commit, push, etc.).",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        operation: { type: "string", description: "Git operation (e.g. 'status', 'diff', 'log --oneline -10')" },
-      },
-      required: ["operation"],
-    },
-  },
-  {
-    name: "tree",
-    description: "Show directory structure of the workspace.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        path: { type: "string", description: "Subdirectory path (default: workspace root)" },
-        depth: { type: "number", description: "Max depth (default: 3)" },
+    type: "function",
+    function: {
+      name: "read_file",
+      description: "Read a file from the workspace. Returns content with line numbers.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_path: { type: "string", description: "Path relative to workspace root" },
+          offset: { type: "number", description: "Start line (0-indexed)" },
+          limit: { type: "number", description: "Number of lines to read" },
+        },
+        required: ["file_path"],
       },
     },
   },
   {
-    name: "fetch_url",
-    description: "Fetch content from a URL (for documentation, APIs, etc.).",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        url: { type: "string", description: "URL to fetch" },
+    type: "function",
+    function: {
+      name: "write_file",
+      description: "Write or create a file in the workspace.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_path: { type: "string", description: "Path relative to workspace root" },
+          content: { type: "string", description: "File content to write" },
+        },
+        required: ["file_path", "content"],
       },
-      required: ["url"],
     },
   },
   {
-    name: "search_knowledge",
-    description: "Search the user's uploaded knowledge base (documents, notes, PDFs). Returns relevant chunks with similarity scores.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        query: { type: "string", description: "Search query" },
-        limit: { type: "number", description: "Max results (default 5)" },
+    type: "function",
+    function: {
+      name: "edit_file",
+      description: "Edit a file by replacing old_string with new_string. The old_string must be unique in the file.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_path: { type: "string", description: "Path relative to workspace root" },
+          old_string: { type: "string", description: "Exact string to find and replace" },
+          new_string: { type: "string", description: "Replacement string" },
+          replace_all: { type: "boolean", description: "Replace all occurrences (default: false)" },
+        },
+        required: ["file_path", "old_string", "new_string"],
       },
-      required: ["query"],
     },
   },
   {
-    name: "list_documents",
-    description: "List the user's uploaded documents in the knowledge base.",
-    input_schema: {
-      type: "object" as const,
-      properties: {},
+    type: "function",
+    function: {
+      name: "bash",
+      description: "Execute a bash command in the workspace directory.",
+      parameters: {
+        type: "object",
+        properties: {
+          command: { type: "string", description: "The bash command to execute" },
+          timeout_ms: { type: "number", description: "Timeout in ms (max 60000)" },
+        },
+        required: ["command"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "glob",
+      description: "Search for files by name pattern in the workspace.",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: { type: "string", description: "File name pattern (e.g. *.ts, *.tsx)" },
+        },
+        required: ["pattern"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "grep",
+      description: "Search file contents by regex pattern in the workspace.",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: { type: "string", description: "Regex pattern to search for" },
+          ignore_case: { type: "boolean", description: "Case insensitive search" },
+          max_results: { type: "number", description: "Max results (default 100)" },
+        },
+        required: ["pattern"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "git",
+      description: "Run a git operation in the workspace (status, diff, log, add, commit, push, etc.).",
+      parameters: {
+        type: "object",
+        properties: {
+          operation: { type: "string", description: "Git operation (e.g. 'status', 'diff', 'log --oneline -10')" },
+        },
+        required: ["operation"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "tree",
+      description: "Show directory structure of the workspace.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Subdirectory path (default: workspace root)" },
+          depth: { type: "number", description: "Max depth (default: 3)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "fetch_url",
+      description: "Fetch content from a URL (for documentation, APIs, etc.).",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "URL to fetch" },
+        },
+        required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_knowledge",
+      description: "Search the user's uploaded knowledge base (documents, notes, PDFs). Returns relevant chunks with similarity scores.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search query" },
+          limit: { type: "number", description: "Max results (default 5)" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_documents",
+      description: "List the user's uploaded documents in the knowledge base.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
     },
   },
 ];
@@ -266,7 +342,6 @@ function computeDiffHunks(before: string, after: string): Array<{
     lines: Array<{ type: "context" | "add" | "remove"; content: string }>;
   }> = [];
 
-  // Simple line-by-line diff — find first and last differing lines
   let firstDiff = -1;
   let lastDiffBefore = -1;
   let lastDiffAfter = -1;
@@ -280,9 +355,8 @@ function computeDiffHunks(before: string, after: string): Array<{
     }
   }
 
-  if (firstDiff === -1) return []; // No diff
+  if (firstDiff === -1) return [];
 
-  // Build a single hunk with context
   const contextLines = 3;
   const hunkStart = Math.max(0, firstDiff - contextLines);
   const hunkEndBefore = Math.min(beforeLines.length - 1, (lastDiffBefore === -1 ? firstDiff : lastDiffBefore) + contextLines);
@@ -290,26 +364,22 @@ function computeDiffHunks(before: string, after: string): Array<{
 
   const lines: Array<{ type: "context" | "add" | "remove"; content: string }> = [];
 
-  // Context before
   for (let i = hunkStart; i < firstDiff; i++) {
     lines.push({ type: "context", content: beforeLines[i] || "" });
   }
 
-  // Removed lines
   for (let i = firstDiff; i <= (lastDiffBefore === -1 ? firstDiff : lastDiffBefore); i++) {
     if (i < beforeLines.length) {
       lines.push({ type: "remove", content: beforeLines[i] });
     }
   }
 
-  // Added lines
   for (let i = firstDiff; i <= (lastDiffAfter === -1 ? firstDiff : lastDiffAfter); i++) {
     if (i < afterLines.length) {
       lines.push({ type: "add", content: afterLines[i] });
     }
   }
 
-  // Context after
   const contextStart = Math.max(
     lastDiffBefore === -1 ? firstDiff + 1 : lastDiffBefore + 1,
     lastDiffAfter === -1 ? firstDiff + 1 : lastDiffAfter + 1,
@@ -368,7 +438,6 @@ async function executeTool(
 
       case "edit_file": {
         const filePath = resolve(input.file_path as string);
-        // Read before for diff
         let before = "";
         try {
           before = fs.readFileSync(filePath, "utf-8");
@@ -381,7 +450,6 @@ async function executeTool(
           input.replace_all as boolean | undefined,
         );
 
-        // Read after for diff
         const after = fs.readFileSync(filePath, "utf-8");
         const hunks = computeDiffHunks(before, after);
 
@@ -517,6 +585,76 @@ You can read, write, and edit files, run bash commands, search code, use git, an
 }
 
 // ============================================================================
+// AI PROVIDER
+// ============================================================================
+
+function getProvider(): { name: string; baseUrl: string; model: string; apiKey: string; timeoutMs: number } {
+  for (const p of PROVIDERS) {
+    const key = process.env[p.envKey];
+    if (key) {
+      return { name: p.name, baseUrl: p.baseUrl, model: p.model, apiKey: key, timeoutMs: p.timeoutMs };
+    }
+  }
+  throw new Error("[AgentExecutor] No AI provider configured. Set DEEPSEEK_API_KEY or GROQ_API_KEY.");
+}
+
+/**
+ * Call OpenAI-compatible chat completions API (DeepSeek / Groq).
+ */
+async function callChatAPI(
+  provider: { baseUrl: string; model: string; apiKey: string },
+  messages: ChatMessage[],
+  tools: FunctionTool[],
+  maxTokens: number,
+  signal: AbortSignal,
+): Promise<{
+  content: string;
+  toolCalls: ToolCallMessage[] | null;
+  finishReason: string;
+}> {
+  const body: Record<string, unknown> = {
+    model: provider.model,
+    messages,
+    max_tokens: maxTokens,
+    temperature: 0.3,
+  };
+
+  if (tools.length > 0) {
+    body.tools = tools;
+    body.tool_choice = "auto";
+  }
+
+  const response = await fetch(`${provider.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${provider.apiKey}`,
+    },
+    body: JSON.stringify(body),
+    signal,
+  });
+
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    const errMsg = (errBody as Record<string, Record<string, string>>)?.error?.message
+      || `${response.status} ${response.statusText}`;
+    throw new Error(`API error ${response.status}: ${errMsg}`);
+  }
+
+  const data = await response.json();
+  const choice = (data as Record<string, unknown[]>).choices?.[0] as Record<string, unknown> | undefined;
+  const message = choice?.message as Record<string, unknown> | undefined;
+
+  return {
+    content: (message?.content as string) || "",
+    toolCalls: Array.isArray(message?.tool_calls) && (message!.tool_calls as unknown[]).length > 0
+      ? message!.tool_calls as ToolCallMessage[]
+      : null,
+    finishReason: (choice?.finish_reason as string) || "stop",
+  };
+}
+
+// ============================================================================
 // MAIN AGENT RUNNER
 // ============================================================================
 
@@ -543,15 +681,16 @@ export async function runAgentCode(
 
   session.lastActiveAt = Date.now();
 
-  // Add user message
+  // Add user message to session
   session.messages.push({ role: "user", content: req.message });
 
-  // Emit session event
   emit({ type: "session", sessionId, workspaceDir });
   emit({ type: "status", status: "processing" });
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const provider = getProvider();
   const systemPrompt = buildSystemPrompt(workspaceDir);
+
+  console.log(`[AgentExecutor] Using ${provider.name} (${provider.model})`);
 
   const abortController = new AbortController();
   const timeoutHandle = setTimeout(
@@ -564,95 +703,85 @@ export async function runAgentCode(
   const toolsUsed: string[] = [];
 
   try {
-    // Copy messages for the API call (keep session.messages as canonical)
-    const messages = [...session.messages];
+    // Build API messages: system + session history
+    const apiMessages: ChatMessage[] = [
+      { role: "system", content: systemPrompt },
+      ...session.messages,
+    ];
 
     while (numTurns < CODING_CONFIG.maxTurns) {
       numTurns++;
 
-      const stream = client.messages.stream(
-        {
-          model: CODING_CONFIG.model,
-          max_tokens: CODING_CONFIG.maxTokens,
-          system: systemPrompt,
-          messages,
-          tools: AGENT_TOOLS,
-        },
-        { signal: abortController.signal },
+      const result = await callChatAPI(
+        provider,
+        apiMessages,
+        AGENT_TOOLS,
+        CODING_CONFIG.maxTokens,
+        abortController.signal,
       );
 
-      // Stream text deltas
-      stream.on("text", (text) => {
-        emit({ type: "delta", text });
-      });
-
-      const response = await stream.finalMessage();
-
-      // Separate text and tool_use blocks
-      const textParts: string[] = [];
-      const toolUseBlocks: Anthropic.ToolUseBlock[] = [];
-
-      for (const block of response.content) {
-        if (block.type === "text") {
-          textParts.push(block.text);
-        } else if (block.type === "tool_use") {
-          toolUseBlocks.push(block);
-        }
+      // Emit text content
+      if (result.content) {
+        emit({ type: "delta", text: result.content });
       }
 
       // No tool calls — done
-      if (response.stop_reason !== "tool_use" || toolUseBlocks.length === 0) {
-        finalText = textParts.join("");
+      if (!result.toolCalls) {
+        finalText = result.content;
         break;
       }
 
-      // Add assistant response to history
-      messages.push({
+      // Add assistant message with tool calls to API messages
+      apiMessages.push({
         role: "assistant",
-        content: response.content as Anthropic.ContentBlockParam[],
+        content: result.content || null,
+        tool_calls: result.toolCalls,
       });
 
-      // Execute tools
-      const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
-        toolUseBlocks.map(async (toolUse) => {
-          const toolName = toolUse.name;
-          if (!toolsUsed.includes(toolName)) toolsUsed.push(toolName);
+      // Execute each tool call and add results
+      for (const tc of result.toolCalls) {
+        const toolName = tc.function.name;
+        if (!toolsUsed.includes(toolName)) toolsUsed.push(toolName);
 
-          emit({ type: "tool_start", tool: toolName });
-          const startMs = Date.now();
+        let args: Record<string, unknown>;
+        try {
+          args = JSON.parse(tc.function.arguments || "{}");
+        } catch {
+          args = {};
+        }
 
-          const { result, isError } = await executeTool(
-            toolName,
-            toolUse.input as Record<string, unknown>,
-            workspaceDir,
-            emit,
-            req.tenantId,
-          );
+        emit({ type: "tool_start", tool: toolName });
+        const startMs = Date.now();
 
-          const durationMs = Date.now() - startMs;
-          emit({
-            type: "tool_end",
-            tool: toolName,
-            durationMs,
-            success: !isError,
-            resultSummary: result.slice(0, 200),
-          });
+        const { result: toolResult, isError } = await executeTool(
+          toolName,
+          args,
+          workspaceDir,
+          emit,
+          req.tenantId,
+        );
 
-          // Truncate long results
-          const truncated = result.length > MAX_TOOL_RESULT_LENGTH
-            ? result.slice(0, MAX_TOOL_RESULT_LENGTH) + `\n\n[Truncated — ${result.length} chars total]`
-            : result;
+        const durationMs = Date.now() - startMs;
+        emit({
+          type: "tool_end",
+          tool: toolName,
+          durationMs,
+          success: !isError,
+          resultSummary: toolResult.slice(0, 200),
+        });
 
-          return {
-            type: "tool_result" as const,
-            tool_use_id: toolUse.id,
-            content: truncated,
-            ...(isError ? { is_error: true as const } : {}),
-          };
-        }),
-      );
+        // Truncate long results
+        const truncated = toolResult.length > MAX_TOOL_RESULT_LENGTH
+          ? toolResult.slice(0, MAX_TOOL_RESULT_LENGTH) + `\n\n[Truncated — ${toolResult.length} chars total]`
+          : toolResult;
 
-      messages.push({ role: "user", content: toolResults });
+        // OpenAI format: each tool result is a separate message
+        apiMessages.push({
+          role: "tool",
+          tool_call_id: tc.id,
+          content: truncated,
+        });
+      }
     }
 
     // Max turns reached
@@ -660,12 +789,12 @@ export async function runAgentCode(
       finalText = "Max interaction limit reached. Try a simpler request.";
     }
 
-    // Update session with final assistant message
+    // Update session with final assistant message (text only)
     session.messages.push({ role: "assistant", content: finalText });
 
-    // Keep session history bounded (last 40 messages)
-    if (session.messages.length > 40) {
-      session.messages = session.messages.slice(-40);
+    // Keep session history bounded (last 20 messages — reduced from 40)
+    if (session.messages.length > 20) {
+      session.messages = session.messages.slice(-20);
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -686,5 +815,6 @@ export async function runAgentCode(
     fullText: finalText,
     toolsUsed,
     numTurns,
+    provider: provider.name,
   });
 }

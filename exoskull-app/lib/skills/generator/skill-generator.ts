@@ -187,7 +187,7 @@ function resolveModelName(model?: SkillGeneratorModel): string {
     case "gemini-flash":
       return "gemini-flash";
     case "claude-sonnet":
-      return "claude-sonnet-4-5";
+      return "deepseek-v3";
     case "auto":
     default:
       return "auto-routed";
@@ -208,7 +208,7 @@ function getModelOptions(model?: SkillGeneratorModel): {
     case "gemini-flash":
       return { forceModel: "gemini-2.5-flash" };
     case "claude-sonnet":
-      return { forceModel: "claude-sonnet-4-5" };
+      return { forceModel: "deepseek-v3" };
     case "auto":
     default:
       return { taskCategory: "code_generation" };
