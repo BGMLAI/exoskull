@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS exo_federation_peers (
   instance_url TEXT NOT NULL,
   capabilities TEXT[] NOT NULL DEFAULT '{}',
   shared_skills TEXT[] NOT NULL DEFAULT '{}',
-  location GEOGRAPHY(POINT, 4326),
+  latitude DOUBLE PRECISION,
+  longitude DOUBLE PRECISION,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'banned')),
   last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
