@@ -11,8 +11,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { IntegrationsWidget } from "@/components/widgets/IntegrationsWidget";
-import { EmailInboxWidget } from "@/components/widgets/EmailInboxWidget";
 import {
   Settings,
   Shield,
@@ -48,7 +46,6 @@ import { MyDataSection } from "./MyDataSection";
 import { SystemPromptSection } from "./SystemPromptSection";
 import { SectionErrorBoundary } from "./SectionErrorBoundary";
 import { VoiceSettingsSection } from "./VoiceSettingsSection";
-import { CockpitSelector } from "@/components/cockpit/CockpitSelector";
 
 interface PersonalityFormState {
   name: string;
@@ -411,22 +408,6 @@ export default function SettingsPage() {
         <VoiceSettingsSection />
       </SectionErrorBoundary>
 
-      {/* Cockpit Skin Selector */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Kokpit 3D
-          </CardTitle>
-          <CardDescription>
-            Wybierz styl kokpitu — ramka 3D wokol interfejsu
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <CockpitSelector />
-        </CardContent>
-      </Card>
-
       <SectionErrorBoundary sectionName="Instrukcje">
         <InstructionsSection />
       </SectionErrorBoundary>
@@ -479,7 +460,12 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <IntegrationsWidget connections={connections} tenantId={tenantId} />
+          <a
+            href="/dashboard/integrations"
+            className="text-sm text-primary hover:underline"
+          >
+            Przejdz do integracji &rarr;
+          </a>
         </CardContent>
       </Card>
 
@@ -696,36 +682,6 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Email Inbox */}
-      <EmailInboxWidget
-        tenantId={tenantId}
-        rigSlug={
-          connections.find(
-            (c) => c.rig_slug === "google" && c.sync_status === "success",
-          )
-            ? "google"
-            : connections.find(
-                  (c) =>
-                    c.rig_slug === "google-workspace" &&
-                    c.sync_status === "success",
-                )
-              ? "google-workspace"
-              : connections.find(
-                    (c) =>
-                      c.rig_slug === "microsoft-365" &&
-                      c.sync_status === "success",
-                  )
-                ? "microsoft-365"
-                : "google"
-        }
-        isConnected={connections.some(
-          (c) =>
-            ["google", "google-workspace", "microsoft-365"].includes(
-              c.rig_slug,
-            ) && c.sync_status === "success",
-        )}
-      />
     </div>
   );
 }

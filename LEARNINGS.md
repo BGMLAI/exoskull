@@ -1,5 +1,37 @@
 # ExoSkull Learnings
 
+## Agent Nie Ma Plan B — Powtarza Ten Sam Błąd w Nieskończoność (2026-02-28)
+**Pattern:** User wgrał PNG ze screenshotem danych OVH. Agent 10+ razy powtórzył "wklej dane tekstowo" zamiast znaleźć rozwiązanie. Tworzył "OCR apps" które były pustymi formularzami. Referował do nieistniejącego dashboardu.
+**Root cause:** Agent nie ma mechanizmu "fallback escalation". Gdy pierwsza metoda zawiedzie, powtarza ją w kółko. Brak: (1) Vision API integration, (2) OCR capability w systemie, (3) mechanizmu "jeśli nie umiem → zbuduj tool → użyj tool".
+**Lesson:** System deklarujący autonomię MUSI umieć: (a) rozpoznać że obecna metoda nie działa po 2 próbach, (b) wygenerować alternatywne podejście, (c) zbudować brakujące narzędzie. Powtarzanie "wklej tekst" 10x to ANTI-PATTERN nr 1 agentowego systemu.
+
+## build_app Tworzy Puste Formularze, Nie Działające Aplikacje (2026-02-28)
+**Pattern:** User poprosił "zrób sobie aplikację OCR". Agent użył `build_app` → powstał pusty formularz DB, nie aplikacja z logiką. `build_app` tworzy: tabelę Postgres + widget Canvas. NIE tworzy: logiki biznesowej, integracji z API, przetwarzania danych.
+**Root cause:** `generateApp()` generuje JSON spec → schema DB → widget render. Zero capability do generowania kodu backendowego.
+**Lesson:** "App" w ExoSkull ≠ aplikacja. To formularz z tabelą. Prawdziwa app wymaga: logiki, API calls, przetwarzania. System kłamie użytkownikowi mówiąc "zbudowałem OCR app".
+
+## Agent Referuje do Nieistniejącego UI (2026-02-28)
+**Pattern:** Agent mówił "wgraj na dashboard", "widget OCR na dashboardzie" — user odpowiedział "KURWA NIE MAM ŻADNEGO DASHBOARDU IDIOTO". Agent hallucynuje UI features które nie istnieją.
+**Root cause:** Agent ma w kontekście ARCHITECTURE.md z "✅ LIVE" statusami, które kłamią. Agent ufa dokumentacji zamiast weryfikować stan faktyczny.
+**Lesson:** Agent MUSI weryfikować czy feature istnieje ZANIM go zasugeruje. Nie ufaj "✅ LIVE" w docs — sprawdź endpoint/komponent.
+
+## Autonomous Loops Must Share Tables (2026-02-28)
+**Pattern:** 5 loops individually coded but Gap Detector writes `learning_events`, Ralph/Impulse read `exo_proactive_log`. Zero cross-loop visibility.
+**Solution:** Bridge writes — upsert gaps to `exo_proactive_log` alongside `learning_events`.
+**Lesson:** Table schema is the contract between autonomous loops. If loops don't share a table, they can't communicate.
+
+## Failed Retries Need Distinct Tracking (2026-02-28)
+**Pattern:** Impulse dedup checked `auto_build:` (success) but not failures. Same broken gap retried every 30min forever.
+**Solution:** Log `auto_build_fail:{id}` on failure, apply exponential backoff `min(2^(n-1), 14)` days.
+**Lesson:** Any retry system needs BOTH success and failure tracking. Success-only dedup creates invisible infinite loops.
+
+## Stuck Counter Needs Escape State (2026-02-28)
+**Pattern:** Ralph stuck counter checks `outcome === "skipped" || "failed"`. Lateral thinking (3+ cycles) logs "skipped" → counter never resets.
+**Solution:** Escalation logs `"escalated"` — breaks consecutive count. SMS user for direction.
+**Lesson:** If all failure paths map to the same state that triggers the failure check, you have a livelock. Add a distinct "gave up" state.
+
+---
+
 ## WSL Git on NTFS Needs Local User Config (2026-02-25)
 **Pattern:** `git commit` fails with "Author identity unknown" even though previous commits exist.
 **Solution:** `git config user.name "X" && git config user.email "x@y"` per-repo. WSL doesn't inherit Windows git global config.

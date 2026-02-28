@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { ChatView } from "@/components/stream/ChatView";
+import { SpatialApp } from "@/components/spatial/SpatialApp";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "ExoSkull" };
 
 /**
- * Dashboard Page — Chat is the primary interface.
+ * Dashboard Page — Spatial Chat OS is the primary interface.
  */
 export default function DashboardPage() {
-  return <ChatView />;
+  return <SpatialApp />;
 }

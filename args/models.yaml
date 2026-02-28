@@ -2,6 +2,7 @@
 # AI Models Configuration - ExoSkull GOTCHA Framework
 # =============================================================================
 # Multi-model routing configuration for cost optimization.
+# Gemini 3.1 Pro migration (2026-02): Anthropic → BYOK only.
 # Tier 1 = cheapest, Tier 4 = most capable.
 # =============================================================================
 
@@ -19,6 +20,39 @@ defaults:
 
 tiers:
   # ---------------------------------------------------------------------------
+  # TIER 0: Self-hosted ($0/token, fixed monthly GPU rental)
+  # ---------------------------------------------------------------------------
+  tier_0:
+    name: "Self-hosted Tier"
+    description: "Zero-cost inference for simple tasks"
+    models:
+      - id: selfhosted-qwen3-30b
+        provider: selfhosted
+        display_name: "Qwen3 30B (self-hosted)"
+        pricing:
+          input_per_1m: 0
+          output_per_1m: 0
+        limits:
+          max_tokens: 8192
+          context_window: 32000
+        features:
+          tools: true
+          streaming: false
+
+      - id: selfhosted-gemma-4b
+        provider: selfhosted
+        display_name: "Gemma 3 4B (self-hosted)"
+        pricing:
+          input_per_1m: 0
+          output_per_1m: 0
+        limits:
+          max_tokens: 4096
+          context_window: 32000
+        features:
+          tools: true
+          streaming: false
+
+  # ---------------------------------------------------------------------------
   # TIER 1: Ultra-cheap, ultra-fast
   # Use for: Simple routing, classification, greetings, data extraction
   # ---------------------------------------------------------------------------
@@ -26,9 +60,24 @@ tiers:
     name: "Flash Tier"
     description: "Ultra-cheap for trivial tasks"
     models:
-      - id: gemini-1.5-flash
+      - id: gemini-3-flash
         provider: gemini
-        display_name: "Gemini 1.5 Flash"
+        display_name: "Gemini 3 Flash"
+        pricing:
+          input_per_1m: 0.50
+          output_per_1m: 3.00
+        limits:
+          max_tokens: 8192
+          context_window: 1000000
+        features:
+          tools: true
+          streaming: true
+          vision: true
+          structured_output: true
+
+      - id: gemini-2.5-flash
+        provider: gemini
+        display_name: "Gemini 2.5 Flash (legacy)"
         pricing:
           input_per_1m: 0.075
           output_per_1m: 0.30
@@ -38,9 +87,7 @@ tiers:
         features:
           tools: true
           streaming: true
-          vision: true
 
-    # Tasks that ALWAYS go to Tier 1
     task_categories:
       - classification
       - extraction
@@ -48,7 +95,6 @@ tiers:
       - routing
       - greetings
 
-    # Keywords that trigger Tier 1
     keywords:
       - "wybierz"
       - "classify"
@@ -64,26 +110,50 @@ tiers:
       - "hej"
 
   # ---------------------------------------------------------------------------
-  # TIER 2: Pattern detection, summarization, analysis
-  # Use for: Moderate complexity, pattern detection, domain analysis
+  # TIER 2: Analysis, reasoning (Gemini 3.1 Pro + Groq FREE)
   # ---------------------------------------------------------------------------
   tier_2:
-    name: "Haiku Tier"
-    description: "Balanced cost/capability for moderate tasks"
+    name: "Pro Tier"
+    description: "Balanced cost/capability — Gemini 3.1 Pro primary"
     models:
-      - id: claude-3-5-haiku
-        provider: anthropic
-        display_name: "Claude 3.5 Haiku"
+      - id: gemini-3.1-pro
+        provider: gemini
+        display_name: "Gemini 3.1 Pro"
         pricing:
-          input_per_1m: 0.80
-          output_per_1m: 4.00
+          input_per_1m: 2.00
+          output_per_1m: 12.00
         limits:
-          max_tokens: 8192
-          context_window: 200000
+          max_tokens: 65536
+          context_window: 1000000
         features:
           tools: true
           streaming: true
           vision: true
+          structured_output: true
+
+      - id: groq-llama-3.3-70b
+        provider: groq
+        display_name: "Llama 3.3 70B (Groq FREE)"
+        pricing:
+          input_per_1m: 0
+          output_per_1m: 0
+        limits:
+          max_tokens: 8192
+          context_window: 128000
+        features:
+          tools: true
+          streaming: true
+        rate_limits:
+          rpm: 30
+          tokens_per_min: 6000
+
+    byok_fallback:
+      - id: claude-3-5-haiku
+        provider: anthropic
+        display_name: "Claude 3.5 Haiku (BYOK)"
+        pricing:
+          input_per_1m: 0.80
+          output_per_1m: 4.00
 
     task_categories:
       - summarization
@@ -92,33 +162,55 @@ tiers:
       - conversation
       - content_generation
 
-    escalate_from_tier_1:
-      - "response too complex"
-      - "requires reasoning"
-      - "pattern detection needed"
-
   # ---------------------------------------------------------------------------
-  # TIER 3: Complex reasoning, long context, multi-agent
-  # Use for: Deep reasoning, 1M+ context, Swarm coordination
+  # TIER 3: Code generation, deep reasoning
   # ---------------------------------------------------------------------------
   tier_3:
-    name: "Kimi Tier"
-    description: "Complex reasoning and long context"
+    name: "Code Tier"
+    description: "Code gen + deep reasoning — Gemini 3.1 Pro + DeepSeek"
     models:
+      - id: gemini-3.1-pro
+        provider: gemini
+        display_name: "Gemini 3.1 Pro"
+
+      - id: deepseek-r1
+        provider: deepseek
+        display_name: "DeepSeek R1"
+        pricing:
+          input_per_1m: 0.55
+          output_per_1m: 2.19
+        limits:
+          max_tokens: 16384
+          context_window: 128000
+        features:
+          tools: true
+          streaming: true
+
       - id: kimi-k2.5
         provider: kimi
         display_name: "Kimi K2.5"
         pricing:
-          input_per_1m: 0.50 # Placeholder
-          output_per_1m: 2.00
+          input_per_1m: 0.60
+          output_per_1m: 2.50
         limits:
-          max_tokens: 128000
-          context_window: 1000000 # 1M tokens
+          max_tokens: 256000
+          context_window: 256000
         features:
           tools: true
           streaming: true
-          vision: true
-          swarm: true # Multi-agent coordination
+          swarm: true
+
+      - id: codex-5-2
+        provider: codex
+        display_name: "Codex 5.2"
+        pricing:
+          input_per_1m: 1.75
+          output_per_1m: 14.00
+
+    byok_fallback:
+      - id: claude-sonnet-4-5
+        provider: anthropic
+        display_name: "Claude Sonnet 4.5 (BYOK)"
 
     task_categories:
       - reasoning
@@ -127,32 +219,31 @@ tiers:
       - code_generation
       - visual_analysis
 
-    # Special capabilities
-    capabilities:
-      swarm_mode: true # Multi-agent coordination
-      visual_agentic: true # Image analysis for actions
-
   # ---------------------------------------------------------------------------
-  # TIER 4: Meta-coordination, crisis, strategic decisions
-  # Use for: Crisis intervention, strategic planning, meta-decisions
+  # TIER 4: Strategic / Crisis (DeepSeek R1 primary)
   # ---------------------------------------------------------------------------
   tier_4:
-    name: "Opus Tier"
-    description: "Top-tier brain for critical decisions"
+    name: "Strategic Tier"
+    description: "Top-tier reasoning — DeepSeek R1 primary, Opus BYOK"
     models:
-      - id: claude-opus-4-5
-        provider: anthropic
-        display_name: "Claude Opus 4.5"
+      - id: deepseek-r1
+        provider: deepseek
+        display_name: "DeepSeek R1"
         pricing:
-          input_per_1m: 15.00
-          output_per_1m: 75.00
-        limits:
-          max_tokens: 32000
-          context_window: 200000
-        features:
-          tools: true
-          streaming: true
-          vision: true
+          input_per_1m: 0.55
+          output_per_1m: 2.19
+
+      - id: gemini-3.1-pro
+        provider: gemini
+        display_name: "Gemini 3.1 Pro (fallback)"
+
+    byok_fallback:
+      - id: claude-opus-4-6
+        provider: anthropic
+        display_name: "Claude Opus 4.6 (BYOK)"
+        pricing:
+          input_per_1m: 5.00
+          output_per_1m: 25.00
 
     task_categories:
       - meta_coordination
@@ -161,7 +252,6 @@ tiers:
       - intervention_design
       - architecture_decisions
 
-    # Crisis detection keywords (ALWAYS escalate to Tier 4)
     crisis_keywords:
       - "samobójcz"
       - "suicide"
@@ -178,7 +268,6 @@ tiers:
       - "chcę umrzeć"
       - "nie chcę żyć"
 
-    # Meta-coordination keywords
     meta_keywords:
       - "strategia"
       - "strategy"
@@ -215,14 +304,12 @@ caching:
   static_context_min_tokens: 1024 # Cache if static context > 1024 tokens
   cache_ttl_seconds: 3600 # 1 hour cache
 
-  # What to cache (static)
   static_content:
     - system_prompt
     - user_profile
     - app_configs
     - pattern_history
 
-  # What NOT to cache (dynamic)
   dynamic_content:
     - current_request
     - recent_conversations
@@ -240,6 +327,7 @@ usage_tracking:
     - tenant_id
     - model
     - tier
+    - provider
     - task_category
     - input_tokens
     - output_tokens
@@ -252,7 +340,12 @@ usage_tracking:
 # =============================================================================
 # ENVIRONMENT VARIABLES REQUIRED
 # =============================================================================
-# GOOGLE_GEMINI_API_KEY - Gemini API key
-# ANTHROPIC_API_KEY - Anthropic API key
-# KIMI_API_KEY - Kimi API key (when available)
+# GOOGLE_AI_API_KEY    - Gemini API (primary — handles Flash, Pro, 3.1 Pro)
+# DEEPSEEK_API_KEY     - DeepSeek (R1 + V3)
+# GROQ_API_KEY         - Groq (FREE Llama 3.3 70B)
+# ANTHROPIC_API_KEY    - Anthropic (emergency fallback)
+# KIMI_API_KEY         - Kimi K2.5 (optional, long context)
+# OPENAI_API_KEY       - OpenAI (embeddings only)
+#
+# BYOK (per tenant): exo_tenant_settings.ai_api_keys (JSONB)
 # =============================================================================

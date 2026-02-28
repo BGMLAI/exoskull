@@ -4,8 +4,6 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AppShell } from "@/components/shell/AppShell";
-import { GoalStrip } from "@/components/shell/GoalStrip";
 
 export const metadata: Metadata = {
   title: {
@@ -15,8 +13,8 @@ export const metadata: Metadata = {
 };
 
 /**
- * Dashboard Layout — AppShell wrapper with auth check.
- * GoalStrip rendered in TopBar slot.
+ * Dashboard Layout — auth check only, no shell wrapper.
+ * SpatialApp provides its own fullscreen layout.
  */
 export default async function DashboardLayout({
   children,
@@ -32,9 +30,5 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  return (
-    <ErrorBoundary>
-      <AppShell topBarSlot={<GoalStrip />}>{children}</AppShell>
-    </ErrorBoundary>
-  );
+  return <ErrorBoundary>{children}</ErrorBoundary>;
 }
