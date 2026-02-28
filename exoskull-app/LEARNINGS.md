@@ -1,5 +1,23 @@
 # ExoSkull Learnings
 
+## Autonomous Loops Must Share Tables, Not Just Concepts (2026-02-28)
+
+- 5 independent loops (MAPE-K, Ralph, Impulse, Gap Detection, Dynamic Skills) were individually coded but **wrote to different tables** — Gap Detector → `learning_events`, Ralph/Impulse → `exo_proactive_log`. Zero cross-loop visibility.
+- **Solution:** Bridge writes — Gap Detector now upserts to `exo_proactive_log` in addition to `learning_events`. Ralph's OBSERVE already queries `exo_proactive_log`, so gaps become visible immediately.
+- **Pattern:** When building multi-loop autonomous systems, the TABLE SCHEMA is the contract between loops, not the code. If two loops don't share a table, they can't communicate. Always audit table reads/writes across all loops before assuming they connect.
+
+## Exponential Backoff Prevents Dead-Gap Blocking (2026-02-28)
+
+- Impulse Handler F's dedup only checked `auto_build:` (success) entries, not failures. A gap that failed `generateApp()` would be retried every 30 minutes forever, blocking all other gaps (one action per cycle).
+- **Solution:** Log failures as `auto_build_fail:{gap.id}` in `exo_proactive_log`. On next cycle, check failure count and apply backoff: `min(2^(n-1), 14)` days. After 4 failures → 14-day max backoff.
+- **Pattern:** Any retry system needs both success AND failure tracking. Success-only dedup creates invisible infinite loops. Always: log failures → count → backoff → eventually retry.
+
+## Stuck Counter Reset Requires Distinct Outcome Values (2026-02-28)
+
+- Ralph Loop's stuck counter checks `outcome === "skipped" || outcome === "failed"` in last 5 journal entries. Lateral thinking (cycles 3+) logs with outcome "skipped" → counter never resets → infinite death spiral.
+- **Solution:** Escalation at 6+ cycles logs with outcome `"escalated"` — neither "skipped" nor "failed" — which breaks the consecutive count.
+- **Pattern:** Finite state machines need explicit "escape" states. If all failure paths map to the same state that triggers the failure check, you have a livelock. Add a distinct state for "gave up and asked for help."
+
 ## Async Seeding Creates Race Conditions (2026-02-23)
 
 - Fire-and-forget DB seeding (`seedDefaultGrants().catch(...)`) means concurrent requests during first user check get inconsistent results.

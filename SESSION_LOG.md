@@ -1,5 +1,62 @@
 # ExoSkull Session Log
 
+## 2026-02-28 (evening) — OCR Failure Analysis + Final Repair Assessment
+
+### Context
+User dostarczył transcript rozmowy z agentem ExoSkull, który 10+ razy nie potrafił odczytać PNG ze screenshotem danych OVH. Agent powtarzał "wklej dane tekstowo" zamiast rozwiązać problem. User rozważa porzucenie projektu na rzecz OpenClaw lub rewrite from scratch.
+
+### Key Findings (z transcriptu)
+
+| Problem | Severity | Detail |
+|---------|----------|--------|
+| Brak Vision/OCR capability | CRITICAL | Agent nie potrafi odczytać obrazu — powtarza "wklej tekst" 10+ razy |
+| build_app = puste formularze | CRITICAL | "OCR app" → pusty formularz DB, zero logiki |
+| Hallucynacja UI features | HIGH | Agent referuje do nieistniejącego "dashboardu" i "widgetów" |
+| Zero adaptacji po failure | CRITICAL | Ta sama odpowiedź 10x bez zmiany strategii |
+| User at breaking point | CRITICAL | "to jest dla was ostatnia szansa... wasza smierc razem z projektem" |
+
+### Dokumenty zaktualizowane
+
+| Dokument | Zmiana |
+|----------|--------|
+| LEARNINGS.md | +3 nowe wpisy: Plan B, build_app puste formularze, hallucynacja UI |
+| SESSION_LOG.md | Ta sesja |
+| AUTONOMY_AUDIT.md | Nowa sekcja 8: Real-world UX failure transcript |
+| PROJECT_STATUS.md | Odświeżony RAG score, dodany CRITICAL ALERT |
+
+### Assessment
+
+**Werdykt zespołu 11 specjalistów:** System wymaga fundamentalnego redesignu, nie kolejnych patchów. Patche (bridge tables, backoff, stuck limits) z sesji porannej to band-aids. Prawdziwy problem: agent nie potrafi adaptacyjnie myśleć i nie ma prawdziwych capabilities (OCR, code gen, tool building).
+
+---
+
+## 2026-02-28 — Autonomy Tier 1: Bridge Disconnected Loops
+
+### Tasks
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Fix 1: Gap Detector → exo_proactive_log bridge | SUCCESS | Upsert `gap:{area.slug}` entries for Ralph/Impulse visibility |
+| Fix 2: Impulse Handler F backoff + rotation | SUCCESS | `auto_build_fail:` tracking, exponential backoff 1→14 days |
+| Fix 3: Ralph Loop stuck limit + escalation | SUCCESS | 6-cycle cap, SMS to user, "escalated" outcome breaks counter |
+| Fix 4: E2E smoke test CRON | SUCCESS | generate → verify table → verify widget → cleanup → journal |
+| Fix 4b: drop_app_table RPC migration | SUCCESS | `exo_app_*` prefix safety guard |
+| Git commit + push | SUCCESS | `ad4ca4d` → main |
+
+### Root Causes
+
+| Issue | Root Cause | Impact |
+|-------|-----------|--------|
+| Table disconnect | Gap Detector → `learning_events`, Ralph reads `exo_proactive_log` | Gap Detector screams into void |
+| Infinite retry | Dedup only checks success (`auto_build:`), not failures | First failing gap blocks all others forever |
+| Death spiral | Lateral thinking logs but never executes differently | Infinite stuck cycle, no user notification |
+| No verification | Nobody tests end-to-end pipeline | Silent infrastructure failures undetected |
+
+### Retries
+- None — all 4 fixes applied cleanly
+
+---
+
 ## 2026-02-25 — CLAUDE.md v017 + Config Sync + Frameworks
 
 ### Tasks

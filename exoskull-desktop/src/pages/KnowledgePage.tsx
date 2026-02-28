@@ -99,7 +99,7 @@ export default function KnowledgePage() {
       </div>
 
       <div className="p-6 space-y-6">
-        <CloudUploader />
+        <CloudUploader onUploadComplete={loadDocuments} />
 
         {/* Search */}
         <form onSubmit={handleSearch} className="flex gap-2">
