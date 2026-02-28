@@ -34,11 +34,11 @@ const TOOL_CATEGORIES: Record<string, string[]> = {
     "email_follow_ups",
     "email_sender_info",
   ],
-  "Pamięć i wiedza": [
+  "Pamięć i wiedza (Unified Brain)": [
+    "search_brain",
+    "remember",
     "get_daily_summary",
     "correct_daily_summary",
-    "search_memory",
-    "search_knowledge",
     "import_url",
     "analyze_knowledge",
     "list_documents",

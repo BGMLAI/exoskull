@@ -119,6 +119,10 @@ export async function processDocument(
       extractedText = await extractXLSX(fileData);
     } else if (["pptx", "ppt"].includes(fileType)) {
       extractedText = await extractPPTX(fileData);
+    } else if (
+      ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"].includes(fileType)
+    ) {
+      extractedText = await extractImageText(fileData, fileType);
     } else {
       // Unsupported type — store metadata only
       await supabase
@@ -506,6 +510,73 @@ async function extractPPTX(fileData: Blob): Promise<string> {
 }
 
 // ============================================================================
+// IMAGE TEXT EXTRACTION (Gemini Flash Vision)
+// ============================================================================
+
+/**
+ * Extract text from images using Gemini Flash vision API.
+ * Handles screenshots, documents, diagrams, handwritten notes, etc.
+ */
+async function extractImageText(
+  fileData: Blob,
+  fileType: string,
+): Promise<string> {
+  const geminiKey = process.env.GOOGLE_AI_API_KEY;
+  if (!geminiKey) {
+    throw new Error("Missing GOOGLE_AI_API_KEY for image processing");
+  }
+
+  const buffer = Buffer.from(await fileData.arrayBuffer());
+  const base64 = buffer.toString("base64");
+
+  const mimeMap: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    webp: "image/webp",
+    bmp: "image/bmp",
+    svg: "image/svg+xml",
+  };
+  const mimeType = mimeMap[fileType] || "image/png";
+
+  try {
+    const { GoogleGenAI } = await import("@google/genai");
+    const ai = new GoogleGenAI({ apiKey: geminiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              inlineData: { mimeType, data: base64 },
+            },
+            {
+              text: `Przeanalizuj ten obraz dokładnie. Wyodrębnij CAŁY widoczny tekst (OCR). Jeśli obraz zawiera diagram, schemat lub interfejs — opisz strukturę i elementy. Jeśli to screenshot — opisz co widzisz na ekranie. Odpowiedz po polsku. Format:
+
+TEKST Z OBRAZU:
+[cały wyodrębniony tekst]
+
+OPIS WIZUALNY:
+[krótki opis co przedstawia obraz, układ, kolory, elementy]`,
+            },
+          ],
+        },
+      ],
+      config: { maxOutputTokens: 2000, temperature: 0.1 },
+    });
+
+    return response.text || "[Nie udało się wyodrębnić tekstu z obrazu]";
+  } catch (err) {
+    logger.error("[DocProcessor] Gemini vision failed:", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+}
+
+// ============================================================================
 // EMBEDDINGS
 // ============================================================================
 
@@ -576,24 +647,19 @@ async function generateSummary(
     }
   }
 
-  // Fallback to Anthropic
+  // Fallback to aiChat with Gemini Flash
   try {
-    const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY!,
-    });
-    const response = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 200,
-      messages: [
+    const { aiChat } = await import("@/lib/ai");
+    const result = await aiChat(
+      [
         {
           role: "user",
           content: `Napisz krótkie podsumowanie (2-3 zdania, po polsku) tego dokumentu "${filename}":\n\n${truncated}`,
         },
       ],
-    });
-    const textBlock = response.content.find((c) => c.type === "text");
-    return (textBlock && "text" in textBlock ? textBlock.text : "") || "";
+      { forceModel: "gemini-3-flash", maxTokens: 200 },
+    );
+    return result.content || truncated.slice(0, 300) + "...";
   } catch {
     return truncated.slice(0, 300) + "...";
   }

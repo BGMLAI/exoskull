@@ -12,6 +12,7 @@ import type { ToolDefinition } from "./shared";
 import { searchDocuments } from "@/lib/knowledge/document-processor";
 import { importUrl } from "@/lib/knowledge/url-processor";
 import { getServiceSupabase } from "@/lib/supabase/service";
+import { searchBrain, formatBrainResults } from "@/lib/memory/brain";
 
 import { logger } from "@/lib/logger";
 
@@ -20,18 +21,13 @@ export const knowledgeTools: ToolDefinition[] = [
     definition: {
       name: "search_knowledge",
       description:
-        'Przeszukaj dokumenty i pliki użytkownika (semantic search). Użyj gdy user pyta o coś co mógł przesłać w pliku, albo gdy potrzebujesz informacji z jego dokumentów. Przykłady: "co było w tym PDF?", "znajdź w moich plikach...", "co pisze w dokumencie o...".',
+        "[DEPRECATED — użyj search_brain] Przeszukaj dokumenty. Przekierowuje do search_brain.",
       input_schema: {
         type: "object" as const,
         properties: {
           query: {
             type: "string",
-            description:
-              "Zapytanie do wyszukania w dokumentach (po polsku lub angielsku)",
-          },
-          limit: {
-            type: "number",
-            description: "Maksymalna liczba wyników (domyślnie 5)",
+            description: "Zapytanie do wyszukania",
           },
         },
         required: ["query"],
@@ -42,50 +38,15 @@ export const knowledgeTools: ToolDefinition[] = [
       tenantId: string,
     ): Promise<string> => {
       const query = input.query as string;
-      const limit = (input.limit as number) || 5;
-
-      logger.info("[KnowledgeTools] search_knowledge:", { query, limit });
-
-      try {
-        const results = await searchDocuments(tenantId, query, limit);
-
-        if (results.length === 0) {
-          // Diagnostic: why no results?
-          const supabase = getServiceSupabase();
-          const [docsResult, chunksResult] = await Promise.all([
-            supabase
-              .from("exo_user_documents")
-              .select("id, status", { count: "exact", head: true })
-              .eq("tenant_id", tenantId),
-            supabase
-              .from("exo_document_chunks")
-              .select("id, embedding", { count: "exact", head: true })
-              .eq("tenant_id", tenantId),
-          ]);
-
-          const totalDocs = docsResult.count ?? 0;
-          const totalChunks = chunksResult.count ?? 0;
-
-          const { count: readyDocs } = await supabase
-            .from("exo_user_documents")
-            .select("id", { count: "exact", head: true })
-            .eq("tenant_id", tenantId)
-            .eq("status", "ready");
-
-          return `Brak wynikow dla zapytania "${query}". Diagnostyka: tenant ma ${totalDocs} dokumentow (${readyDocs ?? 0} gotowych), ${totalChunks} chunkow w bazie. ${totalDocs === 0 ? "User nie wgral jeszcze zadnych plikow do bazy wiedzy." : totalChunks === 0 ? "Dokumenty istnieja ale chunki nie zostaly wygenerowane — prawdopodobnie blad przetwarzania. Zasugeruj ponowne przetworzenie." : "Chunki istnieja ale nie pasuja do zapytania. Sprobuj innego sformulowania lub zapytaj usera o dokladna nazwe dokumentu."}`;
-        }
-
-        let response = `Znaleziono ${results.length} fragmentów w dokumentach:\n\n`;
-        for (const r of results) {
-          response += `📄 **${r.filename}** (${r.category}, trafność: ${Math.round(r.similarity * 100)}%)\n`;
-          response += `${r.content.slice(0, 2000)}${r.content.length > 2000 ? "..." : ""}\n\n`;
-        }
-
-        return response;
-      } catch (searchError) {
-        logger.error("[KnowledgeTools] search_knowledge error:", searchError);
-        return "Nie udało się przeszukać dokumentów. Spróbuj jeszcze raz.";
-      }
+      logger.info(
+        "[KnowledgeTools] search_knowledge (deprecated → search_brain):",
+        { query },
+      );
+      const results = await searchBrain(tenantId, query, {
+        limit: 10,
+        layer: "par",
+      });
+      return formatBrainResults(results, query);
     },
   },
   {

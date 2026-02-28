@@ -80,7 +80,7 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
       channel: "web_chat",
       skipThreadAppend: true,
       systemPromptPrefix: WEB_CHAT_SYSTEM_OVERRIDE,
-      maxTokens: 1500,
+      maxTokens: 4096,
       timeoutMs: 38_000,
     });
 

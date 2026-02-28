@@ -23,6 +23,7 @@ import {
   unifiedSearch,
   formatUnifiedResultsForResponse,
 } from "@/lib/memory/unified-search";
+import { searchBrain, formatBrainResults, remember } from "@/lib/memory/brain";
 
 export const memoryTools: ToolDefinition[] = [
   {
@@ -159,15 +160,15 @@ export const memoryTools: ToolDefinition[] = [
   },
   {
     definition: {
-      name: "search_memory",
+      name: "search_brain",
       description:
-        'Przeszukaj pamięć/historię rozmów. Użyj gdy user pyta "kiedy mówiłem o...", "co ostatnio o...", "znajdź...", "szukaj...".',
+        'Przeszukaj CAŁY mózg — rozmowy, dokumenty, notatki, wiedzę. Użyj ZAWSZE gdy szukasz informacji. Zastępuje search_memory i search_knowledge. Jeden mózg, jedno narzędzie. Przykłady: "kiedy mówiłem o...", "co było w tym pliku?", "znajdź moje klucze Allegro".',
       input_schema: {
         type: "object" as const,
         properties: {
           query: {
             type: "string",
-            description: "Fraza do wyszukania w pamięci",
+            description: "Zapytanie do wyszukania (po polsku lub angielsku)",
           },
           date_from: {
             type: "string",
@@ -177,6 +178,12 @@ export const memoryTools: ToolDefinition[] = [
             type: "string",
             description: "Data końcowa (YYYY-MM-DD), opcjonalne",
           },
+          layer: {
+            type: "string",
+            enum: ["par", "daily", "tacit", "all"],
+            description:
+              "Warstwa pamięci: par (projekty/zasoby), daily (rozmowy/postęp), tacit (preferencje/wzorce), all (domyślne)",
+          },
         },
         required: ["query"],
       },
@@ -185,28 +192,112 @@ export const memoryTools: ToolDefinition[] = [
       const query = input.query as string;
       const dateFrom = input.date_from as string | undefined;
       const dateTo = input.date_to as string | undefined;
+      const layer = (input.layer as "par" | "daily" | "tacit" | "all") || "all";
 
-      logger.info("[MemoryTools] search_memory:", {
+      logger.info("[MemoryTools] search_brain:", {
         query,
         dateFrom,
         dateTo,
+        layer,
         tenantId,
       });
 
       try {
-        const results = await unifiedSearch({
-          tenantId,
-          query,
+        const results = await searchBrain(tenantId, query, {
           limit: 10,
           dateFrom,
           dateTo,
+          layer,
         });
 
-        return formatUnifiedResultsForResponse(results, query);
+        return formatBrainResults(results, query);
       } catch (searchError) {
-        logger.error("[MemoryTools] search_memory error:", searchError);
-        return `Nie udało się przeszukać pamięci. Spróbuj jeszcze raz.`;
+        logger.error("[MemoryTools] search_brain error:", searchError);
+        // Fallback to unified search
+        try {
+          const fallbackResults = await unifiedSearch({
+            tenantId,
+            query,
+            limit: 10,
+            dateFrom,
+            dateTo,
+          });
+          return formatUnifiedResultsForResponse(fallbackResults, query);
+        } catch {
+          return `Nie udało się przeszukać pamięci. Spróbuj jeszcze raz.`;
+        }
       }
+    },
+  },
+  {
+    definition: {
+      name: "search_memory",
+      description:
+        "[DEPRECATED — użyj search_brain] Przeszukaj pamięć. Przekierowuje do search_brain.",
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          query: {
+            type: "string",
+            description: "Fraza do wyszukania",
+          },
+        },
+        required: ["query"],
+      },
+    },
+    execute: async (input, tenantId) => {
+      const query = input.query as string;
+      logger.info("[MemoryTools] search_memory (deprecated → search_brain):", {
+        query,
+        tenantId,
+      });
+      const results = await searchBrain(tenantId, query, { limit: 10 });
+      return formatBrainResults(results, query);
+    },
+  },
+  {
+    definition: {
+      name: "remember",
+      description:
+        'Jawnie zapamiętaj informację w Tacit Knowledge. Użyj gdy user mówi "zapamiętaj że...", "pamiętaj że wolę...", "nie zapomnij o...". Zapisuje w warstwie Tacit (preferencje, wzorce, bezpieczeństwo).',
+      input_schema: {
+        type: "object" as const,
+        properties: {
+          content: {
+            type: "string",
+            description:
+              "Informacja do zapamiętania (np. 'User woli React nad Vue', 'Klucz API Allegro to xyz')",
+          },
+          category: {
+            type: "string",
+            enum: ["preference", "pattern", "security", "relationship"],
+            description:
+              "Kategoria: preference (preferencje), pattern (wzorce zachowań), security (hasła/klucze), relationship (relacje)",
+          },
+        },
+        required: ["content"],
+      },
+    },
+    execute: async (input, tenantId) => {
+      const content = input.content as string;
+      const category =
+        (input.category as
+          | "preference"
+          | "pattern"
+          | "security"
+          | "relationship") || "preference";
+
+      logger.info("[MemoryTools] remember:", {
+        content: content.slice(0, 50),
+        category,
+        tenantId,
+      });
+
+      const result = await remember(tenantId, content, category);
+      if (result.success) {
+        return `Zapamiętane: "${content.slice(0, 100)}" (kategoria: ${category}).`;
+      }
+      return `Nie udało się zapamiętać: ${result.error}`;
     },
   },
 ];

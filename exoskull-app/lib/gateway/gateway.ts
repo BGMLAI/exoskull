@@ -435,7 +435,7 @@ export async function handleInboundMessage(
         onToolEnd: callback?.onToolEnd,
         onCustomEvent: callback?.onCustomEvent,
         systemPromptPrefix: WEB_CHAT_SYSTEM_OVERRIDE,
-        maxTokens: 1500,
+        maxTokens: 4096,
         timeoutMs: SYNC_TIMEOUT_MS - 2_000, // 2s buffer for gateway overhead
       }),
       new Promise<null>((resolve) =>

@@ -108,7 +108,7 @@ export interface AgentResponse {
 // ============================================================================
 
 const WEB_CONFIG = {
-  maxTurns: 10,
+  maxTurns: 15,
   timeoutMs: 55_000,
   model: "claude-sonnet-4-6" as const,
 };
