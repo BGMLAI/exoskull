@@ -40,7 +40,21 @@ export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
     supportsStreaming: false,
   },
 
-  // ── Tier 1: Ultra-cheap, ultra-fast ──
+  // ── Tier 1+2: DeepSeek V3 (primary, replaces Gemini) ──
+  "deepseek-v3": {
+    id: "deepseek-v3",
+    provider: "deepseek",
+    tier: 1,
+    displayName: "DeepSeek V3",
+    inputCostPer1M: 0.27,
+    outputCostPer1M: 1.1,
+    maxTokens: 8192,
+    contextWindow: 128_000,
+    supportsTools: true,
+    supportsStreaming: true,
+  },
+
+  // ── Tier 1: Gemini (fallback if DeepSeek down) ──
   "gemini-3-flash": {
     id: "gemini-3-flash",
     provider: "gemini",
@@ -162,10 +176,11 @@ export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
 };
 
 // Tier to model mapping (order = priority within tier)
+// DeepSeek V3 is primary for Tier 1+2, Gemini as fallback
 export const TIER_MODELS: Record<ModelTier, ModelId[]> = {
   0: ["selfhosted-qwen3-30b", "selfhosted-gemma-4b"],
-  1: ["gemini-3-flash", "gemini-2.5-flash"],
-  2: ["gemini-3-pro", "claude-3-5-haiku"],
+  1: ["deepseek-v3", "gemini-3-flash", "gemini-2.5-flash"],
+  2: ["deepseek-v3", "gemini-3-pro", "claude-3-5-haiku"],
   3: ["codex-5-2", "claude-sonnet-4-5", "kimi-k2.5"],
   4: ["claude-opus-4-6", "claude-sonnet-4-5"],
 };

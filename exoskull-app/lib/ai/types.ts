@@ -18,6 +18,7 @@ export type ModelProvider =
   | "openai"
   | "anthropic"
   | "gemini"
+  | "deepseek"
   | "kimi"
   | "codex"
   | "selfhosted";
@@ -25,9 +26,10 @@ export type ModelProvider =
 export type ModelId =
   | "selfhosted-qwen3-30b" // Tier 0 (self-hosted, primary)
   | "selfhosted-gemma-4b" // Tier 0 (self-hosted, fast)
-  | "gemini-2.5-flash" // Tier 1 (legacy)
-  | "gemini-3-flash" // Tier 1 (primary)
-  | "gemini-3-pro" // Tier 2 (primary)
+  | "deepseek-v3" // Tier 1+2 (primary, replaces Gemini)
+  | "gemini-2.5-flash" // Tier 1 (legacy fallback)
+  | "gemini-3-flash" // Tier 1 (legacy fallback)
+  | "gemini-3-pro" // Tier 2 (legacy fallback)
   | "claude-3-5-haiku" // Tier 2 (fallback)
   | "claude-sonnet-4-5" // Tier 3 (fallback) + universal fallback
   | "kimi-k2.5" // Tier 3 (long context)

@@ -3,6 +3,7 @@
  */
 
 export { GeminiProvider } from "./gemini-provider";
+export { DeepSeekProvider } from "./deepseek-provider";
 export { AnthropicProvider } from "./anthropic-provider";
 export { KimiProvider } from "./kimi-provider";
 export { CodexProvider } from "./codex-provider";

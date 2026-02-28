@@ -22,6 +22,7 @@ import { getCircuitBreaker } from "./circuit-breaker";
 import { getModelsForTier, getModelConfig, ROUTER_CONFIG } from "./config";
 import {
   GeminiProvider,
+  DeepSeekProvider,
   AnthropicProvider,
   KimiProvider,
   CodexProvider,
@@ -38,6 +39,7 @@ export class ModelRouter {
 
   constructor() {
     // Initialize providers
+    this.providers.set("deepseek", new DeepSeekProvider());
     this.providers.set("gemini", new GeminiProvider());
     this.providers.set("anthropic", new AnthropicProvider());
     this.providers.set("kimi", new KimiProvider());
@@ -402,6 +404,7 @@ export class ModelRouter {
   async getProviderStatus(): Promise<Record<ModelProvider, boolean>> {
     const status: Record<ModelProvider, boolean> = {
       selfhosted: false,
+      deepseek: false,
       gemini: false,
       anthropic: false,
       kimi: false,
