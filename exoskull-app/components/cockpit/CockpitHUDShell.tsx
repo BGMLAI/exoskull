@@ -8,6 +8,8 @@ import { CenterViewport } from "./CenterViewport";
 import { ChannelOrbs } from "./ChannelOrbs";
 import { ReactionButtons } from "./ReactionButtons";
 import { CockpitZoneSlot } from "./CockpitZoneSlot";
+import { DjinAvatar } from "@/components/avatar/DjinAvatar";
+import { useSceneStore } from "@/lib/stores/useSceneStore";
 
 /**
  * CockpitHUDShell — Master overlay layout for the cockpit HUD.
@@ -31,9 +33,25 @@ const CHAT_MIN_H = 120;
 const CHAT_DEFAULT_H = 420;
 const CHAT_MAX_H = 700;
 
+// Map scene effects to avatar states
+function useAvatarState() {
+  const effect = useSceneStore((s) => s.effect);
+  switch (effect) {
+    case "thinking":
+      return "thinking" as const;
+    case "building":
+    case "executing":
+    case "searching":
+      return "speaking" as const;
+    default:
+      return "idle" as const;
+  }
+}
+
 export function CockpitHUDShell() {
   useCockpitKeys();
   const hudMinimized = useCockpitStore((s) => s.hudMinimized);
+  const avatarState = useAvatarState();
   const toggleHud = useCockpitStore((s) => s.toggleHudMinimized);
   const zoneWidgets = useCockpitStore((s) => s.zoneWidgets);
 
@@ -186,6 +204,19 @@ export function CockpitHUDShell() {
               <CockpitZoneSlot zoneId="right-wing" />
             </div>
           )}
+
+          {/* ── Avatar: Dżin dots above chat ── */}
+          <div
+            className="cockpit-zone cockpit-zone--avatar"
+            style={{
+              pointerEvents: "none",
+              display: "flex",
+              justifyContent: "center",
+              marginBottom: 8,
+            }}
+          >
+            <DjinAvatar state={avatarState} size="md" />
+          </div>
 
           {/* ── Center: Floating chat area ── */}
           <section

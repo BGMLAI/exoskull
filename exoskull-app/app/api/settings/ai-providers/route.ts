@@ -8,12 +8,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
+import {
+  BYOK_PROVIDERS,
+  invalidateConfigCache,
+  type BYOKProvider,
+} from "@/lib/ai/byok";
+import { MODEL_CONFIGS, TIER_MODELS } from "@/lib/ai/config";
+import type { ModelId, ModelTier } from "@/lib/ai/types";
 
 import { withApiLog } from "@/lib/api/request-logger";
 import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
-type ProviderName = "anthropic" | "openai" | "gemini";
+type ProviderName = BYOKProvider;
 
 interface ProviderConfig {
   api_key?: string;
@@ -30,17 +37,13 @@ function maskKey(key: string): string {
 /** Quick validation: check key format (not full API call) */
 function validateKeyFormat(provider: ProviderName, key: string): boolean {
   if (!key || !key.trim()) return true; // Empty = removing key
-  switch (provider) {
-    case "anthropic":
-      return key.startsWith("sk-ant-");
-    case "openai":
-      return key.startsWith("sk-");
-    case "gemini":
-      return key.length > 20; // Gemini keys don't have a strict prefix
-    default:
-      return false;
-  }
+  const info = BYOK_PROVIDERS.find((p) => p.id === provider);
+  if (!info) return false;
+  if (!info.keyPrefix) return key.length > 10; // Generic check
+  return key.startsWith(info.keyPrefix);
 }
+
+const PROVIDER_NAMES: ProviderName[] = BYOK_PROVIDERS.map((p) => p.id);
 
 export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
@@ -61,23 +64,18 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
     const providers =
       (aiConfig.providers as Record<string, ProviderConfig>) ?? {};
     const defaultProvider =
-      (aiConfig.default_provider as ProviderName) ?? "anthropic";
+      (aiConfig.default_provider as ProviderName) ?? "deepseek";
+    const tierOverrides =
+      (aiConfig.tier_overrides as Record<string, { modelId?: string }>) ?? {};
 
     // Build response with masked keys and status
-    const providerNames: ProviderName[] = ["anthropic", "openai", "gemini"];
     const result: Record<string, unknown> = {};
 
-    for (const name of providerNames) {
+    for (const providerInfo of BYOK_PROVIDERS) {
+      const name = providerInfo.id;
       const cfg = providers[name] ?? {};
       const hasKey = !!cfg.api_key;
-      const hasSystemKey =
-        name === "anthropic"
-          ? !!process.env.ANTHROPIC_API_KEY
-          : name === "openai"
-            ? !!process.env.OPENAI_API_KEY
-            : name === "gemini"
-              ? !!process.env.GOOGLE_GENERATIVE_AI_API_KEY
-              : false;
+      const hasSystemKey = !!process.env[providerInfo.envVar];
 
       let status: string = "no_key";
       let statusMessage: string | undefined;
@@ -104,9 +102,21 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
       };
     }
 
+    // Build available models list for tier override UI
+    const availableModels = Object.values(MODEL_CONFIGS).map((m) => ({
+      id: m.id,
+      displayName: m.displayName,
+      tier: m.tier,
+      provider: m.provider,
+      costInfo: `$${m.inputCostPer1M}/$${m.outputCostPer1M} per 1M tok`,
+    }));
+
     return NextResponse.json({
       default_provider: defaultProvider,
       providers: result,
+      tier_overrides: tierOverrides,
+      available_models: availableModels,
+      tier_defaults: TIER_MODELS,
     });
   } catch (error) {
     logger.error("[AIProvidersAPI] GET Error:", {
@@ -142,8 +152,7 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
 
     // Update default_provider
     if (body.default_provider) {
-      const valid: ProviderName[] = ["anthropic", "openai", "gemini"];
-      if (valid.includes(body.default_provider)) {
+      if (PROVIDER_NAMES.includes(body.default_provider)) {
         updated.default_provider = body.default_provider;
       }
     }
@@ -154,8 +163,7 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
         (current.providers as Record<string, ProviderConfig>) ?? {};
       const newProviders = { ...currentProviders };
 
-      const providerNames: ProviderName[] = ["anthropic", "openai", "gemini"];
-      for (const name of providerNames) {
+      for (const name of PROVIDER_NAMES) {
         const patch = body.providers[name];
         if (!patch || typeof patch !== "object") continue;
 
@@ -166,10 +174,8 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
         if ("api_key" in patch) {
           const key = patch.api_key as string;
           if (!key || !key.trim()) {
-            // Remove key
             delete newCfg.api_key;
           } else {
-            // Validate format
             if (!validateKeyFormat(name, key)) {
               return NextResponse.json(
                 { error: `Nieprawidlowy format klucza dla ${name}` },
@@ -180,12 +186,10 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
           }
         }
 
-        // Enabled toggle
         if ("enabled" in patch) {
           newCfg.enabled = !!patch.enabled;
         }
 
-        // Model selection
         if ("model" in patch) {
           newCfg.model = patch.model as string;
         }
@@ -194,6 +198,11 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
       }
 
       updated.providers = newProviders;
+    }
+
+    // Update tier overrides
+    if (body.tier_overrides && typeof body.tier_overrides === "object") {
+      updated.tier_overrides = body.tier_overrides;
     }
 
     const { error } = await supabase
@@ -215,23 +224,19 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
       );
     }
 
-    // Return updated state (re-read for consistency)
-    const providerNames: ProviderName[] = ["anthropic", "openai", "gemini"];
+    // Invalidate BYOK cache for this tenant
+    invalidateConfigCache(tenantId);
+
+    // Return updated state
     const updatedProviders =
       (updated.providers as Record<string, ProviderConfig>) ?? {};
     const result: Record<string, unknown> = {};
 
-    for (const name of providerNames) {
+    for (const providerInfo of BYOK_PROVIDERS) {
+      const name = providerInfo.id;
       const cfg = updatedProviders[name] ?? {};
       const hasKey = !!cfg.api_key;
-      const hasSystemKey =
-        name === "anthropic"
-          ? !!process.env.ANTHROPIC_API_KEY
-          : name === "openai"
-            ? !!process.env.OPENAI_API_KEY
-            : name === "gemini"
-              ? !!process.env.GOOGLE_GENERATIVE_AI_API_KEY
-              : false;
+      const hasSystemKey = !!process.env[providerInfo.envVar];
 
       let status: string = "no_key";
       let statusMessage: string | undefined;
@@ -259,8 +264,9 @@ export const PATCH = withApiLog(async function PATCH(req: NextRequest) {
     }
 
     return NextResponse.json({
-      default_provider: updated.default_provider ?? "anthropic",
+      default_provider: updated.default_provider ?? "deepseek",
       providers: result,
+      tier_overrides: updated.tier_overrides ?? {},
     });
   } catch (error) {
     logger.error("[AIProvidersAPI] PATCH Error:", {

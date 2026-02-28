@@ -49,7 +49,7 @@ export class ClaudeCodeAdapter implements CodeExecutor {
           { role: "user", content: buildCodeGenUserPrompt(task) },
         ],
         {
-          forceModel: "claude-sonnet-4-5",
+          forceModel: "gemini-3.1-pro",
           maxTokens: 16384,
           tenantId: this.tenantId,
           taskCategory: "analysis",

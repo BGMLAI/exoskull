@@ -85,7 +85,7 @@ const AGENT_CONFIGS: Record<
   { model: string; maxIterations: number; systemPrompt: string }
 > = {
   coordinator: {
-    model: "claude-opus-4-6",
+    model: "deepseek-r1",
     maxIterations: 10,
     systemPrompt: `You are the Coordinator of an AI agent swarm. Your role:
 - Analyze tasks and break them into subtasks
@@ -98,7 +98,7 @@ const AGENT_CONFIGS: Record<
 Respond with JSON: { "action": "assign|evaluate|adjust|complete", "assignments": [...], "evaluation": "...", "nextSteps": [...] }`,
   },
   builder: {
-    model: "claude-sonnet-4-5",
+    model: "gemini-3.1-pro",
     maxIterations: 20,
     systemPrompt: `You are the Builder agent. Your role:
 - Write production-quality code
@@ -110,7 +110,7 @@ Respond with JSON: { "action": "assign|evaluate|adjust|complete", "assignments":
 Respond with JSON: { "action": "code|modify|create", "files": [...], "summary": "..." }`,
   },
   tester: {
-    model: "claude-3-5-haiku",
+    model: "gemini-3-flash",
     maxIterations: 15,
     systemPrompt: `You are the Tester agent. Your role:
 - Validate code correctness
@@ -122,7 +122,7 @@ Respond with JSON: { "action": "code|modify|create", "files": [...], "summary": 
 Respond with JSON: { "action": "test|verify|report", "results": [...], "bugs": [...], "passed": boolean }`,
   },
   lateral: {
-    model: "claude-sonnet-4-5",
+    model: "gemini-3.1-pro",
     maxIterations: 5,
     systemPrompt: `You are the Lateral Thinker agent. Your role:
 - Generate unconventional solutions when other agents are stuck
@@ -134,7 +134,7 @@ Respond with JSON: { "action": "test|verify|report", "results": [...], "bugs": [
 Respond with JSON: { "action": "provoke|associate|reverse|analogize", "idea": "...", "rationale": "..." }`,
   },
   observer: {
-    model: "claude-3-5-haiku",
+    model: "gemini-3-flash",
     maxIterations: 50,
     systemPrompt: `You are the Observer agent. Your role:
 - Monitor all agent activities
@@ -244,7 +244,7 @@ export async function runSwarmCycle(sessionId: string): Promise<{
         { role: "system", content: AGENT_CONFIGS.coordinator.systemPrompt },
         { role: "user", content: coordPrompt },
       ],
-      { forceModel: "claude-opus-4-6", maxTokens: 2000 },
+      { forceModel: "deepseek-r1", maxTokens: 2000 },
     );
 
     coordinator.status = "idle";
@@ -287,7 +287,7 @@ export async function runSwarmCycle(sessionId: string): Promise<{
             },
           ],
           {
-            forceModel: agent.model as "claude-sonnet-4-5" | "claude-3-5-haiku",
+            forceModel: agent.model as "gemini-3.1-pro" | "gemini-3-flash",
             maxTokens: 4000,
           },
         );

@@ -255,7 +255,7 @@ export async function runRalphCycle(
 
     if (action.type === "none") {
       // After 6 stuck cycles: escalate to user instead of spinning forever
-      if (obs.stuckCycles >= 6) {
+      if (observation.stuckCycles >= 6) {
         try {
           const { sendProactiveMessage } =
             await import("@/lib/cron/tenant-utils");
@@ -267,7 +267,7 @@ export async function runRalphCycle(
           );
           logger.warn("[RalphLoop] Escalated to user after 6+ stuck cycles", {
             tenantId,
-            stuckCycles: obs.stuckCycles,
+            stuckCycles: observation.stuckCycles,
           });
         } catch {
           /* non-critical */
@@ -279,7 +279,7 @@ export async function runRalphCycle(
           tenantId,
           "escalation",
           "Escalated to user — stuck 6+ cycles",
-          { stuckCycles: obs.stuckCycles, observedStats },
+          { stuckCycles: observation.stuckCycles, observedStats },
           "escalated",
         );
 

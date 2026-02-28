@@ -210,10 +210,10 @@ export async function executeNextStage(pipelineId: string): Promise<{
     // Use Sonnet for assemble (code generation), Opus for architect/trace, Haiku for link/stress_test
     const model =
       stage === "assemble"
-        ? "claude-sonnet-4-5"
+        ? "gemini-3.1-pro"
         : stage === "architect" || stage === "trace"
-          ? "claude-opus-4-6"
-          : "claude-3-5-haiku";
+          ? "deepseek-r1"
+          : "gemini-3-flash";
 
     const result = await aiChat(
       [
@@ -221,7 +221,7 @@ export async function executeNextStage(pipelineId: string): Promise<{
         { role: "user", content: prompt },
       ],
       {
-        forceModel: model as "claude-sonnet-4-5",
+        forceModel: model as "gemini-3.1-pro",
         maxTokens: stage === "assemble" ? 16000 : 4000,
       },
     );

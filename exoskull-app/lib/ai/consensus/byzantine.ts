@@ -9,13 +9,14 @@
  * the action is escalated to the user.
  *
  * Validators:
- *   1. Gemini Pro     — analytical/data-focused validation
- *   2. Claude Sonnet  — balanced risk assessment
- *   3. Claude Haiku   — fast practical check
- *   4. Gemini Flash   — speed validator (tie-breaker)
+ *   1. Gemini 3.1 Pro — analytical/data-focused validation
+ *   2. Gemini 3.1 Pro — balanced risk assessment
+ *   3. Gemini Flash    — fast practical check
+ *   4. Gemini Flash    — speed validator (tie-breaker)
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import { aiChat } from "@/lib/ai";
+import type { ModelId } from "@/lib/ai/types";
 import { logger } from "@/lib/logger";
 import type {
   ByzantineAction,
@@ -37,34 +38,29 @@ export type {
 
 interface ValidatorConfig {
   name: string;
-  model: string;
-  provider: "anthropic" | "gemini";
+  model: ModelId;
   role: string;
 }
 
 const VALIDATORS: ValidatorConfig[] = [
   {
     name: "Risk Analyst",
-    model: "gemini-2.0-flash",
-    provider: "gemini",
+    model: "gemini-3.1-pro",
     role: "You are a risk analyst. Focus on potential downsides, financial exposure, and worst-case scenarios.",
   },
   {
     name: "Ethics & Safety",
-    model: "claude-sonnet-4-6",
-    provider: "anthropic",
+    model: "gemini-3.1-pro",
     role: "You are an ethics and safety reviewer. Focus on user consent, privacy, legal implications, and potential harm.",
   },
   {
     name: "Practical Validator",
-    model: "claude-haiku-4-5-20251001",
-    provider: "anthropic",
+    model: "gemini-3-flash",
     role: "You are a practical validator. Focus on whether the action is feasible, reversible, and proportionate to the goal.",
   },
   {
     name: "Speed Check",
-    model: "gemini-2.0-flash",
-    provider: "gemini",
+    model: "gemini-3-flash",
     role: "You are a quick-check validator. Give a fast, decisive assessment of whether this action should proceed.",
   },
 ];
@@ -98,7 +94,7 @@ REASONING: (2-3 sentences)`;
 // VALIDATORS
 // ============================================================================
 
-async function runAnthropicValidator(
+async function runValidator(
   config: ValidatorConfig,
   action: ByzantineAction,
 ): Promise<ValidatorVote> {
@@ -115,18 +111,12 @@ async function runAnthropicValidator(
     );
 
   try {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const response = await client.messages.create({
-      model: config.model,
-      max_tokens: 256,
-      messages: [{ role: "user", content: prompt }],
+    const result = await aiChat([{ role: "user", content: prompt }], {
+      forceModel: config.model,
+      maxTokens: 256,
     });
 
-    const text = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("");
-
+    const text = result.content || "";
     return parseVote(config, text, Date.now() - startMs);
   } catch (err) {
     logger.error(`[Byzantine] ${config.name} validator failed:`, {
@@ -135,67 +125,9 @@ async function runAnthropicValidator(
     // Failed validator = escalate (conservative)
     return {
       model: config.model,
-      provider: config.provider,
+      provider: "gemini",
       decision: "escalate",
       reasoning: `Validator failed: ${err instanceof Error ? err.message : "unknown"}`,
-      confidence: 0,
-      latencyMs: Date.now() - startMs,
-    };
-  }
-}
-
-async function runGeminiValidator(
-  config: ValidatorConfig,
-  action: ByzantineAction,
-): Promise<ValidatorVote> {
-  const startMs = Date.now();
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey) {
-    // Fallback to Anthropic
-    return runAnthropicValidator(
-      { ...config, model: "claude-haiku-4-5-20251001", provider: "anthropic" },
-      action,
-    );
-  }
-
-  const prompt = VALIDATOR_PROMPT.replace("{role}", config.role)
-    .replace("{actionType}", action.type)
-    .replace("{description}", action.description)
-    .replace("{domain}", action.domain || "general")
-    .replace("{riskLevel}", action.riskLevel || "medium")
-    .replace(
-      "{tenantContext}",
-      action.tenantId ? `Tenant: ${action.tenantId}` : "",
-    );
-
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 256 },
-        }),
-      },
-    );
-
-    if (!response.ok) throw new Error(`Gemini ${response.status}`);
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-    return parseVote(config, text, Date.now() - startMs);
-  } catch (err) {
-    logger.error(`[Byzantine] ${config.name} Gemini validator failed:`, {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return {
-      model: config.model,
-      provider: config.provider,
-      decision: "escalate",
-      reasoning: `Gemini validator failed`,
       confidence: 0,
       latencyMs: Date.now() - startMs,
     };
@@ -222,7 +154,7 @@ function parseVote(
 
   return {
     model: config.model,
-    provider: config.provider,
+    provider: "gemini",
     decision,
     reasoning,
     confidence: Math.min(Math.max(confidence, 0), 1),
@@ -252,11 +184,7 @@ export async function runByzantineConsensus(
   });
 
   // Run all validators in parallel
-  const votePromises = VALIDATORS.map((config) =>
-    config.provider === "gemini"
-      ? runGeminiValidator(config, action)
-      : runAnthropicValidator(config, action),
-  );
+  const votePromises = VALIDATORS.map((config) => runValidator(config, action));
 
   const votes = await Promise.all(votePromises);
   const latencyMs = Date.now() - startMs;
@@ -299,7 +227,7 @@ export async function runByzantineConsensus(
     totalValidators: VALIDATORS.length,
     supermajorityReached,
     reasoning,
-    totalTokens: 0, // Token tracking would need provider-specific extraction
+    totalTokens: 0,
     latencyMs,
   };
 

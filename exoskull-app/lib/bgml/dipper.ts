@@ -2,18 +2,19 @@
  * BGML DIPPER — 3-Perspective Ensemble with Multi-Model Diversity
  *
  * Generates 3 response variants (analytical, creative, practical)
- * using parallel LLM calls with DIFFERENT models per perspective
+ * using parallel aiChat() calls with DIFFERENT models per perspective
  * for true cognitive diversity.
  *
  * Default model mapping:
- *   analytical → Gemini Pro (best at data/reasoning)
- *   creative   → Claude Sonnet (best at creative/narrative)
- *   practical  → Claude Haiku (fast, practical focus)
+ *   analytical → Gemini 3.1 Pro (best at data/reasoning)
+ *   creative   → Gemini 3.1 Pro (strong creative, cost-effective)
+ *   practical  → Gemini Flash (fast, practical focus)
  *
  * Port from BGML.ai Python → TypeScript, enhanced with multi-model.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import { aiChat } from "@/lib/ai";
+import type { ModelId } from "@/lib/ai/types";
 import { scoreResponse } from "./voting";
 import { logger } from "@/lib/logger";
 
@@ -63,14 +64,14 @@ const PERSPECTIVE_INSTRUCTIONS: Record<Perspective, string> = {
 };
 
 /** Default model per perspective for cognitive diversity */
-const DEFAULT_MODELS: Record<Perspective, string> = {
-  analytical: "gemini-2.0-flash", // Gemini — fast, strong at data/reasoning
-  creative: "claude-sonnet-4-6", // Claude Sonnet — best creative/narrative
-  practical: "claude-haiku-4-5-20251001", // Haiku — fast, practical
+const DEFAULT_MODELS: Record<Perspective, ModelId> = {
+  analytical: "gemini-3.1-pro",
+  creative: "gemini-3.1-pro",
+  practical: "gemini-3-flash",
 };
 
 /**
- * Call a single perspective. Routes to the right provider based on model name.
+ * Call a single perspective via aiChat().
  */
 async function callPerspective(
   perspective: Perspective,
@@ -82,103 +83,26 @@ async function callPerspective(
   const enhancedSystem = `${systemPrompt}\n\n${PERSPECTIVE_INSTRUCTIONS[perspective]}`;
 
   try {
-    // Route to Gemini or Anthropic based on model name
-    if (model.startsWith("gemini")) {
-      return await callGemini(
-        perspective,
-        userMessage,
-        enhancedSystem,
-        model,
-        maxTokens,
-      );
-    } else {
-      return await callAnthropic(
-        perspective,
-        userMessage,
-        enhancedSystem,
-        model,
-        maxTokens,
-      );
-    }
+    const result = await aiChat(
+      [
+        { role: "system", content: enhancedSystem },
+        { role: "user", content: userMessage },
+      ],
+      { forceModel: model as ModelId, maxTokens },
+    );
+
+    return {
+      perspective,
+      text: result.content || "",
+      tokens: result.usage.totalTokens,
+      model,
+    };
   } catch (err) {
     logger.error(`[BGML:DIPPER] ${perspective} variant failed (${model}):`, {
       error: err instanceof Error ? err.message : String(err),
     });
     return { perspective, text: "", tokens: 0, model };
   }
-}
-
-async function callAnthropic(
-  perspective: Perspective,
-  userMessage: string,
-  system: string,
-  model: string,
-  maxTokens: number,
-): Promise<DipperVariant> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const response = await client.messages.create({
-    model,
-    max_tokens: maxTokens,
-    system,
-    messages: [{ role: "user", content: userMessage }],
-  });
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
-
-  return {
-    perspective,
-    text,
-    tokens: response.usage.input_tokens + response.usage.output_tokens,
-    model,
-  };
-}
-
-async function callGemini(
-  perspective: Perspective,
-  userMessage: string,
-  system: string,
-  model: string,
-  maxTokens: number,
-): Promise<DipperVariant> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    // Fallback to Anthropic Haiku if no Gemini key
-    return callAnthropic(
-      perspective,
-      userMessage,
-      system,
-      "claude-haiku-4-5-20251001",
-      maxTokens,
-    );
-  }
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: system }] },
-        contents: [{ parts: [{ text: userMessage }] }],
-        generationConfig: { maxOutputTokens: maxTokens },
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(`Gemini API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  const tokens =
-    (data.usageMetadata?.promptTokenCount || 0) +
-    (data.usageMetadata?.candidatesTokenCount || 0);
-
-  return { perspective, text, tokens, model };
 }
 
 /**

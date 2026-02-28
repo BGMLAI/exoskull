@@ -4,7 +4,7 @@
  *
  * Routing Logic:
  * - Codex 5.2: Default - code generation, app building (cheapest for code)
- * - Claude Code (Sonnet 4.5): Fallback, full-stack multi-file
+ * - Claude Code (Gemini 3.1 Pro via aiChat): Fallback, full-stack multi-file
  * - Kimi Code: Long context (>100K tokens, large repos)
  * - GPT-o1: Deep reasoning (algorithms, optimization, proofs)
  */

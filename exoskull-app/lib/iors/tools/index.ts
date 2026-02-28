@@ -59,6 +59,7 @@ import { codeExecutionTools } from "./code-execution-tools";
 import { mcpBridgeTools } from "./mcp-bridge-tools";
 import { agentFactoryTools } from "./agent-factory-tools";
 import { goalStrategyTools } from "./goal-strategy-tools";
+import { selfBuildTools } from "./self-build-tools";
 
 // Phase 3 — Google & Meta Full Integration
 import { googleCalendarTools } from "./google-calendar-tools";
@@ -125,6 +126,8 @@ export const IORS_EXTENSION_TOOLS = [
   ...discoveryTools,
   // Goal strategy tools — view/approve/pause strategies via chat
   ...goalStrategyTools,
+  // Self-build tools — agent can create new tools at runtime
+  ...selfBuildTools,
 ];
 
 // Register tools and dynamic resolver in the shared registry so

@@ -5,7 +5,7 @@
  * for a given question. "A or B" format.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import { aiChat } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 
 export interface JudgeResult {
@@ -47,26 +47,18 @@ export async function llmJudgePairwise(
   question: string,
   responseA: string,
   responseB: string,
-  options?: { model?: string },
 ): Promise<JudgeResult> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const model = options?.model || "claude-haiku-4-5-20251001";
-
   const prompt = JUDGE_PROMPT.replace("{question}", question)
     .replace("{response_a}", responseA.slice(0, 3000))
     .replace("{response_b}", responseB.slice(0, 3000));
 
   try {
-    const response = await client.messages.create({
-      model,
-      max_tokens: 256,
-      messages: [{ role: "user", content: prompt }],
+    const result = await aiChat([{ role: "user", content: prompt }], {
+      forceModel: "gemini-3-flash",
+      maxTokens: 256,
     });
 
-    const text = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("");
+    const text = result.content || "";
 
     // Parse verdict
     let winner: "A" | "B" | "tie" = "tie";

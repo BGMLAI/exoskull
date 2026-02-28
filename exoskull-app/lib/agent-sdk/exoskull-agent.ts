@@ -561,6 +561,11 @@ export async function runExoSkullAgent(
   let totalOutputTokens = 0;
   let numTurns = 0;
 
+  // ── Fallback strategy: track tool errors ──
+  // After 2x same tool error → suggest build_tool(). After 5 total errors → STOP + explain.
+  const toolErrorCounts = new Map<string, number>();
+  let totalToolErrors = 0;
+
   try {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const anthropicTools = toAnthropicTools(filteredTools);
@@ -718,8 +723,52 @@ export async function runExoSkullAgent(
         }),
       );
 
+      // ── Fallback strategy: track errors and suggest build_tool ──
+      const failedTools: string[] = [];
+      for (const tr of toolResults) {
+        if ("is_error" in tr && tr.is_error) {
+          // Find the tool name from the matching tool_use block
+          const toolBlock = toolUseBlocks.find((b) => b.id === tr.tool_use_id);
+          if (toolBlock) {
+            const count = (toolErrorCounts.get(toolBlock.name) || 0) + 1;
+            toolErrorCounts.set(toolBlock.name, count);
+            totalToolErrors++;
+            if (count >= 2) failedTools.push(toolBlock.name);
+          }
+        }
+      }
+
+      // After 5 total tool errors → force stop with explanation
+      if (totalToolErrors >= 5) {
+        const failedNames = [...toolErrorCounts.entries()]
+          .filter(([, c]) => c >= 1)
+          .map(([n, c]) => `${n} (${c}x)`)
+          .join(", ");
+        finalText =
+          `Przepraszam, napotkałem zbyt wiele błędów narzędzi (${failedNames}). ` +
+          `Spróbuj ponownie lub opisz problem inaczej.`;
+        logger.warn("[ExoSkullAgent] Fallback: 5 total tool errors, stopping", {
+          toolErrorCounts: Object.fromEntries(toolErrorCounts),
+          tenantId: req.tenantId,
+        });
+        break;
+      }
+
       // Add tool results to message history
       messages.push({ role: "user", content: toolResults });
+
+      // After 2x same tool error → inject build_tool suggestion
+      if (failedTools.length > 0) {
+        const suggestion =
+          `[SYSTEM] Narzędzia ${failedTools.join(", ")} zawiodły 2+ razy. ` +
+          `Zamiast ponawiać, użyj build_tool aby zbudować alternatywne narzędzie, ` +
+          `albo użyj innego istniejącego narzędzia. NIE powtarzaj tego samego wywołania.`;
+        messages.push({ role: "user", content: suggestion });
+        logger.info("[ExoSkullAgent] Fallback: suggesting build_tool for", {
+          failedTools,
+          tenantId: req.tenantId,
+        });
+      }
     }
 
     // Max turns reached without final answer

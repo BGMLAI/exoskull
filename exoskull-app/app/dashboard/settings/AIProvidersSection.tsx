@@ -28,9 +28,10 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
+  Layers,
 } from "lucide-react";
 
-type ProviderName = "anthropic" | "openai" | "gemini";
+type ProviderName = "deepseek" | "gemini" | "groq" | "anthropic" | "openai";
 
 interface ProviderState {
   enabled: boolean;
@@ -41,41 +42,61 @@ interface ProviderState {
   status_message?: string;
 }
 
+interface AvailableModel {
+  id: string;
+  displayName: string;
+  tier: number;
+  provider: string;
+  costInfo: string;
+}
+
 interface ProvidersConfig {
   default_provider: ProviderName;
-  providers: Record<ProviderName, ProviderState>;
+  providers: Record<string, ProviderState>;
+  tier_overrides: Record<string, { modelId?: string }>;
+  available_models: AvailableModel[];
+  tier_defaults: Record<string, string[]>;
 }
+
+const PROVIDER_ORDER: ProviderName[] = [
+  "deepseek",
+  "gemini",
+  "groq",
+  "anthropic",
+  "openai",
+];
 
 const PROVIDER_INFO: Record<
   ProviderName,
-  {
-    label: string;
-    description: string;
-    models?: { label: string; value: string }[];
-  }
+  { label: string; description: string }
 > = {
+  deepseek: {
+    label: "DeepSeek",
+    description: "V3 (tani, szybki) + R1 (deep reasoning) — domyslny Tier 1-4",
+  },
   gemini: {
     label: "Google Gemini",
-    description:
-      "Gemini 3 Flash / Pro — glowny dostawca (chat, analiza, wizja, TTS)",
-    models: [
-      { label: "Gemini 3 Flash", value: "gemini-3-flash" },
-      { label: "Gemini 3 Pro", value: "gemini-3-pro" },
-    ],
+    description: "Flash (Tier 1) + Pro (Tier 2-3) — duzy context window",
   },
-  openai: {
-    label: "OpenAI",
-    description: "Codex 5.2 (generowanie kodu) + TTS fallback",
-    models: [
-      { label: "Codex 5.2", value: "codex-5-2" },
-      { label: "GPT-4o", value: "gpt-4o" },
-    ],
+  groq: {
+    label: "Groq",
+    description: "Llama 3.3 70B — darmowy, szybki, limit 30 RPM",
   },
   anthropic: {
     label: "Anthropic (Claude)",
-    description:
-      "Opus 4.6 (strategia, kryzys) / Sonnet 4.5 (uniwersalny fallback)",
+    description: "Haiku / Sonnet / Opus — premium (wymaga klucza BYOK)",
   },
+  openai: {
+    label: "OpenAI",
+    description: "Codex 5.2 (code gen) + GPT-4o — fallback",
+  },
+};
+
+const TIER_LABELS: Record<number, string> = {
+  1: "Tier 1 — Proste (klasyfikacja, routing)",
+  2: "Tier 2 — Analiza (summarization, patterns)",
+  3: "Tier 3 — Zlozzone (code gen, reasoning)",
+  4: "Tier 4 — Strategiczne (kryzys, coaching)",
 };
 
 const STATUS_CONFIG: Record<
@@ -124,8 +145,6 @@ export function AIProvidersSection() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Per-provider key edit state
   const [editingKey, setEditingKey] = useState<ProviderName | null>(null);
   const [keyInput, setKeyInput] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -139,17 +158,15 @@ export function AIProvidersSection() {
       setLoading(true);
       const res = await fetch("/api/settings/ai-providers");
       if (!res.ok) throw new Error("Nie udalo sie pobrac konfiguracji");
-      const data = await res.json();
-      setConfig(data);
+      setConfig(await res.json());
     } catch (err) {
-      console.error("[AIProviders] Load error:", err);
       setError(err instanceof Error ? err.message : "Nieznany blad");
     } finally {
       setLoading(false);
     }
   }
 
-  async function saveConfig(updates: Partial<ProvidersConfig>) {
+  async function saveConfig(updates: Record<string, unknown>) {
     try {
       setSaving(true);
       setSaved(false);
@@ -163,12 +180,12 @@ export function AIProvidersSection() {
         const data = await res.json();
         throw new Error(data.error || "Nie udalo sie zapisac");
       }
+      // Merge response with existing config to keep available_models etc.
       const data = await res.json();
-      setConfig(data);
+      setConfig((prev) => (prev ? { ...prev, ...data } : data));
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      console.error("[AIProviders] Save error:", err);
       setError(err instanceof Error ? err.message : "Nieznany blad");
     } finally {
       setSaving(false);
@@ -177,17 +194,21 @@ export function AIProvidersSection() {
 
   async function saveProviderKey(provider: ProviderName, apiKey: string) {
     await saveConfig({
-      providers: {
-        ...Object.fromEntries(
-          (Object.keys(PROVIDER_INFO) as ProviderName[]).map((p) => [
-            p,
-            p === provider ? { api_key: apiKey } : {},
-          ]),
-        ),
-      } as Record<ProviderName, ProviderState>,
+      providers: { [provider]: { api_key: apiKey } },
     });
     setEditingKey(null);
     setKeyInput("");
+  }
+
+  async function saveTierOverride(tier: number, modelId: string) {
+    const current = config?.tier_overrides ?? {};
+    const updated = { ...current };
+    if (modelId === "default") {
+      delete updated[tier];
+    } else {
+      updated[tier] = { modelId };
+    }
+    await saveConfig({ tier_overrides: updated });
   }
 
   if (loading) {
@@ -198,9 +219,9 @@ export function AIProvidersSection() {
           <Skeleton className="h-4 w-72 mt-1" />
         </CardHeader>
         <CardContent className="space-y-4">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
         </CardContent>
       </Card>
     );
@@ -224,251 +245,243 @@ export function AIProvidersSection() {
     );
   }
 
-  const providerOrder: ProviderName[] = ["gemini", "openai", "anthropic"];
-  const fallbackChain = providerOrder.filter(
-    (p) => config.providers[p]?.enabled && config.providers[p]?.has_key,
+  const activeProviders = PROVIDER_ORDER.filter(
+    (p) => config.providers[p]?.enabled && config.providers[p]?.status === "ok",
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Server className="h-5 w-5" />
-          Dostawcy AI
-          {saving && (
-            <Badge variant="secondary" className="ml-2 text-xs">
-              Zapisywanie...
-            </Badge>
-          )}
-          {saved && (
-            <Badge className="ml-2 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-              Zapisano
-            </Badge>
-          )}
-        </CardTitle>
-        <CardDescription>
-          Wybierz dostawcow AI i wpisz wlasne klucze API. System automatycznie
-          przelacza na zapasowego dostawce gdy glowny jest niedostepny.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Default provider selector */}
-        <div className="flex items-center gap-4">
-          <Label className="min-w-[140px]">Domyslny dostawca</Label>
-          <Select
-            value={config.default_provider}
-            onValueChange={(val) =>
-              saveConfig({ default_provider: val as ProviderName })
-            }
-          >
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {providerOrder.map((p) => (
-                <SelectItem key={p} value={p}>
-                  {PROVIDER_INFO[p].label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+    <div className="space-y-6">
+      {/* Provider Keys Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Server className="h-5 w-5" />
+            Dostawcy AI (BYOK)
+            {saving && (
+              <Badge variant="secondary" className="ml-2 text-xs">
+                Zapisywanie...
+              </Badge>
+            )}
+            {saved && (
+              <Badge className="ml-2 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                Zapisano
+              </Badge>
+            )}
+          </CardTitle>
+          <CardDescription>
+            System ma domyslne modele (tanie). Dodaj wlasne klucze API aby
+            odblokowac premium modele (Claude, GPT-4o). Klucze sa szyfrowane.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {error && <p className="text-sm text-red-500">{error}</p>}
 
-        {error && <p className="text-sm text-red-500">{error}</p>}
+          {PROVIDER_ORDER.map((providerName) => {
+            const provider = config.providers[providerName];
+            const info = PROVIDER_INFO[providerName];
+            const statusCfg =
+              STATUS_CONFIG[provider?.status || "no_key"] ||
+              STATUS_CONFIG.no_key;
+            const StatusIcon = statusCfg.icon;
+            const isEditing = editingKey === providerName;
+            const isDefault = config.default_provider === providerName;
 
-        {/* Provider cards */}
-        {providerOrder.map((providerName) => {
-          const provider = config.providers[providerName];
-          const info = PROVIDER_INFO[providerName];
-          const statusCfg = STATUS_CONFIG[provider?.status || "no_key"];
-          const StatusIcon = statusCfg.icon;
-          const isEditing = editingKey === providerName;
-          const isDefault = config.default_provider === providerName;
-
-          return (
-            <div
-              key={providerName}
-              className={`rounded-lg border p-4 space-y-3 ${
-                isDefault ? "border-primary/50 bg-primary/5" : ""
-              }`}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <StatusIcon className={`h-4 w-4 ${statusCfg.color}`} />
-                  <span className="font-medium">{info.label}</span>
-                  {isDefault && (
-                    <Badge variant="secondary" className="text-xs">
-                      Domyslny
-                    </Badge>
-                  )}
-                  <Badge className={statusCfg.badgeVariant + " text-xs"}>
-                    {statusCfg.label}
-                  </Badge>
-                </div>
-                <Button
-                  size="sm"
-                  variant={provider?.enabled !== false ? "default" : "outline"}
-                  onClick={() =>
-                    saveConfig({
-                      providers: {
-                        ...Object.fromEntries(
-                          providerOrder.map((p) => [
-                            p,
-                            p === providerName
-                              ? { enabled: provider?.enabled === false }
-                              : {},
-                          ]),
-                        ),
-                      } as Record<ProviderName, ProviderState>,
-                    })
-                  }
-                >
-                  {provider?.enabled !== false ? "Wlaczony" : "Wylaczony"}
-                </Button>
-              </div>
-
-              <p className="text-sm text-muted-foreground">
-                {info.description}
-              </p>
-
-              {/* API Key */}
-              <div className="flex items-center gap-2">
-                <Label className="min-w-[80px] text-sm">Klucz API</Label>
-                {isEditing ? (
-                  <>
-                    <div className="relative flex-1">
-                      <Input
-                        type={showKey ? "text" : "password"}
-                        value={keyInput}
-                        onChange={(e) => setKeyInput(e.target.value)}
-                        placeholder="Wklej klucz API..."
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowKey(!showKey)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showKey ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => saveProviderKey(providerName, keyInput)}
-                      disabled={!keyInput.trim()}
-                    >
-                      Zapisz
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setEditingKey(null);
-                        setKeyInput("");
-                      }}
-                    >
-                      Anuluj
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <code className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded flex-1">
-                      {provider?.key_masked || "Nie ustawiony"}
-                    </code>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setEditingKey(providerName);
-                        setKeyInput("");
-                        setShowKey(false);
-                      }}
-                    >
-                      {provider?.has_key ? "Zmien" : "Ustaw"}
-                    </Button>
-                    {provider?.has_key && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-red-500 hover:text-red-600"
-                        onClick={() => saveProviderKey(providerName, "")}
-                      >
-                        Usun
-                      </Button>
+            return (
+              <div
+                key={providerName}
+                className={`rounded-lg border p-4 space-y-2 ${
+                  isDefault ? "border-primary/50 bg-primary/5" : ""
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <StatusIcon className={`h-4 w-4 ${statusCfg.color}`} />
+                    <span className="font-medium">{info.label}</span>
+                    {isDefault && (
+                      <Badge variant="secondary" className="text-xs">
+                        Domyslny
+                      </Badge>
                     )}
-                  </>
-                )}
-              </div>
-
-              {/* Model selector (OpenAI only) */}
-              {info.models && provider?.enabled && (
-                <div className="flex items-center gap-2">
-                  <Label className="min-w-[80px] text-sm">Model</Label>
-                  <Select
-                    value={provider?.model || info.models[0].value}
-                    onValueChange={(val) =>
+                    <Badge className={statusCfg.badgeVariant + " text-xs"}>
+                      {statusCfg.label}
+                    </Badge>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={
+                      provider?.enabled !== false ? "default" : "outline"
+                    }
+                    onClick={() =>
                       saveConfig({
                         providers: {
-                          ...Object.fromEntries(
-                            providerOrder.map((p) => [
-                              p,
-                              p === providerName ? { model: val } : {},
-                            ]),
-                          ),
-                        } as Record<ProviderName, ProviderState>,
+                          [providerName]: {
+                            enabled: provider?.enabled === false,
+                          },
+                        },
                       })
                     }
                   >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {info.models.map((m) => (
-                        <SelectItem key={m.value} value={m.value}>
-                          {m.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    {provider?.enabled !== false ? "Wlaczony" : "Wylaczony"}
+                  </Button>
                 </div>
-              )}
 
-              {/* Status message */}
-              {provider?.status_message && (
-                <p className="text-xs text-muted-foreground">
-                  {provider.status_message}
+                <p className="text-sm text-muted-foreground">
+                  {info.description}
                 </p>
-              )}
-            </div>
-          );
-        })}
 
-        {/* Fallback chain visualization */}
-        {fallbackChain.length > 0 && (
-          <div className="pt-2 border-t">
-            <Label className="text-sm text-muted-foreground">
-              Kolejnosc fallback
-            </Label>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              {fallbackChain.map((p, i) => (
-                <span key={p} className="flex items-center gap-1">
-                  <Badge variant="outline" className="text-xs">
-                    {PROVIDER_INFO[p].label.split(" ")[0]}
-                  </Badge>
-                  {i < fallbackChain.length - 1 && (
-                    <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                <div className="flex items-center gap-2">
+                  <Label className="min-w-[80px] text-sm">Klucz API</Label>
+                  {isEditing ? (
+                    <>
+                      <div className="relative flex-1">
+                        <Input
+                          type={showKey ? "text" : "password"}
+                          value={keyInput}
+                          onChange={(e) => setKeyInput(e.target.value)}
+                          placeholder="Wklej klucz API..."
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowKey(!showKey)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showKey ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => saveProviderKey(providerName, keyInput)}
+                        disabled={!keyInput.trim()}
+                      >
+                        Zapisz
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setEditingKey(null);
+                          setKeyInput("");
+                        }}
+                      >
+                        Anuluj
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <code className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded flex-1">
+                        {provider?.key_masked || "Nie ustawiony"}
+                      </code>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingKey(providerName);
+                          setKeyInput("");
+                          setShowKey(false);
+                        }}
+                      >
+                        {provider?.has_key ? "Zmien" : "Ustaw"}
+                      </Button>
+                      {provider?.has_key && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-500 hover:text-red-600"
+                          onClick={() => saveProviderKey(providerName, "")}
+                        >
+                          Usun
+                        </Button>
+                      )}
+                    </>
                   )}
-                </span>
-              ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Fallback chain */}
+          {activeProviders.length > 0 && (
+            <div className="pt-2 border-t">
+              <Label className="text-sm text-muted-foreground">
+                Aktywni dostawcy (fallback chain)
+              </Label>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                {activeProviders.map((p, i) => (
+                  <span key={p} className="flex items-center gap-1">
+                    <Badge variant="outline" className="text-xs">
+                      {PROVIDER_INFO[p].label}
+                    </Badge>
+                    {i < activeProviders.length - 1 && (
+                      <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                    )}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tier Model Overrides Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Layers className="h-5 w-5" />
+            Wybor modeli per Tier
+          </CardTitle>
+          <CardDescription>
+            Domyslnie system automatycznie wybiera najtanszy model dla kazdego
+            poziomu zlozonosci. Tutaj mozesz nadpisac wybor dla kazdego tieru.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {([1, 2, 3, 4] as number[]).map((tier) => {
+            const defaults = config.tier_defaults?.[tier] || [];
+            const override = config.tier_overrides?.[tier]?.modelId;
+            const models = config.available_models || [];
+            const tierModels = models.filter((m) => {
+              // Show models from this tier and adjacent tiers
+              return Math.abs(m.tier - tier) <= 1;
+            });
+
+            return (
+              <div key={tier} className="flex items-center gap-4">
+                <Label className="min-w-[280px] text-sm">
+                  {TIER_LABELS[tier] || `Tier ${tier}`}
+                </Label>
+                <Select
+                  value={override || "default"}
+                  onValueChange={(val) => saveTierOverride(tier, val)}
+                >
+                  <SelectTrigger className="w-[280px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">
+                      Auto ({defaults.join(", ")})
+                    </SelectItem>
+                    {tierModels.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.displayName} — {m.costInfo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {override && (
+                  <Badge variant="outline" className="text-xs">
+                    Override
+                  </Badge>
+                )}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

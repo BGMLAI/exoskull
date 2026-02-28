@@ -167,7 +167,7 @@ ${req.hashtags !== false ? "Include relevant hashtags" : "No hashtags"}
 Generate engaging content for each channel.`,
       },
     ],
-    { forceModel: "claude-sonnet-4-5", maxTokens: 4000 },
+    { forceModel: "gemini-3.1-pro", maxTokens: 4000 },
   );
 
   // Parse AI response
@@ -242,7 +242,7 @@ Respond as JSON array: [{ "day": "Mon", "channel": "linkedin", "topic": "...", "
         content: `Topics: ${topics.join(", ")}\nChannels: ${channels.join(", ")}\nWeek starting: ${weekStartDate.toLocaleDateString()}`,
       },
     ],
-    { forceModel: "claude-3-5-haiku", maxTokens: 2000 },
+    { forceModel: "gemini-3-flash", maxTokens: 2000 },
   );
 
   try {
@@ -278,7 +278,7 @@ Respond as JSON: { "trends": ["..."], "contentIdeas": ["..."], "competitors": ["
         content: `Industry: ${industry}\nDate: ${new Date().toLocaleDateString()}\n\nWhat are the current hot topics and content opportunities?`,
       },
     ],
-    { forceModel: "claude-3-5-haiku", maxTokens: 2000 },
+    { forceModel: "gemini-3-flash", maxTokens: 2000 },
   );
 
   try {

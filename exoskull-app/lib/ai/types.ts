@@ -1,13 +1,13 @@
 /**
  * Multi-Model AI Router - Type Definitions
  *
- * Tier System (2026-02):
- * - Tier 1: Gemini 3 Flash - Classification, extraction, simple tasks
- * - Tier 2: Gemini 3 Pro - Analysis, summarization, reasoning
- * - Tier 3: Codex 5.2 + Gemini Flash - Code generation, app building
- * - Tier 4: Claude Opus 4.6 - Strategy, crisis, meta-coordination ONLY
+ * Tier System (2026-02 — Gemini 3.1 Pro migration):
+ * - Tier 1: Gemini Flash ($0.50/$3) - Classification, extraction, simple tasks
+ * - Tier 2: Gemini 3.1 Pro ($2/$12) + Groq Llama (FREE) - Analysis, reasoning
+ * - Tier 3: Gemini 3.1 Pro + DeepSeek R1 + Kimi/Codex - Code gen, deep reasoning
+ * - Tier 4: DeepSeek R1 ($0.55/$2.19) + Gemini 3.1 Pro - Strategy, crisis
  *
- * Fallback: Claude Sonnet 4.5 (universal fallback, not primary anywhere)
+ * BYOK: Tenant with own Anthropic key → Claude models available as premium fallback
  */
 
 // Model tiers as defined in ARCHITECTURE.md
@@ -21,21 +21,25 @@ export type ModelProvider =
   | "deepseek"
   | "kimi"
   | "codex"
+  | "groq"
   | "selfhosted";
 
 export type ModelId =
   | "selfhosted-qwen3-30b" // Tier 0 (self-hosted, primary)
   | "selfhosted-gemma-4b" // Tier 0 (self-hosted, fast)
-  | "deepseek-v3" // Tier 1+2 (primary, replaces Gemini)
-  | "gemini-2.5-flash" // Tier 1 (legacy fallback)
-  | "gemini-3-flash" // Tier 1 (legacy fallback)
-  | "gemini-3-pro" // Tier 2 (legacy fallback)
-  | "claude-3-5-haiku" // Tier 2 (fallback)
-  | "claude-sonnet-4-5" // Tier 3 (fallback) + universal fallback
+  | "gemini-2.5-flash" // Tier 1 (legacy)
+  | "gemini-3-flash" // Tier 1 (primary)
+  | "gemini-3-pro" // Tier 2 (legacy)
+  | "gemini-3.1-pro" // Tier 2-3 (primary — $2/$12, 77.1% ARC-AGI-2)
+  | "claude-3-5-haiku" // Tier 2 (BYOK fallback)
+  | "claude-sonnet-4-5" // Tier 3 (BYOK fallback)
   | "kimi-k2.5" // Tier 3 (long context)
   | "codex-5-2" // Tier 3 (code generation)
   | "claude-opus-4-5" // Tier 4 (legacy)
-  | "claude-opus-4-6"; // Tier 4 (primary)
+  | "claude-opus-4-6" // Tier 4 (BYOK only)
+  | "deepseek-r1" // Tier 4 primary ($0.55/$2.19, deep reasoning)
+  | "deepseek-v3" // Tier 3 fallback ($0.27/$1.10, fast)
+  | "groq-llama-3.3-70b"; // Tier 2 fallback (FREE, 30 RPM)
 
 // Task complexity levels
 export type TaskComplexity =

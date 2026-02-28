@@ -146,7 +146,7 @@ Rules:
       { role: "user", content: text.slice(0, 6000) },
     ],
     {
-      forceModel: "claude-3-5-haiku",
+      forceModel: "gemini-3-flash",
       maxTokens: 3000,
     },
   );

@@ -174,7 +174,8 @@ export interface AppGenerationRequest {
     | "user_request"
     | "iors_suggestion"
     | "chat_command"
-    | "auto_detection";
+    | "auto_detection"
+    | "smoke_test";
 }
 
 /** Result of app generation */

@@ -8,6 +8,7 @@
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { getRigConnection } from "@/lib/tools/rig-helpers";
 import { logActivity } from "@/lib/activity-log";
+import { ingest } from "@/lib/memory/ingest";
 import { fetchGmailEmails } from "./providers/gmail";
 import { fetchOutlookEmails } from "./providers/outlook";
 import type { EmailAccount, RawEmail, SyncResult } from "./types";
@@ -253,6 +254,19 @@ async function syncSingleAccount(account: EmailAccount): Promise<SyncResult> {
     }
   }
 
+  // ── Ingest new emails into knowledge graph (async, non-blocking) ──
+  if (inserted > 0) {
+    ingestEmailsBatch(account.tenant_id, filteredEmails).catch((err) =>
+      logger.warn(
+        "[EmailSync] Knowledge graph ingestion failed (non-blocking):",
+        {
+          error: err instanceof Error ? err.message : String(err),
+          accountId: account.id,
+        },
+      ),
+    );
+  }
+
   // Track latest message ID for cursor
   const lastMessageId =
     rawEmails[0]?.messageId || account.last_sync_message_id || undefined;
@@ -264,4 +278,62 @@ async function syncSingleAccount(account: EmailAccount): Promise<SyncResult> {
     errors,
     lastMessageId,
   };
+}
+
+/**
+ * Ingest synced emails into the Unified Brain (knowledge graph + vector store).
+ * Runs async after email insert — non-blocking, max 10 emails per batch.
+ */
+async function ingestEmailsBatch(
+  tenantId: string,
+  emails: RawEmail[],
+): Promise<void> {
+  // Limit batch size to avoid overloading
+  const batch = emails.slice(0, 10);
+
+  for (const email of batch) {
+    const content = buildEmailContent(email);
+    if (content.length < 50) continue;
+
+    try {
+      await ingest({
+        tenantId,
+        content,
+        sourceType: "email",
+        sourceId: email.messageId,
+        sourceName: `Email: ${email.subject || "(brak tematu)"}`,
+        metadata: {
+          from: email.fromEmail,
+          subject: email.subject,
+          date: email.dateReceived,
+        },
+      });
+    } catch (err) {
+      logger.warn("[EmailSync] Ingest single email failed:", {
+        messageId: email.messageId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+}
+
+/**
+ * Build a text representation of an email for ingestion.
+ */
+function buildEmailContent(email: RawEmail): string {
+  const parts: string[] = [];
+
+  if (email.subject) parts.push(`Temat: ${email.subject}`);
+  parts.push(`Od: ${email.fromName || email.fromEmail}`);
+  if (email.dateReceived) parts.push(`Data: ${email.dateReceived}`);
+
+  const body = (email.bodyText || "").trim();
+  if (body) {
+    // Limit body to 4000 chars for embedding efficiency
+    parts.push(body.slice(0, 4000));
+  } else if (email.snippet) {
+    parts.push(email.snippet);
+  }
+
+  return parts.join("\n");
 }

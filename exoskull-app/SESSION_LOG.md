@@ -1,5 +1,116 @@
 # Session Log
 
+## [2026-02-28] Plan Dżina v2 — Phases 1-4
+
+### Phase 1.2: AI Superintegrator migration
+
+- Created `exo_integrations` table migration: **SUCCESS**
+- Updated `exo_dev_journal` CHECK constraint for `self_build`: **SUCCESS**
+
+### Phase 1.3: Agent fallback strategy
+
+- Added tool error tracking to `exoskull-agent.ts`: **SUCCESS**
+- 2x same tool error → suggest `build_tool()`, 5x total → STOP: **SUCCESS**
+
+### Phase 2: Biała Kartka + Awatar
+
+- Created `DjinAvatar.tsx` (3 animated dots, 6 states): **SUCCESS**
+- Integrated avatar in CockpitHUDShell above chat: **SUCCESS**
+- Switched dashboard to CyberpunkDashboard (3D default): **SUCCESS**
+
+### Phase 3: Channels
+
+- All 13 channels already fully implemented: **ALREADY DONE**
+
+### Phase 4: IORS Full-Stack Developer
+
+- Created `full-stack-builder.ts` (iterative build orchestrator): **SUCCESS**
+- Created `infra-helper.ts` (infra status + setup guides): **SUCCESS**
+- Added 3 IORS tools (build_and_deploy, configure_infra, create_project): **SUCCESS**
+- Added Railway deployment to deploy_app: **SUCCESS**
+- Added project scaffold templates: **SUCCESS**
+- Build verification: **PASS**
+
+### Phase 6: Kooperacja IORS + Marketplace
+
+- Created federation protocol (discover/handshake/share/delegate): **SUCCESS**
+- Created federation API route: **SUCCESS**
+- Created marketplace service (publish/discover/download/review): **SUCCESS**
+- Created Stripe Connect royalty system (70/30 split): **SUCCESS**
+- Created marketplace API route (POST + public GET): **SUCCESS**
+- Created DB migration (8 tables + 2 RPC functions): **SUCCESS**
+- Build verification: **PASS**
+
+### Phase 5: Zbieranie + Analiza Wszystkiego
+
+- Created goal-based auto-categorizer (keyword + AI): **SUCCESS**
+- Wired categorizer into ingestion pipeline: **SUCCESS**
+- Bridged email sync → knowledge graph via ingest(): **SUCCESS**
+- Created exo_goal_content_links migration: **SUCCESS**
+- Vision/OCR, Voice/STT, chunking, embeddings, knowledge graph: **ALREADY DONE**
+- Build verification: **PASS**
+
+### Phase 7: Android + Digital Phenotyping
+
+- Created digital phenotyping service (screen time + activity + sleep vs goals): **SUCCESS**
+- Created screen time sync API (POST + GET with aggregation): **SUCCESS**
+- Created phenotyping DB migration (2 tables + RLS): **SUCCESS**
+- Build verification: **PASS**
+
+### Build Fixes During Session
+
+| Error                             | Fix                                                    |
+| --------------------------------- | ------------------------------------------------------ |
+| Duplicate DeepSeekProvider export | Removed duplicate line in `providers/index.ts`         |
+| `smoke_test` not in source union  | Added to `AppGenerationRequest.source` in `types.ts`   |
+| `obs.stuckCycles` undefined       | Fixed to `observation.stuckCycles` in `ralph-loop.ts`  |
+| Non-existent `content` column     | Moved data to `details` JSONB in `self-build-tools.ts` |
+
+---
+
+## [2026-02-28] Fix Autonomy Tier 1 — Bridge Disconnected Loops
+
+### Tasks
+
+- Fix 1: Bridge Gap Detector → exo_proactive_log (gap-detector.ts): **SUCCESS**
+- Fix 2: Impulse Handler F — failure backoff + gap rotation (impulse/route.ts): **SUCCESS**
+- Fix 3: Ralph Loop — hard stuck limit + user escalation (ralph-loop.ts): **SUCCESS**
+- Fix 4: E2E smoke test CRON + drop_app_table RPC (2 new files): **SUCCESS**
+- Git commit + push: **SUCCESS** (`ad4ca4d`)
+
+### Root Cause Analysis
+
+| Issue                  | Root Cause                                                          | Fix                                                                                      |
+| ---------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Gap Detector invisible | Writes to `learning_events`, Ralph/Impulse read `exo_proactive_log` | Upsert each gap to `exo_proactive_log` with `gap:{area.slug}` trigger                    |
+| Impulse infinite retry | Failed `generateApp()` retries same gap every 30min (no backoff)    | Exponential backoff (1→2→4→8→14 days) + `auto_build_fail:` log entries                   |
+| Ralph death spiral     | Lateral thinking at 3+ cycles just logs, never executes differently | Cap lateral to 3-5, escalate to user SMS at 6+, log "escalated" outcome to reset counter |
+| No E2E verification    | Nobody tests whether full pipeline produces a working app           | Daily smoke test CRON: generate → verify table → verify widget → cleanup                 |
+
+### New Files
+
+| File                                                        | Purpose                                         |
+| ----------------------------------------------------------- | ----------------------------------------------- |
+| `app/api/cron/autonomy-smoke-test/route.ts`                 | Daily E2E pipeline verification                 |
+| `supabase/migrations/20260228000001_drop_app_table_rpc.sql` | Safe table cleanup RPC (exo*app*\* prefix only) |
+
+### Modified Files
+
+| File                                     | Change                                                        |
+| ---------------------------------------- | ------------------------------------------------------------- |
+| `lib/agents/specialized/gap-detector.ts` | +20 lines — bridge upsert in `storeGapAnalysis()`             |
+| `app/api/cron/impulse/route.ts`          | +30 lines — failure query, backoff check, failure logging     |
+| `lib/iors/ralph-loop.ts`                 | +25 lines — stuck limit, escalation SMS, lateral thinking cap |
+
+### Key Decisions
+
+- Exponential backoff caps at 14 days (not infinite) — gaps eventually get retried
+- Ralph escalation uses SMS via `sendProactiveMessage()` — consistent with existing proactive system
+- Smoke test cleans up after itself — no test data left in production
+- `drop_app_table` RPC has `exo_app_` prefix guard — cannot accidentally drop system tables
+
+---
+
 ## [2026-02-23] Fix 4 Critical Architecture Issues — DI, Circular Deps, Logging, Race Condition
 
 ### Tasks

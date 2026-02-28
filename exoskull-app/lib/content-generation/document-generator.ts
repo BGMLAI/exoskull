@@ -63,7 +63,7 @@ For documents: use markdown formatting with proper headings, paragraphs, and lis
         content: `Title: ${req.title}\nDescription: ${req.description}${sectionPrompt}${req.context ? `\n\nAdditional context:\n${req.context}` : ""}`,
       },
     ],
-    { forceModel: "claude-sonnet-4-5", maxTokens: 8000 },
+    { forceModel: "gemini-3.1-pro", maxTokens: 8000 },
   );
 
   return result.content || "";

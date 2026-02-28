@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { ConversationView } from "@/components/conversation/ConversationView";
+import { CyberpunkDashboard } from "@/components/dashboard/CyberpunkDashboard";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "ExoSkull" };
 
 /**
- * Dashboard Page — Conversation-centric home.
- * Replaced CyberpunkDashboard with clean ConversationView.
+ * Dashboard Page — 3D spatial workspace (default).
+ * CyberpunkDashboard = 3D scene + HUD overlay with chat, avatar, activity feed.
  */
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -29,7 +29,7 @@ export default async function DashboardPage() {
   return (
     <>
       <h1 className="sr-only">ExoSkull Dashboard</h1>
-      <ConversationView />
+      <CyberpunkDashboard tenantId={user.id} />
     </>
   );
 }

@@ -236,6 +236,23 @@ export async function ingest(input: IngestInput): Promise<IngestResult> {
       }
     }
 
+    // ── Goal-based categorization (async, non-blocking) ──
+    if (content.length > 100 && storeResult.chunks > 0) {
+      try {
+        const { categorizeContent } = await import("./goal-categorizer");
+        await categorizeContent(
+          tenantId,
+          content.slice(0, 3000),
+          sourceType,
+          sourceId,
+        );
+      } catch (catErr) {
+        logger.warn("[Ingest] Goal categorization failed (non-blocking):", {
+          error: catErr instanceof Error ? catErr.message : String(catErr),
+        });
+      }
+    }
+
     return {
       success: true,
       chunksStored: storeResult.chunks,

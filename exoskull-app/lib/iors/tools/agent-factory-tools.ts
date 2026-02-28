@@ -235,35 +235,32 @@ export const agentFactoryTools: ToolDefinition[] = [
           return `Błąd: Agent "${agentRef}" nie znaleziony.`;
         }
 
-        // Use Anthropic directly with agent's system prompt
-        const Anthropic = (await import("@anthropic-ai/sdk")).default;
-        const client = new Anthropic({
-          apiKey: process.env.ANTHROPIC_API_KEY,
-        });
+        // Use aiChat with agent's system prompt, routed through model tier
+        const { aiChat } = await import("@/lib/ai");
+        type ModelId = import("@/lib/ai/types").ModelId;
 
-        const modelMap: Record<number, string> = {
-          1: "claude-haiku-4-5-20251001",
-          2: "claude-haiku-4-5-20251001",
-          3: "claude-sonnet-4-6",
-          4: "claude-sonnet-4-6",
+        const modelMap: Record<number, ModelId> = {
+          1: "gemini-3-flash",
+          2: "gemini-3-flash",
+          3: "gemini-3.1-pro",
+          4: "deepseek-r1",
         };
 
-        const response = await client.messages.create({
-          model: modelMap[agent.tier] || "claude-haiku-4-5-20251001",
-          max_tokens: 2048,
-          system: agent.system_prompt,
-          messages: [
+        const response = await aiChat(
+          [
+            { role: "system", content: agent.system_prompt },
             {
               role: "user",
               content: `Task: ${task}\n\nContext: ${JSON.stringify(context)}`,
             },
           ],
-        });
+          {
+            forceModel: modelMap[agent.tier] || "gemini-3-flash",
+            maxTokens: 2048,
+          },
+        );
 
-        const text = response.content
-          .filter((b) => b.type === "text")
-          .map((b) => ("text" in b ? b.text : ""))
-          .join("");
+        const text = response.content || "";
 
         return `[Agent: ${agent.name}]\n\n${text}`;
       } catch (err) {

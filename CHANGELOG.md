@@ -4,6 +4,148 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-02-28] Phase 7: Android + Digital Phenotyping
+
+### Why
+ExoSkull collects screen time and activity data via Android app, but had no backend analysis connecting behavioral patterns to user goals.
+
+### What
+- **Digital phenotyping service** — analyzes screen time, activity, sleep against active goals. App categorization (~30 packages → categories). Two-tier: rule-based goal matching + formatted snapshots (`digital-phenotyping.ts` NEW)
+- **Screen time sync API** — POST receives entries from Android Usage Stats API (upsert, max 500/req). GET returns aggregated data by day/category (`/api/mobile/screen-time/route.ts` NEW)
+- **DB migration** — `exo_screen_time_entries` (unique per tenant+package+date) + `exo_phenotyping_snapshots` (daily behavioral summaries) with RLS
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `exoskull-app/lib/phenotyping/digital-phenotyping.ts` | NEW — phenotyping service |
+| `exoskull-app/app/api/mobile/screen-time/route.ts` | NEW — screen time API |
+| `exoskull-app/supabase/migrations/20260328000004_phenotyping.sql` | NEW — 2 tables |
+
+---
+
+## [2026-02-28] Phase 6: Kooperacja IORS + Marketplace
+
+### Why
+ExoSkull was single-tenant only. No way for IORS agents to cooperate across tenants, no skill sharing marketplace, no revenue sharing for creators.
+
+### What
+- **Federation protocol** — discover → handshake → share → collaborate between ExoSkull instances. HMAC-signed messages, shared secrets, opt-in only. Privacy-first: never shares private data (`federation.ts` NEW)
+- **Federation API** — register, discover peers, handshake, accept, delegate tasks, ping (`/api/iors/federation/route.ts` NEW)
+- **Marketplace service** — publish skills, discover listings (search + filters), download/install, rate/review. Free skills auto-publish, premium need review (`marketplace.ts` NEW)
+- **Royalty system** — 70/30 creator/platform split via Stripe Connect. Creator onboarding, royalty recording, monthly payout processing, creator stats (`royalties.ts` NEW)
+- **Marketplace API** — publish, discover, download, review, connect_onboarding, creator_stats + public GET for browsing (`/api/marketplace/route.ts` NEW)
+- **DB migration** — 8 tables: federation_peers, federation_connections, federation_tasks, marketplace_listings, marketplace_downloads, marketplace_reviews, marketplace_creators, marketplace_royalties + 2 RPC functions
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `exoskull-app/lib/iors/federation.ts` | NEW — federation protocol |
+| `exoskull-app/app/api/iors/federation/route.ts` | NEW — federation API |
+| `exoskull-app/lib/marketplace/marketplace.ts` | NEW — marketplace service |
+| `exoskull-app/lib/marketplace/royalties.ts` | NEW — Stripe Connect royalties |
+| `exoskull-app/app/api/marketplace/route.ts` | NEW — marketplace API |
+| `exoskull-app/supabase/migrations/20260328000003_federation_marketplace.sql` | NEW — 8 tables + RPC |
+
+---
+
+## [2026-02-28] Phase 5: Zbieranie + Analiza Wszystkiego
+
+### Why
+Content was classified by source type only (PAR/Daily/Tacit). No goal-based categorization — the system couldn't connect a bank screenshot to a "financial freedom" goal. Emails were synced and stored but never ingested into the knowledge graph.
+
+### What
+- **Goal-based auto-categorizer** — matches ingested content to user's active goals. Two-tier: fast keyword matching (free) → AI classification (Gemini Flash, ~$0.0001/call) for ambiguous cases (`goal-categorizer.ts` NEW)
+- **Ingestion pipeline integration** — goal categorizer runs after entity extraction for every ingested piece of content (`ingest.ts`)
+- **Email → Knowledge Graph bridge** — synced emails now flow through `ingest()` → chunking → embedding → entity extraction → goal categorization (`sync.ts`)
+- **Migration** — `exo_goal_content_links` table for storing goal↔content mappings
+
+### Already Existed (no changes needed)
+| Component | Status |
+|-----------|--------|
+| Knowledge Graph (848 LOC) | Fully implemented |
+| Vision/OCR (Gemini Flash) | Fully implemented |
+| Voice/STT (3-tier: Groq→ElevenLabs→Deepgram) | Fully implemented |
+| Document chunking (5 strategies) | Fully implemented |
+| Ingestion pipeline (7 source types) | Fully implemented |
+| Vector store (pgvector + embeddings) | Fully implemented |
+| Brain search (query expansion + RRF + reranking) | Fully implemented |
+| Email sync (Gmail/Outlook/IMAP) | Fully implemented |
+| Data lake ETL (Bronze/Silver/Gold) | Fully implemented |
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `exoskull-app/lib/memory/goal-categorizer.ts` | NEW — goal-based auto-categorization |
+| `exoskull-app/lib/memory/ingest.ts` | +10 lines — goal categorizer hook after entity extraction |
+| `exoskull-app/lib/email/sync.ts` | +50 lines — ingestEmailsBatch after email sync |
+| `exoskull-app/supabase/migrations/20260328000002_goal_content_links.sql` | NEW — goal↔content mapping table |
+
+---
+
+## [2026-02-28] Phase 4: IORS jako Full-Stack Developer
+
+### Why
+IORS had a single-pass code generator but no iterative build cycle (generate → test → fix → redeploy), no Railway deployment, no infra setup guides, and no project scaffolding.
+
+### What
+- **Full-Stack Builder** — orchestrates generate → VPS Docker test → AI fix → retest loop (up to 3 iterations) with optional auto-deploy (`full-stack-builder.ts` NEW)
+- **Railway deployment** — GraphQL API integration for project creation (`deploy_app` + `full-stack-builder.ts`)
+- **Infrastructure helper** — checks env vars, returns step-by-step guides for Supabase/Vercel/Railway/Stripe/VPS/Domain setup (`infra-helper.ts` NEW)
+- **Project scaffolding** — `create_project` tool generates Next.js + Supabase + Tailwind templates (`code-generation-tools.ts`)
+- **3 new IORS tools:** `build_and_deploy`, `configure_infra`, `create_project`
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `exoskull-app/lib/code-generation/full-stack-builder.ts` | NEW — iterative build orchestrator |
+| `exoskull-app/lib/code-generation/infra-helper.ts` | NEW — infra status checks + setup guides |
+| `exoskull-app/lib/iors/tools/code-generation-tools.ts` | +3 tools, Railway deploy, scaffold templates |
+
+---
+
+## [2026-02-28] Phase 2-3: Avatar + Channels
+
+### What
+- **DjinAvatar** — 3 animated dots (6 states: idle/thinking/listening/joy/alert/speaking), CSS keyframes, no dependencies (`DjinAvatar.tsx` NEW)
+- **Avatar integration** — mapped scene effects → avatar states in CockpitHUDShell
+- **3D as default** — dashboard now renders CyberpunkDashboard (R3F) instead of ConversationView
+- **Phase 3 (Channels)** — already fully implemented (13 channels: SMS, Telegram, WhatsApp, Messenger, Slack, Discord, Signal, iMessage, Email, Voice, Instagram, Web Chat, Android)
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `exoskull-app/components/avatar/DjinAvatar.tsx` | NEW — avatar component |
+| `exoskull-app/components/cockpit/CockpitHUDShell.tsx` | +avatar zone, useAvatarState hook |
+| `exoskull-app/app/dashboard/page.tsx` | Switched to CyberpunkDashboard |
+
+---
+
+## [2026-02-28] Autonomy Tier 1 — Bridge Disconnected Loops
+
+### Why
+5 autonomous loops (MAPE-K, Ralph, Impulse, Gap Detection, Dynamic Skills) were individually coded but disconnected. Gap Detector wrote to `learning_events` which nobody read. Failed app builds retried same gap every 30min forever. Ralph Loop entered infinite death spiral after 3 stuck cycles. Zero apps built, zero skills deployed, zero autonomic actions delivered.
+
+### What
+- **Gap Detector bridge** — gaps now upserted to `exo_proactive_log` so Ralph/Impulse can see them (`gap-detector.ts:559-579`)
+- **Impulse backoff** — failed `generateApp()` calls trigger exponential backoff (1→2→4→8→14 days), other gaps still processed (`impulse/route.ts`)
+- **Ralph stuck limit** — after 6 consecutive stuck cycles, SMS escalation to user instead of infinite lateral thinking (`ralph-loop.ts:256-286`)
+- **E2E smoke test** — daily CRON verifies full pipeline: generate → table → widget → cleanup (`autonomy-smoke-test/route.ts` NEW)
+- **drop_app_table RPC** — safe cleanup function with `exo_app_` prefix guard (migration NEW)
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `exoskull-app/lib/agents/specialized/gap-detector.ts` | +20 lines — bridge upsert in `storeGapAnalysis()` |
+| `exoskull-app/app/api/cron/impulse/route.ts` | +30 lines — failure query, backoff check, failure logging |
+| `exoskull-app/lib/iors/ralph-loop.ts` | +25 lines — stuck limit, escalation SMS, lateral thinking cap |
+| `exoskull-app/app/api/cron/autonomy-smoke-test/route.ts` | NEW — daily E2E pipeline verification |
+| `exoskull-app/supabase/migrations/20260228000001_drop_app_table_rpc.sql` | NEW — safe table cleanup RPC |
+
+### Commit
+`ad4ca4d` — pushed to main
+
+---
+
 ## [2026-02-25] CLAUDE.md v017 — Frameworks, Dev Commands, Config Sync
 
 ### Why

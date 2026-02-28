@@ -2,12 +2,13 @@
  * Multi-Model AI Router - Configuration
  *
  * Model pricing and tier configuration.
- * Prices as of 2026-02.
+ * Prices as of 2026-02 (Gemini 3.1 Pro migration).
  *
- * Tier 1: Gemini 3 Flash (cheap, fast) — classification, extraction, simple tasks
- * Tier 2: Gemini 3 Pro (balanced) — analysis, summarization, reasoning
- * Tier 3: Codex 5.2 + Sonnet (code) — code generation, app building
- * Tier 4: Claude Opus 4.6 (strategic) — crisis, meta-coordination ONLY
+ * Tier 1: Gemini Flash ($0.50/$3) — classification, extraction, simple tasks
+ * Tier 2: Gemini 3.1 Pro ($2/$12) + Groq (FREE) — analysis, reasoning
+ * Tier 3: Gemini 3.1 Pro + DeepSeek R1 + Kimi/Codex — code gen, deep reasoning
+ * Tier 4: DeepSeek R1 ($0.55/$2.19) + Gemini 3.1 Pro — strategy, crisis
+ * BYOK: Claude models available when tenant provides own Anthropic key
  */
 
 import { ModelConfig, ModelId, ModelTier, TaskCategory } from "./types";
@@ -87,7 +88,7 @@ export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
     id: "gemini-3-pro",
     provider: "gemini",
     tier: 2,
-    displayName: "Gemini 3 Pro",
+    displayName: "Gemini 3 Pro (legacy)",
     inputCostPer1M: 2.0,
     outputCostPer1M: 12.0,
     maxTokens: 16384,
@@ -96,6 +97,32 @@ export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
     supportsStreaming: true,
     supportsVision: true,
     supportsStructuredOutput: true,
+  },
+  "gemini-3.1-pro": {
+    id: "gemini-3.1-pro",
+    provider: "gemini",
+    tier: 2,
+    displayName: "Gemini 3.1 Pro",
+    inputCostPer1M: 2.0,
+    outputCostPer1M: 12.0,
+    maxTokens: 65536,
+    contextWindow: 1_000_000,
+    supportsTools: true,
+    supportsStreaming: true,
+    supportsVision: true,
+    supportsStructuredOutput: true,
+  },
+  "groq-llama-3.3-70b": {
+    id: "groq-llama-3.3-70b",
+    provider: "groq",
+    tier: 2,
+    displayName: "Llama 3.3 70B (Groq)",
+    inputCostPer1M: 0,
+    outputCostPer1M: 0,
+    maxTokens: 8192,
+    contextWindow: 128_000,
+    supportsTools: true,
+    supportsStreaming: true,
   },
   "claude-3-5-haiku": {
     id: "claude-3-5-haiku",
@@ -148,6 +175,20 @@ export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
     supportsStreaming: true,
   },
 
+  // ── Tier 3-4: DeepSeek models ──
+  "deepseek-r1": {
+    id: "deepseek-r1",
+    provider: "deepseek",
+    tier: 4,
+    displayName: "DeepSeek R1",
+    inputCostPer1M: 0.55,
+    outputCostPer1M: 2.19,
+    maxTokens: 16384,
+    contextWindow: 128_000,
+    supportsTools: true,
+    supportsStreaming: true,
+  },
+
   // ── Tier 4: Strategic / Crisis ──
   "claude-opus-4-6": {
     id: "claude-opus-4-6",
@@ -176,13 +217,13 @@ export const MODEL_CONFIGS: Record<ModelId, ModelConfig> = {
 };
 
 // Tier to model mapping (order = priority within tier)
-// DeepSeek V3 is primary for Tier 1+2, Gemini as fallback
+// Primary: Gemini 3.1 Pro + cheap models. Anthropic = BYOK-only fallback.
 export const TIER_MODELS: Record<ModelTier, ModelId[]> = {
   0: ["selfhosted-qwen3-30b", "selfhosted-gemma-4b"],
-  1: ["deepseek-v3", "gemini-3-flash", "gemini-2.5-flash"],
-  2: ["deepseek-v3", "gemini-3-pro", "claude-3-5-haiku"],
-  3: ["codex-5-2", "claude-sonnet-4-5", "kimi-k2.5"],
-  4: ["claude-opus-4-6", "claude-sonnet-4-5"],
+  1: ["gemini-3-flash", "gemini-2.5-flash"],
+  2: ["gemini-3.1-pro", "groq-llama-3.3-70b"],
+  3: ["gemini-3.1-pro", "deepseek-r1", "kimi-k2.5", "codex-5-2"],
+  4: ["deepseek-r1", "gemini-3.1-pro", "claude-opus-4-6"],
 };
 
 // Category to tier mapping

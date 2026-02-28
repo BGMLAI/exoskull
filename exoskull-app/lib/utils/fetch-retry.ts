@@ -48,12 +48,14 @@ export async function withRetry<T>(
       const status = (err as { status?: number }).status;
       const msg = err instanceof Error ? err.message : String(err);
       const isRetryable =
+        status === 429 ||
         status === 500 ||
         status === 502 ||
         status === 503 ||
         status === 529 ||
         msg.includes("overloaded") ||
         msg.includes("Internal server error") ||
+        msg.includes("rate limit") ||
         msg.includes("ECONNRESET") ||
         msg.includes("socket hang up");
 

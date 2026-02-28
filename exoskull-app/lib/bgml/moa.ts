@@ -4,11 +4,12 @@
  * Layer 1: DIPPER (3 perspective variants with diverse models)
  * Layer 2: Synthesis — merges the 3 variants into a single coherent response
  *
- * For critical/strategic queries (complexity 5), uses Claude Opus for synthesis.
- * Otherwise uses Claude Sonnet.
+ * Uses DeepSeek R1 for synthesis (strong reasoning, cheap).
+ * For critical/strategic queries, uses DeepSeek R1 (useCriticalSynthesis flag).
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import { aiChat } from "@/lib/ai";
+import type { ModelId } from "@/lib/ai/types";
 import { runDipper, type DipperResult, type DipperModelConfig } from "./dipper";
 import { logger } from "@/lib/logger";
 
@@ -59,7 +60,7 @@ export async function runMoA(
     dipperModel?: string; // Single model fallback
     synthesisModel?: string;
     maxTokens?: number;
-    useCriticalSynthesis?: boolean; // Use Opus for synthesis
+    useCriticalSynthesis?: boolean; // Use DeepSeek R1 for synthesis
   },
 ): Promise<MoAResult> {
   // Layer 1: DIPPER with multi-model diversity
@@ -83,21 +84,18 @@ export async function runMoA(
     .replace("{creative}", variantMap.creative || "(no response)")
     .replace("{practical}", variantMap.practical || "(no response)");
 
-  // Choose synthesis model based on criticality
-  const synthesisModel =
-    options?.synthesisModel ||
-    (options?.useCriticalSynthesis ? "claude-opus-4-6" : "claude-sonnet-4-6");
+  // Choose synthesis model: DeepSeek R1 for critical, Gemini 3.1 Pro for normal
+  const synthesisModel: ModelId =
+    (options?.synthesisModel as ModelId) ||
+    (options?.useCriticalSynthesis ? "deepseek-r1" : "gemini-3.1-pro");
 
   let synthesis = "";
   let synthesisTokens = 0;
 
   try {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const response = await client.messages.create({
-      model: synthesisModel,
-      max_tokens: options?.maxTokens || 2048,
-      system: systemPrompt,
-      messages: [
+    const result = await aiChat(
+      [
+        { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
         {
           role: "assistant",
@@ -106,15 +104,11 @@ export async function runMoA(
         },
         { role: "user", content: synthesisPrompt },
       ],
-    });
+      { forceModel: synthesisModel, maxTokens: options?.maxTokens || 2048 },
+    );
 
-    synthesis = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("");
-
-    synthesisTokens =
-      response.usage.input_tokens + response.usage.output_tokens;
+    synthesis = result.content || "";
+    synthesisTokens = result.usage.totalTokens;
 
     logger.info("[BGML:MoA] Synthesis complete:", {
       synthesisModel,

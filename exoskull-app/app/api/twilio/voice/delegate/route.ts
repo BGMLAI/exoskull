@@ -11,7 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { aiChat } from "@/lib/ai";
 import {
   generateGatherTwiML,
   generateSayAndGatherTwiML,
@@ -29,14 +29,8 @@ export const dynamic = "force-dynamic";
 // CONFIGURATION
 // ============================================================================
 
-const CLAUDE_MODEL = "claude-sonnet-4-6";
-
 function getAppUrl() {
   return process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
-}
-
-function getAnthropicApiKey() {
-  return process.env.ANTHROPIC_API_KEY!;
 }
 
 // ============================================================================
@@ -146,27 +140,24 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
           .eq("id", sessionId);
       }
 
-      // Generate opening line with Claude
-      const anthropic = new Anthropic({ apiKey: getAnthropicApiKey() });
+      // Generate opening line with Gemini 3.1 Pro
       const systemPrompt = buildDelegatePrompt(metadata);
 
-      const response = await anthropic.messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: 150,
-        system: systemPrompt,
-        messages: [
+      const aiResult = await aiChat(
+        [
+          { role: "system", content: systemPrompt },
           {
             role: "user",
             content:
               "Osoba odebała telefon. Przedstaw się i powiedz po co dzwonisz.",
           },
         ],
-      });
+        { forceModel: "gemini-3.1-pro", maxTokens: 150 },
+      );
 
       const greeting =
-        response.content.find(
-          (c): c is Anthropic.TextBlock => c.type === "text",
-        )?.text || `Dzień dobry, dzwonię w imieniu ${metadata.user_name}.`;
+        aiResult.content ||
+        `Dzień dobry, dzwonię w imieniu ${metadata.user_name}.`;
 
       // Save greeting to messages
       const messages = session.messages || [];
@@ -209,28 +200,23 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
       const messages = session.messages || [];
       messages.push({ role: "user", content: userText });
 
-      // Process with Claude
-      const anthropic = new Anthropic({ apiKey: getAnthropicApiKey() });
+      // Process with Gemini 3.1 Pro
       const systemPrompt = buildDelegatePrompt(metadata);
 
-      const claudeMessages: Anthropic.MessageParam[] = messages.map(
-        (m: { role: string; content: string }) => ({
+      const aiMessages = [
+        { role: "system" as const, content: systemPrompt },
+        ...messages.map((m: { role: string; content: string }) => ({
           role: m.role as "user" | "assistant",
           content: m.content,
-        }),
-      );
+        })),
+      ];
 
-      const response = await anthropic.messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: 150,
-        system: systemPrompt,
-        messages: claudeMessages,
+      const aiResult = await aiChat(aiMessages, {
+        forceModel: "gemini-3.1-pro",
+        maxTokens: 150,
       });
 
-      const responseText =
-        response.content.find(
-          (c): c is Anthropic.TextBlock => c.type === "text",
-        )?.text || "Rozumiem. Dziękuję.";
+      const responseText = aiResult.content || "Rozumiem. Dziękuję.";
 
       // Check if conversation should end
       const shouldEnd = checkDelegateEnd(responseText, userText);

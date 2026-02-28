@@ -27,6 +27,7 @@ import { logger } from "@/lib/logger";
 const GEMINI_MODEL_MAP: Record<string, string> = {
   "gemini-3-flash": "gemini-3-flash-preview",
   "gemini-3-pro": "gemini-3-pro-preview",
+  "gemini-3.1-pro": "gemini-3.1-pro-preview",
   "gemini-2.5-flash": "gemini-2.5-flash",
 };
 
@@ -35,6 +36,7 @@ export class GeminiProvider implements IAIProvider {
   readonly supportedModels: ModelId[] = [
     "gemini-3-flash",
     "gemini-3-pro",
+    "gemini-3.1-pro",
     "gemini-2.5-flash",
   ];
 
@@ -114,7 +116,8 @@ export class GeminiProvider implements IAIProvider {
         }));
       }
 
-      const tier = model === "gemini-3-pro" ? 2 : 1;
+      const tier =
+        model === "gemini-3-pro" || model === "gemini-3.1-pro" ? 2 : 1;
 
       return {
         content: response.text || "",

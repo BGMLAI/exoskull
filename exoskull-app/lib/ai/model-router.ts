@@ -26,8 +26,15 @@ import {
   AnthropicProvider,
   KimiProvider,
   CodexProvider,
+  GroqProvider,
   SelfHostedProvider,
 } from "./providers";
+import {
+  getTenantAIConfig,
+  getModelsForTierWithBYOK,
+  getEffectiveApiKey,
+  type TenantAIConfig,
+} from "./byok";
 
 import { logger } from "@/lib/logger";
 export class ModelRouter {
@@ -44,6 +51,7 @@ export class ModelRouter {
     this.providers.set("anthropic", new AnthropicProvider());
     this.providers.set("kimi", new KimiProvider());
     this.providers.set("codex", new CodexProvider());
+    this.providers.set("groq", new GroqProvider());
 
     // Self-hosted provider (Tier 0) — only if configured
     if (process.env.SELFHOSTED_API_URL) {
@@ -165,12 +173,24 @@ export class ModelRouter {
       }
     }
 
-    // 5. Route to tier with fallback/escalation
+    // 5. Load tenant BYOK config for tier-aware routing
+    let tenantConfig: TenantAIConfig | undefined;
+    if (options.tenantId) {
+      try {
+        tenantConfig = await getTenantAIConfig(options.tenantId);
+      } catch {
+        // Fall through to defaults
+      }
+    }
+
+    // 6. Route to tier with fallback/escalation (BYOK-aware)
     return this.routeToTier(
       options,
       effectiveTier,
       attemptedModels,
       classification.category,
+      0,
+      tenantConfig,
     );
   }
 
@@ -183,9 +203,13 @@ export class ModelRouter {
     attemptedModels: ModelId[],
     category: string,
     escalationCount = 0,
+    tenantConfig?: TenantAIConfig,
   ): Promise<AIResponse> {
     const circuitBreaker = getCircuitBreaker();
-    const tierModels = getModelsForTier(tier);
+    // Use BYOK-aware model list if tenant config available
+    const tierModels = tenantConfig
+      ? getModelsForTierWithBYOK(tier, tenantConfig)
+      : getModelsForTier(tier);
 
     // Try each model in the tier
     for (const model of tierModels) {
@@ -221,6 +245,7 @@ export class ModelRouter {
         attemptedModels,
         category,
         escalationCount + 1,
+        tenantConfig,
       );
     }
 
@@ -410,6 +435,7 @@ export class ModelRouter {
       kimi: false,
       openai: false,
       codex: false,
+      groq: false,
     };
 
     for (const [provider, instance] of this.providers) {
