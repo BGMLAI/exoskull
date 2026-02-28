@@ -219,7 +219,7 @@ export function ConversationPanel({
         const errorMsg =
           err instanceof Error && err.message !== "Failed to fetch"
             ? err.message
-            : "Przepraszam, wystapil blad. Sprobuj ponownie.";
+            : "Wystąpił błąd. Spróbuj ponownie.";
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMsgId

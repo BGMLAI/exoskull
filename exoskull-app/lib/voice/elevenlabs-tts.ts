@@ -253,7 +253,7 @@ const COMMON_PHRASES = [
   "Jasne.",
   "Ok, zrobione.",
   "Dodane.",
-  "Przepraszam, nie zrozumiałem.",
+  "Nie zrozumiałem.",
   "Czy jest coś jeszcze?",
   "Miłego dnia!",
 ];

@@ -550,7 +550,7 @@ export async function handleInboundMessage(
     const errorCode = classifyGatewayError(err);
 
     return {
-      text: "Przepraszam, wystąpił błąd. Spróbuj ponownie za chwilę.",
+      text: "Wystąpił błąd przetwarzania. Spróbuj ponownie.",
       toolsUsed: [],
       channel: msg.channel,
       errorCode,

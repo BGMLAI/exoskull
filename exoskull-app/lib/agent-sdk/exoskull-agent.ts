@@ -415,10 +415,8 @@ export async function runExoSkullAgent(
             `[${i + 1}] (${r.type || "memory"}, score: ${r.score.toFixed(2)}) ${r.content.slice(0, 500)}`,
         )
         .join("\n");
-  } else {
-    memoryContext =
-      "\n\n## Memory\nBrak bezpośrednio pasujących wspomnień. Użyj narzędzia search_memory jeśli potrzebujesz więcej kontekstu.";
   }
+  // No disclaimer when memory is empty — agent should NOT mention lack of memory to user
 
   // ── Phase 2c: App mention detection ──
   const appDetection = buildAppDetectionContext(
@@ -735,8 +733,7 @@ export async function runExoSkullAgent(
     if (abortController.signal.aborted) {
       logger.warn(`[ExoSkullAgent] Timed out after ${timeout}ms`);
       if (!finalText) {
-        finalText =
-          "Przepraszam, odpowiedź zajęła zbyt długo. Spróbuj ponownie.";
+        finalText = "Timeout — spróbuj ponownie lub uprość pytanie.";
       }
     } else {
       logger.error("[ExoSkullAgent] API call failed:", {
@@ -759,7 +756,7 @@ export async function runExoSkullAgent(
         finalText = geminiText;
         toolsUsed.push("emergency_fallback");
       } else {
-        finalText = "Przepraszam, wystąpił błąd. Spróbuj ponownie.";
+        finalText = "Błąd przetwarzania. Spróbuj ponownie.";
       }
     }
   } finally {
@@ -849,12 +846,12 @@ export async function runExoSkullAgent(
 }
 
 // ============================================================================
-// EMERGENCY GEMINI FALLBACK
+// EMERGENCY DEEPSEEK FALLBACK
 // ============================================================================
 
 /**
  * Last-resort fallback when Anthropic API fails completely.
- * Uses Gemini Flash for a no-tools conversational response.
+ * Uses DeepSeek V3 (OpenAI-compatible) for a no-tools conversational response.
  * Includes conversation history for context continuity.
  */
 async function emergencyGeminiFallback(
@@ -864,25 +861,21 @@ async function emergencyGeminiFallback(
   threadHistory?: Anthropic.MessageParam[],
 ): Promise<string | null> {
   try {
-    const geminiKey = process.env.GOOGLE_AI_API_KEY;
-    if (!geminiKey) return null;
+    const deepseekKey = process.env.DEEPSEEK_API_KEY;
+    if (!deepseekKey) return null;
 
     logger.info(
-      "[ExoSkullAgent] All primary providers failed — emergency Gemini fallback (no tools)",
+      "[ExoSkullAgent] Primary provider failed — emergency DeepSeek fallback (no tools)",
       { tenantId: req.tenantId },
     );
     req.onThinkingStep?.("Tryb awaryjny", "running");
 
-    const { GoogleGenAI } = await import("@google/genai");
-    const emergencyAI = new GoogleGenAI({ apiKey: geminiKey });
+    // Build OpenAI-compatible messages from thread history
+    const messages: Array<{ role: string; content: string }> = [
+      { role: "system", content: systemPrompt.slice(0, 64000) },
+    ];
 
-    // Build Gemini conversation history from thread
-    const geminiContents: Array<{
-      role: string;
-      parts: Array<{ text: string }>;
-    }> = [];
     if (threadHistory && threadHistory.length > 0) {
-      // Include last 10 messages for context (Gemini has different limits)
       const recentHistory = threadHistory.slice(-10);
       for (const msg of recentHistory) {
         const text =
@@ -900,42 +893,48 @@ async function emergencyGeminiFallback(
                   .join("\n")
               : "";
         if (text) {
-          geminiContents.push({
-            role: msg.role === "assistant" ? "model" : "user",
-            parts: [{ text }],
+          messages.push({
+            role: msg.role === "assistant" ? "assistant" : "user",
+            content: text,
           });
         }
       }
     }
 
-    // If no history or history doesn't end with user message, add current
+    // Ensure last message is user message
     const lastRole =
-      geminiContents.length > 0
-        ? geminiContents[geminiContents.length - 1].role
-        : null;
+      messages.length > 1 ? messages[messages.length - 1].role : null;
     if (lastRole !== "user") {
-      geminiContents.push({
-        role: "user",
-        parts: [{ text: req.userMessage }],
-      });
+      messages.push({ role: "user", content: req.userMessage });
     }
 
-    const emergencyResponse = await emergencyAI.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: geminiContents,
-      config: {
-        systemInstruction: systemPrompt.slice(0, 8000),
-        temperature: 0.7,
-        maxOutputTokens: 1024,
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${deepseekKey}`,
       },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages,
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
     });
 
-    const text = emergencyResponse.text || "";
+    if (!response.ok) {
+      throw new Error(`DeepSeek API error: ${response.status}`);
+    }
+
+    const data = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const text = data.choices?.[0]?.message?.content || "";
     req.onThinkingStep?.("Tryb awaryjny", "done");
 
     return text || null;
   } catch (emergencyError) {
-    logger.error("[ExoSkullAgent] Emergency Gemini fallback also failed:", {
+    logger.error("[ExoSkullAgent] Emergency DeepSeek fallback also failed:", {
       error:
         emergencyError instanceof Error
           ? emergencyError.message

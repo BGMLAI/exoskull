@@ -137,7 +137,7 @@ export async function runAgentLoop(
     // No tools — extract text and return immediately
     const text = extractText(initialResponse);
     return {
-      text: text || "Przepraszam, nie zrozumiałem.",
+      text: text || "Nie zrozumiałem. Spróbuj inaczej.",
       toolsUsed: [],
       budgetExhausted: false,
       roundsExecuted: 0,
@@ -330,7 +330,7 @@ export async function runAgentLoopStreaming(
       // No tools — text was streamed, done
       ctx.callback?.onThinkingStep?.("Generuję odpowiedź", "done");
       return {
-        text: streamedText.trim() || "Przepraszam, nie zrozumiałem.",
+        text: streamedText.trim() || "Nie zrozumiałem. Spróbuj inaczej.",
         toolsUsed,
         budgetExhausted: false,
         roundsExecuted: round,
@@ -361,7 +361,7 @@ export async function runAgentLoopStreaming(
   const fallbackText =
     toolsUsed.length > 0
       ? `Gotowe. Użyłem: ${toolsUsed.join(", ")}.`
-      : "Przepraszam, nie mogłem przetworzyć tej wiadomości.";
+      : "Nie udało się przetworzyć wiadomości. Spróbuj ponownie.";
 
   return {
     text: fallbackText,
@@ -456,7 +456,7 @@ function buildFallbackText(toolsUsed: string[]): string {
   if (toolsUsed.length > 0) {
     return `Gotowe. Użyłem: ${toolsUsed.join(", ")}.`;
   }
-  return "Przepraszam, nie mogłem przetworzyć tej wiadomości. Spróbuj ponownie.";
+  return "Nie udało się przetworzyć wiadomości. Spróbuj ponownie.";
 }
 
 /** Build text when budget is exhausted mid-execution */

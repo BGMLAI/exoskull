@@ -3,7 +3,7 @@
 
 **Version:** 7.0
 **Created:** 2026-02-01
-**Updated:** 2026-02-20
+**Updated:** 2026-02-28
 **Status:** 🟡 Active Development — MVP Live (exoskull.xyz)
 
 ---
@@ -42,7 +42,7 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 | **Voice Pipeline** | ✅ Live | Twilio → Cartesia Sonic 3 STT → Claude Sonnet 4 (56 tools) → Cartesia Sonic 3 TTS + streaming Haiku pipeline |
 | **Memory System** | ✅ Live | Unified search (vector + keyword + notes + entity), HNSW index, score normalization, note embeddings, 50+ msg context |
 | **Data Lake** | ✅ Live | Bronze (R2 Parquet) → Silver (Postgres) → Gold (Materialized Views) |
-| **AI Router** | ✅ Live | Direct Anthropic Messages API with manual tool loop (replaced Agent SDK query()). Emergency Gemini fallback. 3 configs: WEB (10 turns, Sonnet), VOICE (6 turns, Haiku), ASYNC (15 turns, Sonnet) |
+| **AI Router** | ✅ Live | Direct Anthropic Messages API with manual tool loop. DeepSeek V3 primary Tier 1+2, Gemini fallback, Anthropic Tier 3+4. 3 configs: WEB (10 turns, Sonnet), VOICE (6 turns, Haiku), ASYNC (15 turns, Sonnet) |
 | **Mod System** | ✅ Live | 5 mods: task-manager, mood, habit, sleep, activity |
 | **Rig System** | ✅ Live | 6 rigs: Oura, Google Fit, Google Workspace, MS 365, Notion, Todoist. Google rig-sync CRON (every 30 min) |
 | **Knowledge** | ✅ Live | RAG pipeline (pgvector embeddings, cosine similarity search), web search (Tavily), URL import (Firecrawl v2), local file sync (exo-agent CLI) |
@@ -52,7 +52,7 @@ ExoSkull:          Multimodal - voice, text, images, video, biosignals, smartgla
 | **Unified Memory** | ✅ Live | Single `unifiedSearch()` entry point: vector store + keyword + notes + entity search, score normalization, entity boost |
 | **Self-Modification** | ✅ New | Source engine → diff generator → kernel guard → PR pipeline → swarm coordinator. All diffs validated (no auth bypass, no data deletion, no env mutation) |
 | **Signal Triage** | ✅ New | 663-line engine classifies signals by urgency (critical/high/medium/low) and domain (health/productivity/financial/social/meta) |
-| **Strategy Engine** | ✅ New | 780-line goal strategy generator with AI-powered plan decomposition + progress tracking |
+| **Strategy Engine** | ✅ Live | 780-line goal strategy generator with AI-powered plan decomposition + progress tracking. Auto-activation (confidence ≥ 0.7), 3 IORS tools for chat management, full feedback loop (task completion → strategy step update) |
 | **Proactive Notifications** | ✅ Live | 5 systems: gap detection, goal milestones, predictions, guardian values, insight push. All deliver via SMS/preferred channel. Rate: 8 msgs/day, quiet hours 23:00-07:00 |
 | **SMS Gateway** | ✅ Live | Two-way SMS via Twilio (+48732143210). Inbound webhook + auto-registration + full 40+ IORS tool pipeline |
 | **Google Data Pipeline** | ✅ Live | Fit health metrics, Calendar events, Gmail → Supabase. 30-min CRON sync + standalone script |

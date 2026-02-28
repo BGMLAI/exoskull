@@ -408,7 +408,7 @@ async function handlePrompt(ws: WebSocket, data: PromptMessage): Promise<void> {
       ws.send(
         JSON.stringify({
           type: "text",
-          token: "Przepraszam, coś poszło nie tak. Spróbuj jeszcze raz.",
+          token: "Coś poszło nie tak. Spróbuj jeszcze raz.",
           last: true,
         }),
       );

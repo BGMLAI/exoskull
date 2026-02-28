@@ -125,7 +125,7 @@ export async function handleBirthMessage(
     });
 
     return {
-      text: "Przepraszam, coś poszło nie tak. Napisz jeszcze raz — chcę Cię poznać!",
+      text: "Coś poszło nie tak. Napisz jeszcze raz — chcę Cię poznać!",
       toolsUsed: [],
       channel,
     };

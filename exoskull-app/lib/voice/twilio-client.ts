@@ -170,7 +170,7 @@ export function generateErrorTwiML(): string {
   const response = new VoiceResponse();
   response.say(
     { voice: TWILIO_POLISH_VOICE, language: TWILIO_POLISH_LANGUAGE },
-    "Przepraszam, wystąpił błąd. Spróbuj ponownie później.",
+    "Wystąpił błąd techniczny. Spróbuj ponownie później.",
   );
   response.hangup();
   return response.toString();

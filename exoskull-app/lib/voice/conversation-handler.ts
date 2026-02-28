@@ -1001,7 +1001,7 @@ export async function processUserMessage(
           );
 
           return {
-            text: result.text || "Przepraszam, nie zrozumiałem.",
+            text: result.text || "Nie zrozumiałem. Spróbuj ponownie.",
             toolsUsed: result.toolsUsed,
             shouldEndCall: false,
             emotion: emotionState,
@@ -1079,7 +1079,7 @@ export async function processUserMessage(
     }
 
     // All providers truly failed — show specific error message
-    let userMessage = "Przepraszam, wystąpił problem. Spróbuj ponownie.";
+    let userMessage = "Wystąpił problem z przetwarzaniem. Spróbuj ponownie.";
     if (err.status === 400 && err.error?.message?.includes("credit balance")) {
       userMessage =
         "Serwis AI jest chwilowo niedostępny (problem z kontem API). Sprawdź dostawców w Ustawienia → Dostawcy AI.";

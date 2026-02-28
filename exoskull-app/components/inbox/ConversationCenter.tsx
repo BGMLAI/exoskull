@@ -201,7 +201,7 @@ export function ConversationCenter({
             msg.id === assistantMsgId
               ? {
                   ...msg,
-                  content: "Przepraszam, wystapil blad. Sprobuj ponownie.",
+                  content: "Wystąpił błąd. Spróbuj ponownie.",
                 }
               : msg,
           ),

@@ -586,12 +586,9 @@ export const POST = withApiLog(async function POST(request: NextRequest) {
           vpsMessage = `[KNOWLEDGE CONTEXT]\n${context}\n[/KNOWLEDGE CONTEXT]\n\n${message}`;
         }
       } catch (err) {
-        logger.debug(
-          "[ChatStream] Knowledge pre-fetch failed (non-blocking):",
-          {
-            error: err instanceof Error ? err.message : String(err),
-          },
-        );
+        logger.warn("[ChatStream] Knowledge pre-fetch failed (non-blocking):", {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 

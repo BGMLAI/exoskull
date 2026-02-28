@@ -1,5 +1,63 @@
 # ExoSkull Session Log
 
+## 2026-02-28 — Fix: Agent Amnesia & Apologetic Behavior
+
+**Status:** SUCCESS
+**Duration:** ~10 min
+**Retries:** 0
+
+### Tasks
+1. Diagnose agent "forgetting" and apologizing behavior: SUCCESS
+2. Remove memory disclaimer injection from system prompt: SUCCESS
+3. Fix error handler — remove "Przepraszam" hardcoded text: SUCCESS
+4. Increase Gemini fallback system prompt from 8K to 64K chars: SUCCESS
+5. Upgrade knowledge pre-fetch failure logging to WARN: SUCCESS
+
+### Root Cause Analysis
+Agent had 4 compounding issues:
+- Empty memory search → disclaimer in system prompt → agent parroted "nie pamiętam"
+- Error handler text violated own "NIGDY nie przepraszaj" rule
+- Gemini fallback received only 8K of system prompt → lost personality entirely
+- Knowledge search failures invisible (DEBUG level)
+
+### Learnings
+- System prompt injections (like memory disclaimers) are parroted by the model as its own conclusions
+- Error fallback text must follow the same personality rules as the main system prompt
+- Gemini 2.5 Flash supports 1M context — no reason to limit system prompt to 8K
+
+---
+
+## 2026-02-28 — Strategy→Task Pipeline Fix + DeepSeek V3
+
+**Status:** SUCCESS
+**Duration:** ~60 min
+**Retries:** 2 (git push rejected → rebase, Vercel CLI crash → discovered Git Integration auto-deploy)
+
+### Tasks
+1. Health analysis of autonomy pipeline: SUCCESS
+2. Fix `isStrategyStuck()` (broken table query): SUCCESS
+3. Auto-activate strategies (confidence ≥ 0.7): SUCCESS
+4. Add `goal_id` to task context (4 places): SUCCESS
+5. Create 3 IORS goal-strategy tools: SUCCESS
+6. Register tools in IORS index: SUCCESS
+7. Commit + push strategy pipeline fix: SUCCESS
+8. Add DeepSeek V3 provider (OpenAI-compatible): SUCCESS
+9. Update types, config, model-router for DeepSeek: SUCCESS
+10. Commit + push DeepSeek changes: SUCCESS
+11. Deploy to production (Git Integration auto-deploy): SUCCESS
+12. Update Vercel spending limit: SUCCESS (user action)
+
+### Commits
+- `d0b1b52` — feat: wire strategy→task execution pipeline — auto-activate goals
+- `d8542ac` — feat: add DeepSeek V3 as primary Tier 1+2 model, replacing Gemini
+
+### Decisions
+- Auto-activate at confidence ≥ 0.7 (not 0.5) — avoids activating low-quality strategies
+- DeepSeek over Kimi — cheaper ($0.27 vs $0.60/1M input), OpenAI-compatible, better coding benchmarks
+- Gemini kept as fallback in tier arrays (not removed)
+
+---
+
 ## 2026-02-24 — ExoSkull Desktop v0.1.0 + Download Page + CI
 
 **Status:** PARTIAL (builds pass, Windows app not launching — debugging)
