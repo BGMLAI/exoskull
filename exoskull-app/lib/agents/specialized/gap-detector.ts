@@ -519,17 +519,11 @@ export class GapDetectorAgent extends BaseAgent {
             `[GapDetector] Proposed build_app for severe gap: ${gap.area.slug}`,
           );
 
-          // Queue proactive SMS notification so user learns about it outside chat
-          await this.supabase.from("exo_petla_queue").insert({
-            tenant_id: tenantId,
-            handler: "proactive",
-            priority: 75,
-            params: {
-              message: `Zauważyłem lukę w obszarze "${gap.area.name}" (${gap.daysSinceActivity}+ dni bez aktywności). Proponuję zbudować prosty tracker. Napisz "tak" lub "ok", żebym go stworzył.`,
-            },
-            status: "queued",
-            scheduled_for: new Date().toISOString(),
-          });
+          // Proactive SMS disabled — interventions stay in DB for user to review in chat.
+          // Previously spammed users every Sunday with unsolicited gap notifications.
+          logger.info(
+            `[GapDetector] Intervention created for ${gap.area.slug} — no SMS (proactive disabled)`,
+          );
         }
       } catch (error) {
         logger.error(
@@ -561,6 +555,34 @@ export class GapDetectorAgent extends BaseAgent {
       },
       agent_id: this.id,
     });
+
+    // Bridge gaps into exo_proactive_log for Ralph Loop + Impulse visibility
+    const significantGaps = gaps.filter((g) => g.severity !== "none");
+    for (const gap of significantGaps) {
+      try {
+        await this.supabase.from("exo_proactive_log").upsert(
+          {
+            tenant_id: tenantId,
+            trigger_type: `gap:${gap.area.slug}`,
+            channel: "system",
+            metadata: {
+              severity: gap.severity,
+              coveragePercent: gap.coveragePercent,
+              daysSinceActivity: gap.daysSinceActivity,
+              description:
+                gap.suggestedIntervention || `Gap in ${gap.area.name}`,
+              source: "gap_detector",
+            },
+          },
+          { onConflict: "tenant_id,trigger_type" },
+        );
+      } catch (err) {
+        logger.error(
+          `[GapDetector] Failed to bridge gap ${gap.area.slug} to proactive_log:`,
+          err,
+        );
+      }
+    }
   }
 }
 

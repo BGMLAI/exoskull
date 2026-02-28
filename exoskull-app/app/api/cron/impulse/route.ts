@@ -447,6 +447,26 @@ async function checkSystemDevelopment(
       ),
     );
 
+    // Check recent build failures for exponential backoff
+    const { data: recentFailures } = await supabase
+      .from("exo_proactive_log")
+      .select("trigger_type, created_at")
+      .eq("tenant_id", tenantId)
+      .like("trigger_type", "auto_build_fail:%")
+      .gte("created_at", fourteenDaysAgo);
+
+    const failureCounts = new Map<string, { count: number; lastAt: string }>();
+    for (const f of recentFailures || []) {
+      const key = f.trigger_type.replace("auto_build_fail:", "");
+      const existing = failureCounts.get(key);
+      if (existing) {
+        existing.count++;
+        if (f.created_at > existing.lastAt) existing.lastAt = f.created_at;
+      } else {
+        failureCounts.set(key, { count: 1, lastAt: f.created_at });
+      }
+    }
+
     // Also check 7-day dedup for suggestions (things we can't auto-build)
     const sevenDaysAgo = new Date(
       Date.now() - 7 * 24 * 60 * 60 * 1000,
@@ -605,6 +625,23 @@ async function checkSystemDevelopment(
 
       if (dedupSet.has(dedupKey)) continue;
 
+      // Exponential backoff for previously failed gaps
+      const failInfo = failureCounts.get(gap.id);
+      if (failInfo && failInfo.count > 0) {
+        const backoffDays = Math.min(Math.pow(2, failInfo.count - 1), 14);
+        const daysSinceLastFail =
+          (Date.now() - new Date(failInfo.lastAt).getTime()) / 86400000;
+        if (daysSinceLastFail < backoffDays) {
+          logger.info("[Impulse] Skipping gap (backoff):", {
+            gapId: gap.id,
+            failures: failInfo.count,
+            backoffDays,
+            daysSinceLastFail: Math.round(daysSinceLastFail * 10) / 10,
+          });
+          continue;
+        }
+      }
+
       try {
         const hasGap = await gap.query();
         if (!hasGap) continue;
@@ -632,6 +669,16 @@ async function checkSystemDevelopment(
               tenantId,
               gapId: gap.id,
               error: appResult.error,
+            });
+            // Log failure for backoff tracking
+            await supabase.from("exo_proactive_log").insert({
+              tenant_id: tenantId,
+              trigger_type: `auto_build_fail:${gap.id}`,
+              channel: "system",
+              metadata: {
+                error: appResult.error,
+                attempt: (failureCounts.get(gap.id)?.count || 0) + 1,
+              },
             });
             continue; // Try next gap
           }

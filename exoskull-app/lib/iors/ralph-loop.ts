@@ -254,6 +254,47 @@ export async function runRalphCycle(
     const action = await analyze(tenantId, observation, gotchaPromptEnrichment);
 
     if (action.type === "none") {
+      // After 6 stuck cycles: escalate to user instead of spinning forever
+      if (obs.stuckCycles >= 6) {
+        try {
+          const { sendProactiveMessage } =
+            await import("@/lib/cron/tenant-utils");
+          await sendProactiveMessage(
+            tenantId,
+            "Twoj ExoSkull jest zablokowany od kilku cykli i nie moze podjac zadnej akcji. Czy mozesz mi powiedziec nad czym chcesz abym pracowal? Napisz SMS lub wejdz na dashboard.",
+            "ralph_stuck_escalation",
+            "ralph_loop",
+          );
+          logger.warn("[RalphLoop] Escalated to user after 6+ stuck cycles", {
+            tenantId,
+            stuckCycles: obs.stuckCycles,
+          });
+        } catch {
+          /* non-critical */
+        }
+
+        // Log as "escalated" to break the stuck counter
+        // (counter only counts "skipped" and "failed" — "escalated" resets it)
+        await logToJournal(
+          tenantId,
+          "escalation",
+          "Escalated to user — stuck 6+ cycles",
+          { stuckCycles: obs.stuckCycles, observedStats },
+          "escalated",
+        );
+
+        return {
+          observed: observedStats,
+          action: {
+            type: "none",
+            description: "Escalated to user — stuck 6+ cycles",
+            params: {},
+          },
+          outcome: "skipped",
+          durationMs: Math.round(performance.now() - startTime),
+        };
+      }
+
       return {
         observed: observedStats,
         action,
@@ -614,9 +655,9 @@ async function analyze(
 ): Promise<RalphAction> {
   const router = new ModelRouter();
 
-  // If stuck 3+ cycles, inject lateral thinking instructions
+  // If stuck 3-5 cycles, inject lateral thinking. At 6+ → escalate instead.
   const lateralThinking =
-    obs.stuckCycles >= 3
+    obs.stuckCycles >= 3 && obs.stuckCycles < 6
       ? `\n## LATERAL THINKING MODE (stuck ${obs.stuckCycles} cycles)
 You've been stuck. Try something UNEXPECTED:
 - Use "lateral_experiment": pick a random combination of existing tools
