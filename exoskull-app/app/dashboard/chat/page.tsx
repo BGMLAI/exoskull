@@ -1,9 +1,12 @@
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
+import { ChatView } from "@/components/stream/ChatView";
+
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Czat" };
 
 /**
- * Chat page — redirects to main dashboard.
- * Chat River is now the primary interface on /dashboard.
+ * Chat page — primary interface.
  */
 export default function ChatPage() {
-  redirect("/dashboard");
+  return <ChatView />;
 }

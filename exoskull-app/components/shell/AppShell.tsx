@@ -36,7 +36,7 @@ export function AppShell({ children, topBarSlot }: AppShellProps) {
         <TopBar>{topBarSlot}</TopBar>
 
         {/* Content area */}
-        <main className="flex-1 min-h-0 overflow-hidden" id="main-content">
+        <main className="flex-1 min-h-0 overflow-y-auto" id="main-content">
           {children}
         </main>
 

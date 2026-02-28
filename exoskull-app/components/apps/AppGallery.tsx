@@ -34,16 +34,28 @@ export function AppGallery() {
         if (cancelled) return;
         const list = data.mods || data.apps || data || [];
         setApps(
-          list.map((a: Record<string, unknown>) => ({
-            id: (a.id as string) || (a.slug as string),
-            slug: (a.slug as string) || (a.id as string),
-            name: a.name as string,
-            description: a.description as string | undefined,
-            icon: a.icon as string | undefined,
-            category: a.category as string | undefined,
-            installed:
-              (a.installed as boolean) ?? (a.is_active as boolean) ?? false,
-          })),
+          list.map((a: Record<string, unknown>) => {
+            // API returns nested mod object: { id, active, mod: { slug, name, ... } }
+            const mod = (a.mod as Record<string, unknown>) || {};
+            return {
+              id: (mod.id as string) || (a.id as string) || (a.slug as string),
+              slug:
+                (mod.slug as string) || (a.slug as string) || (a.id as string),
+              name: (mod.name as string) || (a.name as string) || "Bez nazwy",
+              description:
+                (mod.description as string) ||
+                (a.description as string) ||
+                undefined,
+              icon: (mod.icon as string) || (a.icon as string) || undefined,
+              category:
+                (mod.category as string) || (a.category as string) || undefined,
+              installed:
+                (a.installed as boolean) ??
+                (a.active as boolean) ??
+                (a.is_active as boolean) ??
+                false,
+            };
+          }),
         );
       } catch {
         // Non-critical
