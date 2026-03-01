@@ -113,7 +113,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/chat/") || // Chat endpoints — Bearer JWT auth verified in routes (verifyTenantAuth)
     pathname.startsWith("/api/voice/") || // Voice endpoints — Bearer JWT auth verified in routes (verifyTenantAuth)
     pathname.startsWith("/api/debug/") || // Debug endpoints — own CRON_SECRET auth
-    pathname.startsWith("/api/internal/"); // Service-to-service — VPS_AGENT_SECRET auth
+    pathname.startsWith("/api/internal/") || // Service-to-service — VPS_AGENT_SECRET auth
+    pathname.startsWith("/api/v3/"); // v3 endpoints — own auth via verifyTenantAuth
 
   // ============================================================================
   // AUTH GUARD: Redirect unauthenticated users to login
