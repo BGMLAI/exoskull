@@ -4,6 +4,34 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-03-01] Docs: Rewrite CLAUDE.md + MEMORY.md — Full Vision Alignment
+
+### Why
+Claude Code sessions were losing the core product vision. CLAUDE.md described ExoSkull as a vague "second brain" / "goal executor" instead of what it actually is: a **SaaS platform for fully autonomous AI agents** that build apps, self-modify code, take real-world outbound actions, and run continuously.
+
+Stale data everywhere: route count (142→219), CRONs (28→43), deprecated Multi-Model Routing table (Agent SDK is sole path since 2026-02-16), duplicated Frameworks section from global CLAUDE.md.
+
+### What
+- **Rewrote `CLAUDE.md` from scratch** — now opens with explicit product identity and 6 non-negotiable core capabilities:
+  1. AUTONOMY — 24/7 goal pursuit without prompting
+  2. BUILDS COMPLEX APPS — generates full DB+API+UI applications autonomously
+  3. SELF-MODIFYING CODE — agent reads/modifies/extends its own source
+  4. GENERATES SUB-AGENTS & SKILLS — each IORS is a factory
+  5. OUTBOUND REAL-WORLD ACTIONS — calls, emails, negotiates, operates accounts
+  6. SELF-BUILDS FROM CONVERSATIONS — MVP minimal, rest emerges organically
+- **Added Game HUD UI paradigm** — 2D canvas overlay (chat, widgets, /commands) + 3D grid (models, #hashtag nodes as spatial info anchors)
+- **Added 3 product phases**: MVP (chat+voice+3D+/commands+autonomy) → Phase 2 (omnichannel, gamification, hooked UI) → Phase 3 (device sensors, marketplace, A2A negotiation)
+- **Removed**: stale Multi-Model Routing table, duplicated Frameworks section (30 lines), outdated numbers
+- **Fixed**: route count 219, CRON count 43, added voice-ws commands, clarified Railway deployment
+- **Added Gotchas section** — Supabase, Next.js, TypeScript, Voice common traps
+- **Restructured MEMORY.md** — product vision is now the FIRST section (was missing entirely). Moved 150+ lines of subsystem details to 6 topic files. Down from 253→128 lines (under 200 limit)
+- **Created 6 topic files**: infrastructure.md, voice-pipeline.md, cockpit-hud.md, cron-loops.md, chat-stream.md, email-system.md
+
+### Impact
+Every new Claude Code session now immediately understands: this is an autonomous agent platform (not a chatbot), it builds apps, it modifies its own code, it takes real-world actions, and the UI is a game-like 3D+2D spatial environment.
+
+---
+
 ## [2026-03-01] Fix: v3 Tools — Missing RPC Functions + Timeout Fix
 
 ### Why
