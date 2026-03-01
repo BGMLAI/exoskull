@@ -1,5 +1,35 @@
 # ExoSkull Session Log
 
+## 2026-03-01 — CLAUDE.md Full Vision Rewrite + MEMORY.md Restructure
+
+### Context
+Claude Code sessions were losing product vision. CLAUDE.md described ExoSkull as a vague "second brain" instead of an autonomous agent SaaS platform. MEMORY.md was 253 lines (over 200 limit), causing truncation warnings every session.
+
+### Actions
+| # | Action | Result |
+|---|--------|--------|
+| 1 | MEMORY.md restructure (253→128 lines) | SUCCESS — moved details to 6 topic files |
+| 2 | Created infrastructure.md, voice-pipeline.md, cockpit-hud.md, cron-loops.md, chat-stream.md, email-system.md | SUCCESS |
+| 3 | CLAUDE.md full rewrite from scratch | SUCCESS — product vision, 7 core capabilities, game HUD paradigm, 3 phases |
+| 4 | Added 7 core capabilities (NON-NEGOTIABLE list) | SUCCESS — autonomy, builds apps, self-modifying code, sub-agents, outbound actions, superintegrator, self-builds |
+| 5 | Found superintegrator migration via conversation log mining | SUCCESS — `20260328000001_superintegrator.sql`, `exo_integrations` table |
+| 6 | CHANGELOG.md update | SUCCESS |
+| 7 | MEMORY.md vision section added (first section) | SUCCESS |
+| 8 | Fixed stale data: routes 142→219, CRONs 28→43, tools 8→101 | SUCCESS |
+| 9 | Removed duplicated Frameworks section + stale Multi-Model Routing | SUCCESS |
+
+### Commits
+- `efce2e2` — docs: add CLAUDE.md rewrite + MEMORY.md restructure to CHANGELOG
+- `32a3ff7` — docs: add SUPERINTEGRATOR as 7th core capability in CLAUDE.md
+
+### Key Decisions
+- Product vision is now FIRST section in both CLAUDE.md and MEMORY.md — impossible to miss
+- 7 core capabilities listed explicitly as numbered NON-NEGOTIABLE items
+- Game HUD paradigm documented (2D canvas overlay + 3D grid with #hashtag nodes)
+- Removed ~100 lines of aspirational prose, replaced with concrete capability descriptions
+
+---
+
 ## 2026-03-01 — ExoSkull v3: All 7 Phases Implemented
 
 ### Context

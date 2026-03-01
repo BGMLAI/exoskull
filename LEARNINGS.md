@@ -1,5 +1,16 @@
 # ExoSkull Learnings
 
+## CLAUDE.md Musi Miec Wizje Produktu, Nie Tylko Techniczne Detale (2026-03-01)
+**Pattern:** Claude Code gubil wizje produktu miedzy sesjami. Budowal "asystenta" zamiast "autonomicznego agenta SaaS". CLAUDE.md opisywal "second brain" i "goal executor" — zbyt ogolnikowo.
+**Root cause:** CLAUDE.md mial ~100 linii aspiracyjnej prozy (Data Lake details, Android APIs, Skill API code) ale ZERO explicite wymienionych core capabilities. Stale dane (142 routes zamiast 219, deprecated Multi-Model Routing). Sekcja Frameworks zduplikowana z globalnego.
+**Solution:** Przepisac CLAUDE.md z numerowana lista NON-NEGOTIABLE capabilities (autonomia, budowanie appek, self-modifying code, sub-agenty, outbound actions, superintegrator, self-build). Wizja produktu jako PIERWSZA sekcja.
+**Lesson:** CLAUDE.md to nie dokumentacja techniczna — to BRIEFING dla nowego developera. Musi odpowiadac na "CO budujemy i DLACZEGO" zanim przejdzie do "JAK".
+
+## MEMORY.md Musi Byc Indeksem, Nie Zbiorem Wszystkiego (2026-03-01)
+**Pattern:** MEMORY.md uroslo do 253 linii (limit 200). Kazda sesja dostawala truncation warning. Szczegoly subsystemow (voice pipeline, cockpit HUD, email system) zasmiecaly glowny plik.
+**Solution:** MEMORY.md jako zwiezly indeks (128 linii) z linkami do 6 topic files. Wizja produktu na gorze, gotchas w srodku, projekt structure na dole.
+**Lesson:** Persistent memory files traktuj jak RAM — ograniczona pojemnosc. Szczegoly w osobnych plikach (jak swap), indeks w glownym.
+
 ## ExoSkull v2 — Separate Repo, Not Branch (2026-03-01)
 **Pattern:** v1 monorepo grew to 120k+ LOC, 40+ tables, 18 layers. Refactoring inside the same repo would carry dead weight.
 **Solution:** Clean repo (`exoskull-v2`) with Turborepo, shared packages (`types`, `engine`, `store`, `ui`), 4-layer architecture. Claude Code as nervous system, not a feature.
