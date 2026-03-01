@@ -10,7 +10,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const maxDuration = 60;
 
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
