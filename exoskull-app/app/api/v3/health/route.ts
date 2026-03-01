@@ -84,9 +84,24 @@ export async function GET() {
     check("rpc_hybrid_search", async () => {
       const { error } = await supabase.rpc("hybrid_search", {
         query_text: "test",
-        query_embedding: new Array(1536).fill(0),
+        query_embedding: JSON.stringify(new Array(1536).fill(0)),
+        match_tenant_id: "00000000-0000-0000-0000-000000000000",
+        match_threshold: 0.01,
         match_count: 1,
-        p_tenant_id: "00000000-0000-0000-0000-000000000000",
+        source_types: null,
+        recency_weight: 0.1,
+        keyword_weight: 0.2,
+        vector_weight: 0.7,
+      });
+      if (error) throw new Error(error.message);
+    }),
+    check("rpc_vector_search", async () => {
+      const { error } = await supabase.rpc("vector_search", {
+        query_embedding: JSON.stringify(new Array(1536).fill(0)),
+        match_tenant_id: "00000000-0000-0000-0000-000000000000",
+        match_threshold: 0.01,
+        match_count: 1,
+        source_types: null,
       });
       if (error) throw new Error(error.message);
     }),
@@ -120,6 +135,16 @@ export async function GET() {
       const key = process.env.OPENAI_API_KEY;
       if (!key) throw new Error("not set");
       if (key.startsWith("op://")) throw new Error("unresolved 1Password ref");
+    }),
+
+    check("GOOGLE_AI_API_KEY", async () => {
+      const key = process.env.GOOGLE_AI_API_KEY;
+      if (!key) throw new Error("not set (query expansion/reranking disabled)");
+    }),
+
+    check("TAVILY_API_KEY", async () => {
+      const key = process.env.TAVILY_API_KEY;
+      if (!key) throw new Error("not set (web search disabled)");
     }),
 
     check("GITHUB_TOKEN", async () => {
