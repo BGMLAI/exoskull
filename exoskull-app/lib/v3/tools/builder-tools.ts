@@ -4,7 +4,7 @@
  * BMAD Pipeline: PM → Architect → Developer → Reviewer → Deploy
  * Real code generation, not JSON specs.
  *
- * 3 tools: build_app, generate_content, self_extend_tool
+ * 4 tools: build_app, generate_content, self_modify, self_extend_tool
  */
 
 import type { V3ToolDefinition } from "./index";
@@ -255,7 +255,118 @@ Pisz konkretnie, z wartością merytoryczną. ZERO puchu. Formatuj w Markdown.`,
 };
 
 // ============================================================================
-// #3 self_extend_tool — create a new tool when capability is missing
+// #3 self_modify — modify ExoSkull source code via GitHub API
+// ============================================================================
+
+const selfModifyTool: V3ToolDefinition = {
+  definition: {
+    name: "self_modify",
+    description:
+      "Zmodyfikuj własny kod źródłowy ExoSkull. Branch → commit → push via GitHub API, Vercel auto-deploy. Używaj do: dodawania feature'ów, naprawy bugów, zmian UI, nowych narzędzi. Kernel guard chroni pliki krytyczne.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action: {
+          type: "string",
+          enum: ["add_feature", "fix_bug", "modify_ui", "add_tool"],
+          description: "Typ modyfikacji",
+        },
+        description: {
+          type: "string",
+          description:
+            "Szczegółowy opis co zmodyfikować (np. 'dodaj ciemny motyw do /v3', 'napraw błąd walidacji formularza')",
+        },
+        target_files: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Ścieżki plików do modyfikacji (np. ['app/v3/page.tsx']). Opcjonalne — AI wykryje sam.",
+        },
+      },
+      required: ["action", "description"],
+    },
+  },
+  timeoutMs: 55_000,
+  async execute(input, tenantId) {
+    const action = input.action as string;
+    const description = input.description as string;
+    const targetFiles = (input.target_files as string[]) || [];
+
+    try {
+      const { modifySource } =
+        await import("@/lib/self-modification/source-engine");
+      const { getServiceSupabase } = await import("@/lib/supabase/service");
+
+      const actionLabels: Record<string, string> = {
+        add_feature: "Dodanie feature",
+        fix_bug: "Naprawa buga",
+        modify_ui: "Modyfikacja UI",
+        add_tool: "Dodanie narzędzia",
+      };
+
+      const fullDescription = `${actionLabels[action] || action}: ${description}`;
+
+      const result = await modifySource(tenantId, {
+        description: fullDescription,
+        targetFiles,
+        context: `Action type: ${action}. V3 tool self-modification request.`,
+        triggeredBy: "user_request",
+      });
+
+      // Audit log
+      const supabase = getServiceSupabase();
+      await supabase.from("exo_autonomy_log").insert({
+        tenant_id: tenantId,
+        event_type: "self_modify",
+        payload: {
+          action,
+          description,
+          target_files: targetFiles,
+          success: result.success,
+          pr_url: result.prUrl,
+          pr_number: result.prNumber,
+          risk_level: result.riskLevel,
+          tests_passed: result.testsPassed,
+          error: result.error,
+          blocked_reason: result.blockedReason,
+        },
+      });
+
+      if (!result.success) {
+        const reason = result.blockedReason || result.error || "Nieznany błąd";
+        return `Modyfikacja zablokowana: ${reason}`;
+      }
+
+      const riskEmoji =
+        result.riskLevel === "low"
+          ? "LOW"
+          : result.riskLevel === "medium"
+            ? "MEDIUM"
+            : "HIGH";
+
+      const lines = [
+        `Modyfikacja kodu zakonczona.`,
+        ``,
+        `**Akcja:** ${actionLabels[action] || action}`,
+        `**Opis:** ${description}`,
+        `**Ryzyko:** ${riskEmoji}`,
+        `**Testy:** ${result.testsPassed ? "PASS" : "Pominiete (VPS offline)"}`,
+      ];
+
+      if (result.prUrl) {
+        lines.push(`**PR:** ${result.prUrl}`);
+        lines.push(`**Preview:** Vercel automatycznie deployuje z brancha PR.`);
+      }
+
+      return lines.join("\n");
+    } catch (err) {
+      return `Blad self-modify: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  },
+};
+
+// ============================================================================
+// #4 self_extend_tool — create a new tool when capability is missing
 // ============================================================================
 
 const selfExtendTool: V3ToolDefinition = {
@@ -342,5 +453,6 @@ const selfExtendTool: V3ToolDefinition = {
 export const builderTools: V3ToolDefinition[] = [
   buildAppTool,
   generateContentTool,
+  selfModifyTool,
   selfExtendTool,
 ];

@@ -27,6 +27,9 @@ const TOOL_LABELS: Record<string, string> = {
   fetch_url: "Pobieram stronę",
   analyze_image: "Analizuję obraz",
   extract_text_from_image: "Odczytuję tekst z obrazu",
+  self_modify: "Modyfikuję kod źródłowy",
+  build_app: "Buduję aplikację",
+  generate_content: "Generuję treść",
 };
 
 function getToolLabel(name: string): string {

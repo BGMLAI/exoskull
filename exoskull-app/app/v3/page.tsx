@@ -1,14 +1,17 @@
 "use client";
 
 /**
- * /v2 — Standalone v3 Chat Page
+ * /v3 — Standalone v3 Chat Page
  *
  * Self-contained: own auth, own chat, no dashboard dependencies.
  * Hits /api/v3/chat/stream for the v3 agent pipeline.
+ * Features: voice input, file upload, TTS, markdown rendering.
  */
 
 import { useState, useRef, useEffect, useCallback, FormEvent } from "react";
 import { createClient } from "@supabase/supabase-js";
+import ReactMarkdown from "react-markdown";
+import { useDictation } from "@/lib/hooks/useDictation";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,10 +22,17 @@ const supabase = createClient(
 // TYPES
 // ============================================================================
 
+interface Attachment {
+  name: string;
+  type: string;
+  dataUrl: string;
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
   toolsUsed?: string[];
+  attachments?: Attachment[];
 }
 
 interface ThinkingStep {
@@ -151,7 +161,22 @@ function ChatView({
   const [streaming, setStreaming] = useState(false);
   const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
   const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [dragOver, setDragOver] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Voice input
+  const dictation = useDictation({
+    authToken: session.access_token,
+    onFinalTranscript: (text) => {
+      setInput((prev) => (prev ? `${prev} ${text}` : text));
+    },
+    onError: (err) => {
+      console.error("[Voice]", err);
+    },
+  });
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -159,18 +184,84 @@ function ChatView({
 
   useEffect(scrollToBottom, [messages, thinkingSteps, scrollToBottom]);
 
+  // TTS: speak new assistant messages
+  const lastMsgCountRef = useRef(0);
+  useEffect(() => {
+    if (!ttsEnabled || messages.length === 0) return;
+    const last = messages[messages.length - 1];
+    if (
+      last.role === "assistant" &&
+      !streaming &&
+      messages.length > lastMsgCountRef.current
+    ) {
+      lastMsgCountRef.current = messages.length;
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(last.content);
+        utterance.lang = "pl-PL";
+        utterance.rate = 1.1;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+  }, [messages, streaming, ttsEnabled]);
+
+  // File upload handler
+  const handleFiles = useCallback((files: FileList | File[]) => {
+    Array.from(files).forEach((file) => {
+      if (file.size > 10 * 1024 * 1024) return; // 10MB limit
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAttachments((prev) => [
+          ...prev,
+          {
+            name: file.name,
+            type: file.type,
+            dataUrl: reader.result as string,
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  const removeAttachment = useCallback((index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
   const sendMessage = async (e: FormEvent) => {
     e.preventDefault();
     const text = input.trim();
-    if (!text || streaming) return;
+    if (!text && attachments.length === 0) return;
+    if (streaming) return;
+
+    // Stop voice if active
+    if (dictation.isListening) dictation.stopListening();
+
+    // Build message with attachments
+    let fullMessage = text;
+    const currentAttachments = [...attachments];
+    if (currentAttachments.length > 0) {
+      const attachInfo = currentAttachments
+        .map((a) => `[Plik: ${a.name} (${a.type})]`)
+        .join(" ");
+      fullMessage = text ? `${text}\n\n${attachInfo}` : attachInfo;
+    }
 
     setInput("");
+    setAttachments([]);
     setStreaming(true);
     setThinkingSteps([]);
     setActiveTool(null);
 
     // Add user message
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "user",
+        content: fullMessage,
+        attachments: currentAttachments.length ? currentAttachments : undefined,
+      },
+    ]);
 
     // Add empty assistant message to fill
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
@@ -182,7 +273,7 @@ function ChatView({
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: fullMessage }),
       });
 
       if (!response.ok) {
@@ -310,13 +401,48 @@ function ChatView({
           <span style={styles.headerTitle}>ExoSkull v3</span>
           <span style={styles.headerSub}> — {session.user.email}</span>
         </div>
-        <button onClick={handleLogout} style={styles.logoutBtn}>
-          Wyloguj
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button
+            onClick={() => {
+              setTtsEnabled((v) => !v);
+              if (ttsEnabled && typeof window !== "undefined") {
+                window.speechSynthesis?.cancel();
+              }
+            }}
+            style={{
+              ...styles.logoutBtn,
+              color: ttsEnabled ? "#3b82f6" : "#888",
+              borderColor: ttsEnabled ? "#3b82f6" : "#333",
+            }}
+            title={ttsEnabled ? "TTS wlaczone" : "TTS wylaczone"}
+          >
+            {ttsEnabled ? "TTS ON" : "TTS"}
+          </button>
+          <button onClick={handleLogout} style={styles.logoutBtn}>
+            Wyloguj
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
-      <div style={styles.messageList}>
+      <div
+        style={{
+          ...styles.messageList,
+          ...(dragOver
+            ? { outline: "2px dashed #3b82f6", outlineOffset: -4 }
+            : {}),
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+        }}
+      >
         {messages.length === 0 && (
           <div style={styles.emptyState}>
             <h2 style={{ margin: 0, fontSize: 20 }}>
@@ -354,9 +480,82 @@ function ChatView({
               {msg.role === "user" ? "Ty" : "ExoSkull"}
             </div>
             <div style={styles.msgContent}>
-              {msg.content ||
-                (streaming && i === messages.length - 1 ? "..." : "")}
+              {msg.role === "assistant" ? (
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => (
+                      <p style={{ margin: "4px 0" }}>{children}</p>
+                    ),
+                    code: ({ children, className }) =>
+                      className ? (
+                        <pre
+                          style={{
+                            background: "#0a0a12",
+                            padding: "8px 12px",
+                            borderRadius: 6,
+                            overflow: "auto",
+                            fontSize: 13,
+                          }}
+                        >
+                          <code>{children}</code>
+                        </pre>
+                      ) : (
+                        <code
+                          style={{
+                            background: "#1a1a2e",
+                            padding: "2px 5px",
+                            borderRadius: 3,
+                            fontSize: 13,
+                          }}
+                        >
+                          {children}
+                        </code>
+                      ),
+                    a: ({ href, children }) => (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "#60a5fa" }}
+                      >
+                        {children}
+                      </a>
+                    ),
+                  }}
+                >
+                  {msg.content ||
+                    (streaming && i === messages.length - 1 ? "..." : "")}
+                </ReactMarkdown>
+              ) : (
+                msg.content ||
+                (streaming && i === messages.length - 1 ? "..." : "")
+              )}
             </div>
+            {msg.attachments && msg.attachments.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 4,
+                  marginTop: 4,
+                  flexWrap: "wrap" as const,
+                }}
+              >
+                {msg.attachments.map((a, j) => (
+                  <span
+                    key={j}
+                    style={{
+                      fontSize: 11,
+                      background: "#1a1a2e",
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                      color: "#888",
+                    }}
+                  >
+                    {a.name}
+                  </span>
+                ))}
+              </div>
+            )}
             {msg.toolsUsed && msg.toolsUsed.length > 0 && (
               <div style={styles.toolsUsed}>
                 Użyto: {msg.toolsUsed.join(", ")}
@@ -382,23 +581,91 @@ function ChatView({
         <div ref={bottomRef} />
       </div>
 
+      {/* Attachment preview */}
+      {attachments.length > 0 && (
+        <div style={styles.attachmentBar}>
+          {attachments.map((a, i) => (
+            <div key={i} style={styles.attachmentChip}>
+              <span style={{ fontSize: 12 }}>{a.name}</span>
+              <button
+                onClick={() => removeAttachment(i)}
+                style={styles.attachmentRemove}
+              >
+                x
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Voice status */}
+      {dictation.isListening && (
+        <div style={styles.voiceStatus}>{dictation.interimTranscript}</div>
+      )}
+
       {/* Input */}
       <form onSubmit={sendMessage} style={styles.inputBar}>
+        {/* Upload button */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,.pdf,.txt,.csv,.json,.md"
+          onChange={(e) => {
+            if (e.target.files) handleFiles(e.target.files);
+            e.target.value = "";
+          }}
+          style={{ display: "none" }}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={streaming}
+          style={styles.iconBtn}
+          title="Dodaj plik"
+        >
+          +
+        </button>
+
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={streaming ? "Czekam na odpowiedź..." : "Napisz coś..."}
+          placeholder={
+            dictation.isListening
+              ? "Mow..."
+              : streaming
+                ? "Czekam na odpowiedz..."
+                : "Napisz cos..."
+          }
           disabled={streaming}
           style={styles.chatInput}
           autoFocus
         />
+
+        {/* Mic button */}
+        {dictation.isSupported && (
+          <button
+            type="button"
+            onClick={dictation.toggleListening}
+            disabled={streaming}
+            style={{
+              ...styles.iconBtn,
+              color: dictation.isListening ? "#ef4444" : "#888",
+              borderColor: dictation.isListening ? "#ef4444" : "#333",
+            }}
+            title={dictation.isListening ? "Zatrzymaj nagrywanie" : "Mow"}
+          >
+            {dictation.isListening ? "||" : "mic"}
+          </button>
+        )}
+
         <button
           type="submit"
-          disabled={streaming || !input.trim()}
+          disabled={streaming || (!input.trim() && attachments.length === 0)}
           style={styles.sendBtn}
         >
-          {streaming ? "..." : "→"}
+          {streaming ? "..." : ">"}
         </button>
       </form>
     </div>
@@ -616,5 +883,47 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 16,
     fontWeight: 700,
     cursor: "pointer",
+  },
+  iconBtn: {
+    padding: "10px 14px",
+    background: "transparent",
+    border: "1px solid #333",
+    borderRadius: 10,
+    color: "#888",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+    flexShrink: 0,
+  },
+  attachmentBar: {
+    display: "flex",
+    gap: 6,
+    padding: "6px 20px",
+    background: "#0e0e16",
+    flexWrap: "wrap" as const,
+  },
+  attachmentChip: {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    padding: "4px 8px",
+    background: "#1a1a2e",
+    borderRadius: 6,
+    border: "1px solid #333",
+    color: "#aaa",
+  },
+  attachmentRemove: {
+    background: "none",
+    border: "none",
+    color: "#666",
+    cursor: "pointer",
+    fontSize: 12,
+    padding: "0 2px",
+  },
+  voiceStatus: {
+    padding: "4px 20px",
+    background: "#0e0e16",
+    fontSize: 12,
+    color: "#ef4444",
   },
 };
