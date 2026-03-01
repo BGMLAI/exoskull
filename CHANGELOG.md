@@ -4,6 +4,99 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-03-01] ExoSkull v3 — Cyfrowy Żywy Organizm (All 7 Phases)
+
+### Why
+v1 was 120k+ LOC with 18 layers, zero wiring, zero autonomous actions. v3 is a goal-driven autonomous organism: 29 tools, 4 CRONs, BMAD pipeline, reflexion loop, self-extending capabilities.
+
+### What — 7 Phases Complete
+- **Phase 1:** Foundation — Auth + SSE chat + 7 brain tools + v3 agent (~300 LOC vs v1's 995)
+- **Phase 2:** Memory — Knowledge pipeline (RAG), nightly consolidation CRON, 4 knowledge tools
+- **Phase 3:** Goals — Tyrolka framework (set_goal, decompose, track progress), 6 goal tools
+- **Phase 4:** Heartbeat — Goal-driven autonomy loop every 15min, 4 autonomy tools
+- **Phase 5:** App Builder — BMAD pipeline (PM→PRD→Developer→Code), content generation, self-extending tools (3 tools)
+- **Phase 6:** Channels — SMS (Twilio), Email (Resend), Outbound calling (Twilio Voice), morning/evening CRONs (3 tools)
+- **Phase 7:** Self-evolution — get_capabilities (self-awareness), reflexion_evaluate (Sweet & Sour learning) (2 tools)
+
+### Architecture (4 layers, not 18)
+```
+ZMYSŁY (Channels): Web Chat │ Voice │ SMS │ Telegram │ Email
+WOLA (Autonomy):   Heartbeat │ Goal Engine │ Queue │ Permissions
+CIAŁO (Memory):    pgvector │ Knowledge Graph │ Organism Knowledge
+UKŁAD NERWOWY:     Claude Sonnet/Haiku │ Direct API │ 29 Tools
+```
+
+### Key Files
+- `lib/v3/agent.ts` — Direct Anthropic API tool loop (~300 LOC)
+- `lib/v3/tools/` — 7 tool files, 29 tools total
+- `lib/v3/mission-prompt.ts` — Agent SOUL with goal-driven mission
+- `lib/v3/dynamic-context.ts` — 6 parallel context queries
+- `app/api/v3/cron/` — 4 CRONs: heartbeat, consolidate, morning, evening
+- `app/api/chat/stream/route.ts` — SSE endpoint (v3 agent)
+- `supabase/migrations/20260301000001_v3_foundation.sql` — 3 new tables
+
+### 29 Tools (all with real implementations, zero stubs)
+Brain (7) │ Knowledge (4) │ Goals (6) │ Autonomy (4) │ Builder (3) │ Channels (3) │ Evolution (2)
+
+---
+
+## [2026-03-01] ExoSkull v2 — GitHub Repo Created
+
+### Why
+ExoSkull v1 grew to 120k+ LOC with 40+ DB tables and 18 architecture layers. v2 is a clean rewrite with Claude Code as the nervous system — 4 layers, 8 tables max, 21k LOC target.
+
+### What
+- **Created `exoskull-v2` repo** — [BGMLAI/exoskull-v2](https://github.com/BGMLAI/exoskull-v2) (public)
+- **Turborepo monorepo** — `apps/web` (Next.js 15), `apps/desktop` (Tauri v2), 4 shared packages
+- **Scaffold includes:** SSE chat engine, 7 UI components (ChatShell, InputBar, MessageList, CodeBlock, DiffViewer, FileTree, TerminalOutput), Zustand stores, Anthropic API streaming endpoint
+- **Philosophy shift:** Claude Code IS the app — ExoSkull is a wrapper, not the other way around
+
+### Structure
+```
+apps/web/          — Next.js 15 + React 19 (split view: chat | code panel)
+apps/desktop/      — Tauri v2 (scaffold)
+packages/types/    — Message, ToolCall, StreamEvent, Session, Autonomy
+packages/engine/   — SSE parser + useChatEngine hook
+packages/store/    — Zustand (session + spatial)
+packages/ui/       — Chat + Code components (shared web/desktop)
+```
+
+---
+
+## [2026-03-01] Spatial Chat OS — Full UI Rebuild (PR #34)
+
+### Why
+Dashboard had 75% dead code (81/108 components unused), 5 dead UI layers (cockpit, canvas, widgets, mindmap, inbox), 11 hidden pages unreachable from navigation. Old sidebar+pages paradigm didn't match ExoSkull's vision as a conversational OS.
+
+### What
+- **Deleted 130+ dead components** — cockpit, canvas, widgets, mindmap, inbox, floating panels, old dashboard shells, voice overlays, old 3D scenes. Removed ~33k lines.
+- **New Spatial Chat OS architecture** — 4 z-index layers: SceneCanvas (3D background, z=0) → WidgetHUD (floating stat cards, z=8) → ChatHUD (main chat interface, z=10) → CommandPalette (Ctrl+K overlay, z=50)
+- **Extracted useChatEngine hook** (1112 lines) — SSE streaming, history, TTS, thread management, pulled out of monolithic UnifiedStream
+- **EnhancedInputBar** — slash commands (5 categories, 30+ commands), voice dictation, file upload, hashtag navigation
+- **WidgetHUD** — glass-morphism floating cards in 4 screen zones (top-left/right, bottom-left/right), auto-fetch from `/api/canvas/data/*` endpoints
+- **CommandPalette** — Ctrl+K fuzzy search over all slash commands
+- **SceneCanvas** — React Three Fiber ambient background with SpatialGrid + IORSOrb
+- **Dashboard simplified** — single `SpatialApp` entry point, no sidebar, no pages. Navigation via `/commands` and `#hashtags`
+
+### Files Changed (key)
+| File | Change |
+|------|--------|
+| `components/hud/ChatHUD.tsx` | NEW — 2D chat overlay (MessageList + InputBar) |
+| `components/hud/EnhancedInputBar.tsx` | NEW — slash commands, voice, file upload |
+| `components/hud/CommandPalette.tsx` | NEW — Ctrl+K fuzzy command search |
+| `components/hud/MessageList.tsx` | NEW — reuses StreamEventRouter renderers |
+| `components/hud/HUDWidget.tsx` | NEW — single floating stat card |
+| `components/hud/WidgetHUD.tsx` | NEW — 4-zone widget container |
+| `components/scene/*` | NEW — SceneCanvas, IORSOrb, SpatialGrid, etc. |
+| `components/spatial/SpatialApp.tsx` | NEW — root component, layer composition |
+| `lib/hooks/useChatEngine.ts` | NEW — extracted chat logic (1112 lines) |
+| `lib/stores/useSpatialStore.ts` | NEW — Zustand store for chat/widgets/hashtags/3D |
+| `app/dashboard/page.tsx` | MOD — renders `<SpatialApp />` |
+| `app/dashboard/layout.tsx` | MOD — auth-only, no AppShell wrapper |
+| 130+ files in components/ | DELETED — dead code |
+
+---
+
 ## [2026-02-28] Phase 7: Android + Digital Phenotyping
 
 ### Why

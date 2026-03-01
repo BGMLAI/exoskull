@@ -1,8 +1,10 @@
 /**
- * POST /api/chat/stream — v3 Streaming chat endpoint
+ * POST /api/v3/chat/stream — v3 Streaming chat endpoint
  *
- * v3 simplification: direct v3 agent call with SSE streaming.
- * No VPS proxy, no circuit breaker, no code routing.
+ * Simplified from v1 (648 LOC → ~150 LOC):
+ * - Removed: VPS proxy, circuit breaker, code routing, hallucination filtering
+ * - Kept: SSE streaming, auth, rate limiting, unified thread persistence
+ * - Uses: v3 agent directly
  */
 
 import { NextRequest } from "next/server";
@@ -25,21 +27,6 @@ const TOOL_LABELS: Record<string, string> = {
   fetch_url: "Pobieram stronę",
   analyze_image: "Analizuję obraz",
   extract_text_from_image: "Odczytuję tekst z obrazu",
-  // Phase 2+
-  import_document: "Importuję dokument",
-  list_documents: "Pobieram listę dokumentów",
-  get_document_content: "Czytam dokument",
-  analyze_knowledge: "Analizuję wiedzę",
-  // Phase 3+
-  create_op: "Tworzę zadanie",
-  list_ops: "Pobieram zadania",
-  update_op_status: "Aktualizuję zadanie",
-  create_quest: "Tworzę quest",
-  create_goal: "Tworzę cel",
-  decompose_goal: "Rozkładam cel na zadania",
-  check_goals: "Sprawdzam cele",
-  log_mood: "Loguję nastrój",
-  log_data: "Loguję dane",
 };
 
 function getToolLabel(name: string): string {
@@ -50,7 +37,7 @@ function getToolLabel(name: string): string {
 // SSE STREAM BUILDER
 // ============================================================================
 
-function createStream(
+function createV3Stream(
   message: string,
   tenantId: string,
   conversationId?: string,
@@ -100,7 +87,7 @@ function createStream(
           sessionId,
           userMessage: message,
           channel: "web_chat",
-          skipThreadAppend: true,
+          skipThreadAppend: true, // we already appended above
           onThinkingStep: (step, status) => {
             controller.enqueue(
               encoder.encode(
@@ -132,7 +119,7 @@ function createStream(
           },
         });
 
-        // If text wasn't streamed, chunk it now
+        // If text wasn't streamed token-by-token, chunk it now
         const responseText = result.text;
         if (!streamedText && responseText) {
           const chunkSize = 50;
@@ -207,7 +194,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const stream = createStream(message, tenantId, conversationId);
+    const stream = createV3Stream(message, tenantId, conversationId);
 
     return new Response(stream, {
       headers: {

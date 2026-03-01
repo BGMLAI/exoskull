@@ -1,0 +1,365 @@
+/**
+ * ExoSkull v3 Agent — Direct Anthropic API orchestrator
+ *
+ * Simplified from v1 (995 LOC → ~300 LOC):
+ * - Removed: BGML, planner, emotion system, VPS fallback, app detection, personality
+ * - Kept: Anthropic API, tool loop, streaming, dynamic context, memory search
+ * - Added: v3 mission prompt, organism knowledge injection
+ *
+ * Architecture:
+ *   User Message → buildV3DynamicContext → buildV3SystemPrompt
+ *     → Anthropic Messages API (streaming) → tool loop → IORS tools
+ *     → final text response
+ */
+
+import Anthropic from "@anthropic-ai/sdk";
+import { buildV3SystemPrompt } from "./mission-prompt";
+import { buildV3DynamicContext } from "./dynamic-context";
+import { V3_TOOLS, type V3ToolDefinition } from "./tools";
+import { getThreadContext } from "@/lib/unified-thread";
+import { unifiedSearch } from "@/lib/memory/unified-search";
+import type { UnifiedSearchResult } from "@/lib/memory/types";
+import { withRetry } from "@/lib/utils/fetch-retry";
+import { logger } from "@/lib/logger";
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+export type AgentChannel =
+  | "web_chat"
+  | "voice"
+  | "sms"
+  | "telegram"
+  | "email"
+  | "autonomous";
+
+export interface V3AgentRequest {
+  tenantId: string;
+  sessionId: string;
+  userMessage: string;
+  channel: AgentChannel;
+  /** Autonomous mode — no user interaction, heartbeat-driven */
+  mode?: "interactive" | "autonomous";
+  /** Token streaming callback (for SSE) */
+  onTextDelta?: (delta: string) => void;
+  /** Tool execution start callback */
+  onToolStart?: (name: string) => void;
+  /** Tool execution end callback */
+  onToolEnd?: (
+    name: string,
+    durationMs: number,
+    meta?: { success?: boolean; resultSummary?: string },
+  ) => void;
+  /** Thinking step callback */
+  onThinkingStep?: (step: string, status: "running" | "done") => void;
+  /** Gateway already wrote user message to thread */
+  skipThreadAppend?: boolean;
+  /** Max tokens for response */
+  maxTokens?: number;
+  /** Timeout in ms */
+  timeoutMs?: number;
+}
+
+export interface V3AgentResponse {
+  text: string;
+  toolsUsed: string[];
+  costUsd?: number;
+  numTurns?: number;
+  durationMs?: number;
+}
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+const WEB_CONFIG = {
+  maxTurns: 15,
+  timeoutMs: 55_000,
+  model: "claude-sonnet-4-6" as const,
+};
+const VOICE_CONFIG = {
+  maxTurns: 6,
+  timeoutMs: 40_000,
+  model: "claude-sonnet-4-6" as const,
+};
+const AUTONOMOUS_CONFIG = {
+  maxTurns: 8,
+  timeoutMs: 50_000,
+  model: "claude-sonnet-4-6" as const,
+};
+
+const MAX_TOOL_RESULT_LENGTH = 50_000;
+
+// ============================================================================
+// TOOL HELPERS
+// ============================================================================
+
+function toAnthropicTools(tools: V3ToolDefinition[]): Anthropic.Tool[] {
+  return tools.map((t) => ({
+    name: t.definition.name,
+    description: t.definition.description || t.definition.name,
+    input_schema: t.definition.input_schema as Anthropic.Tool["input_schema"],
+  }));
+}
+
+async function executeV3Tool(
+  tools: V3ToolDefinition[],
+  name: string,
+  input: Record<string, unknown>,
+  tenantId: string,
+): Promise<{ result: string; isError: boolean }> {
+  const toolDef = tools.find((t) => t.definition.name === name);
+  if (!toolDef) return { result: `Tool not found: ${name}`, isError: true };
+
+  const timeout = toolDef.timeoutMs ?? 10_000;
+
+  try {
+    let result = await Promise.race([
+      toolDef.execute(input, tenantId),
+      new Promise<string>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Tool ${name} timed out after ${timeout}ms`)),
+          timeout,
+        ),
+      ),
+    ]);
+
+    if (result.length > MAX_TOOL_RESULT_LENGTH) {
+      result =
+        result.slice(0, MAX_TOOL_RESULT_LENGTH) +
+        `\n\n[Truncated — ${result.length} chars total]`;
+    }
+
+    return { result, isError: false };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error(`[v3:Agent] Tool ${name} failed:`, { error: msg });
+    return { result: `Błąd: ${msg}`, isError: true };
+  }
+}
+
+// ============================================================================
+// MAIN AGENT FUNCTION
+// ============================================================================
+
+export async function runV3Agent(
+  req: V3AgentRequest,
+): Promise<V3AgentResponse> {
+  const startMs = Date.now();
+  const config =
+    req.mode === "autonomous"
+      ? AUTONOMOUS_CONFIG
+      : req.channel === "voice"
+        ? VOICE_CONFIG
+        : WEB_CONFIG;
+
+  req.onThinkingStep?.("Ładuję kontekst", "running");
+
+  // ── Phase 1: Load context + memory in parallel ──
+  const [dynamicCtx, threadHistory, memoryResults] = await Promise.all([
+    buildV3DynamicContext(req.tenantId),
+    getThreadContext(req.tenantId, 50),
+    unifiedSearch({
+      tenantId: req.tenantId,
+      query: req.userMessage,
+      limit: 10,
+      minScore: 0.05,
+    }).catch((err) => {
+      logger.warn("[v3:Agent] Memory search failed (non-blocking):", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [] as UnifiedSearchResult[];
+    }),
+  ]);
+
+  // ── Phase 2: Build system prompt ──
+  let memoryContext = "";
+  if (memoryResults && memoryResults.length > 0) {
+    memoryContext =
+      "\n\n## Relevant Memory\n" +
+      memoryResults
+        .map(
+          (r, i) =>
+            `[${i + 1}] (${r.type || "memory"}, score: ${r.score.toFixed(2)}) ${r.content.slice(0, 500)}`,
+        )
+        .join("\n");
+  }
+
+  const systemPrompt = buildV3SystemPrompt(dynamicCtx.context + memoryContext);
+
+  const contextMs = Date.now() - startMs;
+  logger.info(
+    `[v3:Agent] Context loaded in ${contextMs}ms, ${V3_TOOLS.length} tools`,
+  );
+  req.onThinkingStep?.("Ładuję kontekst", "done");
+
+  // ── Phase 3: Tool loop ──
+  req.onThinkingStep?.("Generuję odpowiedź", "running");
+
+  const abortController = new AbortController();
+  const timeout = req.timeoutMs || config.timeoutMs;
+  const timeoutHandle = setTimeout(() => abortController.abort(), timeout);
+
+  const toolsUsed: string[] = [];
+  let finalText = "";
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let numTurns = 0;
+  let totalToolErrors = 0;
+
+  try {
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const anthropicTools = toAnthropicTools(V3_TOOLS);
+
+    // Build message history
+    let messages: Anthropic.MessageParam[];
+    if (req.skipThreadAppend && threadHistory.length > 0) {
+      const last = threadHistory[threadHistory.length - 1];
+      messages =
+        last.role === "user"
+          ? threadHistory
+          : [
+              ...threadHistory,
+              { role: "user" as const, content: req.userMessage },
+            ];
+    } else {
+      messages = [
+        ...threadHistory,
+        { role: "user" as const, content: req.userMessage },
+      ];
+    }
+
+    while (numTurns < config.maxTurns) {
+      numTurns++;
+
+      const response = await withRetry(
+        async () => {
+          const stream = client.messages.stream(
+            {
+              model: config.model,
+              max_tokens: req.maxTokens || 4096,
+              system: systemPrompt,
+              messages,
+              ...(anthropicTools.length > 0 ? { tools: anthropicTools } : {}),
+            },
+            { signal: abortController.signal },
+          );
+
+          if (req.onTextDelta) {
+            stream.on("text", (text) => req.onTextDelta!(text));
+          }
+
+          return stream.finalMessage();
+        },
+        { maxRetries: 3, delayMs: 1500, label: "v3Agent.stream" },
+      );
+
+      totalInputTokens += response.usage.input_tokens;
+      totalOutputTokens += response.usage.output_tokens;
+
+      // Separate text and tool_use blocks
+      const textParts: string[] = [];
+      const toolUseBlocks: Anthropic.ToolUseBlock[] = [];
+
+      for (const block of response.content) {
+        if (block.type === "text") textParts.push(block.text);
+        else if (block.type === "tool_use") toolUseBlocks.push(block);
+      }
+
+      // If no tool calls → done
+      if (response.stop_reason !== "tool_use" || toolUseBlocks.length === 0) {
+        finalText = textParts.join("");
+        break;
+      }
+
+      // Tool use → execute all in parallel
+      messages.push({
+        role: "assistant",
+        content: response.content as Anthropic.ContentBlockParam[],
+      });
+
+      const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+        toolUseBlocks.map(async (toolUse) => {
+          const toolName = toolUse.name;
+          if (!toolsUsed.includes(toolName)) toolsUsed.push(toolName);
+
+          req.onToolStart?.(toolName);
+          const toolStartMs = Date.now();
+
+          const { result, isError } = await executeV3Tool(
+            V3_TOOLS,
+            toolName,
+            toolUse.input as Record<string, unknown>,
+            req.tenantId,
+          );
+
+          if (isError) totalToolErrors++;
+
+          const durationMs = Date.now() - toolStartMs;
+          logger.info(
+            `[v3:Agent] Tool ${toolName}: ${isError ? "FAIL" : "OK"} (${durationMs}ms)`,
+          );
+          req.onToolEnd?.(toolName, durationMs, {
+            success: !isError,
+            resultSummary: result.slice(0, 200),
+          });
+
+          return {
+            type: "tool_result" as const,
+            tool_use_id: toolUse.id,
+            content: result,
+            ...(isError ? { is_error: true as const } : {}),
+          };
+        }),
+      );
+
+      // Stop after 5 tool errors
+      if (totalToolErrors >= 5) {
+        finalText =
+          "Zbyt wiele błędów narzędzi. Spróbuj ponownie lub opisz problem inaczej.";
+        break;
+      }
+
+      messages.push({ role: "user", content: toolResults });
+    }
+
+    if (!finalText && numTurns >= config.maxTurns) {
+      finalText =
+        "Osiągnięto limit interakcji. Spróbuj ponownie z prostszym pytaniem.";
+    }
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    if (abortController.signal.aborted) {
+      logger.warn(`[v3:Agent] Timed out after ${timeout}ms`);
+      finalText = finalText || "Timeout — spróbuj ponownie.";
+    } else {
+      logger.error("[v3:Agent] API call failed:", {
+        error: errMsg,
+        tenantId: req.tenantId,
+      });
+      finalText = "Błąd przetwarzania. Spróbuj ponownie.";
+    }
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+
+  req.onThinkingStep?.("Generuję odpowiedź", "done");
+
+  // Cost calculation (Sonnet: $3/MTok in, $15/MTok out)
+  const costUsd =
+    (totalInputTokens * 3.0 + totalOutputTokens * 15.0) / 1_000_000;
+  const durationMs = Date.now() - startMs;
+
+  logger.info("[v3:Agent] Done:", {
+    tenantId: req.tenantId,
+    channel: req.channel,
+    toolsUsed,
+    numTurns,
+    tokens: { input: totalInputTokens, output: totalOutputTokens },
+    costUsd: costUsd.toFixed(4),
+    durationMs,
+  });
+
+  return { text: finalText, toolsUsed, costUsd, numTurns, durationMs };
+}

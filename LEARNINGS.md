@@ -1,5 +1,20 @@
 # ExoSkull Learnings
 
+## ExoSkull v2 — Separate Repo, Not Branch (2026-03-01)
+**Pattern:** v1 monorepo grew to 120k+ LOC, 40+ tables, 18 layers. Refactoring inside the same repo would carry dead weight.
+**Solution:** Clean repo (`exoskull-v2`) with Turborepo, shared packages (`types`, `engine`, `store`, `ui`), 4-layer architecture. Claude Code as nervous system, not a feature.
+**Lesson:** When rewriting >80% of a codebase, start a new repo. Shared packages (`@exoskull/*`) allow cherry-picking working code from v1 without inheriting debt.
+
+## 75% Dead Code = Rebuild, Not Refactor (2026-03-01)
+**Pattern:** Dashboard audit found 81/108 components dead, 5 dead UI layers, 11 hidden pages. Patches on top of dead code kept growing.
+**Solution:** Full purge (130+ files, -33k lines) + new architecture from scratch (Spatial Chat OS). Kept only stream renderers and API routes.
+**Lesson:** When dead code exceeds 50%, refactoring costs more than rebuilding. Audit first, count dead %, then decide.
+
+## Pointer-Events Layering for HUD Overlays (2026-03-01)
+**Pattern:** Multiple transparent layers (3D scene, widgets, chat) need to pass clicks through while keeping interactive elements clickable.
+**Solution:** Container `pointer-events-none` + interactive children `pointer-events-auto`. Z-index layers: scene(0) → widgets(8) → chat(10) → palette(50).
+**Lesson:** Glass-morphism HUD overlays need explicit pointer-events management per layer.
+
 ## Agent Nie Ma Plan B — Powtarza Ten Sam Błąd w Nieskończoność (2026-02-28)
 **Pattern:** User wgrał PNG ze screenshotem danych OVH. Agent 10+ razy powtórzył "wklej dane tekstowo" zamiast znaleźć rozwiązanie. Tworzył "OCR apps" które były pustymi formularzami. Referował do nieistniejącego dashboardu.
 **Root cause:** Agent nie ma mechanizmu "fallback escalation". Gdy pierwsza metoda zawiedzie, powtarza ją w kółko. Brak: (1) Vision API integration, (2) OCR capability w systemie, (3) mechanizmu "jeśli nie umiem → zbuduj tool → użyj tool".
