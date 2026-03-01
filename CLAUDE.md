@@ -24,7 +24,8 @@ ExoSkull is a **SaaS platform** where every user gets a **fully autonomous AI ag
 3. **SELF-MODIFYING CODE** — agent can read, modify, and extend its OWN source code. It evolves itself — adds new capabilities, fixes its own bugs, optimizes its own behavior
 4. **GENERATES SUB-AGENTS & SKILLS** — spawns specialized sub-agents and skills on demand. Each IORS is a factory that builds whatever it needs to achieve the user's goals
 5. **OUTBOUND REAL-WORLD ACTIONS** — calls strangers, sends emails/SMS, schedules appointments, pays bills, negotiates, operates on user's accounts and services — full delegation with permission system
-6. **SELF-BUILDS FROM CONVERSATIONS** — MVP ships minimal. The rest emerges organically from user-AI dialogue. The system grows itself
+6. **SUPERINTEGRATOR** — agent auto-discovers and auto-connects to ALL user's apps and services. Supports OAuth2, API keys, and webhooks. Encrypted credentials (AES-256). The agent proactively integrates itself with whatever the user uses — not the user configuring connections, the AGENT doing it. DB: `exo_integrations` table. Migration: `20260328000001_superintegrator.sql`
+7. **SELF-BUILDS FROM CONVERSATIONS** — MVP ships minimal. The rest emerges organically from user-AI dialogue. The system grows itself
 
 ### The #1 Priority: AUTONOMY
 Every feature, every design decision, every architectural choice serves one goal: **the agent autonomously realizes the user's goals using all available tools and strategies.** Everything else is secondary.
