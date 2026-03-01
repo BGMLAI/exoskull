@@ -4,6 +4,27 @@ All notable changes to ExoSkull are documented here.
 
 ---
 
+## [2026-03-01] Fix: v3 Tools — Missing RPC Functions + Timeout Fix
+
+### Why
+ALL v3 tools (search_brain, etc.) were failing on production. The agent would hit 5 tool errors and hard-stop, telling users "system ma problemy." Root cause: `hybrid_search`, `vector_search`, and `vector_search_notes` SQL functions were referenced in code but **never created in any migration**.
+
+### What
+- **Created 3 SQL RPC functions** via migration `20260329000001_add_search_rpc_functions.sql`:
+  - `hybrid_search()` — vector + keyword + recency scoring on `exo_vector_embeddings`
+  - `vector_search()` — simple vector-only search
+  - `vector_search_notes()` — vector search on `user_notes`
+- **Added GIN indexes** for full-text search on `exo_vector_embeddings.content` and `exo_unified_messages.content`
+- **Fixed `search_brain` timeout** — was defaulting to 10s, pipeline needs 25s (Gemini expansion + OpenAI embedding + Supabase RPC + Gemini reranking)
+- **Added health check** at `/api/v3/health` — tests all tables, RPC functions, and API keys
+- **Dropped duplicate function overloads** — old `vector`-type parameter versions conflicted with new `text`-type versions
+
+### Remaining
+- `GITHUB_TOKEN` + `GITHUB_REPO` not set on Vercel → `self_modify` tool disabled
+- Need GitHub PAT with `repo` scope added to Vercel env vars
+
+---
+
 ## [2026-03-01] ExoSkull v3 — Cyfrowy Żywy Organizm (All 7 Phases)
 
 ### Why
