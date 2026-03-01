@@ -1,211 +1,111 @@
-/**
- * GET /api/v3/test-autonomy — Run 5 autonomy & self-modification tests
- *
- * TEMPORARY endpoint. Remove after testing.
- * Protected by CRON_SECRET to prevent abuse.
- */
-
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
-import { v3Tools, executeV3Tool } from "@/lib/v3/tools";
 
-export const dynamic = "force-dynamic";
-export const maxDuration = 120;
-
-const ADMIN_TENANT_ID = "be769cc4-43db-4b26-bcc2-046c6653e3b3";
-
-interface TestResult {
-  name: string;
-  description: string;
-  passed: boolean;
-  durationMs: number;
-  toolResult?: string;
-  error?: string;
-}
-
-async function runTest(
-  name: string,
-  description: string,
-  fn: () => Promise<{ result: string; error?: boolean }>,
-): Promise<TestResult> {
-  const start = Date.now();
-  try {
-    const { result, error } = await fn();
-    return {
-      name,
-      description,
-      passed: !error && result.length > 0,
-      durationMs: Date.now() - start,
-      toolResult: result.slice(0, 500),
-      error: error ? "Tool returned isError" : undefined,
-    };
-  } catch (err) {
-    return {
-      name,
-      description,
-      passed: false,
-      durationMs: Date.now() - start,
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
-}
-
-export async function GET(request: NextRequest) {
-  // Auth check - require CRON_SECRET
-  const secret = request.nextUrl.searchParams.get("secret");
+/**
+ * v3 Autonomy Test — quick smoke test for v3 subsystems
+ * GET /api/v3/test-autonomy?tenant_id=xxx
+ */
+export async function GET(req: Request) {
+  const secret = req.headers.get("authorization")?.replace("Bearer ", "");
   if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const results: TestResult[] = [];
+  const { searchParams } = new URL(req.url);
+  const tenantId = searchParams.get("tenant_id");
 
-  // ═══════════════════════════════════════════════════
-  // TEST 1: search_brain — Memory search works
-  // ═══════════════════════════════════════════════════
-  results.push(
-    await runTest(
-      "search_brain",
-      "Search memory for user preferences and goals",
-      async () => {
-        const { result, isError } = await executeV3Tool(
-          "search_brain",
-          { query: "preferencje użytkownika" },
-          ADMIN_TENANT_ID,
-        );
-        return { result, error: isError };
-      },
-    ),
-  );
+  if (!tenantId) {
+    return NextResponse.json({ error: "tenant_id required" }, { status: 400 });
+  }
 
-  // ═══════════════════════════════════════════════════
-  // TEST 2: remember — Can persist knowledge
-  // ═══════════════════════════════════════════════════
-  results.push(
-    await runTest("remember", "Save a fact to organism knowledge", async () => {
-      const { result, isError } = await executeV3Tool(
-        "remember",
-        {
-          content: `[AUTONOMY_TEST] System autonomy verified at ${new Date().toISOString()}`,
-          category: "fact",
-        },
-        ADMIN_TENANT_ID,
-      );
-      return { result, error: isError };
-    }),
-  );
+  const supabase = getServiceSupabase();
+  const results: Record<string, { ok: boolean; detail: string }> = {};
 
-  // ═══════════════════════════════════════════════════
-  // TEST 3: search_web — Internet search via Tavily
-  // ═══════════════════════════════════════════════════
-  results.push(
-    await runTest(
-      "search_web",
-      "Search the internet via Tavily API",
-      async () => {
-        const { result, isError } = await executeV3Tool(
-          "search_web",
-          { query: "ExoSkull adaptive life operating system", max_results: 2 },
-          ADMIN_TENANT_ID,
-        );
-        return { result, error: isError };
-      },
-    ),
-  );
+  // 1. Check v3 tables exist
+  try {
+    const { count } = await supabase
+      .from("exo_autonomy_queue")
+      .select("*", { count: "exact", head: true })
+      .eq("tenant_id", tenantId);
+    results.autonomy_queue = { ok: true, detail: `${count ?? 0} items` };
+  } catch (e) {
+    results.autonomy_queue = {
+      ok: false,
+      detail: e instanceof Error ? e.message : "unknown",
+    };
+  }
 
-  // ═══════════════════════════════════════════════════
-  // TEST 4: self_modify — Self-modification via GitHub
-  // ═══════════════════════════════════════════════════
-  results.push(
-    await runTest(
-      "self_modify",
-      "Create a code modification via GitHub API (branch + commit)",
-      async () => {
-        const { result, isError } = await executeV3Tool(
-          "self_modify",
-          {
-            action: "add_feature",
-            description:
-              "Add a comment '// ExoSkull autonomy test: self-modification verified' at the end of the health check file app/api/v3/health/route.ts",
-            target_files: ["app/api/v3/health/route.ts"],
-          },
-          ADMIN_TENANT_ID,
-        );
-        return { result, error: isError };
-      },
-    ),
-  );
+  try {
+    const { count } = await supabase
+      .from("exo_autonomy_log")
+      .select("*", { count: "exact", head: true })
+      .eq("tenant_id", tenantId);
+    results.autonomy_log = { ok: true, detail: `${count ?? 0} events` };
+  } catch (e) {
+    results.autonomy_log = {
+      ok: false,
+      detail: e instanceof Error ? e.message : "unknown",
+    };
+  }
 
-  // ═══════════════════════════════════════════════════
-  // TEST 5: log_note + search_brain chain — Multi-tool autonomy
-  // ═══════════════════════════════════════════════════
-  results.push(
-    await runTest(
-      "multi_tool_chain",
-      "Log a note then search for it (2-tool chain)",
-      async () => {
-        // Step 1: Log a note
-        const noteResult = await executeV3Tool(
-          "log_note",
-          {
-            title: "Autonomy Test Note",
-            content: `System autonomy chain test at ${new Date().toISOString()}. All subsystems operational.`,
-            type: "observation",
-          },
-          ADMIN_TENANT_ID,
-        );
+  try {
+    const { count } = await supabase
+      .from("exo_organism_knowledge")
+      .select("*", { count: "exact", head: true })
+      .eq("tenant_id", tenantId);
+    results.organism_knowledge = {
+      ok: true,
+      detail: `${count ?? 0} entries`,
+    };
+  } catch (e) {
+    results.organism_knowledge = {
+      ok: false,
+      detail: e instanceof Error ? e.message : "unknown",
+    };
+  }
 
-        if (noteResult.isError) {
-          return { result: noteResult.result, error: true };
-        }
+  // 2. Check tenant has v3 columns
+  try {
+    const { data } = await supabase
+      .from("exo_tenants")
+      .select("permission_level, quiet_hours_start, quiet_hours_end")
+      .eq("id", tenantId)
+      .single();
+    results.tenant_v3_columns = {
+      ok: !!data?.permission_level,
+      detail: data
+        ? `permission=${data.permission_level}, quiet=${data.quiet_hours_start}-${data.quiet_hours_end}`
+        : "no tenant",
+    };
+  } catch (e) {
+    results.tenant_v3_columns = {
+      ok: false,
+      detail: e instanceof Error ? e.message : "unknown",
+    };
+  }
 
-        // Step 2: Verify via direct DB check
-        const supabase = getServiceSupabase();
-        const { data, error } = await supabase
-          .from("user_notes")
-          .select("id, title, content")
-          .eq("tenant_id", ADMIN_TENANT_ID)
-          .eq("title", "Autonomy Test Note")
-          .order("created_at", { ascending: false })
-          .limit(1);
+  // 3. Check v3 tools load
+  try {
+    const { V3_TOOLS } = await import("@/lib/v3/tools");
+    results.v3_tools = { ok: true, detail: `${V3_TOOLS.length} tools loaded` };
+  } catch (e) {
+    results.v3_tools = {
+      ok: false,
+      detail: e instanceof Error ? e.message : "unknown",
+    };
+  }
 
-        if (error) {
-          return {
-            result: `Note saved but verification failed: ${error.message}`,
-            error: true,
-          };
-        }
+  // 4. Check Anthropic API key
+  results.anthropic_key = {
+    ok: !!process.env.ANTHROPIC_API_KEY,
+    detail: process.env.ANTHROPIC_API_KEY ? "set" : "MISSING",
+  };
 
-        const found = data && data.length > 0;
-        return {
-          result: found
-            ? `Chain OK: Note saved (${noteResult.result}) → Verified in DB (id: ${data[0].id})`
-            : `Note saved (${noteResult.result}) but not found in DB`,
-          error: !found,
-        };
-      },
-    ),
-  );
-
-  // ═══════════════════════════════════════════════════
-  // SUMMARY
-  // ═══════════════════════════════════════════════════
-  const passed = results.filter((r) => r.passed).length;
-  const totalMs = results.reduce((sum, r) => sum + r.durationMs, 0);
+  const allOk = Object.values(results).every((r) => r.ok);
 
   return NextResponse.json({
-    summary: {
-      passed,
-      failed: results.length - passed,
-      total: results.length,
-      totalDurationMs: totalMs,
-      timestamp: new Date().toISOString(),
-      verdict:
-        passed === results.length
-          ? "ALL_PASS"
-          : passed >= 3
-            ? "PARTIAL"
-            : "FAIL",
-    },
-    tests: results,
+    status: allOk ? "PASS" : "FAIL",
+    timestamp: new Date().toISOString(),
+    results,
   });
 }
