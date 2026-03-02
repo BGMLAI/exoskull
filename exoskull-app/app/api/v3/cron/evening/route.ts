@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     const { data: tenants } = await supabase
       .from("exo_tenants")
       .select("id, name, quiet_hours_start, quiet_hours_end")
-      .eq("active", true);
+      .not("subscription_status", "in", "(cancelled,suspended)");
 
     if (!tenants?.length) {
       return NextResponse.json({ message: "No active tenants", results: [] });
