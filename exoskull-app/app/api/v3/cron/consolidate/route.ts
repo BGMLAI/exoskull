@@ -16,7 +16,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const maxDuration = 60;
 
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   // Auth: CRON_SECRET
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     const { data: tenants } = await supabase
       .from("exo_tenants")
       .select("id, name")
-      .eq("active", true);
+      .in("subscription_status", ["active", "trialing"]);
 
     if (!tenants?.length) {
       return NextResponse.json({ message: "No active tenants", results: [] });

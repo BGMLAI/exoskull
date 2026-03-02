@@ -100,6 +100,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/webhooks/") ||
     pathname.startsWith("/api/cron/") ||
+    pathname.startsWith("/api/v3/") ||
     pathname.startsWith("/api/public/") ||
     pathname.startsWith("/api/twilio/") ||
     pathname.startsWith("/api/gateway/") || // External messaging webhooks (Telegram, Discord, Slack, Signal, iMessage)

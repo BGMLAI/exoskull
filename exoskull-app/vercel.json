@@ -27,6 +27,9 @@
     },
     "app/api/models/**/*.ts": {
       "maxDuration": 30
+    },
+    "app/api/v3/cron/**/*.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [
@@ -189,6 +192,22 @@
     {
       "path": "/api/cron/memory-consolidation",
       "schedule": "15 3 * * *"
+    },
+    {
+      "path": "/api/v3/cron/heartbeat",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/v3/cron/morning",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/v3/cron/evening",
+      "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/v3/cron/consolidate",
+      "schedule": "0 2 * * *"
     }
   ]
 }
