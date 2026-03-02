@@ -172,24 +172,37 @@ const sendEmailTool: V3ToolDefinition = {
       if (!toEmail)
         return "Brak adresu email. Podaj email lub ustaw w profilu.";
 
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${resendKey}`,
-        },
-        body: JSON.stringify({
-          from: "ExoSkull <noreply@exoskull.app>",
-          to: [toEmail],
-          subject: input.subject as string,
-          text: input.body as string,
-        }),
-        signal: AbortSignal.timeout(10_000),
-      });
+      // Try verified domain first, fallback to Resend test address
+      const fromAddresses = [
+        "ExoSkull <noreply@exoskull.xyz>",
+        "Onboarding <onboarding@resend.dev>",
+      ];
 
-      if (!response.ok) {
-        const err = await response.text();
-        return `Błąd email: ${response.status} — ${err.slice(0, 200)}`;
+      let response: Response | null = null;
+      let lastErr = "";
+
+      for (const fromAddr of fromAddresses) {
+        response = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${resendKey}`,
+          },
+          body: JSON.stringify({
+            from: fromAddr,
+            to: [toEmail],
+            subject: input.subject as string,
+            text: input.body as string,
+          }),
+          signal: AbortSignal.timeout(10_000),
+        });
+
+        if (response.ok) break;
+        lastErr = await response.text();
+      }
+
+      if (!response?.ok) {
+        return `Błąd email: ${response?.status} — ${lastErr.slice(0, 200)}`;
       }
 
       const result = await response.json();
