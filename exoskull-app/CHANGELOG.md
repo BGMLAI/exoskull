@@ -4,6 +4,16 @@ All notable changes to this project.
 
 ---
 
+## [2026-03-02] Autonomy Auditor Agent v2
+
+- **Created** `autonomy-auditor.md` agent — OAF framework (OpenClaw Autonomy Framework)
+- **14 dimensions** (up from 8): Code Gen, Self-Edit, Heartbeat, Memory, Tools, Outbound+Superintegration, Delegation, Error Recovery, UX, Security, Cost Optimization, Health Monitoring, Multimodality, Transparency
+- **10 scenario-based E2E tests** with cross-verification (Browser × DB × Logs × External)
+- Based on BGML Bible knowledge (OpenClaw, Felix, BMAD, CLAWS, QMD, Reflexion)
+- Installed in `~/.claude/agents/` (global) + `.claude/agents/` (project)
+
+---
+
 ## [2026-03-02] Activate v3 Autonomy Engine — 3 Fatal Bugs Fixed
 
 ### Summary
