@@ -34,7 +34,7 @@ export async function GET(req: Request) {
       .select(
         "id, name, permission_level, quiet_hours_start, quiet_hours_end, preferred_channel",
       )
-      .in("subscription_status", ["active", "trialing"]);
+      .in("subscription_status", ["active", "trialing", "trial"]);
 
     if (!tenants?.length) {
       return NextResponse.json({ message: "No active tenants", results: [] });
