@@ -4,6 +4,19 @@ All notable changes to this project.
 
 ---
 
+## [2026-03-02] E2E Round 4 — 9/10 PASS (v4 goal-tools fix)
+
+- **Fixed** v3 goal-tools.ts: 4 tools had wrong column names for Tyrolka tables
+  - `create_task`: removed non-existent `type` column from `user_ops` → moved to `metadata` JSONB
+  - `set_goal`: `title`→`name`, `status`→`is_active`, `metadata`→`aspects` for `user_loops`
+  - `update_goal`: same column fixes + `status`→`is_active` mapping
+  - `get_goals`: removed `.eq("type","goal")` filter, fixed column names
+  - Added `slug` auto-generation from title (NFD diacritics strip)
+- **Fixed** channel-filters.ts: stale `"add_task"` → `"create_task"` in CORE_TOOL_NAMES
+- **PASS (9):** S1 Chat, S2 Task, S3 Heartbeat, S5 Memory, S6 Code Gen, S7 Search, S8 Workflow, S9 Safety, S10 Morning
+- **FAIL (1):** S4 Email — Resend domain not verified (admin setup, not code bug)
+- DB verified: tasks in `user_ops`, goals in `user_loops` with correct schema
+
 ## [2026-03-02] E2E Round 3 — v4 LIVE, 6/10 PASS, 4/10 PARTIAL
 
 - **Deployed** v4 to production after ~7h Vercel platform outage recovery
