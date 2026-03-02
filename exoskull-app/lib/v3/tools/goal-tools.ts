@@ -48,10 +48,20 @@ const setGoalTool: V3ToolDefinition = {
       const { getServiceSupabase } = await import("@/lib/supabase/service");
       const supabase = getServiceSupabase();
 
+      // Generate slug from title (URL-safe, lowercase, no diacritics)
+      const slug = (input.title as string)
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 60);
+
       const { data, error } = await supabase
         .from("user_loops")
         .insert({
           tenant_id: tenantId,
+          slug,
           name: input.title as string,
           description: (input.description as string) || null,
           priority: (input.priority as number) || 7,
