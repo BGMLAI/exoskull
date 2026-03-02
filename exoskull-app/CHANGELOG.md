@@ -4,6 +4,49 @@ All notable changes to this project.
 
 ---
 
+## [2026-03-02] Activate v3 Autonomy Engine — 3 Fatal Bugs Fixed
+
+### Summary
+
+v3 autonomy code (3180 LOC, 30 tools, 4 CRONs) existed but was 100% dead due to 3 stacked bugs. All fixed, deployed, and verified live on production.
+
+### Bug Chain (each alone was fatal)
+
+| Bug                    | Root Cause                                            | Fix                                                                        |
+| ---------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| CRONs never scheduled  | 4 v3 cron paths missing from `vercel.json`            | Added heartbeat/morning/evening/consolidate + `maxDuration: 60`            |
+| 405 on every CRON fire | All 4 routes exported `POST`, Vercel CRONs send `GET` | Changed all to `export async function GET`                                 |
+| Silent Postgres error  | `.eq("active", true)` on non-existent column          | Replaced with `.not("subscription_status", "in", "(cancelled,suspended)")` |
+
+### Additional Fix
+
+- `test-autonomy/route.ts` was 0 bytes (broke TS build) — rewritten as v3 smoke test endpoint
+
+### Verification
+
+- `GET /api/v3/health` → 200, 14/14 checks PASS
+- `GET /api/v3/cron/heartbeat` (with CRON_SECRET) → 200, processes tenants correctly
+- Manual heartbeat returned: `{"tenantId":"be769cc4...","action":"no_action","status":"ok"}`
+
+### Commits
+
+- `a3ab40e` — feat: activate v3 autonomous agent — wire crons + fix test endpoint
+- `0f167aa` — fix: change v3 cron routes from POST to GET for Vercel Crons
+- `84260a1` — fix: replace non-existent .eq("active", true) with subscription_status filter
+
+### Files Modified
+
+| File                                   | Change                                    |
+| -------------------------------------- | ----------------------------------------- |
+| `vercel.json`                          | +4 cron entries, +1 function config       |
+| `app/api/v3/cron/heartbeat/route.ts`   | POST→GET, active→subscription_status      |
+| `app/api/v3/cron/morning/route.ts`     | POST→GET, active→subscription_status      |
+| `app/api/v3/cron/evening/route.ts`     | POST→GET, active→subscription_status      |
+| `app/api/v3/cron/consolidate/route.ts` | POST→GET, active→subscription_status      |
+| `app/api/v3/test-autonomy/route.ts`    | Rewritten from 0 bytes to full smoke test |
+
+---
+
 ## [2026-02-23] Fix 4 Critical Architecture Issues in Autonomy System
 
 ### DI Support for Autonomy Singletons

@@ -1,5 +1,27 @@
 # ExoSkull Learnings
 
+## Vercel CRONs Always Send GET (2026-03-02)
+
+- All 4 v3 cron routes used `export async function POST` — Vercel CRONs always send GET requests.
+- Result: 405 Method Not Allowed on every scheduled invocation. Code was "running" but never reached.
+- **Pattern:** Vercel CRONs = GET only. Always verify HTTP method matches the invoker. `POST` for crons is a silent killer — no error logs in your app, just Vercel getting 405 and moving on.
+
+## Non-Existent Columns Fail Silently in Supabase JS Client (2026-03-02)
+
+- `.eq("active", true)` on a table without an `active` column doesn't throw in the Supabase JS client — it returns a Postgres error in `{ error }` which the code's `try/catch` silently swallows.
+- Result: `tenants` is `null`, loop body never executes, function returns "No active tenants" — looks like a valid result.
+- **Pattern:** Always validate that queried columns actually exist in the schema. Supabase PostgREST returns HTTP 400 with `column X does not exist` but `.from().select().eq()` wraps it as `{ data: null, error: {...} }` — if you only check `data`, you'll never see the error.
+- **Fix:** Check `{ error }` from every Supabase query, or at minimum log when `data` is unexpectedly null.
+
+## Three-Bug Chain: Complete System Failure From Trivial Causes (2026-03-02)
+
+- v3 autonomy (3180 LOC, 30 tools) was 100% dead from 3 one-line bugs stacked together:
+  1. CRONs not in vercel.json → never scheduled
+  2. POST instead of GET → 405 on every invocation
+  3. `.eq("active", true)` → silent Postgres error
+- Each bug alone was fatal. Together they made the system appear "deployed but doing nothing."
+- **Pattern:** When code exists but "nothing works," check the invocation chain from the scheduler down: (1) Is the code scheduled? (2) Is the code reachable (correct method, correct URL)? (3) Does the first DB query succeed? These 3 checks cover 90% of "dead code" scenarios in CRON-based systems.
+
 ## Autonomous Loops Must Share Tables, Not Just Concepts (2026-02-28)
 
 - 5 independent loops (MAPE-K, Ralph, Impulse, Gap Detection, Dynamic Skills) were individually coded but **wrote to different tables** — Gap Detector → `learning_events`, Ralph/Impulse → `exo_proactive_log`. Zero cross-loop visibility.
