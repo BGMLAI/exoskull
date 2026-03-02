@@ -1,5 +1,27 @@
 # ExoSkull Learnings
 
+## Next.js Route Files Can Only Export HTTP Handlers (2026-03-02)
+
+- Putting helper functions (`registerConversation`, `getActiveConversationCount`) alongside `POST` handler in a route file caused TS error: `Property 'registerConversation' is incompatible with index signature`.
+- Next.js App Router validates that route files only export: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, plus `config`, `generateStaticParams`, etc.
+- **Solution:** Extract shared state/helpers to a separate module (`lib/chat/active-conversations.ts`) and import in the route.
+- **Pattern:** Route files are API boundaries — keep them thin. Business logic, shared state, and utilities belong in `lib/`.
+
+## Supabase Migration History Needs Manual Repair for Prod Drift (2026-03-02)
+
+- `supabase db push` fails when remote has migration versions not found locally (e.g., applied directly via SQL Editor or different branch).
+- Error: "Remote migration versions not found in local migrations directory."
+- **Solution:** `supabase migration repair --status reverted <version>` for remote-only entries, `--status applied <version>` for objects that already exist.
+- Always use `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, and `DO $$ BEGIN CREATE POLICY ... EXCEPTION WHEN duplicate_object THEN NULL; END $$` for idempotent migrations.
+- **Pattern:** Production databases drift from migration files. Make every migration idempotent (IF NOT EXISTS everywhere) so re-running is safe.
+
+## Vercel Outages Block Git-Based Deploys But Code Is Safe (2026-03-02)
+
+- Vercel "internal error" during "Deploying outputs" = platform issue, not code issue. Build succeeds, deployment fails.
+- 6 redeploy attempts over 20 minutes — all same error. Redeploying old known-good builds also fails.
+- Code is in git → will auto-deploy when Vercel recovers.
+- **Pattern:** For CI/CD, always have a way to verify: (1) code compiles, (2) tests pass — independently of the deployment platform. Don't block E2E testing on a single deploy target if you can test subsets against existing prod.
+
 ## Autonomous Loops Must Share Tables, Not Just Concepts (2026-02-28)
 
 - 5 independent loops (MAPE-K, Ralph, Impulse, Gap Detection, Dynamic Skills) were individually coded but **wrote to different tables** — Gap Detector → `learning_events`, Ralph/Impulse → `exo_proactive_log`. Zero cross-loop visibility.
@@ -166,6 +188,19 @@
   - Punctuation must be stripped before word splitting
   - Threshold `>=0.5` catches "word word word other" (3/4 = 75%)
   - Single "Halo?" is legitimate — require `{3,}` repetitions for short greetings
+
+## .vercelignore Patterns Are Recursive Like .gitignore (2026-03-02)
+
+- `supabase/` in `.vercelignore` matches ALL directories named `supabase` at ANY depth — including `lib/supabase/` which contains `client.ts`, `server.ts`, `middleware.ts`.
+- Similarly, `tools/` matches `lib/iors/tools/` — the entire IORS tool library.
+- **Solution:** Prefix with `/` for root-only matching: `/supabase/`, `/tools/`, `/scripts/`.
+- **Pattern:** `.vercelignore` (like `.gitignore`) treats bare directory names as recursive patterns. Always use `/dirname/` (leading slash) for top-level-only exclusions. This silently broke the build with "Module not found" errors.
+
+## Vercel Deploys From Specific GitHub Repo (2026-03-02)
+
+- Two remotes: `origin` (exoskull.git) and `v3-origin` (exoskull-v3.git). Vercel project `exoskull-v3` deploys from `v3-origin`, NOT `origin`.
+- Pushing to `origin/v3` does NOT trigger Vercel deployment. Must push to `v3-origin/main`.
+- **Pattern:** Always verify which remote/branch Vercel is connected to before assuming deployment was triggered. Check `exoskull-app/.vercel/project.json` for project ID, then cross-reference with Vercel dashboard.
 
 ## Bash in Claude Code on Windows
 

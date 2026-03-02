@@ -4,6 +4,12 @@ All notable changes to this project.
 
 ---
 
+## [2026-03-02] Fix: .vercelignore recursive patterns broke build
+
+- **Fixed** `.vercelignore` patterns (`supabase/`, `tools/`) excluded `lib/supabase/` and `lib/iors/tools/`
+- All patterns now use `/` prefix for root-only matching
+- **Fixed** deployment remote: v4 code now pushed to both `origin/v3` AND `v3-origin/main` (Vercel source)
+
 ## [2026-03-02] Sprint v4 — 140/140 Perfect Autonomy Score
 
 ### Self-Modification (D2: +2.5)

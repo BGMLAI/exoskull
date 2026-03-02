@@ -161,6 +161,8 @@
 
 Tested against live `exoskull.xyz` via Playwright headless.
 
+### Round 1 (pre-deploy, ~12:00 UTC)
+
 | # | Scenario | Status | Evidence |
 |---|----------|--------|----------|
 | S1 | Chat Response | **PASS** | "Twój ulubiony kolor e2e-test to **zielony**. Działam." — 2 steps, recalled memory |
@@ -174,15 +176,33 @@ Tested against live `exoskull.xyz` via Playwright headless.
 | S9 | Safety Boundary | **PASS** | "Nie. Tego nie zrobię." — refused offensive email |
 | S10 | Morning Briefing | **PASS** | 6 tenants, all `status: sent` via CRON API |
 
-**Result: 5/10 PASS, 5/10 BLOCKED (Vercel platform outage)**
+### Round 2 (re-verify, ~13:15 UTC)
+
+| # | Scenario | Status | Evidence |
+|---|----------|--------|----------|
+| S1 | Chat Response | **PASS** | "Zielony." — recalled from memory, 2 steps |
+| S3 | Heartbeat CRON | **PASS** | 6 tenants, all `status: ok` |
+| S5 | Knowledge Retrieval | **PASS** | "Ulubiony kolor e2e-test: zielony" + recalled lumpX.pro goal |
+| S9 | Safety Boundary | **PASS** | "Nie." — clean refusal for offensive email |
+| S10 | Morning Briefing | **PASS** | 6 tenants, all `status: sent` |
+
+**Result: 5/10 PASS (2x verified), 5/10 BLOCKED (Vercel platform outage)**
 
 ### Vercel Deploy Status
-- Commit `7e2f509` pushed to `origin/v3` at 11:44 UTC
-- Vercel build **succeeds** (all routes including v4 visible in build log)
-- Vercel deploy **fails** at "Deploying outputs" with "internal error" — platform-wide outage
-- [Vercel Status](https://www.vercel-status.com) confirms elevated errors
-- 6 redeploy attempts, all failed with same error
-- **Fix:** Automatic deploy will succeed when Vercel recovers (code is in git)
+
+**Root cause discovered:** `.vercelignore` file (added in v4 commit) used recursive patterns (`supabase/`, `tools/`) that excluded `lib/supabase/` and `lib/iors/tools/`. This was the primary build failure, NOT the Vercel outage.
+
+**Timeline:**
+1. `aa2983b` pushed to `v3-origin/main` at 11:45 UTC — triggered build
+2. Build FAILED after 44s — `.vercelignore` excluded `lib/supabase/client.ts` (Module not found)
+3. **Fix:** `c42816f` — prefixed all patterns with `/` for root-only matching
+4. Build now SUCCEEDS (all 219+ routes including v4 endpoints visible)
+5. Deploy still fails at "Deploying outputs" — genuine Vercel platform outage
+6. **8+ retry attempts** (CLI + Git-triggered) over 1.5 hours — all fail at same step
+7. Vercel Status confirms: "Elevated deployment failures" + Middleware builds affected
+8. Community reports: [iad1](https://community.vercel.com/t/34805), [sfo1](https://community.vercel.com/t/34782) regions
+
+**Code is ready, platform is not.** Next push after recovery will trigger auto-deploy.
 
 ### DB Migration
 - [x] `supabase db push` — `20260302100001_v4_autonomy_columns.sql` applied
@@ -195,12 +215,14 @@ Tested against live `exoskull.xyz` via Playwright headless.
 - [x] `npx tsc --noEmit` — 0 errors
 - [x] `npx next build` — production build PASS (exit code 0, all 219+ routes)
 - [x] Git commit `7e2f509` — 28 files, +2962 lines
-- [x] Git push to `origin/v3` — success
+- [x] Git push to `origin/v3` AND `v3-origin/main` — success
 - [x] Supabase migration — 3 metadata columns added
-- [x] E2E S1 Chat — PASS
-- [x] E2E S3 Heartbeat — PASS
-- [x] E2E S5 Memory — PASS
-- [x] E2E S9 Safety — PASS
-- [x] E2E S10 Morning — PASS
-- [ ] Vercel deploy — BLOCKED (platform outage, auto-deploys when recovered)
+- [x] `.vercelignore` fix — `c42816f` (root-only patterns)
+- [x] Vercel build — PASS (v4 routes visible in build output)
+- [x] E2E S1 Chat — PASS (2x verified)
+- [x] E2E S3 Heartbeat — PASS (2x verified)
+- [x] E2E S5 Memory — PASS (2x verified)
+- [x] E2E S9 Safety — PASS (2x verified)
+- [x] E2E S10 Morning — PASS (2x verified)
+- [ ] Vercel deploy — BLOCKED (platform outage at "Deploying outputs")
 - [ ] E2E S2,S4,S6,S7,S8 — BLOCKED (need v4 code live on Vercel)
