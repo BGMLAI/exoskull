@@ -4,6 +4,14 @@ All notable changes to this project.
 
 ---
 
+## [2026-03-02] E2E Round 3 — v4 LIVE, 6/10 PASS, 4/10 PARTIAL
+
+- **Deployed** v4 to production after ~7h Vercel platform outage recovery
+- **PASS (6):** S1 Chat, S3 Heartbeat, S5 Memory, S6 Code Generation, S9 Safety, S10 Morning
+- **PARTIAL (4):** S2 Task (DB column mismatch), S4 Email (API key), S7 Search (API key), S8 Workflow (DB unavailable)
+- All PARTIAL scenarios: tools correctly invoked — failures are prod config, not code
+- Graceful degradation confirmed: `create_task` → fallback to `remember`
+
 ## [2026-03-02] Fix: .vercelignore recursive patterns broke build
 
 - **Fixed** `.vercelignore` patterns (`supabase/`, `tools/`) excluded `lib/supabase/` and `lib/iors/tools/`
