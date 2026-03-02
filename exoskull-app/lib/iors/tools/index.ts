@@ -45,6 +45,8 @@ import { codeGenerationTools } from "./code-generation-tools";
 import { tyrolkaTools } from "./tyrolka-tools";
 import { valueTools } from "./value-tools";
 import { debateTools } from "./debate-tools";
+import { reflexionTools } from "./reflexion-tools";
+import { delegationTools } from "./delegation-tools";
 import { capabilitiesTools } from "./capabilities-tools";
 import { dashboardTools } from "./dashboard-tools";
 
@@ -60,6 +62,8 @@ import { mcpBridgeTools } from "./mcp-bridge-tools";
 import { agentFactoryTools } from "./agent-factory-tools";
 import { goalStrategyTools } from "./goal-strategy-tools";
 import { selfBuildTools } from "./self-build-tools";
+import { selfModificationTools } from "./self-modification-tools";
+import { mediaCaptureTools } from "./media-capture-tools";
 
 // Phase 3 — Google & Meta Full Integration
 import { googleCalendarTools } from "./google-calendar-tools";
@@ -122,12 +126,20 @@ export const IORS_EXTENSION_TOOLS = [
   ...googleAnalyticsTools,
   ...facebookTools,
   ...threadsTools,
+  // Reflexion tools — Sweet & Sour learning pattern
+  ...reflexionTools,
+  // Auto-delegation tools — complexity analysis + agent routing
+  ...delegationTools,
   // Discovery tools — available on ALL channels
   ...discoveryTools,
   // Goal strategy tools — view/approve/pause strategies via chat
   ...goalStrategyTools,
   // Self-build tools — agent can create new tools at runtime
   ...selfBuildTools,
+  // Self-modification tools — agent can propose source code changes via PR pipeline
+  ...selfModificationTools,
+  // Media capture tools — screenshot, camera, image analysis
+  ...mediaCaptureTools,
 ];
 
 // Register tools and dynamic resolver in the shared registry so

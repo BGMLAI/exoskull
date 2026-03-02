@@ -396,7 +396,111 @@ export async function handleOAuthCallback(
 }
 
 /**
+ * Refresh an expired OAuth2 access token using the stored refresh_token.
+ * Returns new credentials or null if refresh fails.
+ */
+export async function refreshAccessToken(
+  tenantId: string,
+  serviceSlug: string,
+): Promise<Record<string, unknown> | null> {
+  const supabase = getServiceSupabase();
+
+  const { data: integration } = await supabase
+    .from("exo_integrations")
+    .select("id, credentials_encrypted, oauth_config, auth_method")
+    .eq("tenant_id", tenantId)
+    .eq("service_slug", serviceSlug)
+    .eq("status", "connected")
+    .eq("auth_method", "oauth2")
+    .single();
+
+  if (!integration?.credentials_encrypted || !integration.oauth_config) {
+    return null;
+  }
+
+  try {
+    const creds = JSON.parse(decrypt(integration.credentials_encrypted));
+    if (!creds.refresh_token) {
+      logger.warn("[Superintegrator] No refresh_token for:", {
+        serviceSlug,
+        tenantId,
+      });
+      return null;
+    }
+
+    const oauthConfig = integration.oauth_config as OAuthConfig;
+
+    const tokenResponse = await fetch(oauthConfig.token_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: creds.refresh_token,
+        client_id: oauthConfig.client_id,
+        ...(creds.client_secret ? { client_secret: creds.client_secret } : {}),
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      logger.error("[Superintegrator] Token refresh failed:", {
+        serviceSlug,
+        tenantId,
+        status: tokenResponse.status,
+        error: errorText.slice(0, 200),
+      });
+
+      // Mark as expired if refresh fails with 4xx
+      if (tokenResponse.status >= 400 && tokenResponse.status < 500) {
+        await supabase
+          .from("exo_integrations")
+          .update({ status: "expired", updated_at: new Date().toISOString() })
+          .eq("id", integration.id);
+      }
+      return null;
+    }
+
+    const tokens = await tokenResponse.json();
+
+    const newCreds = {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token || creds.refresh_token,
+      expires_at: tokens.expires_in
+        ? Date.now() + tokens.expires_in * 1000
+        : null,
+      token_type: tokens.token_type || creds.token_type,
+      scope: tokens.scope || creds.scope,
+      ...(creds.client_secret ? { client_secret: creds.client_secret } : {}),
+    };
+
+    const encryptedCreds = encrypt(JSON.stringify(newCreds));
+
+    await supabase
+      .from("exo_integrations")
+      .update({
+        credentials_encrypted: encryptedCreds,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", integration.id);
+
+    logger.info("[Superintegrator] Token refreshed:", {
+      serviceSlug,
+      tenantId,
+    });
+    return newCreds;
+  } catch (err) {
+    logger.error("[Superintegrator] Token refresh error:", {
+      serviceSlug,
+      tenantId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+/**
  * Get decrypted credentials for a connected service.
+ * Auto-refreshes expired OAuth2 tokens when possible.
  */
 export async function getServiceCredentials(
   tenantId: string,
@@ -416,6 +520,20 @@ export async function getServiceCredentials(
 
   try {
     const creds = JSON.parse(decrypt(data.credentials_encrypted));
+
+    // Auto-refresh expired OAuth2 tokens (5 min buffer)
+    if (
+      data.auth_method === "oauth2" &&
+      creds.expires_at &&
+      Date.now() > creds.expires_at - 5 * 60 * 1000
+    ) {
+      const refreshed = await refreshAccessToken(tenantId, serviceSlug);
+      if (refreshed) {
+        return { ...refreshed, api_base_url: data.api_base_url };
+      }
+      // Fall through with potentially expired token
+    }
+
     return { ...creds, api_base_url: data.api_base_url };
   } catch {
     return null;

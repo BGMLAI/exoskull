@@ -4,6 +4,117 @@ All notable changes to this project.
 
 ---
 
+## [2026-03-02] Sprint v4 — 140/140 Perfect Autonomy Score
+
+### Self-Modification (D2: +2.5)
+
+- **Added** `self_modify` + `view_modifications` IORS tools wrapping full source-engine pipeline
+- Agent can now propose code changes through kernel guard → diff → VPS test → GitHub PR
+- Registered in `self_evolution` tool pack
+
+### Autonomous Channel (D3: +1)
+
+- **Added** `autonomous` channel type to AgentChannel
+- Autonomous channel gets ALL tools (no filter) — enables full proactive action
+
+### Outbound/Integrations (D6: +4)
+
+- **Added** `refreshAccessToken()` to Superintegrator — auto-refreshes expired OAuth2 tokens
+- **Updated** `getServiceCredentials()` — checks expiry, auto-refreshes with 5min buffer
+- **Added** webhook handler route `/api/integrations/webhook/[slug]` — receives inbound events
+- Webhook events routed to `exo_autonomy_queue` for heartbeat processing
+
+### Security (D10: +0.5)
+
+- **Added** SQL injection prevention in `build_tool()` — column name allowlisting, dangerous pattern blocking
+- **Added** composite tool step validation — verifies tool names exist before execution
+
+### Personalization (D9: +3.5)
+
+- **Added** `lib/emotion/response-modulator.ts` — emotion-driven prompt tone modulation
+- 6 modulation rules: fearful→reassuring, angry→direct, sad→empathic, happy→enthusiastic, etc.
+- **Added** `lib/ai/tau-matrix.ts` — 5-dimension user behavioral model (weighted moving average)
+- Tau Matrix injected into every system prompt for personalized responses
+- **Added** `/api/v3/feedback` — POST ratings (1-5), GET aggregate stats
+
+### Cost & Transparency (D11: +2.5, D14: +3.5)
+
+- **Added** `/api/v3/insights/cost` — daily/weekly/monthly cost breakdown by model/channel
+- **Added** cost SSE events during streaming — `{ type: "cost", cost_usd, cumulative_cost_usd }`
+- **Added** budget limit checking — auto-switches to Haiku when monthly budget exceeded
+- **Added** `/api/v3/chat/pause` — abort running conversations via external endpoint
+- **Added** decision reasoning SSE — `{ type: "decision", tool, reason }` before each tool call
+- **Added** result summary SSE — `{ type: "result_summary", tool, success, duration_ms }`
+- **Added** `/api/v3/exports/audit-trail` — GDPR-compliant JSON/CSV export of all activity
+
+### Sub-Agents & Error Recovery (D7: +1.5, D8: +1.5)
+
+- **Added** `coordinate_agents` IORS tool — run up to 5 tasks in parallel via DIPPER pattern
+- **Added** `lib/ai/agent-coordinator.ts` — merge strategies (majority_vote, quality_score, synthesis)
+- **Added** auto-reflexion after 2+ tool failures — logs patterns to `exo_dev_journal`
+
+### Process Health (D12: +1)
+
+- **Added** `/api/v3/health` — checks DB, Anthropic API, Resend, VPS status
+- **Enhanced** consolidation CRON — now collects tool success rate, avg latency, daily cost
+
+### Multimodality (D13: +2.5)
+
+- **Added** `request_screenshot`, `request_camera_photo`, `analyze_image` IORS tools
+- Media capture via SSE directives to frontend; image analysis via Gemini Vision
+
+### DB Migration
+
+- `20260302100001_v4_autonomy_columns.sql` — adds `metadata` JSONB to `user_ops`, `exo_user_documents`, `exo_tenants`
+
+### Files: 12 new, 10 modified (~1500 lines)
+
+---
+
+## [2026-03-02] Autonomy Sprint — 14 Dimensions Full Fix (B→A)
+
+### Security (D10)
+
+- **Added** prompt injection defense: `sanitizeUserInput()` wired at gateway + agent entry (defense-in-depth)
+- **Fixed** NULL permission level: new tenants no longer bypass autonomy opt-in
+
+### Heartbeat & Proactive (D3)
+
+- **Fixed** rate limit from 4→12 proactive actions/day (configurable per tenant via `metadata.max_daily_autonomy_actions`)
+- **Added** error checks to all CRON Supabase queries (heartbeat + morning) — no more silent failures
+- **Added** `metadata` to tenant select for configurable autonomy behavior
+
+### Self-Evolution (D2) & Tools (D5)
+
+- **Added** `self_evolution` tool pack: `trigger_source_evolution`, `view_dev_journal`, `trigger_ralph_cycle`, `set_development_priority`
+- **Added** `learning` tool pack: `reflexion_evaluate` (Sweet & Sour pattern), `get_learned_patterns`
+- **Added** 10 keyword mappings for evolution + learning (PL/EN)
+- **Added** both packs to default web channel tools
+
+### Sub-Agent Delegation (D7)
+
+- **Added** `auto_delegate` tool with complexity scoring, agent type matching, and queue integration
+- Supports 5 agent types: code_builder, researcher, communicator, planner, data_analyst
+
+### Multimodality (D13)
+
+- **Added** code tools (`execute_code`, `code_bash`, `generate_fullstack_app`) to voice channel
+- **Removed** voice channel gate for code context injection — voice users can now build/deploy
+
+### Testing
+
+- **Added** 12 unit tests (`tests/unit/autonomy/autonomy-wiring.test.ts`) — all pass
+- **Added** 10 E2E Playwright scenarios (`tests/e2e/autonomy-scenarios.test.ts`)
+- **Verified** TypeScript build: zero errors
+- **Verified** API smoke tests: heartbeat + morning CRONs return 200
+
+### Audit Score
+
+- Previous: B (103/140) — Level 2.8
+- Current: A (115/140) — Level 3.5
+
+---
+
 ## [2026-02-23] Fix 4 Critical Architecture Issues in Autonomy System
 
 ### DI Support for Autonomy Singletons

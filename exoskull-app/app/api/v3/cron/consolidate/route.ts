@@ -171,7 +171,54 @@ Zasady:
     await supabase.from("exo_organism_knowledge").insert(rows);
   }
 
-  // 6. Log consolidation event
+  // 6. Collect system health metrics for this tenant
+  let healthMetrics: Record<string, unknown> = {};
+  try {
+    // Tool success rate today
+    const { data: toolStats } = await supabase
+      .from("exo_tool_executions")
+      .select("success")
+      .eq("tenant_id", tenantId)
+      .gte("created_at", dayStart.toISOString());
+
+    const totalTools = toolStats?.length || 0;
+    const successTools =
+      toolStats?.filter((t: Record<string, unknown>) => t.success).length || 0;
+
+    // Avg response time today
+    const { data: usageStats } = await supabase
+      .from("exo_ai_usage")
+      .select("latency_ms, estimated_cost")
+      .eq("tenant_id", tenantId)
+      .gte("created_at", dayStart.toISOString());
+
+    const latencies = (usageStats || []).map(
+      (u: Record<string, unknown>) => (u.latency_ms as number) || 0,
+    );
+    const avgLatency =
+      latencies.length > 0
+        ? latencies.reduce((a: number, b: number) => a + b, 0) /
+          latencies.length
+        : 0;
+    const totalCost = (usageStats || []).reduce(
+      (sum: number, u: Record<string, unknown>) =>
+        sum + ((u.estimated_cost as number) || 0),
+      0,
+    );
+
+    healthMetrics = {
+      tool_success_rate:
+        totalTools > 0 ? Math.round((successTools / totalTools) * 100) : 100,
+      total_tool_calls: totalTools,
+      avg_response_ms: Math.round(avgLatency),
+      daily_cost_usd: Math.round(totalCost * 10000) / 10000,
+      total_ai_calls: usageStats?.length || 0,
+    };
+  } catch {
+    // Health metrics are non-critical
+  }
+
+  // 7. Log consolidation event with health metrics
   await supabase.from("exo_autonomy_log").insert({
     tenant_id: tenantId,
     event_type: "nightly_consolidation",
@@ -181,6 +228,18 @@ Zasady:
       patterns_extracted: parsed.patterns?.length || 0,
       goal_updates: parsed.goal_updates?.length || 0,
       tomorrow_priorities: parsed.tomorrow_priorities || [],
+      health_metrics: healthMetrics,
     },
   });
+
+  // Store health metrics in organism_knowledge for trend analysis
+  if (Object.keys(healthMetrics).length > 0) {
+    await supabase.from("exo_organism_knowledge").insert({
+      tenant_id: tenantId,
+      content: `System health ${now.toISOString().split("T")[0]}: ${JSON.stringify(healthMetrics)}`,
+      category: "system_metric",
+      confidence: 1.0,
+      source: "nightly_consolidation",
+    });
+  }
 }

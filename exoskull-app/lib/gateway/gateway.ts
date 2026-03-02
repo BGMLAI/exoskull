@@ -27,6 +27,7 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { emitEvent } from "@/lib/iors/loop";
 import { grantPermission } from "@/lib/iors/autonomy";
 import { WEB_CHAT_SYSTEM_OVERRIDE } from "../voice/system-prompt";
+import { sanitizeUserInput } from "@/lib/security/safety-guardrails";
 
 import { logger } from "@/lib/logger";
 import { logActivity } from "@/lib/activity-log";
@@ -426,7 +427,7 @@ export async function handleInboundMessage(
       runExoSkullAgent({
         tenantId,
         sessionId,
-        userMessage: msg.text,
+        userMessage: sanitizeUserInput(msg.text),
         channel: msg.channel as AgentChannel,
         skipThreadAppend: true,
         onTextDelta: callback?.onTextDelta,

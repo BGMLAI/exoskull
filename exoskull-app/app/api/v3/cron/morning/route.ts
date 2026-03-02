@@ -21,10 +21,20 @@ export async function GET(req: Request) {
   const results: { tenantId: string; status: string }[] = [];
 
   try {
-    const { data: tenants } = await supabase
+    const { data: tenants, error: tenantsError } = await supabase
       .from("exo_tenants")
       .select("id, name, preferred_channel, quiet_hours_start, quiet_hours_end")
       .in("subscription_status", ["active", "trialing", "trial"]);
+
+    if (tenantsError) {
+      console.error("[Morning] Failed to fetch tenants:", {
+        error: tenantsError,
+      });
+      return NextResponse.json(
+        { error: "Failed to fetch tenants" },
+        { status: 500 },
+      );
+    }
 
     if (!tenants?.length) {
       return NextResponse.json({ message: "No active tenants", results: [] });
@@ -64,7 +74,10 @@ async function generateMorningBriefing(
   userName: string | null,
 ) {
   // Gather context: goals, tasks, yesterday's actions
-  const [goalsResult, tasksResult, actionsResult] = await Promise.all([
+  const [goalsResult, tasksResult, actionsResult] = await Promise.all<{
+    data: unknown[] | null;
+    error: unknown;
+  }>([
     supabase
       .from("user_loops")
       .select("title, priority, status, metadata")
@@ -91,9 +104,38 @@ async function generateMorningBriefing(
       .limit(10),
   ]);
 
-  const goals = goalsResult.data || [];
-  const tasks = tasksResult.data || [];
-  const actions = actionsResult.data || [];
+  if (goalsResult.error)
+    console.error(
+      `[Morning] Goals query failed for ${tenantId}:`,
+      goalsResult.error,
+    );
+  if (tasksResult.error)
+    console.error(
+      `[Morning] Tasks query failed for ${tenantId}:`,
+      tasksResult.error,
+    );
+  if (actionsResult.error)
+    console.error(
+      `[Morning] Actions query failed for ${tenantId}:`,
+      actionsResult.error,
+    );
+
+  const goals = (goalsResult.data || []) as {
+    title: string;
+    priority: number;
+    status: string;
+    metadata: unknown;
+  }[];
+  const tasks = (tasksResult.data || []) as {
+    title: string;
+    status: string;
+    priority: number;
+    metadata: unknown;
+  }[];
+  const actions = (actionsResult.data || []) as {
+    event_type: string;
+    payload: unknown;
+  }[];
 
   if (!goals.length && !tasks.length) return; // Nothing to brief about
 

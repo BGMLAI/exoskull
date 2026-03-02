@@ -266,6 +266,49 @@ export const selfBuildTools: ToolDefinition[] = [
   },
 ];
 
+// SQL injection prevention: allowlisted column names for query handlers
+const SAFE_COLUMN_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+const DANGEROUS_SQL_PATTERNS =
+  /\b(DROP|DELETE|ALTER|TRUNCATE|INSERT|UPDATE|EXEC|EXECUTE|UNION|--|;|\/\*)\b/i;
+
+// Known static IORS tool names for composite step validation
+const KNOWN_TOOL_PREFIXES = [
+  "add_",
+  "complete_",
+  "list_",
+  "search_",
+  "get_",
+  "send_",
+  "log_",
+  "define_",
+  "check_",
+  "build_",
+  "plan_",
+  "create_",
+  "update_",
+  "delete_",
+  "connect_",
+  "discover_",
+  "import_",
+  "analyze_",
+  "email_",
+  "code_",
+  "publish_",
+  "manage_",
+  "view_",
+  "trigger_",
+  "set_",
+  "start_",
+  "submit_",
+  "request_",
+  "grant_",
+  "revoke_",
+  "propose_",
+  "auto_",
+  "tau_",
+  "dyn_",
+];
+
 function validateHandlerConfig(
   handlerType: string,
   config: Record<string, unknown>,
@@ -276,6 +319,27 @@ function validateHandlerConfig(
       if (!table) return "app_crud wymaga table_name w handler_config";
       if (!table.startsWith("exo_app_"))
         return "app_crud dozwolone tylko na tabelach exo_app_* (bezpieczeństwo)";
+      // Validate table name against SQL injection
+      if (!SAFE_COLUMN_PATTERN.test(table))
+        return "app_crud: nazwa tabeli zawiera niedozwolone znaki";
+      // Validate select_columns if provided
+      const cols = config.select_columns as string[] | undefined;
+      if (cols) {
+        for (const col of cols) {
+          if (!SAFE_COLUMN_PATTERN.test(col))
+            return `app_crud: niedozwolona nazwa kolumny: "${col}"`;
+          if (DANGEROUS_SQL_PATTERNS.test(col))
+            return `app_crud: niebezpieczny wzorzec w kolumnie: "${col}"`;
+        }
+      }
+      // Validate WHERE conditions if provided
+      const where = config.where as Record<string, unknown> | undefined;
+      if (where) {
+        for (const key of Object.keys(where)) {
+          if (!SAFE_COLUMN_PATTERN.test(key))
+            return `app_crud: niedozwolona nazwa pola WHERE: "${key}"`;
+        }
+      }
       return null;
     }
     case "query": {
@@ -283,13 +347,40 @@ function validateHandlerConfig(
       if (!table) return "query wymaga table_name w handler_config";
       if (!table.startsWith("exo_"))
         return "query dozwolone tylko na tabelach exo_* (bezpieczeństwo)";
+      // Validate table name
+      if (!SAFE_COLUMN_PATTERN.test(table))
+        return "query: nazwa tabeli zawiera niedozwolone znaki";
+      // Validate select_columns
+      const selectCols = config.select_columns as string[] | undefined;
+      if (selectCols) {
+        for (const col of selectCols) {
+          if (!SAFE_COLUMN_PATTERN.test(col))
+            return `query: niedozwolona nazwa kolumny: "${col}"`;
+          if (DANGEROUS_SQL_PATTERNS.test(col))
+            return `query: niebezpieczny wzorzec SQL w kolumnie: "${col}"`;
+        }
+      }
+      // Validate order_by
+      const orderBy = config.order_by as string | undefined;
+      if (orderBy && !SAFE_COLUMN_PATTERN.test(orderBy))
+        return `query: niedozwolona nazwa kolumny w order_by: "${orderBy}"`;
       return null;
     }
     case "composite": {
-      const steps = config.steps as unknown[];
+      const steps = config.steps as Array<Record<string, unknown>> | undefined;
       if (!steps || !Array.isArray(steps) || steps.length === 0)
         return "composite wymaga steps[] w handler_config";
       if (steps.length > 5) return "composite: max 5 kroków";
+      // Validate each step's tool_name exists
+      for (let i = 0; i < steps.length; i++) {
+        const step = steps[i];
+        const toolName = step?.tool_name as string;
+        if (!toolName) return `composite: krok ${i + 1} nie ma tool_name`;
+        // Tool name must match known prefix pattern or be a dyn_ tool
+        const isKnown = KNOWN_TOOL_PREFIXES.some((p) => toolName.startsWith(p));
+        if (!isKnown && !SAFE_COLUMN_PATTERN.test(toolName))
+          return `composite: nieznana nazwa narzędzia w kroku ${i + 1}: "${toolName}"`;
+      }
       return null;
     }
     default:

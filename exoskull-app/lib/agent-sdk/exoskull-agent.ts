@@ -28,6 +28,7 @@ import { analyzeEmotion } from "@/lib/emotion";
 import { detectCrisis } from "@/lib/emotion/crisis-detector";
 import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
 import { logEmotion } from "@/lib/emotion/logger";
+import { sanitizeUserInput } from "@/lib/security/safety-guardrails";
 import { getToolFilterForChannel } from "@/lib/iors/tools/channel-filters";
 import { getThreadContext } from "@/lib/unified-thread";
 import { unifiedSearch } from "@/lib/memory/unified-search";
@@ -39,6 +40,13 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { runBGMLPipeline, shouldEscalate } from "@/lib/bgml/pipeline";
 import { generatePlan, type ExecutionPlan } from "@/lib/ai/planning/planner";
 import { buildToolDescriptions } from "@/lib/iors/tools/tool-descriptions";
+import { modulatePrompt } from "@/lib/emotion/response-modulator";
+import {
+  getTauMatrix,
+  updateTauMatrix,
+  inferTauFromMessage,
+  tauMatrixToContext,
+} from "@/lib/ai/tau-matrix";
 
 // ============================================================================
 // TYPES
@@ -58,7 +66,8 @@ export type AgentChannel =
   | "imessage"
   | "android_app"
   | "messenger"
-  | "instagram";
+  | "instagram"
+  | "autonomous";
 
 export interface AgentRequest {
   tenantId: string;
@@ -309,6 +318,10 @@ export async function runExoSkullAgent(
   req: AgentRequest,
 ): Promise<AgentResponse> {
   const startMs = Date.now();
+  // Defense-in-depth: sanitize user input even if gateway already did
+  if (req.userMessage) {
+    req.userMessage = sanitizeUserInput(req.userMessage);
+  }
   const config = req.isAsync
     ? ASYNC_CONFIG
     : req.channel === "voice"
@@ -404,6 +417,14 @@ export async function runExoSkullAgent(
     })
     .catch(() => {});
 
+  // Fire-and-forget Tau Matrix update from message signals
+  const msgHour = new Date().getUTCHours();
+  const tauSignal = inferTauFromMessage(req.userMessage, msgHour);
+  updateTauMatrix(req.tenantId, tauSignal).catch(() => {});
+
+  // Load Tau Matrix for context injection
+  const tauMatrix = await getTauMatrix(req.tenantId).catch(() => null);
+
   // ── Phase 2b: Format memory context ──
   let memoryContext = "";
   if (memoryResults && memoryResults.length > 0) {
@@ -474,7 +495,7 @@ export async function runExoSkullAgent(
         t.definition.name === "generate_fullstack_app" ||
         t.definition.name === "execute_code",
     );
-    if (req.channel !== "voice" && hasCodeTools) {
+    if (hasCodeTools) {
       parts.push(
         `You have full coding capabilities via VPS tools.\n` +
           `Admin workspace: /root/projects/exoskull/\n` +
@@ -488,6 +509,8 @@ export async function runExoSkullAgent(
     if (memoryContext) parts.push(memoryContext);
     // Append app autodetekcja context (unconnected apps mentioned by user)
     if (appDetection.contextFragment) parts.push(appDetection.contextFragment);
+    // Inject Tau Matrix user profile context
+    if (tauMatrix) parts.push(tauMatrixToContext(tauMatrix));
 
     // ── Planner Context Injection (pre-search + execution plan) ──
     if (planResult?.contextInjection) {
@@ -548,6 +571,11 @@ export async function runExoSkullAgent(
     systemPrompt = parts.join("\n\n");
   }
 
+  // Apply emotion-driven prompt modulation (non-crisis only)
+  if (!crisis.detected) {
+    systemPrompt = modulatePrompt(emotionState, systemPrompt);
+  }
+
   // ── Phase 4: Direct Anthropic API tool loop ──
   req.onThinkingStep?.("Generuję odpowiedź", "running");
 
@@ -560,6 +588,44 @@ export async function runExoSkullAgent(
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let numTurns = 0;
+  const isHaikuModel = config.model.includes("haiku");
+
+  // C3: Budget limit check — switch to cheaper model if exceeded
+  let effectiveModel: string = config.model;
+  try {
+    const budgetDb = getServiceSupabase();
+    const { data: tenantData } = await budgetDb
+      .from("exo_tenants")
+      .select("metadata")
+      .eq("id", req.tenantId)
+      .single();
+    const meta = tenantData?.metadata as Record<string, unknown> | null;
+    const monthlyBudget = meta?.monthly_budget_usd as number | undefined;
+    if (monthlyBudget && monthlyBudget > 0) {
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setUTCHours(0, 0, 0, 0);
+      const { data: usageData } = await budgetDb
+        .from("exo_ai_usage")
+        .select("estimated_cost")
+        .eq("tenant_id", req.tenantId)
+        .gte("created_at", monthStart.toISOString());
+      const totalSpent = (usageData || []).reduce(
+        (sum, r) => sum + ((r.estimated_cost as number) || 0),
+        0,
+      );
+      if (totalSpent >= monthlyBudget) {
+        effectiveModel = "claude-haiku-4-5-20251001";
+        logger.info("[ExoSkullAgent] Budget exceeded, switching to Haiku:", {
+          tenantId: req.tenantId,
+          totalSpent,
+          monthlyBudget,
+        });
+      }
+    }
+  } catch {
+    // Budget check is optional
+  }
 
   // ── Fallback strategy: track tool errors ──
   // After 2x same tool error → suggest build_tool(). After 5 total errors → STOP + explain.
@@ -607,7 +673,7 @@ export async function runExoSkullAgent(
         async () => {
           const stream = client.messages.stream(
             {
-              model: config.model,
+              model: effectiveModel,
               max_tokens: req.maxTokens || 4096,
               system: systemPrompt,
               messages,
@@ -629,6 +695,31 @@ export async function runExoSkullAgent(
       // Track token usage
       totalInputTokens += response.usage.input_tokens;
       totalOutputTokens += response.usage.output_tokens;
+
+      // C2: Emit cost metadata via SSE
+      if (req.onCustomEvent) {
+        const turnInputCost =
+          (response.usage.input_tokens * (isHaikuModel ? 0.8 : 3.0)) /
+          1_000_000;
+        const turnOutputCost =
+          (response.usage.output_tokens * (isHaikuModel ? 4.0 : 15.0)) /
+          1_000_000;
+        req.onCustomEvent({
+          type: "cost",
+          input_tokens: response.usage.input_tokens,
+          output_tokens: response.usage.output_tokens,
+          model: config.model,
+          cost_usd:
+            Math.round((turnInputCost + turnOutputCost) * 10000) / 10000,
+          cumulative_cost_usd:
+            Math.round(
+              ((totalInputTokens * (isHaikuModel ? 0.8 : 3.0) +
+                totalOutputTokens * (isHaikuModel ? 4.0 : 15.0)) /
+                1_000_000) *
+                10000,
+            ) / 10000,
+        });
+      }
 
       // Separate text and tool_use blocks
       const textParts: string[] = [];
@@ -688,6 +779,18 @@ export async function runExoSkullAgent(
         content: response.content as Anthropic.ContentBlockParam[],
       });
 
+      // C5: Emit decision reasoning SSE before tool calls
+      if (req.onCustomEvent && toolUseBlocks.length > 0) {
+        for (const toolUse of toolUseBlocks) {
+          req.onCustomEvent({
+            type: "decision",
+            tool: toolUse.name,
+            reason: `Agent calling ${toolUse.name} with ${JSON.stringify(toolUse.input).slice(0, 200)}`,
+            turn: numTurns,
+          });
+        }
+      }
+
       // Execute all requested tools in parallel
       const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
         toolUseBlocks.map(async (toolUse) => {
@@ -713,6 +816,16 @@ export async function runExoSkullAgent(
             success: !isError,
             resultSummary: result.slice(0, 200),
           });
+
+          // C5: Emit result summary SSE
+          if (req.onCustomEvent) {
+            req.onCustomEvent({
+              type: "result_summary",
+              tool: toolName,
+              success: !isError,
+              duration_ms: durationMs,
+            });
+          }
 
           return {
             type: "tool_result" as const,
@@ -757,7 +870,7 @@ export async function runExoSkullAgent(
       // Add tool results to message history
       messages.push({ role: "user", content: toolResults });
 
-      // After 2x same tool error → inject build_tool suggestion
+      // After 2x same tool error → inject build_tool suggestion + auto-reflexion
       if (failedTools.length > 0) {
         const suggestion =
           `[SYSTEM] Narzędzia ${failedTools.join(", ")} zawiodły 2+ razy. ` +
@@ -768,6 +881,29 @@ export async function runExoSkullAgent(
           failedTools,
           tenantId: req.tenantId,
         });
+
+        // A2: Auto-reflexion — log failure patterns for learning
+        try {
+          const reflexionDb = getServiceSupabase();
+          await reflexionDb.from("exo_dev_journal").insert({
+            tenant_id: req.tenantId,
+            entry_type: "learning",
+            title: `Auto-reflexion: tools failed (${failedTools.join(", ")})`,
+            details: {
+              task: req.userMessage.slice(0, 200),
+              sweet: [],
+              sour: failedTools.map(
+                (t) =>
+                  `${t} failed ${toolErrorCounts.get(t) || 0}x — consider alternative`,
+              ),
+              tags: ["auto_reflexion", "tool_failure"],
+              evaluated_at: new Date().toISOString(),
+            },
+            outcome: "failed",
+          });
+        } catch {
+          // Auto-reflexion is non-blocking
+        }
       }
     }
 

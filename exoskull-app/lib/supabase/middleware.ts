@@ -104,6 +104,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/public/") ||
     pathname.startsWith("/api/twilio/") ||
     pathname.startsWith("/api/gateway/") || // External messaging webhooks (Telegram, Discord, Slack, Signal, iMessage)
+    pathname.startsWith("/api/integrations/webhook/") || // Superintegrator inbound webhooks (signature verified in route)
     pathname.startsWith("/api/rigs/") || // OAuth connect/callback + sync (routes verify JWT internally)
     pathname.startsWith("/api/meta/") || // Meta deauth/pages (routes verify JWT internally)
     pathname === "/api/pulse" ||
