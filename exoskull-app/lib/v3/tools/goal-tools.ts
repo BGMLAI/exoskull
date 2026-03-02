@@ -52,23 +52,23 @@ const setGoalTool: V3ToolDefinition = {
         .from("user_loops")
         .insert({
           tenant_id: tenantId,
-          title: input.title as string,
+          name: input.title as string,
           description: (input.description as string) || null,
           priority: (input.priority as number) || 7,
-          status: "active",
-          type: "goal",
-          metadata: {
+          is_active: true,
+          aspects: {
+            type: "goal",
             deadline: input.deadline || null,
             category: input.category || "personal",
             strategies: [],
             progress: 0,
           },
         })
-        .select("id, title")
+        .select("id, name")
         .single();
 
       if (error) return `Błąd: ${error.message}`;
-      return `✅ Cel ustawiony: "${data.title}" (ID: ${data.id}). Teraz rozłożę go na strategię i konkretne zadania.`;
+      return `✅ Cel ustawiony: "${data.name}" (ID: ${data.id}). Teraz rozłożę go na strategię i konkretne zadania.`;
     } catch (err) {
       return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
     }
@@ -107,30 +107,35 @@ const updateGoalTool: V3ToolDefinition = {
       // Get current goal
       const { data: goal } = await supabase
         .from("user_loops")
-        .select("id, title, metadata")
+        .select("id, name, aspects")
         .eq("id", input.goal_id as string)
         .eq("tenant_id", tenantId)
         .single();
 
       if (!goal) return "Nie znaleziono celu.";
 
-      const metadata = (goal.metadata as Record<string, unknown>) || {};
+      const aspects = (goal.aspects as Record<string, unknown>) || {};
       const updates: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
       };
 
       if (input.progress !== undefined) {
-        metadata.progress = input.progress as number;
-        updates.metadata = metadata;
+        aspects.progress = input.progress as number;
+        updates.aspects = aspects;
       }
       if (input.status) {
-        updates.status = input.status as string;
-        if (input.status === "completed") {
-          updates.completed_at = new Date().toISOString();
+        if (
+          input.status === "completed" ||
+          input.status === "dropped" ||
+          input.status === "paused"
+        ) {
+          updates.is_active = false;
+        } else {
+          updates.is_active = true;
         }
       }
-      if (Object.keys(updates).length > 1) {
-        updates.metadata = metadata;
+      if (input.progress !== undefined) {
+        updates.aspects = aspects;
       }
 
       const { error } = await supabase
@@ -145,14 +150,13 @@ const updateGoalTool: V3ToolDefinition = {
       if (input.note) {
         await supabase.from("user_notes").insert({
           tenant_id: tenantId,
-          type: "progress",
-          title: `Postęp: ${goal.title}`,
+          title: `Postęp: ${goal.name}`,
           content: input.note as string,
           metadata: { goal_id: goal.id },
         });
       }
 
-      return `📊 Cel "${goal.title}" zaktualizowany.${input.progress !== undefined ? ` Postęp: ${input.progress}%` : ""}${input.status ? ` Status: ${input.status}` : ""}`;
+      return `📊 Cel "${goal.name}" zaktualizowany.${input.progress !== undefined ? ` Postęp: ${input.progress}%` : ""}${input.status ? ` Status: ${input.status}` : ""}`;
     } catch (err) {
       return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
     }
@@ -187,14 +191,13 @@ const getGoalsTool: V3ToolDefinition = {
       let query = supabase
         .from("user_loops")
         .select(
-          "id, title, description, priority, status, metadata, created_at",
+          "id, name, description, priority, is_active, aspects, created_at",
         )
         .eq("tenant_id", tenantId)
-        .eq("type", "goal")
         .order("priority", { ascending: false });
 
       if (!input.include_completed) {
-        query = query.in("status", ["active", "pending"]);
+        query = query.eq("is_active", true);
       }
 
       const { data, error } = await query.limit(20);
@@ -206,18 +209,18 @@ const getGoalsTool: V3ToolDefinition = {
         .map(
           (g: {
             id: string;
-            title: string;
+            name: string;
             description: string | null;
             priority: number;
-            status: string;
-            metadata: unknown;
+            is_active: boolean;
+            aspects: unknown;
           }) => {
-            const meta = (g.metadata as Record<string, unknown>) || {};
-            const progress = (meta.progress as number) || 0;
+            const asp = (g.aspects as Record<string, unknown>) || {};
+            const progress = (asp.progress as number) || 0;
             const bar =
               "█".repeat(Math.floor(progress / 10)) +
               "░".repeat(10 - Math.floor(progress / 10));
-            return `[${g.status === "completed" ? "✅" : "🎯"}] ${g.title} (priorytet: ${g.priority}/10)\n    ${bar} ${progress}%${g.description ? `\n    ${g.description.slice(0, 100)}` : ""}`;
+            return `[${!g.is_active ? "✅" : "🎯"}] ${g.name} (priorytet: ${g.priority}/10)\n    ${bar} ${progress}%${g.description ? `\n    ${g.description.slice(0, 100)}` : ""}`;
           },
         )
         .join("\n\n");
@@ -269,10 +272,10 @@ const createTaskTool: V3ToolDefinition = {
           title: input.title as string,
           status: "pending",
           priority: (input.priority as number) || 5,
-          type: "task",
+          due_date: (input.due_date as string) || null,
           metadata: {
+            type: "task",
             goal_id: input.goal_id || null,
-            due_date: input.due_date || null,
             assignee: input.assignee || "user",
             details: input.details || null,
           },

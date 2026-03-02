@@ -15,7 +15,7 @@
 
 export const CORE_TOOL_NAMES = new Set([
   // Tasks
-  "add_task",
+  "create_task",
   "complete_task",
   "list_tasks",
   // Memory & Context
