@@ -50,35 +50,38 @@ CREATE TABLE IF NOT EXISTS exo_process_registry (
 );
 
 -- Active process count (the hot query — conductor runs this every minute)
-CREATE INDEX idx_process_registry_active
+CREATE INDEX IF NOT EXISTS idx_process_registry_active
   ON exo_process_registry (status, started_at DESC)
   WHERE status = 'running';
 
 -- Per-tenant active processes
-CREATE INDEX idx_process_registry_tenant_active
+CREATE INDEX IF NOT EXISTS idx_process_registry_tenant_active
   ON exo_process_registry (tenant_id, status)
   WHERE status = 'running';
 
 -- Stale heartbeat detection
-CREATE INDEX idx_process_registry_heartbeat
+CREATE INDEX IF NOT EXISTS idx_process_registry_heartbeat
   ON exo_process_registry (last_heartbeat_at, expires_at)
   WHERE status = 'running';
 
 -- Cleanup index
-CREATE INDEX idx_process_registry_cleanup
+CREATE INDEX IF NOT EXISTS idx_process_registry_cleanup
   ON exo_process_registry (completed_at)
   WHERE status IN ('completed', 'failed', 'expired');
 
 -- Work catalog cooldown lookups
-CREATE INDEX idx_process_registry_catalog
+CREATE INDEX IF NOT EXISTS idx_process_registry_catalog
   ON exo_process_registry (work_catalog_id, completed_at DESC)
   WHERE work_catalog_id IS NOT NULL;
 
 ALTER TABLE exo_process_registry ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Service role full access process_registry"
-  ON exo_process_registry FOR ALL
-  USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  CREATE POLICY "Service role full access process_registry"
+    ON exo_process_registry FOR ALL
+    USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ============================================================================
 -- TABLE: exo_conductor_config
@@ -107,9 +110,12 @@ ON CONFLICT DO NOTHING;
 
 ALTER TABLE exo_conductor_config ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Service role full access conductor_config"
-  ON exo_conductor_config FOR ALL
-  USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  CREATE POLICY "Service role full access conductor_config"
+    ON exo_conductor_config FOR ALL
+    USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ============================================================================
 -- RPC: register_process

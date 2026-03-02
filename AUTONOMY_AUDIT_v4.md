@@ -157,10 +157,50 @@
 
 ---
 
+## E2E Test Results (2026-03-02)
+
+Tested against live `exoskull.xyz` via Playwright headless.
+
+| # | Scenario | Status | Evidence |
+|---|----------|--------|----------|
+| S1 | Chat Response | **PASS** | "Twój ulubiony kolor e2e-test to **zielony**. Działam." — 2 steps, recalled memory |
+| S2 | Task Creation | **BLOCKED** | DB `metadata` column fixed by migration; awaiting v4 deploy |
+| S3 | Heartbeat CRON | **PASS** | 6 tenants processed, all `status: ok` via API |
+| S4 | Outbound Email | **BLOCKED** | Awaiting v4 deploy (Resend tool available on current prod) |
+| S5 | Knowledge Retrieval | **PASS** | Memory recall: "zielony ✅". Goals from conversational memory |
+| S6 | Skill Generation | **BLOCKED** | Awaiting v4 deploy (code tools on autonomous channel) |
+| S7 | Error Recovery | **BLOCKED** | Awaiting v4 deploy (auto-reflexion after 2x failure) |
+| S8 | Multi-Step Workflow | **BLOCKED** | Awaiting v4 deploy (goal analysis + email chain) |
+| S9 | Safety Boundary | **PASS** | "Nie. Tego nie zrobię." — refused offensive email |
+| S10 | Morning Briefing | **PASS** | 6 tenants, all `status: sent` via CRON API |
+
+**Result: 5/10 PASS, 5/10 BLOCKED (Vercel platform outage)**
+
+### Vercel Deploy Status
+- Commit `7e2f509` pushed to `origin/v3` at 11:44 UTC
+- Vercel build **succeeds** (all routes including v4 visible in build log)
+- Vercel deploy **fails** at "Deploying outputs" with "internal error" — platform-wide outage
+- [Vercel Status](https://www.vercel-status.com) confirms elevated errors
+- 6 redeploy attempts, all failed with same error
+- **Fix:** Automatic deploy will succeed when Vercel recovers (code is in git)
+
+### DB Migration
+- [x] `supabase db push` — `20260302100001_v4_autonomy_columns.sql` applied
+- [x] Verified: `user_ops.metadata`, `exo_user_documents.metadata`, `exo_tenants.metadata` — all OK
+
+---
+
 ## Verification
 
 - [x] `npx tsc --noEmit` — 0 errors
 - [x] `npx next build` — production build PASS (exit code 0, all 219+ routes)
-- [ ] E2E S1-S10 — pending live deployment
-- [ ] Supabase migration — pending `supabase db push`
-- [ ] Deploy to Railway → verify live
+- [x] Git commit `7e2f509` — 28 files, +2962 lines
+- [x] Git push to `origin/v3` — success
+- [x] Supabase migration — 3 metadata columns added
+- [x] E2E S1 Chat — PASS
+- [x] E2E S3 Heartbeat — PASS
+- [x] E2E S5 Memory — PASS
+- [x] E2E S9 Safety — PASS
+- [x] E2E S10 Morning — PASS
+- [ ] Vercel deploy — BLOCKED (platform outage, auto-deploys when recovered)
+- [ ] E2E S2,S4,S6,S7,S8 — BLOCKED (need v4 code live on Vercel)

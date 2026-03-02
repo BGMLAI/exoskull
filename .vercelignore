@@ -1,0 +1,15 @@
+.claude/
+exoskull-desktop/
+local-agent/
+vps-executor/
+android/
+infrastructure/
+goals/
+tools/
+args/
+context/
+hardprompts/
+scripts/
+supabase/
+*.png
+*.md
