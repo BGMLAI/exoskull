@@ -38,8 +38,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ message: "No active tenants", results: [] });
     }
 
-    // Process tenants in parallel (max 3 concurrent) to avoid timeout
-    const BATCH_SIZE = 3;
+    // Process tenants in parallel (max 6 concurrent) to avoid timeout
+    const BATCH_SIZE = 6;
     for (let i = 0; i < tenants.length; i += BATCH_SIZE) {
       const batch = tenants.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.allSettled(
@@ -174,7 +174,7 @@ Zasady:
         const ai = new GoogleGenAI({ apiKey: geminiKey });
         const result = await ai.models.generateContent({
           model: "gemini-2.5-flash",
-          contents: `${systemPrompt}\n\n${userPrompt}`,
+          contents: `${systemPrompt}\n\n${userPrompt.slice(0, 3000)}`,
         });
         aiResponseText = result.text || null;
       } catch (err) {
