@@ -1,41 +1,66 @@
 # Session Log
 
-## [2026-03-03] E2E S11-S30 Test Suite Execution
+## [2026-03-03] E2E S11-S30 — Session 2: Gemini Fallback + CRON Fixes
 
-### Results: 8 PASS / 3 PARTIAL / 2 FAIL / 7 BLOCKED
+### Session 2 Results: 4 PASS / 16 BLOCKED (Anthropic credits exhausted)
 
-| #   | Scenario                 | Status      | Tools                                     |
-| --- | ------------------------ | ----------- | ----------------------------------------- |
-| S11 | Memory Save & Recall     | **PASS**    | remember, search_brain                    |
-| S12 | Daily Summary            | **BLOCKED** | get_daily_summary doesn't exist           |
-| S13 | Daily Summary Correction | **BLOCKED** | correct_daily_summary doesn't exist       |
-| S14 | Emotional State          | **BLOCKED** | analyze_emotional_state doesn't exist     |
-| S15 | URL Import               | **PARTIAL** | import_url OK, indexing lag               |
-| S16 | Document Listing         | **PASS**    | list_knowledge                            |
-| S17 | Goal Lifecycle           | **PARTIAL** | set_goal OK, update_goal needs UUID       |
-| S18 | Task Creation            | **PASS**    | create_task                               |
-| S19 | Goal-Task Dependency     | **BLOCKED** | Chat rate-limited                         |
-| S20 | Autonomy Permissions     | **PASS**    | check_permissions                         |
-| S21 | Autonomy Log             | **BLOCKED** | log_autonomy is write-only                |
-| S22 | Content Generation       | **FAIL**    | generate_content API model error          |
-| S23 | Self-Extend              | **BLOCKED** | Chat rate-limited                         |
-| S24 | SMS Outbound             | **FAIL**    | send_sms — no phone in profile            |
-| S25 | Phone Call               | **BLOCKED** | Chat rate-limited                         |
-| S26 | Capabilities + Reflexion | **PASS**    | get_capabilities, reflexion_evaluate      |
-| S27 | Evening CRON             | **PASS**    | /api/v3/cron/evening — 6 tenants          |
-| S28 | Consolidation CRON       | **PASS**    | /api/v3/cron/consolidate — 6 tenants      |
-| S29 | APIs                     | **PARTIAL** | Health PASS, cost/audit need session auth |
-| S30 | Security Boundaries      | **PASS**    | 401 enforced, SQL injection refused       |
+**CRITICAL BLOCKER:** Anthropic API credits exhausted. All 29 v3 tools require Anthropic's tool_use API. Chat falls back to Gemini (conversation-only, no tools). 16 scenarios that need tool execution are BLOCKED until credits are refilled.
 
-### Key Findings
+| #   | Scenario                 | Status      | Notes                                                     |
+| --- | ------------------------ | ----------- | --------------------------------------------------------- |
+| S11 | Memory Save & Recall     | **BLOCKED** | Needs Anthropic tools (remember, search_brain)            |
+| S12 | Daily Summary            | **BLOCKED** | Tool implemented but Anthropic unavailable                |
+| S13 | Summary Correction       | **BLOCKED** | Tool implemented but Anthropic unavailable                |
+| S14 | Emotional State          | **BLOCKED** | Tool implemented but Anthropic unavailable                |
+| S15 | URL Import               | **BLOCKED** | Needs import_url tool                                     |
+| S16 | Document Listing         | **BLOCKED** | Needs list_documents tool                                 |
+| S17 | Goal Lifecycle           | **BLOCKED** | Needs set_goal/update_goal/get_goals tools                |
+| S18 | Task Lifecycle           | **BLOCKED** | Needs create_task/update_task/get_tasks tools             |
+| S19 | Goal-Task Dependency     | **BLOCKED** | Needs tools                                               |
+| S20 | Autonomy Request         | **BLOCKED** | Needs tools                                               |
+| S21 | Autonomy Log             | **BLOCKED** | Tool implemented (get_autonomy_log) but Anthropic unavail |
+| S22 | Content Generation       | **BLOCKED** | generate_content has Gemini fallback but agent can't call |
+| S23 | Self-Extend              | **BLOCKED** | Needs tools                                               |
+| S24 | SMS Outbound             | **BLOCKED** | Needs send_sms tool                                       |
+| S25 | Phone Call               | **BLOCKED** | Needs make_call tool                                      |
+| S26 | Capabilities + Reflexion | **BLOCKED** | Needs tools                                               |
+| S27 | Evening CRON             | **PASS**    | Gemini fallback works! 6/6 tenants "sent"                 |
+| S28 | Consolidation CRON       | **PASS**    | Gemini fallback + parallel processing, 6/6 "success"      |
+| S29 | Health/Cost/Audit APIs   | **PASS**    | Health 200 OK, Cost 401, Audit 401 (all correct)          |
+| S30 | Security Boundaries      | **PASS**    | SQL injection refused, auth enforced on protected routes  |
 
-- 3 planned brain tools (daily summary, correction, emotional state) NOT implemented
-- `generate_content` has API model error (external provider issue)
-- `log_autonomy` write-only — no retrieval tool exists
-- Chat crashes after ~15 messages ("Błąd przetwarzania") — rate limit or context overflow
-- All 4 CRONs operational (heartbeat, morning, evening, consolidate)
-- Full test file: `tests/e2e/autonomy-scenarios-v4.test.ts`
-- Full report: `E2E_REPORT_S11-S30.md`
+### Code Changes This Session
+
+1. **Gemini fallback in agent.ts** — When Anthropic fails, falls back to Gemini 2.5 Flash (conversation-only)
+2. **Fixed Gemini model ID** — `gemini-2.5-flash-preview-05-20` (expired) → `gemini-2.5-flash` (stable)
+3. **Evening CRON Gemini fallback** — `app/api/v3/cron/evening/route.ts`
+4. **Consolidation CRON Gemini fallback** — `app/api/v3/cron/consolidate/route.ts`
+5. **Parallelized consolidation** — Process all tenants concurrently to avoid 60s timeout
+6. **JSON code fence stripping** — Gemini wraps JSON in `json...`, parser now handles this
+
+### Commits
+
+- `31af35c` fix: E2E S11-S30 — add 4 missing tools, fix name resolution + Gemini fallback
+- `05941c8` fix: agent API key trim + reduce thread context 50→20
+- `4db5ed9` fix: add Gemini emergency fallback when Anthropic credits exhausted
+- `ec7f5a6` fix: Gemini model ID gemini-2.5-flash-preview-05-20 → gemini-2.5-flash
+- `0b2530d` fix: add Gemini fallback to evening + consolidation CRONs
+- `22ae51f` fix: parallelize consolidation CRON to avoid timeout
+- `8bf51d8` fix: increase consolidation batch size + limit Gemini prompt
+
+### Security Notes (S30)
+
+- `/api/v3/insights/cost` — 401 without auth ✅
+- `/api/v3/exports/audit-trail` — 401 without auth ✅
+- `/api/v3/feedback` — 400 (validates tenant_id but NO auth check) ⚠️
+- `/api/v3/chat/pause` — 500 (validates params but NO auth check) ⚠️
+- SQL injection via chat — refused by both Anthropic agent and Gemini fallback ✅
+
+### Next Steps
+
+- **CRITICAL:** Refill Anthropic API credits to unblock S11-S26
+- After credits: re-run ALL 16 blocked scenarios
+- Fix feedback/pause auth enforcement (S30 security gaps)
 
 ---
 

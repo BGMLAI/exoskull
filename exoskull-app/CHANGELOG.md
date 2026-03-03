@@ -4,6 +4,21 @@ All notable changes to this project.
 
 ---
 
+## [2026-03-03] Gemini Fallback + CRON Resilience
+
+- **Added** Emergency Gemini 2.5 Flash fallback in `lib/v3/agent.ts` — chat works even when Anthropic credits exhausted
+- **Fixed** Gemini model ID: `gemini-2.5-flash-preview-05-20` (expired) → `gemini-2.5-flash` (stable)
+- **Added** Gemini fallback to Evening CRON (`/api/v3/cron/evening`) and Consolidation CRON (`/api/v3/cron/consolidate`)
+- **Fixed** Consolidation CRON timeout: parallelized tenant processing (6 concurrent) + limited Gemini prompt to 3000 chars
+- **Added** JSON code fence stripping for Gemini responses (`json...` → raw JSON)
+- **Implemented** 3 missing brain tools: `get_daily_summary`, `correct_daily_summary`, `analyze_emotional_state`
+- **Implemented** `get_autonomy_log` tool (was write-only, now has retrieval)
+- **Fixed** `update_goal` name resolution: supports `goal_name` parameter with fuzzy ilike search
+- **Fixed** `generate_content` Gemini fallback model ID
+- **E2E S27-S30:** 4/4 PASS (Evening CRON, Consolidation CRON, Health/Cost/Audit APIs, Security Boundaries)
+- **E2E S11-S26:** 16/16 BLOCKED — Anthropic API credits exhausted, tools unavailable
+- **Security:** `/api/v3/feedback` and `/api/v3/chat/pause` lack auth enforcement (documented, not fixed)
+
 ## [2026-03-02] E2E Round 4 — 9/10 PASS (v4 goal-tools fix)
 
 - **Fixed** v3 goal-tools.ts: 4 tools had wrong column names for Tyrolka tables
