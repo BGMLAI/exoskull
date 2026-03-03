@@ -93,11 +93,15 @@ const updateGoalTool: V3ToolDefinition = {
   definition: {
     name: "update_goal",
     description:
-      "Zaktualizuj postęp lub status celu. Użyj po każdej akcji przybliżającej cel.",
+      "Zaktualizuj postęp lub status celu. Użyj po każdej akcji przybliżającej cel. Podaj goal_id (UUID) LUB goal_name (nazwę) — system sam znajdzie cel.",
     input_schema: {
       type: "object" as const,
       properties: {
         goal_id: { type: "string", description: "UUID celu" },
+        goal_name: {
+          type: "string",
+          description: "Nazwa celu (jeśli nie znasz UUID)",
+        },
         progress: { type: "number", description: "Postęp 0-100%" },
         status: {
           type: "string",
@@ -106,7 +110,7 @@ const updateGoalTool: V3ToolDefinition = {
         },
         note: { type: "string", description: "Notatka o postępie" },
       },
-      required: ["goal_id"],
+      required: [],
     },
   },
   async execute(input, tenantId) {
@@ -114,13 +118,35 @@ const updateGoalTool: V3ToolDefinition = {
       const { getServiceSupabase } = await import("@/lib/supabase/service");
       const supabase = getServiceSupabase();
 
-      // Get current goal
-      const { data: goal } = await supabase
-        .from("user_loops")
-        .select("id, name, aspects")
-        .eq("id", input.goal_id as string)
-        .eq("tenant_id", tenantId)
-        .single();
+      // Resolve goal: try UUID first, then name search
+      let goal: { id: string; name: string; aspects: unknown } | null = null;
+
+      if (input.goal_id) {
+        const { data } = await supabase
+          .from("user_loops")
+          .select("id, name, aspects")
+          .eq("id", input.goal_id as string)
+          .eq("tenant_id", tenantId)
+          .single();
+        goal = data;
+      }
+
+      if (!goal && input.goal_name) {
+        // Fuzzy match by name (case-insensitive, partial match)
+        const { data } = await supabase
+          .from("user_loops")
+          .select("id, name, aspects")
+          .eq("tenant_id", tenantId)
+          .eq("is_active", true)
+          .ilike("name", `%${input.goal_name as string}%`)
+          .limit(1)
+          .single();
+        goal = data;
+      }
+
+      if (!goal && !input.goal_id && !input.goal_name) {
+        return "Podaj goal_id (UUID) lub goal_name (nazwę celu) żebym mógł go znaleźć.";
+      }
 
       if (!goal) return "Nie znaleziono celu.";
 

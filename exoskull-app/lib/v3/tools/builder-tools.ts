@@ -200,12 +200,6 @@ const generateContentTool: V3ToolDefinition = {
   timeoutMs: 30_000,
   async execute(input, tenantId) {
     try {
-      const anthropicKey = process.env.ANTHROPIC_API_KEY;
-      if (!anthropicKey) return "Brak ANTHROPIC_API_KEY.";
-
-      const { default: Anthropic } = await import("@anthropic-ai/sdk");
-      const client = new Anthropic({ apiKey: anthropicKey });
-
       const lengthGuide =
         input.length === "short"
           ? "~300 słów"
@@ -213,23 +207,55 @@ const generateContentTool: V3ToolDefinition = {
             ? "~2000 słów"
             : "~800 słów";
 
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-6-20250514",
-        max_tokens: 4000,
-        system: `Jesteś ekspertem od tworzenia treści. Pisz po polsku, ${input.tone || "profesjonalnie ale przystępnie"}.
+      const systemPrompt = `Jesteś ekspertem od tworzenia treści. Pisz po polsku, ${input.tone || "profesjonalnie ale przystępnie"}.
 Typ: ${input.type}. Długość: ${lengthGuide}. Odbiorcy: ${input.audience || "dorośli profesjonaliści"}.
-Pisz konkretnie, z wartością merytoryczną. ZERO puchu. Formatuj w Markdown.`,
-        messages: [
-          {
-            role: "user",
-            content: `Tytuł: ${input.title}\nTemat: ${input.topic}`,
-          },
-        ],
-      });
+Pisz konkretnie, z wartością merytoryczną. ZERO puchu. Formatuj w Markdown.`;
+      const userPrompt = `Tytuł: ${input.title}\nTemat: ${input.topic}`;
 
-      const text = response.content.find((c) => c.type === "text");
-      if (!text || !("text" in text))
-        return "Nie udało się wygenerować treści.";
+      let generatedText: string | null = null;
+
+      // Try Anthropic first
+      const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
+      if (anthropicKey) {
+        try {
+          const { default: Anthropic } = await import("@anthropic-ai/sdk");
+          const client = new Anthropic({ apiKey: anthropicKey });
+          const response = await client.messages.create({
+            model: "claude-sonnet-4-6-20250514",
+            max_tokens: 4000,
+            system: systemPrompt,
+            messages: [{ role: "user", content: userPrompt }],
+          });
+          const block = response.content.find((c) => c.type === "text");
+          if (block && "text" in block) generatedText = block.text;
+        } catch (anthropicErr) {
+          console.error("[generate_content] Anthropic error:", anthropicErr);
+        }
+      }
+
+      // Fallback: Gemini
+      if (!generatedText) {
+        const geminiKey =
+          process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+        if (geminiKey) {
+          try {
+            const { GoogleGenAI } = await import("@google/genai");
+            const ai = new GoogleGenAI({ apiKey: geminiKey });
+            const result = await ai.models.generateContent({
+              model: "gemini-2.5-flash-preview-05-20",
+              contents: `${systemPrompt}\n\n${userPrompt}`,
+            });
+            generatedText = result.text || null;
+          } catch (geminiErr) {
+            console.error("[generate_content] Gemini error:", geminiErr);
+          }
+        }
+      }
+
+      if (!generatedText)
+        return "Nie udało się wygenerować treści — brak działającego klucza AI (Anthropic lub Gemini).";
+
+      const text = { text: generatedText };
 
       // Save to notes
       const { getServiceSupabase } = await import("@/lib/supabase/service");
