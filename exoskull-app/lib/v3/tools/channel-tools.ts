@@ -55,10 +55,10 @@ const sendSmsTool: V3ToolDefinition = {
         const supabase = getServiceSupabase();
         const { data } = await supabase
           .from("exo_tenants")
-          .select("phone_number")
+          .select("phone")
           .eq("id", tenantId)
           .single();
-        toNumber = data?.phone_number || toNumber;
+        toNumber = data?.phone || toNumber;
       }
 
       if (!toNumber)
@@ -279,10 +279,10 @@ const makeCallTool: V3ToolDefinition = {
         const supabase = getServiceSupabase();
         const { data } = await supabase
           .from("exo_tenants")
-          .select("phone_number")
+          .select("phone")
           .eq("id", tenantId)
           .single();
-        toNumber = data?.phone_number || toNumber;
+        toNumber = data?.phone || toNumber;
       }
 
       if (!toNumber) return "Brak numeru telefonu.";
