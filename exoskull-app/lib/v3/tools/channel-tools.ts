@@ -294,18 +294,21 @@ const makeCallTool: V3ToolDefinition = {
       }
 
       // Get the base URL for the voice webhook
-      const baseUrl =
-        process.env.NEXT_PUBLIC_APP_URL ||
-        process.env.VERCEL_URL ||
-        "https://exoskull.app";
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
 
       // Make outbound call via Twilio REST API
       const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`;
+      const purposeParam = encodeURIComponent(
+        (input.purpose as string).slice(0, 200),
+      );
+      const instructionsParam = input.instructions
+        ? `&instructions=${encodeURIComponent((input.instructions as string).slice(0, 500))}`
+        : "";
       const body = new URLSearchParams({
         To: toNumber,
         From: fromNumber,
-        Url: `${baseUrl}/api/twilio/voice?action=start&tenant_id=${tenantId}&purpose=${encodeURIComponent((input.purpose as string).slice(0, 200))}`,
-        StatusCallback: `${baseUrl}/api/twilio/voice?action=end`,
+        Url: `${baseUrl}/api/twilio/voice?action=start&tenant_id=${tenantId}&purpose=${purposeParam}${instructionsParam}`,
+        StatusCallback: `${baseUrl}/api/twilio/voice?action=end&tenant_id=${tenantId}`,
         Timeout: "30",
       });
 
