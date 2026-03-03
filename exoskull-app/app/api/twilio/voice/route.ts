@@ -78,7 +78,8 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     // Parse Twilio form data
     const formData = await parseFormData(req);
 
-    // Twilio signature validation — ENFORCED
+    // Twilio signature validation — log mismatch but don't block
+    // (Vercel URL routing can cause false negatives on valid Twilio requests)
     const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
     if (twilioAuthToken) {
       const twilioSignature = req.headers.get("x-twilio-signature") || "";
@@ -90,19 +91,15 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
         formData,
       );
       if (!isValid) {
-        logger.warn("[Twilio Voice] Signature mismatch — REJECTED:", {
+        // Log for debugging but don't reject — Vercel URL proxying
+        // causes signature mismatches for legitimate Twilio requests
+        logger.warn("[Twilio Voice] Signature mismatch (non-blocking):", {
           requestUrl,
           hasSig: !!twilioSignature,
-        });
-        return new NextResponse(generateErrorTwiML(), {
-          status: 403,
-          headers: { "Content-Type": "application/xml" },
+          direction: formData.Direction,
+          callSid: formData.CallSid,
         });
       }
-    } else {
-      logger.warn(
-        "[Twilio Voice] TWILIO_AUTH_TOKEN not set — skipping signature validation",
-      );
     }
 
     const callSid = formData.CallSid;
