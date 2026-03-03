@@ -38,21 +38,34 @@ export async function GET(req: Request) {
       return NextResponse.json({ message: "No active tenants", results: [] });
     }
 
-    for (const tenant of tenants) {
-      try {
-        await consolidateTenant(supabase, tenant.id);
-        results.push({
-          tenantId: tenant.id,
-          status: "success",
-          details: "Consolidated",
-        });
-      } catch (err) {
-        console.error(`[Consolidation] Failed for ${tenant.id}:`, err);
-        results.push({
-          tenantId: tenant.id,
-          status: "error",
-          details: err instanceof Error ? err.message : String(err),
-        });
+    // Process tenants in parallel (max 3 concurrent) to avoid timeout
+    const BATCH_SIZE = 3;
+    for (let i = 0; i < tenants.length; i += BATCH_SIZE) {
+      const batch = tenants.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map(async (tenant) => {
+          await consolidateTenant(supabase, tenant.id);
+          return tenant.id;
+        }),
+      );
+      for (let j = 0; j < batchResults.length; j++) {
+        const r = batchResults[j];
+        const tid = batch[j].id;
+        if (r.status === "fulfilled") {
+          results.push({
+            tenantId: tid,
+            status: "success",
+            details: "Consolidated",
+          });
+        } else {
+          console.error(`[Consolidation] Failed for ${tid}:`, r.reason);
+          results.push({
+            tenantId: tid,
+            status: "error",
+            details:
+              r.reason instanceof Error ? r.reason.message : String(r.reason),
+          });
+        }
       }
     }
 
