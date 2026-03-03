@@ -159,7 +159,7 @@ export async function runV3Agent(
   // ── Phase 1: Load context + memory in parallel ──
   const [dynamicCtx, threadHistory, memoryResults] = await Promise.all([
     buildV3DynamicContext(req.tenantId),
-    getThreadContext(req.tenantId, 50),
+    getThreadContext(req.tenantId, 20),
     unifiedSearch({
       tenantId: req.tenantId,
       query: req.userMessage,
@@ -209,7 +209,9 @@ export async function runV3Agent(
   let totalToolErrors = 0;
 
   try {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const client = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY?.trim(),
+    });
     const anthropicTools = toAnthropicTools(V3_TOOLS);
 
     // Build message history
@@ -337,6 +339,9 @@ export async function runV3Agent(
       logger.error("[v3:Agent] API call failed:", {
         error: errMsg,
         tenantId: req.tenantId,
+        numTurns,
+        messagesCount: messages?.length ?? 0,
+        toolsUsed,
       });
       finalText = "Błąd przetwarzania. Spróbuj ponownie.";
     }
