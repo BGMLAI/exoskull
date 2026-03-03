@@ -365,7 +365,7 @@ export async function runV3Agent(
             .join("\n");
 
           const geminiResult = await ai.models.generateContent({
-            model: "gemini-2.5-flash-preview-05-20",
+            model: "gemini-2.5-flash",
             contents: `${systemPrompt.slice(0, 4000)}\n\nHistoria:\n${historyText}\n\nUser: ${req.userMessage}\n\nOdpowiedz po polsku. Nie masz dostępu do narzędzi — odpowiadaj z wiedzy ogólnej i kontekstu rozmowy.`,
           });
 

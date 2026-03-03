@@ -242,7 +242,7 @@ Pisz konkretnie, z wartością merytoryczną. ZERO puchu. Formatuj w Markdown.`;
             const { GoogleGenAI } = await import("@google/genai");
             const ai = new GoogleGenAI({ apiKey: geminiKey });
             const result = await ai.models.generateContent({
-              model: "gemini-2.5-flash-preview-05-20",
+              model: "gemini-2.5-flash",
               contents: `${systemPrompt}\n\n${userPrompt}`,
             });
             generatedText = result.text || null;
