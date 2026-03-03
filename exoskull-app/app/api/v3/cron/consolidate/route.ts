@@ -108,17 +108,8 @@ async function consolidateTenant(
     )
     .join("\n");
 
-  // 4. Use AI to extract patterns (Haiku for cost efficiency)
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicKey) return;
-
-  const { default: Anthropic } = await import("@anthropic-ai/sdk");
-  const client = new Anthropic({ apiKey: anthropicKey });
-
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 1000,
-    system: `Jesteś systemem konsolidacji pamięci ExoSkull. Analizujesz rozmowy i akcje z dnia i wyciągasz wzorce.
+  // 4. Use AI to extract patterns (with Gemini fallback)
+  const systemPrompt = `Jesteś systemem konsolidacji pamięci ExoSkull. Analizujesz rozmowy i akcje z dnia i wyciągasz wzorce.
 
 Zwróć JSON (i NIC więcej):
 {
@@ -133,17 +124,56 @@ Zasady:
 - Sour: co nie zadziałało → anti_pattern (confidence 0.3-0.5)
 - Preferencje usera → preference (confidence 0.8+)
 - Fakty → fact (confidence 0.9+)
-- Max 5 patterns, 3 goal updates, 5 priorities`,
-    messages: [
-      {
-        role: "user",
-        content: `Dzisiejsze rozmowy (${messages.length} wiadomości):\n${conversationSummary.slice(0, 6000)}\n\nDzisiejsze akcje autonomii:\n${actionsSummary.slice(0, 2000)}`,
-      },
-    ],
-  });
+- Max 5 patterns, 3 goal updates, 5 priorities`;
+  const userPrompt = `Dzisiejsze rozmowy (${messages.length} wiadomości):\n${conversationSummary.slice(0, 6000)}\n\nDzisiejsze akcje autonomii:\n${actionsSummary.slice(0, 2000)}`;
 
-  const text = response.content.find((c) => c.type === "text");
-  if (!text || !("text" in text)) return;
+  let aiResponseText: string | null = null;
+
+  // Try Anthropic first
+  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (anthropicKey) {
+    try {
+      const { default: Anthropic } = await import("@anthropic-ai/sdk");
+      const client = new Anthropic({ apiKey: anthropicKey });
+      const response = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      });
+      const block = response.content.find((c) => c.type === "text");
+      if (block && "text" in block) aiResponseText = block.text;
+    } catch (err) {
+      console.error(
+        "[Consolidation] Anthropic failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  // Gemini fallback
+  if (!aiResponseText) {
+    const geminiKey =
+      process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      try {
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: geminiKey });
+        const result = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: `${systemPrompt}\n\n${userPrompt}`,
+        });
+        aiResponseText = result.text || null;
+      } catch (err) {
+        console.error(
+          "[Consolidation] Gemini fallback failed:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+  }
+
+  if (!aiResponseText) return;
 
   let parsed: {
     patterns?: { content: string; category: string; confidence: number }[];
@@ -152,7 +182,11 @@ Zasady:
   };
 
   try {
-    parsed = JSON.parse(text.text);
+    // Strip markdown code fences if present (Gemini sometimes wraps JSON in ```json...```)
+    let jsonStr = aiResponseText;
+    const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) jsonStr = fenceMatch[1];
+    parsed = JSON.parse(jsonStr.trim());
   } catch {
     console.error("[Consolidation] Failed to parse AI response for", tenantId);
     return;

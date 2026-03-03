@@ -83,41 +83,71 @@ async function generateEveningReflection(
   const completedTasks = tasksResult.data || [];
   const actions = actionsResult.data || [];
 
-  // Generate reflection via Haiku
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicKey) return;
-
-  const { default: Anthropic } = await import("@anthropic-ai/sdk");
-  const client = new Anthropic({ apiKey: anthropicKey });
-
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 400,
-    system: `Jesteś wieczorną refleksją ExoSkull. Napisz CIEPŁE podsumowanie dnia (max 5 zdań).
+  // Generate reflection via Haiku (with Gemini fallback)
+  const systemPrompt = `Jesteś wieczorną refleksją ExoSkull. Napisz CIEPŁE podsumowanie dnia (max 5 zdań).
 Format: "[co udało się dziś] [postęp celów] [1 sugestia na jutro]"
 Styl: ciepły, wspierający, bez presji. Doceniaj wysiłek. Emoji OK.
-Imię: ${userName || "szefie"}`,
-    messages: [
-      {
-        role: "user",
-        content: `Rozmów: ${messages.length}\nZadania ukończone: ${completedTasks.map((t: { title: string }) => t.title).join(", ") || "brak"}\nAkcje systemu: ${actions.length}\nAkcje: ${
-          actions
-            .slice(0, 5)
-            .map((a: { event_type: string }) => a.event_type)
-            .join(", ") || "brak"
-        }`,
-      },
-    ],
-  });
+Imię: ${userName || "szefie"}`;
+  const userPrompt = `Rozmów: ${messages.length}\nZadania ukończone: ${completedTasks.map((t: { title: string }) => t.title).join(", ") || "brak"}\nAkcje systemu: ${actions.length}\nAkcje: ${
+    actions
+      .slice(0, 5)
+      .map((a: { event_type: string }) => a.event_type)
+      .join(", ") || "brak"
+  }`;
 
-  const text = response.content.find((c) => c.type === "text");
-  if (!text || !("text" in text)) return;
+  let reflectionText: string | null = null;
+
+  // Try Anthropic first
+  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (anthropicKey) {
+    try {
+      const { default: Anthropic } = await import("@anthropic-ai/sdk");
+      const client = new Anthropic({ apiKey: anthropicKey });
+      const response = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 400,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      });
+      const block = response.content.find((c) => c.type === "text");
+      if (block && "text" in block) reflectionText = block.text;
+    } catch (err) {
+      console.error(
+        "[Evening] Anthropic failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  // Gemini fallback
+  if (!reflectionText) {
+    const geminiKey =
+      process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      try {
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: geminiKey });
+        const result = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: `${systemPrompt}\n\n${userPrompt}`,
+        });
+        reflectionText = result.text || null;
+      } catch (err) {
+        console.error(
+          "[Evening] Gemini fallback failed:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+  }
+
+  if (!reflectionText) return;
 
   await supabase.from("exo_autonomy_log").insert({
     tenant_id: tenantId,
     event_type: "evening_reflection",
     payload: {
-      message: text.text,
+      message: reflectionText,
       conversations: messages.length,
       tasks_completed: completedTasks.length,
       actions_taken: actions.length,
@@ -127,7 +157,7 @@ Imię: ${userName || "szefie"}`,
   await supabase.from("exo_unified_messages").insert({
     tenant_id: tenantId,
     role: "assistant",
-    content: text.text,
+    content: reflectionText,
     channel: "autonomous",
     metadata: { type: "evening_reflection" },
   });
