@@ -207,6 +207,7 @@ export async function runV3Agent(
   let totalOutputTokens = 0;
   let numTurns = 0;
   let totalToolErrors = 0;
+  let messagesCount = 0;
 
   try {
     const client = new Anthropic({
@@ -231,6 +232,7 @@ export async function runV3Agent(
         { role: "user" as const, content: req.userMessage },
       ];
     }
+    messagesCount = messages.length;
 
     while (numTurns < config.maxTurns) {
       numTurns++;
@@ -340,10 +342,52 @@ export async function runV3Agent(
         error: errMsg,
         tenantId: req.tenantId,
         numTurns,
-        messagesCount: messages?.length ?? 0,
+        messagesCount,
         toolsUsed,
       });
-      finalText = "Błąd przetwarzania. Spróbuj ponownie.";
+
+      // ── Emergency Gemini fallback (no tools, conversation only) ──
+      const geminiKey =
+        process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+      if (geminiKey && !abortController.signal.aborted) {
+        try {
+          logger.info("[v3:Agent] Falling back to Gemini...");
+          const { GoogleGenAI } = await import("@google/genai");
+          const ai = new GoogleGenAI({ apiKey: geminiKey });
+
+          // Build simple prompt with last few messages
+          const recentMsgs = threadHistory.slice(-6);
+          const historyText = recentMsgs
+            .map(
+              (m) =>
+                `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`,
+            )
+            .join("\n");
+
+          const geminiResult = await ai.models.generateContent({
+            model: "gemini-2.5-flash-preview-05-20",
+            contents: `${systemPrompt.slice(0, 4000)}\n\nHistoria:\n${historyText}\n\nUser: ${req.userMessage}\n\nOdpowiedz po polsku. Nie masz dostępu do narzędzi — odpowiadaj z wiedzy ogólnej i kontekstu rozmowy.`,
+          });
+
+          finalText =
+            geminiResult.text || "Błąd przetwarzania. Spróbuj ponownie.";
+          if (geminiResult.text) {
+            finalText =
+              "[Gemini fallback — narzędzia niedostępne]\n\n" + finalText;
+            logger.info("[v3:Agent] Gemini fallback succeeded");
+          }
+        } catch (geminiErr) {
+          logger.error("[v3:Agent] Gemini fallback failed:", {
+            error:
+              geminiErr instanceof Error
+                ? geminiErr.message
+                : String(geminiErr),
+          });
+          finalText = "Błąd przetwarzania. Spróbuj ponownie.";
+        }
+      } else {
+        finalText = "Błąd przetwarzania. Spróbuj ponownie.";
+      }
     }
   } finally {
     clearTimeout(timeoutHandle);
