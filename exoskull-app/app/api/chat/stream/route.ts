@@ -13,6 +13,7 @@ import { appendMessage } from "@/lib/unified-thread";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 // ============================================================================
 // TOOL LABELS (human-readable tool names for UI)
