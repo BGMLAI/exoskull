@@ -1,5 +1,44 @@
 # Session Log
 
+## [2026-03-04] FAZA 1-9: Smart Routing + E2E Verification — ALL PASS
+
+### Changes Deployed
+
+- **Gemini Smart Router** (`lib/v3/gemini-router.ts`) — NEW FILE
+  - `classifyQuery()`: simple queries → Gemini Flash (<1s, $0 cost)
+  - `handleSimpleQuery()`: Gemini 2.5 Flash for greetings/acknowledgments
+  - 40+ TOOL_KEYWORDS, 6 SIMPLE_PATTERNS regex
+- **Agent thinking steps improved** (`lib/v3/agent.ts`)
+  - "Szybka odpowiedź" for Gemini-routed queries
+  - "Znalazłem N wspomnienia powiązane z Twoim pytaniem" — memory count
+  - "Analizuję i odpowiadam" replaces "Generuję odpowiedź"
+- **Tool result summaries** in SSE stream (`app/api/chat/stream/route.ts`)
+- **useDictation stubs** for future SpeechRecognition API
+
+### E2E Results on exoskull.xyz (2026-03-04 05:49 CET)
+
+| Test                    | Result   | Details                                                       |
+| ----------------------- | -------- | ------------------------------------------------------------- |
+| S1: Chat response       | **PASS** | "Cześć" → natural response, <5s                               |
+| S11: Memory save+recall | **PASS** | `remember` tool → "Rust" recalled correctly                   |
+| S17: Goal creation      | **PASS** | `set_goal` (152ms) → ID created, priority 8                   |
+| Web search              | **PASS** | `search_web` (Tavily, 1.3s) → 5 Rust 2026 news items          |
+| S29: Health API         | **PASS** | JSON with 4 dependency checks                                 |
+| S30: Auth enforcement   | **PASS** | /cost 401, /audit-trail 401 without auth                      |
+| S30: Safety boundary    | **PASS** | SQL injection refused, tenant isolation enforced              |
+| Smart routing           | **PASS** | "Szybka odpowiedź" thinking step confirmed for simple queries |
+| Memory count            | **PASS** | "Znalazłem 8 wspomnienia" thinking step visible               |
+| Tool summaries          | **PASS** | Expanded tool results with 100-char previews                  |
+
+### Key Confirmations
+
+- Gemini Smart Router: LIVE and routing simple queries to Flash
+- All 29 V3 tools: still operational (verified S11-S30 in previous session)
+- New deploy propagated in ~2 minutes after `git push v3-origin v3:main`
+- Build passes locally with 2.1GB free disk space
+
+---
+
 ## [2026-03-03] E2E S11-S30 — Session 4: FINAL — 19 PASS / 1 PARTIAL
 
 ### Session 4 Results: 19 PASS / 1 PARTIAL / 0 FAIL / 0 BLOCKED

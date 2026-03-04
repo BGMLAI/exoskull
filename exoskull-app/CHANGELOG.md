@@ -4,6 +4,22 @@ All notable changes to this project.
 
 ---
 
+## [2026-03-04] Gemini Smart Routing + Improved Reasoning Display
+
+- **NEW** `lib/v3/gemini-router.ts` — Smart query classification
+  - Simple queries (greetings, acknowledgments) → Gemini 2.5 Flash (<1s, $0)
+  - Complex queries (tool-requiring, goals, memory) → Claude Sonnet (with tools)
+  - 40+ TOOL_KEYWORDS for complexity detection
+- **IMPROVED** Agent thinking steps in `lib/v3/agent.ts`:
+  - "Szybka odpowiedź" for Gemini-routed queries
+  - "Znalazłem N wspomnienia..." — shows memory relevance count
+  - "Analizuję i odpowiadam" replaces generic "Generuję odpowiedź"
+- **IMPROVED** SSE tool events include `resultSummary` (first 100 chars)
+- **DOCS** Updated ARCHITECTURE.md v8.0, CLAUDE.md, PRODUCT_DECISIONS_v1.md, MVP_EXECUTION_PLAN.md
+- **E2E** All tests PASS on production (smart routing, memory, goals, search, safety)
+
+---
+
 ## [2026-03-03] E2E FINAL: 19 PASS / 1 PARTIAL — All 29 Tools Verified + Working
 
 ### E2E Session 4: S24+S25 PASS — Twilio fully operational
