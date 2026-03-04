@@ -82,7 +82,8 @@ WYMAGANIA TECHNICZNE:
 - Polskie UI (napisy, przyciski po polsku)
 - CRUD operacje jeśli potrzebne
 - Profesjonalny, nowoczesny wygląd
-- Minimum 300 linii kodu — pełna funkcjonalność, nie stub
+- Kompletna funkcjonalność (nie stub/placeholder)
+- Max 200 linii — zwięzły ale pełny kod
 
 Odpowiedz TYLKO czystym JSON:
 {"html":"<!DOCTYPE html>...cały kod HTML...","title":"Tytuł aplikacji"}
@@ -92,17 +93,17 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
       let html: string | null = null;
       let title: string = rawName;
 
-      // Try Gemini first (JSON mode guarantees valid JSON)
+      // Try Gemini 2.0 Flash first (fast, JSON mode)
       if (geminiKey) {
         try {
           const { GoogleGenAI } = await import("@google/genai");
           const ai = new GoogleGenAI({ apiKey: geminiKey });
           const result = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.0-flash",
             contents: prompt,
             config: {
               responseMimeType: "application/json",
-              maxOutputTokens: 16384,
+              maxOutputTokens: 8192,
             },
           });
           const text = result.text;
