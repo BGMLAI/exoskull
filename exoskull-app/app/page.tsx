@@ -125,7 +125,7 @@ export default async function LandingPage() {
               href="#jak-to-dziala"
               className="text-sm text-slate-400 hover:text-white transition-colors"
             >
-              Jak to dziala
+              Jak to działa
             </a>
             <a
               href="#cennik"
@@ -161,7 +161,7 @@ export default async function LandingPage() {
               className="text-2xl sm:text-4xl md:text-5xl lg:text-7xl font-bold mb-6 leading-tight"
               id="hero-heading"
             >
-              Twoj Drugi Mozg.
+              Twój Drugi Mózg.
               <br />
               <span className="text-blue-400">
                 Zbudowany Dla Ciebie. Przez AI.
@@ -183,7 +183,7 @@ export default async function LandingPage() {
                 href="#jak-to-dziala"
                 className="px-8 py-4 border border-slate-600 hover:border-slate-500 rounded-xl text-lg font-medium transition-colors text-slate-300"
               >
-                Jak to dziala?
+                Jak to działa?
               </a>
             </div>
           </section>
@@ -273,17 +273,17 @@ export default async function LandingPage() {
                 </div>
                 <h3 className="text-2xl font-bold mb-2">Beta</h3>
                 <div className="flex items-baseline gap-1 mb-4">
-                  <span className="text-4xl font-bold">0 zl</span>
-                  <span className="text-slate-500">/miesiac</span>
+                  <span className="text-4xl font-bold">0 zł</span>
+                  <span className="text-slate-500">/miesiąc</span>
                 </div>
                 <ul className="space-y-3 text-slate-300 text-sm mb-8">
                   <li className="flex items-start gap-2">
                     <span className="text-blue-400 mt-0.5">&#10003;</span>
-                    Pelny dostep do IORS (glos + tekst)
+                    Pełny dostęp do IORS (głos + tekst)
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-blue-400 mt-0.5">&#10003;</span>
-                    Wszystkie Mody (sen, nastroj, nawyki, finanse)
+                    Wszystkie Mody (sen, nastrój, nawyki, finanse)
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-blue-400 mt-0.5">&#10003;</span>
@@ -291,7 +291,7 @@ export default async function LandingPage() {
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-blue-400 mt-0.5">&#10003;</span>
-                    Pamiec bez limitu
+                    Pamięć bez limitu
                   </li>
                 </ul>
                 <Link
@@ -326,7 +326,7 @@ export default async function LandingPage() {
                   </li>
                 </ul>
                 <div className="block text-center w-full py-3 border border-slate-600 rounded-lg font-medium text-slate-400">
-                  Wkrotce
+                  Wkrótce
                 </div>
               </div>
             </div>
@@ -460,7 +460,7 @@ export default async function LandingPage() {
                 </a>
               </div>
               <p className="text-xs">
-                &copy; {new Date().getFullYear()} Fundacja Lokalny Certyfikowany
+                &copy; {new Date().getFullYear()} ExoSkull by BGML.ai
               </p>
             </div>
           </div>
