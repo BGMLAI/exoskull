@@ -609,6 +609,146 @@ async function runOpenAIAgentFallback(
 }
 
 // ============================================================================
+// DEEPSEEK AGENT FALLBACK (OpenAI-compatible API with tool calling)
+// ============================================================================
+
+interface DeepSeekAgentOpts {
+  tenantId: string;
+  userMessage: string;
+  systemPrompt: string;
+  threadHistory: Array<{ role: string; content: string }>;
+  tools: V3ToolDefinition[];
+  deepseekKey: string;
+  maxTurns: number;
+  onToolStart?: (name: string) => void;
+  onToolEnd?: (
+    name: string,
+    durationMs: number,
+    meta?: { success?: boolean; resultSummary?: string },
+  ) => void;
+  onTextDelta?: (delta: string) => void;
+}
+
+async function runDeepSeekAgentFallback(
+  opts: DeepSeekAgentOpts,
+): Promise<{ text: string; toolsUsed: string[]; turns: number }> {
+  const dsTools = opts.tools.map((t) => ({
+    type: "function" as const,
+    function: {
+      name: t.definition.name,
+      description: t.definition.description || t.definition.name,
+      parameters: t.definition.input_schema,
+    },
+  }));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const messages: any[] = [
+    { role: "system", content: opts.systemPrompt.slice(0, 16000) },
+  ];
+  for (const msg of opts.threadHistory.slice(-10)) {
+    messages.push({
+      role: msg.role === "user" ? "user" : "assistant",
+      content: typeof msg.content === "string" ? msg.content : "",
+    });
+  }
+  const lastMsg = messages[messages.length - 1];
+  if (!lastMsg || lastMsg.role !== "user") {
+    messages.push({ role: "user", content: opts.userMessage });
+  }
+
+  const toolsUsed: string[] = [];
+  let finalText = "";
+  let turns = 0;
+
+  while (turns < opts.maxTurns) {
+    turns++;
+
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${opts.deepseekKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages,
+        tools: dsTools,
+        tool_choice: "auto",
+        max_tokens: 4096,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`DeepSeek ${response.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+    const choice = data.choices?.[0];
+    if (!choice) throw new Error("DeepSeek: no choice in response");
+
+    const assistantMsg = choice.message;
+    const toolCalls = assistantMsg.tool_calls;
+
+    if (!toolCalls || toolCalls.length === 0) {
+      finalText = assistantMsg.content || "";
+      if (opts.onTextDelta && finalText) {
+        const chunkSize = 50;
+        for (let i = 0; i < finalText.length; i += chunkSize) {
+          opts.onTextDelta(finalText.slice(i, i + chunkSize));
+        }
+      }
+      break;
+    }
+
+    messages.push(assistantMsg);
+
+    for (const tc of toolCalls) {
+      const toolName = tc.function.name;
+      if (!toolsUsed.includes(toolName)) toolsUsed.push(toolName);
+      opts.onToolStart?.(toolName);
+      const toolStartMs = Date.now();
+
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(tc.function.arguments || "{}");
+      } catch {
+        args = {};
+      }
+
+      const { result: toolResult, isError } = await executeV3Tool(
+        opts.tools,
+        toolName,
+        args,
+        opts.tenantId,
+      );
+
+      const durationMs = Date.now() - toolStartMs;
+      logger.info(
+        `[v3:DeepSeek] Tool ${toolName}: ${isError ? "FAIL" : "OK"} (${durationMs}ms)`,
+      );
+      opts.onToolEnd?.(toolName, durationMs, {
+        success: !isError,
+        resultSummary: toolResult.slice(0, 200),
+      });
+
+      messages.push({
+        role: "tool",
+        tool_call_id: tc.id,
+        content: toolResult,
+      });
+    }
+  }
+
+  if (!finalText && turns >= opts.maxTurns) {
+    finalText = "Osiągnięto limit interakcji DeepSeek. Spróbuj ponownie.";
+  }
+
+  return { text: finalText, toolsUsed, turns };
+}
+
+// ============================================================================
 // MAIN AGENT FUNCTION
 // ============================================================================
 
@@ -953,7 +1093,42 @@ export async function runV3Agent(
                         ? openaiErr.message
                         : String(openaiErr),
                   });
-                  finalText = `Wszystkie modele AI niedostępne (Anthropic: brak kredytów, Gemini: rate limit, Groq: ${groqErr instanceof Error ? groqErr.message.slice(0, 50) : "error"}, OpenAI: ${openaiErr instanceof Error ? openaiErr.message.slice(0, 50) : "error"}). Spróbuj za kilka minut.`;
+
+                  // ── DeepSeek fallback (OpenAI-compatible API) ──
+                  const deepseekKey = process.env.DEEPSEEK_API_KEY?.trim();
+                  if (deepseekKey && !abortController.signal.aborted) {
+                    try {
+                      logger.info("[v3:Agent] Falling back to DeepSeek...");
+                      const deepseekResult = await runDeepSeekAgentFallback({
+                        tenantId: req.tenantId,
+                        userMessage: req.userMessage,
+                        systemPrompt,
+                        threadHistory,
+                        tools: V3_TOOLS,
+                        deepseekKey,
+                        maxTurns: Math.min(config.maxTurns, 8),
+                        onToolStart: req.onToolStart,
+                        onToolEnd: req.onToolEnd,
+                        onTextDelta: req.onTextDelta,
+                      });
+                      finalText = deepseekResult.text;
+                      toolsUsed.push(...deepseekResult.toolsUsed);
+                      logger.info("[v3:Agent] DeepSeek fallback succeeded", {
+                        toolsUsed: deepseekResult.toolsUsed,
+                        turns: deepseekResult.turns,
+                      });
+                    } catch (deepseekErr) {
+                      logger.error("[v3:Agent] DeepSeek fallback failed:", {
+                        error:
+                          deepseekErr instanceof Error
+                            ? deepseekErr.message
+                            : String(deepseekErr),
+                      });
+                      finalText = `Wszystkie modele AI niedostępne (Anthropic: brak kredytów, Gemini: rate limit, Groq: ${groqErr instanceof Error ? groqErr.message.slice(0, 50) : "error"}, OpenAI: ${openaiErr instanceof Error ? openaiErr.message.slice(0, 50) : "error"}, DeepSeek: ${deepseekErr instanceof Error ? deepseekErr.message.slice(0, 50) : "error"}). Spróbuj za kilka minut.`;
+                    }
+                  } else {
+                    finalText = `Wszystkie modele AI niedostępne (Anthropic: brak kredytów, Gemini: rate limit, Groq: ${groqErr instanceof Error ? groqErr.message.slice(0, 50) : "error"}, OpenAI: ${openaiErr instanceof Error ? openaiErr.message.slice(0, 50) : "error"}). Spróbuj za kilka minut.`;
+                  }
                 }
               } else {
                 finalText = `Wszystkie modele AI niedostępne (Anthropic: brak kredytów, Gemini: rate limit, Groq: ${groqErr instanceof Error ? groqErr.message.slice(0, 50) : "error"}). Spróbuj za kilka minut.`;
