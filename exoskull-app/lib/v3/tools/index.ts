@@ -9,7 +9,9 @@
  * Phase 6: +3 channel tools (send_sms, send_email, make_call)
  * Phase 7: +2 evolution tools (get_capabilities, reflexion_evaluate)
  *
- * Current: 33 tools (Phase 1-7) ← v4 E2E fixes
+ * Phase 8: +1 marketplace tool (publish_to_allegro)
+ *
+ * Current: 34 tools (Phase 1-8)
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
@@ -38,6 +40,7 @@ import { autonomyTools } from "./autonomy-tools";
 import { builderTools } from "./builder-tools";
 import { channelTools } from "./channel-tools";
 import { evolutionTools } from "./evolution-tools";
+import { marketplaceTools } from "./marketplace-tools";
 
 // ============================================================================
 // MERGED REGISTRY
@@ -51,6 +54,7 @@ export const V3_TOOLS: V3ToolDefinition[] = [
   ...builderTools, // 3: build_app, generate_content, self_extend_tool
   ...channelTools, // 3: send_sms, send_email, make_call
   ...evolutionTools, // 2: get_capabilities, reflexion_evaluate
+  ...marketplaceTools, // 1: publish_to_allegro
 ];
 
 /**
