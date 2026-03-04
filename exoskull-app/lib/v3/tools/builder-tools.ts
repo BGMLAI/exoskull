@@ -134,7 +134,113 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
         }
       }
 
-      // Fallback 2: Groq (Llama 3.3 70B — fast, free, JSON mode)
+      // Fallback 2: OpenAI GPT-4o-mini (cheap, high quality, JSON mode)
+      const openaiKey = process.env.OPENAI_API_KEY?.trim();
+      if (!html && openaiKey) {
+        try {
+          console.log("[build_app] Trying OpenAI GPT-4o-mini...");
+          const openaiResponse = await fetch(
+            "https://api.openai.com/v1/chat/completions",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${openaiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "gpt-4o-mini",
+                messages: [
+                  {
+                    role: "system",
+                    content:
+                      "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy. Klucz 'html' zawiera kompletny HTML string. Klucz 'title' zawiera tytuł.",
+                  },
+                  { role: "user", content: prompt },
+                ],
+                max_tokens: 16000,
+                temperature: 0.7,
+                response_format: { type: "json_object" },
+              }),
+            },
+          );
+          if (openaiResponse.ok) {
+            const openaiData = await openaiResponse.json();
+            const openaiText = openaiData.choices?.[0]?.message?.content;
+            if (openaiText) {
+              const parsed = JSON.parse(openaiText);
+              html = parsed.html || null;
+              title = parsed.title || rawName;
+            }
+          } else {
+            const errText = await openaiResponse.text();
+            errors.push(
+              `OpenAI: ${openaiResponse.status} ${errText.slice(0, 200)}`,
+            );
+            console.error("[build_app] OpenAI error:", errText.slice(0, 200));
+          }
+        } catch (openaiErr) {
+          const msg =
+            openaiErr instanceof Error
+              ? openaiErr.message
+              : JSON.stringify(openaiErr);
+          errors.push(`OpenAI: ${msg.slice(0, 200)}`);
+          console.error("[build_app] OpenAI error:", msg);
+        }
+      }
+
+      // Fallback 3: DeepSeek (cheap, good code quality, OpenAI-compatible)
+      const deepseekKey = process.env.DEEPSEEK_API_KEY?.trim();
+      if (!html && deepseekKey) {
+        try {
+          console.log("[build_app] Trying DeepSeek...");
+          const dsResponse = await fetch(
+            "https://api.deepseek.com/chat/completions",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${deepseekKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "deepseek-chat",
+                messages: [
+                  {
+                    role: "system",
+                    content:
+                      "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy. Klucz 'html' zawiera kompletny HTML string. Klucz 'title' zawiera tytuł.",
+                  },
+                  { role: "user", content: prompt },
+                ],
+                max_tokens: 8000,
+                temperature: 0.7,
+                response_format: { type: "json_object" },
+              }),
+            },
+          );
+          if (dsResponse.ok) {
+            const dsData = await dsResponse.json();
+            const dsText = dsData.choices?.[0]?.message?.content;
+            if (dsText) {
+              const parsed = JSON.parse(dsText);
+              html = parsed.html || null;
+              title = parsed.title || rawName;
+            }
+          } else {
+            const errText = await dsResponse.text();
+            errors.push(
+              `DeepSeek: ${dsResponse.status} ${errText.slice(0, 200)}`,
+            );
+            console.error("[build_app] DeepSeek error:", errText.slice(0, 200));
+          }
+        } catch (dsErr) {
+          const msg =
+            dsErr instanceof Error ? dsErr.message : JSON.stringify(dsErr);
+          errors.push(`DeepSeek: ${msg.slice(0, 200)}`);
+          console.error("[build_app] DeepSeek error:", msg);
+        }
+      }
+
+      // Fallback 4: Groq (Llama 3.3 70B — fast, free, JSON mode)
       const groqKey = process.env.GROQ_API_KEY?.trim();
       if (!html && groqKey) {
         try {
@@ -188,7 +294,7 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
         }
       }
 
-      // Fallback 3: Anthropic (if credits available)
+      // Fallback 5: Anthropic (if credits available)
       if (!html && anthropicKey) {
         try {
           const { default: Anthropic } = await import("@anthropic-ai/sdk");
