@@ -22,18 +22,22 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
     // Return actual task objects via dual-read service (handles both exo_tasks and user_ops)
     const tasks = await getTasks(tenantId, { limit: 50 });
 
-    return NextResponse.json({
-      data: tasks.map((t) => ({
-        id: t.id,
-        title: t.title,
-        status: t.status,
-        priority: t.priority,
-        due_date: t.due_date,
-        completed_at: t.completed_at,
-        created_at: t.created_at,
-        done: t.status === "done",
-      })),
-    });
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    const pending = tasks.filter((t) => t.status === "pending").length;
+    const today = tasks.filter(
+      (t) =>
+        t.due_date &&
+        t.due_date.slice(0, 10) === todayStr &&
+        t.status !== "done",
+    ).length;
+    const overdue = tasks.filter(
+      (t) =>
+        t.due_date && t.due_date.slice(0, 10) < todayStr && t.status !== "done",
+    ).length;
+
+    return NextResponse.json({ pending, today, overdue });
   } catch (error) {
     logger.error("[Canvas] Tasks data error:", error);
     return NextResponse.json(
