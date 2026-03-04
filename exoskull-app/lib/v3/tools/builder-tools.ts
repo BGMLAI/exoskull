@@ -134,10 +134,10 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
           const { default: Anthropic } = await import("@anthropic-ai/sdk");
           const client = new Anthropic({ apiKey: anthropicKey });
           const response = await client.messages.create({
-            model: "claude-sonnet-4-6-20250514",
+            model: "claude-haiku-4-5-20251001",
             max_tokens: 8000,
             system:
-              "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy. Klucz 'html' zawiera kompletny HTML.",
+              "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy. Klucz 'html' zawiera kompletny HTML string.",
             messages: [{ role: "user", content: prompt }],
           });
           const block = response.content.find((c) => c.type === "text");
