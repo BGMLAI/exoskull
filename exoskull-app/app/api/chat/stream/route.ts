@@ -118,7 +118,7 @@ function createStream(
           onToolEnd: (toolName, durationMs, meta) => {
             controller.enqueue(
               encoder.encode(
-                `data: ${JSON.stringify({ type: "tool_end", tool: toolName, durationMs, success: meta?.success })}\n\n`,
+                `data: ${JSON.stringify({ type: "tool_end", tool: toolName, durationMs, success: meta?.success, resultSummary: meta?.resultSummary?.slice(0, 100) })}\n\n`,
               ),
             );
           },

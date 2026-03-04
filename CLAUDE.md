@@ -26,7 +26,7 @@ Read [ARCHITECTURE.md](./ARCHITECTURE.md) for full vision (18 layers).
 ### Monorepo Structure
 ```
 exoskull/
-├── exoskull-app/        # Next.js web app (main product, deployed on Railway)
+├── exoskull-app/        # Next.js web app (main product, deployed on Vercel)
 │   ├── app/             # Next.js app router (pages, API routes)
 │   ├── components/      # React components
 │   ├── lib/             # Business logic, system (atlas-pipeline, gotcha-engine)
@@ -114,50 +114,43 @@ Connect → Listen → Archive → Wire → Sense
 
 ---
 
-## Progressive Deployment
+## Deployment Strategy (2026-03-04)
 
-Don't wait for "complete system" before delivering value. Start achieving goals from day 1.
+**Web-first, omnichannel from day 1.** All channels available simultaneously.
 
-- **Day 1:** SMS + voice — capture goals, break into first actions
-- **Week 1:** Daily task generation from goals, progress tracking via SMS
-- **Week 2:** First custom app deployed for user's top goal
-- **Month 1-3:** Full goal intelligence (strategy adjustment, autonomous execution)
+- **Day 1:** Web chat + voice dictation + file upload. Full tool suite available
+- **Week 1:** All channels active (SMS, email, WhatsApp, Telegram, Discord, etc.)
+- **Month 1:** SuperIntegrator connects user's services, first custom apps built by AI
 
-**Zero-tech requirement:** SMS + voice first. Web dashboard OPTIONAL.
+**No progressive unlock.** Full capabilities from registration. No SMS-first.
 
 ---
 
-## Multi-Model AI Routing
+## Multi-Model AI Routing (2026-03-04)
 
-Use the cheapest model that can handle the task:
+Smart routing: simple queries → fast/cheap, complex → powerful.
 
 | Tier | Model | Use For |
 |------|-------|---------|
-| 1 | Gemini 1.5 Flash | Simple SMS, classification, routing |
-| 2 | Claude Haiku | Pattern detection, summarization |
-| 3 | Kimi 2.5 / GPT-4 Codex | Deep reasoning, code generation |
-| 4 | Claude Opus | Meta-coordination, gap detection, crisis |
+| 1 | Gemini 2.5 Flash | Simple chat, classification, routing (<1s) |
+| 2 | Claude Haiku 4.5 | Pattern detection, summarization |
+| 3 | Claude Sonnet 4.6 | Complex tasks with tools (V3 agent) |
+| 4 | Claude Opus 4.6 | Meta-coordination, gap detection, crisis |
 
-**Routing:** Classify complexity → check history → route to cheapest tier → escalate on failure (max 3 retries).
+**Smart Routing:** Classify query complexity BEFORE calling model. Simple → Gemini Flash (no tools, <1s). Complex → Claude Sonnet (with tools, async if >5s).
+**Emergency Fallback:** Gemini 2.5 Flash when Anthropic credits exhausted (conversation-only mode).
 **Prompt Caching:** Static context cached for 90% savings. Only dynamic context sent fresh.
 
 ---
 
-## Skill Library System
+## Skill Library System (2026-03-04)
 
 ExoSkull builds skills on-demand when a goal requires capabilities the system doesn't have yet.
 
-- **Core Skills:** Built-in (sleep_tracker, energy_monitor, task_manager)
-- **Custom Skills:** System detects goal needs skill → auto-generates it
-
-**Standard Skill API:**
-```javascript
-init(user_config)  // Setup
-log(data)          // Store data point
-analyze()          // Generate insights
-alert(condition)   // Proactive message
-export()           // Data download
-```
+- **Core Skills:** Built-in (task_manager, memory, knowledge, goals)
+- **Dynamic Skills:** AI detects need → generates → validates → USES without asking user
+- **Proactive:** AI generates and deploys skills autonomously when goals require them
+- **Felix Pattern:** Full automation — AI achieves complex goals (research → plan → build → market → sell → support). AI estimates cost and asks before spending.
 
 ---
 
@@ -180,33 +173,85 @@ Implemented from DAY 1. Total Recall requires full data history.
 
 ---
 
-## Autonomous Actions
+## Autonomous Actions (2026-03-04)
 
-ExoSkull acts on user's behalf - BUT only with explicit permission.
+ExoSkull acts on user's behalf with **fully adaptive autonomy**.
 
-**Permission Model:** Granular (per-action) | Category (per-domain) | Emergency (upfront consent)
+**Permission Model:** User defines rules in chat → AI records and generates workspace view.
+- Example: "Emaile do X wysyłaj sam, SMS zawsze pytaj, telefony blokuj"
+- AI decides WHEN and WHAT to propose — based on goals, behavior, preferences
+- AI generates and USES skills without asking — if goal requires it
+- Before large spend: AI estimates cost and asks ("Szacuję ~$30 AI. OK?")
 
-**Examples:** Auto-log sleep, block calendar for deep work, auto-categorize transactions, draft emails, call strangers (schedule doctor, negotiate bills).
+**Outbound:** emails, SMS, calls (user + strangers), negotiations (AI solo or AI+user per situation)
+**CRONs:** Must do CONCRETE things (check deadlines, emails, goals, calendar). Not abstract wellness.
 
 ---
 
 ## CRON & Scheduled Operations
 
-All scheduled operations are **goal-driven** — no hardcoded wellness CRONs. The system creates schedules based on active goals.
+All scheduled operations are **goal-driven** — CRONs must do CONCRETE things.
 
+**Current v3 CRONs:** heartbeat (5min), morning briefing, evening reflection, nightly consolidation
 **Goal-derived:** System analyzes active goals → generates relevant check-ins, reminders, and reviews automatically.
 **Event-driven:** Triggered by goal-relevant conditions (deadline approaching, metric off-track, blocked task).
-**Periodic reviews:** Weekly goal progress, monthly strategy adjustment — only for goals that exist.
+**MAPE-K + Ralph Loop = one unified loop.** Signal Triage is part of Monitor phase.
 
 **Adaptive:** Learn optimal times, don't interrupt deep work, batch notifications. No schedule without a goal behind it.
 
 ---
 
-## Android-First Integration
+## Shared Workspace (2026-03-04)
 
-**Key APIs:** Digital Wellbeing, Activity Recognition, Geofencing, HealthConnect, Notification Listener
-**Deployment:** <5MB APK, <2% battery/day
-**Zero-Install:** SMS-first (no app needed day 1)
+Split layout: Left = Chat/Unified Stream, Right = Shared Workspace.
+
+**Workspace contains:**
+- Virtual browser (Chrome on VPS via CDP + WebRTC live stream) — AI controls, user sees and can take over
+- Expanded links/files from unified stream
+- AI-generated dashboards/pages (zero precoded pages)
+- VPS terminal, code execution output
+- Document previews, visualizations
+
+**Mobile:** Chat-first. Workspace auto-opens when agent shows something.
+**Tech:** Chrome DevTools Protocol for interaction + WebRTC for live view.
+
+---
+
+## Graph-Based Knowledge (2026-03-04)
+
+**Tyrolka framework REMOVED.** Replaced by graph model in Postgres.
+
+```
+nodes (id, tenant_id, type, name, content, metadata JSONB, embedding vector(1536), parent_id, created_at)
+  type: 'goal', 'task', 'note', 'memory', 'pattern', 'document', 'tag'
+
+edges (id, source_id, target_id, relation, metadata JSONB)
+  relation: 'has_subtask', 'tagged_with', 'related_to', 'blocks', 'depends_on'
+```
+
+**#Hashtags** = simultaneously tag + semantic key + knowledge graph node. Multi-nested hierarchy.
+**pgvector embeddings** on nodes → semantic search + graph traversal.
+**Dashboard** = interactive hashtag tree (not traditional pages).
+
+---
+
+## Tenant Instance Isolation (2026-03-04)
+
+Parent/child model for self-modification:
+
+**Platform core (IMMUTABLE):** auth, billing, middleware, agent engine, security, DB migrations, infrastructure
+**Tenant instance (MODIFIABLE by agent):** skills, UI, config, prompts, new API routes (sandbox), generated apps
+
+Each IORS agent can modify EVERYTHING in its user's instance but NOTHING in the platform core.
+
+---
+
+## Channels: Omnichannel (2026-03-04)
+
+ALL channels available from day 1 via separate adapters (NO GoHighLevel):
+- Web chat, SMS, Email, WhatsApp, Telegram, Discord, Messenger, Instagram, Slack, iMessage
+- Same tools on ALL channels. Output adapted per channel (voice=describes, web=shows, SMS=brief)
+- Onboarding: conversational, omnichannel. AI decides what to ask adaptively
 
 ---
 
@@ -220,8 +265,7 @@ All scheduled operations are **goal-driven** — no hardcoded wellness CRONs. Th
 **IP:** Never attribute architecture to competitors. DO mention tools we USE (tech stack).
 
 **TODO (Legal):**
-- [ ] IP review of terminology (Mods, Rigs, Quests, Exoskulleton)
-- [ ] Trademark search for "ExoSkull" and "Exoskulleton"
+- [ ] Trademark search for "ExoSkull" and "IORS"
 
 ---
 

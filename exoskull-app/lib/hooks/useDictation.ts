@@ -20,6 +20,10 @@ interface UseDictationReturn {
   setContinuous: (on: boolean) => void;
   startListening: () => void;
   stopListening: () => void;
+  /** Live dictation text that should fill the input field (Gboard-style) */
+  liveText: string;
+  /** Whether using live SpeechRecognition (true) or MediaRecorder+Whisper (false) */
+  isLiveMode: boolean;
 }
 
 // ============================================================================
@@ -320,5 +324,7 @@ export function useDictation(
     setContinuous,
     startListening,
     stopListening,
+    liveText: "",
+    isLiveMode: false,
   };
 }

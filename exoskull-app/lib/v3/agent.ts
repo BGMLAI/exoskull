@@ -21,6 +21,7 @@ import { unifiedSearch } from "@/lib/memory/unified-search";
 import type { UnifiedSearchResult } from "@/lib/memory/types";
 import { withRetry } from "@/lib/utils/fetch-retry";
 import { logger } from "@/lib/logger";
+import { classifyQuery, handleSimpleQuery } from "./gemini-router";
 
 // ============================================================================
 // TYPES
@@ -154,6 +155,43 @@ export async function runV3Agent(
         ? VOICE_CONFIG
         : WEB_CONFIG;
 
+  // ── Phase 0: Smart routing — simple queries via Gemini Flash ──
+  if (req.channel === "web_chat" && req.mode !== "autonomous") {
+    const complexity = classifyQuery(req.userMessage);
+    if (complexity === "simple") {
+      req.onThinkingStep?.("Szybka odpowiedź", "running");
+      const threadHistory = await getThreadContext(req.tenantId, 6);
+      const simpleHistory = threadHistory.map((m) => ({
+        role: m.role,
+        content: typeof m.content === "string" ? m.content : req.userMessage,
+      }));
+      const geminiResponse = await handleSimpleQuery(
+        req.userMessage,
+        undefined,
+        simpleHistory,
+      );
+      if (geminiResponse) {
+        req.onThinkingStep?.("Szybka odpowiedź", "done");
+        // Stream the response
+        if (req.onTextDelta) {
+          const chunkSize = 30;
+          for (let i = 0; i < geminiResponse.length; i += chunkSize) {
+            req.onTextDelta(geminiResponse.slice(i, i + chunkSize));
+          }
+        }
+        return {
+          text: geminiResponse,
+          toolsUsed: [],
+          costUsd: 0,
+          numTurns: 0,
+          durationMs: Date.now() - startMs,
+        };
+      }
+      // Gemini failed → fall through to Claude
+      logger.info("[v3:Agent] Gemini simple routing failed, using Claude");
+    }
+  }
+
   req.onThinkingStep?.("Ładuję kontekst", "running");
 
   // ── Phase 1: Load context + memory in parallel ──
@@ -194,8 +232,16 @@ export async function runV3Agent(
   );
   req.onThinkingStep?.("Ładuję kontekst", "done");
 
+  // Emit memory context info
+  if (memoryResults && memoryResults.length > 0) {
+    req.onThinkingStep?.(
+      `Znalazłem ${memoryResults.length} wspomnienia powiązane z Twoim pytaniem`,
+      "done",
+    );
+  }
+
   // ── Phase 3: Tool loop ──
-  req.onThinkingStep?.("Generuję odpowiedź", "running");
+  req.onThinkingStep?.("Analizuję i odpowiadam", "running");
 
   const abortController = new AbortController();
   const timeout = req.timeoutMs || config.timeoutMs;
@@ -393,7 +439,7 @@ export async function runV3Agent(
     clearTimeout(timeoutHandle);
   }
 
-  req.onThinkingStep?.("Generuję odpowiedź", "done");
+  req.onThinkingStep?.("Analizuję i odpowiadam", "done");
 
   // Cost calculation (Sonnet: $3/MTok in, $15/MTok out)
   const costUsd =
