@@ -40,11 +40,20 @@ export async function GET(
     );
   }
 
+  // Debug: include content length and first chars hash for debugging stale content
+  const contentLen = data.content?.length || 0;
+  const contentPreview = (data.content || "")
+    .substring(0, 80)
+    .replace(/[^a-zA-Z0-9]/g, "");
+
   return new Response(data.content, {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store, no-cache, must-revalidate",
+      "X-Content-Length": String(contentLen),
+      "X-Content-Preview": contentPreview.substring(0, 60),
+      "X-Deploy-Ts": "20260304-2005",
     },
   });
 }
