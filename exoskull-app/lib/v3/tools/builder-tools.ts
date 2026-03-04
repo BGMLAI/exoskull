@@ -93,17 +93,18 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
       let html: string | null = null;
       let title: string = rawName;
 
-      // Try Gemini 2.0 Flash first (fast, JSON mode)
+      // Try Gemini 2.5 Flash (JSON mode, thinking disabled for speed)
       if (geminiKey) {
         try {
           const { GoogleGenAI } = await import("@google/genai");
           const ai = new GoogleGenAI({ apiKey: geminiKey });
           const result = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
             contents: prompt,
             config: {
               responseMimeType: "application/json",
               maxOutputTokens: 8192,
+              thinkingConfig: { thinkingBudget: 0 },
             },
           });
           const text = result.text;
@@ -145,8 +146,10 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
         }
       }
 
-      if (!html)
-        return "Nie udało się wygenerować aplikacji — spróbuj ponownie.";
+      if (!html) {
+        const keys = { gemini: !!geminiKey, anthropic: !!anthropicKey };
+        return `Nie udało się wygenerować aplikacji (klucze: ${JSON.stringify(keys)}). Spróbuj ponownie.`;
+      }
 
       // Validate it looks like HTML
       if (!html.includes("<html") && !html.includes("<!DOCTYPE")) {
