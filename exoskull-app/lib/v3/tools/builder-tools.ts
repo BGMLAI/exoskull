@@ -17,16 +17,20 @@ const buildAppTool: V3ToolDefinition = {
   definition: {
     name: "build_app",
     description:
-      "Zbuduj prawdziwą aplikację (React + API + DB). BMAD pipeline: PM→PRD, Architect→design, Developer→code, Reviewer→review, Deploy. Użyj gdy cel użytkownika wymaga nowego narzędzia/aplikacji.",
+      "Zbuduj działającą aplikację webową i od razu ją udostępnij pod URL. Generuje standalone HTML z Tailwind CSS + vanilla JS. Użyj gdy użytkownik chce nową appkę/narzędzie.",
     input_schema: {
       type: "object" as const,
       properties: {
         name: {
           type: "string",
           description:
-            "Nazwa aplikacji (np. 'habit-tracker', 'expense-manager')",
+            "Nazwa/slug aplikacji (np. 'habit-tracker', 'lumpx-pro'). Będzie w URL.",
         },
-        description: { type: "string", description: "Co aplikacja ma robić" },
+        description: {
+          type: "string",
+          description:
+            "Co aplikacja ma robić — im więcej szczegółów tym lepiej",
+        },
         goal_id: {
           type: "string",
           description: "UUID celu którego ta app jest częścią",
@@ -43,164 +47,163 @@ const buildAppTool: V3ToolDefinition = {
   },
   timeoutMs: 55_000,
   async execute(input, tenantId) {
-    const name = input.name as string;
+    const rawName = input.name as string;
     const description = input.description as string;
     const features = (input.features as string[]) || [];
 
-    // Helper: extract JSON from text that may contain markdown code blocks
-    function extractJSON(text: string): string {
-      // Try raw first
-      const trimmed = text.trim();
-      if (trimmed.startsWith("{") || trimmed.startsWith("[")) return trimmed;
-      // Strip ```json ... ``` or ``` ... ```
-      const match = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-      if (match) return match[1].trim();
-      // Find first { to last }
-      const start = trimmed.indexOf("{");
-      const end = trimmed.lastIndexOf("}");
-      if (start !== -1 && end > start) return trimmed.slice(start, end + 1);
-      return trimmed;
-    }
+    // Sanitize slug: lowercase, alphanumeric + hyphens only
+    const slug = rawName
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    if (!slug) return "Nieprawidłowa nazwa aplikacji.";
 
     try {
-      const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
       const geminiKey =
         process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
+      const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
 
-      const prdPrompt = `Napisz krótki PRD dla mini-aplikacji.
-App: "${name}". Opis: ${description}. Funkcje: ${features.join(", ") || "podstawowe"}.
+      // Single prompt: generate complete standalone HTML app
+      const prompt = `Wygeneruj KOMPLETNĄ, DZIAŁAJĄCĄ aplikację webową jako JEDEN plik HTML.
+
+Nazwa: "${rawName}"
+Opis: ${description}
+Funkcje: ${features.join(", ") || "podstawowe"}
+
+WYMAGANIA TECHNICZNE:
+- Kompletny plik HTML5 z <!DOCTYPE html>
+- Tailwind CSS via CDN: <script src="https://cdn.tailwindcss.com"></script>
+- Dane przechowuj w localStorage (JSON)
+- Vanilla JavaScript (bez frameworków)
+- Responsywny design (mobile-first)
+- Ciemny motyw (dark mode)
+- Polskie UI (napisy, przyciski po polsku)
+- CRUD operacje jeśli potrzebne
+- Profesjonalny, nowoczesny wygląd
+- Minimum 300 linii kodu — pełna funkcjonalność, nie stub
+
 Odpowiedz TYLKO czystym JSON:
-{"title":"...","user_stories":["..."],"data_model":[{"table":"...","columns":["id uuid","name text","created_at timestamp"]}],"api_endpoints":[{"method":"GET","path":"/api/...","description":"..."}],"ui_components":["..."]}
-Limit: 1 tabela, max 3 endpointy, max 3 komponenty. MINIMALIZM. ZERO tekstu poza JSON.`;
+{"html":"<!DOCTYPE html>...cały kod HTML...","title":"Tytuł aplikacji"}
 
-      // === PHASE 1: PM — Generate PRD (Gemini JSON mode first, Anthropic fallback) ===
-      let prd: Record<string, unknown> | null = null;
+ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
 
-      // Try Gemini first with JSON mode (guaranteed valid JSON)
-      if (!prd && geminiKey) {
+      let html: string | null = null;
+      let title: string = rawName;
+
+      // Try Gemini first (JSON mode guarantees valid JSON)
+      if (geminiKey) {
         try {
           const { GoogleGenAI } = await import("@google/genai");
           const ai = new GoogleGenAI({ apiKey: geminiKey });
           const result = await ai.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: prdPrompt,
-            config: { responseMimeType: "application/json" },
+            contents: prompt,
+            config: {
+              responseMimeType: "application/json",
+              maxOutputTokens: 16384,
+            },
           });
           const text = result.text;
-          if (text) prd = JSON.parse(extractJSON(text));
-        } catch (geminiErr) {
-          console.error("[build_app] Gemini PRD error:", geminiErr);
-        }
-      }
-
-      // Fallback: Anthropic
-      if (!prd && anthropicKey) {
-        try {
-          const { default: Anthropic } = await import("@anthropic-ai/sdk");
-          const client = new Anthropic({ apiKey: anthropicKey });
-          const prdResponse = await client.messages.create({
-            model: "claude-haiku-4-5-20251001",
-            max_tokens: 1500,
-            system:
-              "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy, zero tekstu.",
-            messages: [{ role: "user", content: prdPrompt }],
-          });
-          const prdBlock = prdResponse.content.find((c) => c.type === "text");
-          if (prdBlock && "text" in prdBlock) {
-            prd = JSON.parse(extractJSON(prdBlock.text));
+          if (text) {
+            const parsed = JSON.parse(text);
+            html = parsed.html || null;
+            title = parsed.title || rawName;
           }
-        } catch (anthropicErr) {
-          console.error("[build_app] Anthropic PRD error:", anthropicErr);
-        }
-      }
-
-      if (!prd) return "Nie udało się wygenerować PRD — spróbuj ponownie.";
-
-      // === PHASE 2: Developer — Generate Code (Gemini JSON mode first) ===
-      const codePrompt = `Na podstawie PRD napisz KOMPLETNY kod aplikacji.
-Stack: Next.js App Router, Supabase (Postgres), Tailwind CSS.
-PRD: ${JSON.stringify(prd)}
-
-Odpowiedz TYLKO czystym JSON:
-{"files":[{"path":"app/apps/${name}/page.tsx","content":"'use client';\\nimport..."}]}
-
-Zasady: JEDEN plik page.tsx z PEŁNYM kodem, 'use client' na górze, Supabase via createBrowserClient(), Tailwind, KOMPLETNY kod, max 200 LOC. ZERO tekstu poza JSON.`;
-
-      let codeResult: { files: { path: string; content: string }[] } | null =
-        null;
-
-      // Try Gemini first with JSON mode
-      if (!codeResult && geminiKey) {
-        try {
-          const { GoogleGenAI } = await import("@google/genai");
-          const ai = new GoogleGenAI({ apiKey: geminiKey });
-          const result = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: codePrompt,
-            config: { responseMimeType: "application/json" },
-          });
-          const text = result.text;
-          if (text) codeResult = JSON.parse(extractJSON(text));
         } catch (geminiErr) {
-          console.error("[build_app] Gemini code error:", geminiErr);
+          console.error("[build_app] Gemini error:", geminiErr);
         }
       }
 
       // Fallback: Anthropic
-      if (!codeResult && anthropicKey) {
+      if (!html && anthropicKey) {
         try {
           const { default: Anthropic } = await import("@anthropic-ai/sdk");
           const client = new Anthropic({ apiKey: anthropicKey });
-          const codeResponse = await client.messages.create({
+          const response = await client.messages.create({
             model: "claude-sonnet-4-6-20250514",
-            max_tokens: 4000,
+            max_tokens: 8000,
             system:
-              "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy.",
-            messages: [{ role: "user", content: codePrompt }],
+              "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy. Klucz 'html' zawiera kompletny HTML.",
+            messages: [{ role: "user", content: prompt }],
           });
-          const codeBlock = codeResponse.content.find((c) => c.type === "text");
-          if (codeBlock && "text" in codeBlock) {
-            codeResult = JSON.parse(extractJSON(codeBlock.text));
+          const block = response.content.find((c) => c.type === "text");
+          if (block && "text" in block) {
+            const raw = block.text.trim();
+            // Extract JSON from possible markdown wrapping
+            const jsonStr = raw.startsWith("{")
+              ? raw
+              : raw.match(/\{[\s\S]*\}/)?.[0] || raw;
+            const parsed = JSON.parse(jsonStr);
+            html = parsed.html || null;
+            title = parsed.title || rawName;
           }
         } catch (anthropicErr) {
-          console.error("[build_app] Anthropic code error:", anthropicErr);
+          console.error("[build_app] Anthropic error:", anthropicErr);
         }
       }
 
-      if (!codeResult?.files?.length)
-        return "Nie udało się wygenerować kodu — spróbuj ponownie.";
+      if (!html)
+        return "Nie udało się wygenerować aplikacji — spróbuj ponownie.";
 
-      // === PHASE 3: Store generated app ===
+      // Validate it looks like HTML
+      if (!html.includes("<html") && !html.includes("<!DOCTYPE")) {
+        return "Wygenerowany kod nie wygląda na poprawny HTML — spróbuj ponownie.";
+      }
+
+      // === Store generated app ===
       const { getServiceSupabase } = await import("@/lib/supabase/service");
       const supabase = getServiceSupabase();
 
-      // Store app metadata
+      // Upsert: if slug already exists for this tenant, update it
+      const { data: existing } = await supabase
+        .from("exo_organism_knowledge")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("category", "generated_app")
+        .eq("source", slug)
+        .limit(1)
+        .single();
+
+      if (existing) {
+        await supabase
+          .from("exo_organism_knowledge")
+          .update({
+            content: html,
+            confidence: 1.0,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("exo_organism_knowledge").insert({
+          tenant_id: tenantId,
+          category: "generated_app",
+          content: html,
+          confidence: 1.0,
+          source: slug,
+        });
+      }
+
+      // Log the build event
       await supabase.from("exo_autonomy_log").insert({
         tenant_id: tenantId,
         event_type: "app_built",
         payload: {
-          name,
+          name: rawName,
+          slug,
+          title,
           description,
+          features,
           goal_id: input.goal_id || null,
-          files: codeResult.files.map((f) => f.path),
-          prd_summary: prd.title || name,
-          status: "generated",
+          html_size: html.length,
+          status: "live",
         },
       });
 
-      // Store files in knowledge for reference
-      await supabase.from("exo_organism_knowledge").insert({
-        tenant_id: tenantId,
-        category: "fact",
-        content: `Zbudowano app "${name}": ${codeResult.files.map((f) => f.path).join(", ")}`,
-        confidence: 0.9,
-        source: "build_app",
-      });
+      const appUrl = `https://exoskull.xyz/api/apps/${slug}`;
 
-      const fileList = codeResult.files
-        .map((f) => `  📄 ${f.path} (${f.content.length} chars)`)
-        .join("\n");
-      return `🏗️ App "${name}" zbudowana!\n\nPliki:\n${fileList}\n\nPRD: ${(prd.title as string) || name}\nStatus: generated (gotowe do review i deploy)\n\nNastępny krok: review kodu i deploy na VPS/Vercel.`;
+      return `🚀 App "${title}" jest LIVE!\n\n🔗 ${appUrl}\n\nSlug: ${slug}\nRozmiar: ${html.length} znaków\nStack: HTML5 + Tailwind CSS + vanilla JS + localStorage\n\nAplikacja jest dostępna pod powyższym linkiem. Możesz ją otworzyć w przeglądarce.`;
     } catch (err) {
       return `Błąd budowania: ${err instanceof Error ? err.message : String(err)}`;
     }
