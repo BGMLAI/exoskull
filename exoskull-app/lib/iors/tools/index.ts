@@ -65,6 +65,10 @@ import { selfBuildTools } from "./self-build-tools";
 import { selfModificationTools } from "./self-modification-tools";
 import { mediaCaptureTools } from "./media-capture-tools";
 
+// V3 tools bridge — marketplace tools (publish_to_allegro)
+// Uses same ToolDefinition shape (definition + execute + timeoutMs)
+import { marketplaceTools } from "../../v3/tools/marketplace-tools";
+
 // Phase 3 — Google & Meta Full Integration
 import { googleCalendarTools } from "./google-calendar-tools";
 import { googleTasksTools } from "./google-tasks-tools";
@@ -140,6 +144,8 @@ export const IORS_EXTENSION_TOOLS = [
   ...selfModificationTools,
   // Media capture tools — screenshot, camera, image analysis
   ...mediaCaptureTools,
+  // V3 bridge — Marketplace tools (publish_to_allegro)
+  ...marketplaceTools,
 ];
 
 // Register tools and dynamic resolver in the shared registry so

@@ -930,12 +930,13 @@ export async function runExoSkullAgent(
         historyLength: threadHistory.length,
       });
 
-      // ── Emergency Gemini fallback (with conversation history) ──
+      // ── Emergency fallback chain: DeepSeek (tools) → Kimi (tools) → DeepSeek (no tools) ──
       const geminiText = await emergencyGeminiFallback(
         req,
         systemPrompt,
         emotionState,
         threadHistory,
+        filteredTools,
       );
       if (geminiText) {
         finalText = geminiText;
@@ -1031,101 +1032,380 @@ export async function runExoSkullAgent(
 }
 
 // ============================================================================
-// EMERGENCY DEEPSEEK FALLBACK
+// EMERGENCY FALLBACK CHAIN: DeepSeek (tools) → Kimi (tools) → DeepSeek (no tools)
 // ============================================================================
 
+/** OpenAI-compatible tool format */
+interface OAITool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+/** OpenAI-compatible message */
+interface OAIMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }>;
+  tool_call_id?: string;
+}
+
+/** OpenAI-compatible response */
+interface OAIResponse {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+      tool_calls?: Array<{
+        id: string;
+        type: "function";
+        function: { name: string; arguments: string };
+      }>;
+    };
+    finish_reason?: string;
+  }>;
+}
+
 /**
- * Last-resort fallback when Anthropic API fails completely.
- * Uses DeepSeek V3 (OpenAI-compatible) for a no-tools conversational response.
- * Includes conversation history for context continuity.
+ * Convert Anthropic thread history to OpenAI-compatible messages.
+ */
+function threadToOAIMessages(
+  systemPrompt: string,
+  threadHistory: Anthropic.MessageParam[] | undefined,
+  userMessage: string,
+): OAIMessage[] {
+  const messages: OAIMessage[] = [
+    { role: "system", content: systemPrompt.slice(0, 64000) },
+  ];
+
+  if (threadHistory && threadHistory.length > 0) {
+    for (const msg of threadHistory.slice(-10)) {
+      const text =
+        typeof msg.content === "string"
+          ? msg.content
+          : Array.isArray(msg.content)
+            ? msg.content
+                .filter(
+                  (b) =>
+                    "text" in b &&
+                    typeof (b as unknown as { text: unknown }).text ===
+                      "string",
+                )
+                .map((b) => (b as unknown as { text: string }).text)
+                .join("\n")
+            : "";
+      if (text) {
+        messages.push({
+          role: msg.role === "assistant" ? "assistant" : "user",
+          content: text,
+        });
+      }
+    }
+  }
+
+  // Ensure last message is user
+  const lastRole =
+    messages.length > 1 ? messages[messages.length - 1].role : null;
+  if (lastRole !== "user") {
+    messages.push({ role: "user", content: userMessage });
+  }
+
+  return messages;
+}
+
+/**
+ * Convert IORS tools to OpenAI function-calling format.
+ */
+function toolsToOAIFormat(tools: ToolDefinition[]): OAITool[] {
+  return tools.slice(0, 64).map((t) => ({
+    type: "function" as const,
+    function: {
+      name: t.definition.name,
+      description: (t.definition.description || t.definition.name).slice(
+        0,
+        1024,
+      ),
+      parameters: t.definition.input_schema as Record<string, unknown>,
+    },
+  }));
+}
+
+/**
+ * Run a multi-turn tool-calling loop against an OpenAI-compatible API.
+ * Returns final text or null on failure.
+ */
+async function runOAIToolLoop(opts: {
+  apiUrl: string;
+  apiKey: string;
+  model: string;
+  messages: OAIMessage[];
+  tools: OAITool[];
+  iorTools: ToolDefinition[];
+  tenantId: string;
+  maxTurns: number;
+  label: string;
+  onToolStart?: (name: string) => void;
+  onToolEnd?: (
+    name: string,
+    durationMs: number,
+    meta?: { success?: boolean },
+  ) => void;
+}): Promise<{ text: string; toolsUsed: string[] } | null> {
+  const {
+    apiUrl,
+    apiKey,
+    model,
+    messages,
+    tools,
+    iorTools,
+    tenantId,
+    maxTurns,
+    label,
+  } = opts;
+  const toolsUsed: string[] = [];
+  let turns = 0;
+
+  while (turns < maxTurns) {
+    turns++;
+
+    const body: Record<string, unknown> = {
+      model,
+      messages,
+      temperature: 0.7,
+      max_tokens: 4096,
+    };
+    if (tools.length > 0) {
+      body.tools = tools;
+      body.tool_choice = "auto";
+    }
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`${label} API error: ${response.status}`);
+    }
+
+    const data = (await response.json()) as OAIResponse;
+    const choice = data.choices?.[0];
+    if (!choice?.message) throw new Error(`${label}: empty response`);
+
+    const assistantMsg = choice.message;
+    const toolCalls = assistantMsg.tool_calls;
+
+    // No tool calls → final answer
+    if (!toolCalls || toolCalls.length === 0) {
+      return { text: assistantMsg.content || "", toolsUsed };
+    }
+
+    // Add assistant message with tool_calls to history
+    messages.push({
+      role: "assistant",
+      content: assistantMsg.content || null,
+      tool_calls: toolCalls,
+    });
+
+    // Execute each tool call
+    for (const tc of toolCalls) {
+      const toolName = tc.function.name;
+      if (!toolsUsed.includes(toolName)) toolsUsed.push(toolName);
+
+      opts.onToolStart?.(toolName);
+      const startMs = Date.now();
+
+      let result: string;
+      try {
+        const input = JSON.parse(tc.function.arguments || "{}");
+        const toolDef = iorTools.find((t) => t.definition.name === toolName);
+        if (!toolDef) {
+          result = `Tool not found: ${toolName}`;
+        } else {
+          const timeout = toolDef.timeoutMs ?? 10_000;
+          result = await Promise.race([
+            toolDef.execute(input, tenantId),
+            new Promise<string>((_, reject) =>
+              setTimeout(
+                () => reject(new Error(`Tool ${toolName} timed out`)),
+                timeout,
+              ),
+            ),
+          ]);
+        }
+      } catch (e) {
+        result = `Error: ${e instanceof Error ? e.message : String(e)}`;
+      }
+
+      const durationMs = Date.now() - startMs;
+      opts.onToolEnd?.(toolName, durationMs, {
+        success: !result.startsWith("Error:"),
+      });
+
+      // Truncate large results
+      if (result.length > 50_000) {
+        result = result.slice(0, 50_000) + "\n[Truncated]";
+      }
+
+      messages.push({
+        role: "tool",
+        content: result,
+        tool_call_id: tc.id,
+      });
+    }
+  }
+
+  return null; // Max turns exhausted
+}
+
+/**
+ * Emergency fallback chain when Anthropic API fails.
+ *
+ * Chain: DeepSeek (with tools) → Kimi (with tools) → DeepSeek (no tools)
+ * Each provider gets the full tool suite so IORS can still use tools like
+ * publish_to_allegro even when Anthropic is down.
  */
 async function emergencyGeminiFallback(
   req: AgentRequest,
   systemPrompt: string,
   _emotionState: EmotionState,
   threadHistory?: Anthropic.MessageParam[],
+  filteredTools?: ToolDefinition[],
 ): Promise<string | null> {
-  try {
-    const deepseekKey = process.env.DEEPSEEK_API_KEY;
-    if (!deepseekKey) return null;
+  const oaiMessages = threadToOAIMessages(
+    systemPrompt,
+    threadHistory,
+    req.userMessage,
+  );
+  const iorTools = filteredTools || [];
+  const oaiTools = iorTools.length > 0 ? toolsToOAIFormat(iorTools) : [];
 
-    logger.info(
-      "[ExoSkullAgent] Primary provider failed — emergency DeepSeek fallback (no tools)",
-      { tenantId: req.tenantId },
-    );
-    req.onThinkingStep?.("Tryb awaryjny", "running");
+  // ── Attempt 1: DeepSeek WITH tool calling ──
+  const deepseekKey = process.env.DEEPSEEK_API_KEY;
+  if (deepseekKey) {
+    try {
+      logger.info("[ExoSkullAgent] Fallback #1: DeepSeek with tools", {
+        tenantId: req.tenantId,
+        toolCount: oaiTools.length,
+      });
+      req.onThinkingStep?.("Tryb awaryjny (DeepSeek)", "running");
 
-    // Build OpenAI-compatible messages from thread history
-    const messages: Array<{ role: string; content: string }> = [
-      { role: "system", content: systemPrompt.slice(0, 64000) },
-    ];
-
-    if (threadHistory && threadHistory.length > 0) {
-      const recentHistory = threadHistory.slice(-10);
-      for (const msg of recentHistory) {
-        const text =
-          typeof msg.content === "string"
-            ? msg.content
-            : Array.isArray(msg.content)
-              ? msg.content
-                  .filter(
-                    (b) =>
-                      "text" in b &&
-                      typeof (b as unknown as { text: unknown }).text ===
-                        "string",
-                  )
-                  .map((b) => (b as unknown as { text: string }).text)
-                  .join("\n")
-              : "";
-        if (text) {
-          messages.push({
-            role: msg.role === "assistant" ? "assistant" : "user",
-            content: text,
-          });
-        }
-      }
-    }
-
-    // Ensure last message is user message
-    const lastRole =
-      messages.length > 1 ? messages[messages.length - 1].role : null;
-    if (lastRole !== "user") {
-      messages.push({ role: "user", content: req.userMessage });
-    }
-
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${deepseekKey}`,
-      },
-      body: JSON.stringify({
+      const result = await runOAIToolLoop({
+        apiUrl: "https://api.deepseek.com/chat/completions",
+        apiKey: deepseekKey,
         model: "deepseek-chat",
-        messages,
-        temperature: 0.7,
-        max_tokens: 1024,
-      }),
-    });
+        messages: structuredClone(oaiMessages),
+        tools: oaiTools,
+        iorTools,
+        tenantId: req.tenantId,
+        maxTurns: 8,
+        label: "DeepSeek",
+        onToolStart: req.onToolStart,
+        onToolEnd: req.onToolEnd,
+      });
 
-    if (!response.ok) {
-      throw new Error(`DeepSeek API error: ${response.status}`);
+      if (result?.text) {
+        req.onThinkingStep?.("Tryb awaryjny (DeepSeek)", "done");
+        return result.text;
+      }
+    } catch (e) {
+      logger.warn("[ExoSkullAgent] Fallback #1 (DeepSeek+tools) failed:", {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
-
-    const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const text = data.choices?.[0]?.message?.content || "";
-    req.onThinkingStep?.("Tryb awaryjny", "done");
-
-    return text || null;
-  } catch (emergencyError) {
-    logger.error("[ExoSkullAgent] Emergency DeepSeek fallback also failed:", {
-      error:
-        emergencyError instanceof Error
-          ? emergencyError.message
-          : String(emergencyError),
-      tenantId: req.tenantId,
-    });
-    return null;
   }
+
+  // ── Attempt 2: Kimi/Moonshot WITH tool calling ──
+  const moonshotKey = process.env.MOONSHOT_API_KEY || process.env.KIMI_API_KEY;
+  if (moonshotKey) {
+    try {
+      logger.info("[ExoSkullAgent] Fallback #2: Kimi/Moonshot with tools", {
+        tenantId: req.tenantId,
+        toolCount: oaiTools.length,
+      });
+      req.onThinkingStep?.("Tryb awaryjny (Kimi)", "running");
+
+      const result = await runOAIToolLoop({
+        apiUrl: "https://api.moonshot.cn/v1/chat/completions",
+        apiKey: moonshotKey,
+        model: "moonshot-v1-32k",
+        messages: structuredClone(oaiMessages),
+        tools: oaiTools,
+        iorTools,
+        tenantId: req.tenantId,
+        maxTurns: 8,
+        label: "Kimi",
+        onToolStart: req.onToolStart,
+        onToolEnd: req.onToolEnd,
+      });
+
+      if (result?.text) {
+        req.onThinkingStep?.("Tryb awaryjny (Kimi)", "done");
+        return result.text;
+      }
+    } catch (e) {
+      logger.warn("[ExoSkullAgent] Fallback #2 (Kimi+tools) failed:", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  // ── Attempt 3: DeepSeek NO tools (last resort — conversation only) ──
+  if (deepseekKey) {
+    try {
+      logger.info(
+        "[ExoSkullAgent] Fallback #3: DeepSeek no tools (last resort)",
+        {
+          tenantId: req.tenantId,
+        },
+      );
+      req.onThinkingStep?.("Tryb awaryjny", "running");
+
+      const response = await fetch(
+        "https://api.deepseek.com/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${deepseekKey}`,
+          },
+          body: JSON.stringify({
+            model: "deepseek-chat",
+            messages: oaiMessages,
+            temperature: 0.7,
+            max_tokens: 2048,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`DeepSeek API error: ${response.status}`);
+      }
+
+      const data = (await response.json()) as OAIResponse;
+      const text = data.choices?.[0]?.message?.content || "";
+      req.onThinkingStep?.("Tryb awaryjny", "done");
+      return text || null;
+    } catch (e) {
+      logger.error(
+        "[ExoSkullAgent] Fallback #3 (DeepSeek no-tools) also failed:",
+        {
+          error: e instanceof Error ? e.message : String(e),
+          tenantId: req.tenantId,
+        },
+      );
+    }
+  }
+
+  return null;
 }
