@@ -26,7 +26,7 @@ export async function GET(
   // Find the most recent generated app with this slug
   const { data, error } = await supabase
     .from("exo_organism_knowledge")
-    .select("id, content, created_at")
+    .select("content")
     .eq("category", "generated_app")
     .eq("source", slug)
     .order("created_at", { ascending: false })
@@ -40,22 +40,11 @@ export async function GET(
     );
   }
 
-  // Debug headers for stale content investigation
-  const contentLen = data.content?.length || 0;
-  const contentPreview = (data.content || "")
-    .substring(0, 80)
-    .replace(/[^a-zA-Z0-9]/g, "");
-
   return new Response(data.content, {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store, no-cache, must-revalidate",
-      "X-Row-Id": data.id || "unknown",
-      "X-Row-Created": data.created_at || "unknown",
-      "X-Content-Length": String(contentLen),
-      "X-Content-Preview": contentPreview.substring(0, 60),
-      "X-Deploy-Ts": "20260304-2010",
     },
   });
 }

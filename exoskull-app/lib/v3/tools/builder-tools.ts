@@ -1,23 +1,24 @@
 /**
  * v3 App Builder Tools — Phase 5
  *
- * BMAD Pipeline: PM → Architect → Developer → Reviewer → Deploy
- * Real code generation, not JSON specs.
+ * REAL app builder: creates Postgres tables + CRUD API + HTML frontend.
+ * Uses existing generateApp() pipeline for backend, AI for frontend.
  *
  * 3 tools: build_app, generate_content, self_extend_tool
  */
 
 import type { V3ToolDefinition } from "./index";
+import { logger } from "@/lib/logger";
 
 // ============================================================================
-// #1 build_app — BMAD pipeline for app generation
+// #1 build_app — Real app with Postgres backend + API + HTML frontend
 // ============================================================================
 
 const buildAppTool: V3ToolDefinition = {
   definition: {
     name: "build_app",
     description:
-      "Zbuduj działającą aplikację webową i od razu ją udostępnij pod URL. Generuje standalone HTML z Tailwind CSS + vanilla JS. Użyj gdy użytkownik chce nową appkę/narzędzie.",
+      "Zbuduj prawdziwą aplikację z bazą danych Postgres, REST API i frontendem. Tworzy tabelę, CRUD endpoint /api/apps/{slug}/data i widget na dashboardzie. Dane trwałe w DB, nie localStorage.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -39,7 +40,7 @@ const buildAppTool: V3ToolDefinition = {
           type: "array",
           items: { type: "string" },
           description:
-            "Lista funkcji (np. ['dodawanie nawyków', 'streak tracker', 'wykresy postępu'])",
+            "Lista funkcji (np. ['dodawanie produktów', 'statystyki', 'eksport'])",
         },
       },
       required: ["name", "description"],
@@ -51,7 +52,7 @@ const buildAppTool: V3ToolDefinition = {
     const description = input.description as string;
     const features = (input.features as string[]) || [];
 
-    // Sanitize slug: lowercase, alphanumeric + hyphens only
+    // Sanitize slug
     const slug = rawName
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, "-")
@@ -61,85 +62,116 @@ const buildAppTool: V3ToolDefinition = {
     if (!slug) return "Nieprawidłowa nazwa aplikacji.";
 
     try {
-      const geminiKey =
-        process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
-      const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
+      // ── Step 1: Create real Postgres table + CRUD via generateApp() ──
+      const { generateApp } =
+        await import("@/lib/apps/generator/app-generator");
 
-      // Single prompt: generate complete standalone HTML app
-      const prompt = `Wygeneruj KOMPLETNĄ, DZIAŁAJĄCĄ aplikację webową jako JEDEN plik HTML.
+      const fullDescription =
+        features.length > 0
+          ? `[Slug: ${slug}] ${description}. Funkcje: ${features.join(", ")}`
+          : `[Slug: ${slug}] ${description}`;
 
-Nazwa: "${rawName}"
-Opis: ${description}
-Funkcje: ${features.join(", ") || "podstawowe"}
+      logger.info("[build_app] Creating real app via generateApp()", {
+        slug,
+        tenantId,
+      });
 
-WYMAGANIA TECHNICZNE:
-- Kompletny plik HTML5 z <!DOCTYPE html>
+      const result = await generateApp({
+        tenant_id: tenantId,
+        description: fullDescription,
+        source: "chat_command",
+      });
+
+      if (!result.success || !result.app) {
+        return `Nie udało się utworzyć aplikacji: ${result.error || "Nieznany błąd"}`;
+      }
+
+      const app = result.app;
+      const appSlug = app.slug;
+      const tableName = app.table_name;
+      const columns = (app.columns || []) as Array<{
+        name: string;
+        type: string;
+        description?: string;
+      }>;
+      const columnList = columns
+        .map(
+          (c) =>
+            `${c.name} (${c.type}${c.description ? ": " + c.description : ""})`,
+        )
+        .join(", ");
+
+      logger.info("[build_app] App created in DB", {
+        appSlug,
+        tableName,
+        columnCount: columns.length,
+      });
+
+      // ── Step 2: Generate frontend HTML that calls real API ──
+      const htmlPrompt = `Wygeneruj kompletną stronę HTML dla aplikacji "${app.name || rawName}".
+Opis: ${fullDescription}
+
+BACKEND API (już istnieje, NIE twórz go):
+- GET /api/apps/${appSlug}/data → {"app":{"slug","name","columns","ui_config"},"entries":[...],"total":N}
+- POST /api/apps/${appSlug}/data → tworzy wpis. Body JSON z polami: ${columnList}
+
+Kolumny w bazie danych: ${columnList}
+
+WYMAGANIA:
+- Kompletny HTML5 z <!DOCTYPE html>
 - Tailwind CSS via CDN: <script src="https://cdn.tailwindcss.com"></script>
-- Dane przechowuj w localStorage (JSON)
-- Vanilla JavaScript (bez frameworków)
-- Responsywny design (mobile-first)
-- Ciemny motyw (dark mode)
-- Polskie UI (napisy, przyciski po polsku)
-- CRUD operacje jeśli potrzebne
-- Profesjonalny, nowoczesny wygląd
-- Kompletna funkcjonalność (nie stub/placeholder)
-- Max 200 linii — zwięzły ale pełny kod
+- Na starcie: fetch('/api/apps/${appSlug}/data', {credentials:'include'}) → wyświetl wpisy
+- Formularz dodawania: POST /api/apps/${appSlug}/data z JSON body
+- Przy 401: pokaż "Zaloguj się na exoskull.xyz aby korzystać z aplikacji"
+- Ciemny motyw, polskie UI, nowoczesny profesjonalny wygląd
+- fetch() ZAWSZE z {credentials:'include'} i {headers:{'Content-Type':'application/json'}}
+- Po dodaniu wpisu: odśwież listę (ponowne GET)
+- Obsługa błędów (try/catch, wyświetl komunikat)
+- Responsywny (mobile-first)
+- Max 250 linii
+- ZERO localStorage — dane TYLKO przez API
 
 Odpowiedz TYLKO czystym JSON:
-{"html":"<!DOCTYPE html>...cały kod HTML...","title":"Tytuł aplikacji"}
-
-ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
+{"html":"<!DOCTYPE html>...cały kod HTML...","title":"Tytuł"}
+ZERO tekstu poza JSON.`;
 
       let html: string | null = null;
-      let title: string = rawName;
-
+      let title: string = app.name || rawName;
       const errors: string[] = [];
 
-      // Try Gemini 2.5 Flash (JSON mode) with retries on 429
+      // Try Gemini
+      const geminiKey =
+        process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
       if (geminiKey) {
-        for (let attempt = 0; attempt < 3 && !html; attempt++) {
-          try {
-            if (attempt > 0) {
-              const delay = (attempt + 1) * 5000; // 10s, 15s
-              console.log(
-                `[build_app] Gemini retry ${attempt}/2, waiting ${delay}ms`,
-              );
-              await new Promise((r) => setTimeout(r, delay));
-            }
-            const { GoogleGenAI } = await import("@google/genai");
-            const ai = new GoogleGenAI({ apiKey: geminiKey });
-            const result = await ai.models.generateContent({
-              model: "gemini-2.5-flash",
-              contents: prompt,
-              config: {
-                responseMimeType: "application/json",
-                maxOutputTokens: 8192,
-              },
-            });
-            const text = result.text;
-            if (text) {
-              const parsed = JSON.parse(text);
-              html = parsed.html || null;
-              title = parsed.title || rawName;
-            }
-          } catch (geminiErr) {
-            const msg =
-              geminiErr instanceof Error
-                ? geminiErr.message
-                : JSON.stringify(geminiErr);
-            if (msg.includes("429") && attempt < 2) continue; // retry on rate limit
-            errors.push(`Gemini: ${msg.slice(0, 200)}`);
-            console.error("[build_app] Gemini error:", msg);
+        try {
+          const { GoogleGenAI } = await import("@google/genai");
+          const ai = new GoogleGenAI({ apiKey: geminiKey });
+          const genResult = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: htmlPrompt,
+            config: {
+              responseMimeType: "application/json",
+              maxOutputTokens: 8192,
+            },
+          });
+          const text = genResult.text;
+          if (text) {
+            const parsed = JSON.parse(text);
+            html = parsed.html || null;
+            title = parsed.title || title;
           }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          errors.push(`Gemini: ${msg.slice(0, 200)}`);
+          logger.warn("[build_app] Gemini HTML gen failed:", msg);
         }
       }
 
-      // Fallback 2: OpenAI GPT-4o-mini (cheap, high quality, JSON mode)
+      // Fallback: OpenAI
       const openaiKey = process.env.OPENAI_API_KEY?.trim();
       if (!html && openaiKey) {
         try {
-          console.log("[build_app] Trying OpenAI GPT-4o-mini...");
-          const openaiResponse = await fetch(
+          const resp = await fetch(
             "https://api.openai.com/v1/chat/completions",
             {
               method: "POST",
@@ -153,9 +185,9 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
                   {
                     role: "system",
                     content:
-                      "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy. Klucz 'html' zawiera kompletny HTML string. Klucz 'title' zawiera tytuł.",
+                      "Odpowiadasz TYLKO czystym JSON. Klucz 'html' = kompletny HTML. Klucz 'title' = tytuł.",
                   },
-                  { role: "user", content: prompt },
+                  { role: "user", content: htmlPrompt },
                 ],
                 max_tokens: 16000,
                 temperature: 0.7,
@@ -163,37 +195,27 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
               }),
             },
           );
-          if (openaiResponse.ok) {
-            const openaiData = await openaiResponse.json();
-            const openaiText = openaiData.choices?.[0]?.message?.content;
-            if (openaiText) {
-              const parsed = JSON.parse(openaiText);
-              html = parsed.html || null;
-              title = parsed.title || rawName;
+          if (resp.ok) {
+            const data = await resp.json();
+            const text = data.choices?.[0]?.message?.content;
+            if (text) {
+              const p = JSON.parse(text);
+              html = p.html || null;
+              title = p.title || title;
             }
           } else {
-            const errText = await openaiResponse.text();
-            errors.push(
-              `OpenAI: ${openaiResponse.status} ${errText.slice(0, 200)}`,
-            );
-            console.error("[build_app] OpenAI error:", errText.slice(0, 200));
+            errors.push(`OpenAI: ${resp.status}`);
           }
-        } catch (openaiErr) {
-          const msg =
-            openaiErr instanceof Error
-              ? openaiErr.message
-              : JSON.stringify(openaiErr);
-          errors.push(`OpenAI: ${msg.slice(0, 200)}`);
-          console.error("[build_app] OpenAI error:", msg);
+        } catch (e) {
+          errors.push(`OpenAI: ${(e as Error).message?.slice(0, 200)}`);
         }
       }
 
-      // Fallback 3: DeepSeek (cheap, good code quality, OpenAI-compatible)
+      // Fallback: DeepSeek
       const deepseekKey = process.env.DEEPSEEK_API_KEY?.trim();
       if (!html && deepseekKey) {
         try {
-          console.log("[build_app] Trying DeepSeek...");
-          const dsResponse = await fetch(
+          const resp = await fetch(
             "https://api.deepseek.com/chat/completions",
             {
               method: "POST",
@@ -207,9 +229,9 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
                   {
                     role: "system",
                     content:
-                      "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy. Klucz 'html' zawiera kompletny HTML string. Klucz 'title' zawiera tytuł.",
+                      "Odpowiadasz TYLKO czystym JSON. Klucz 'html' = kompletny HTML. Klucz 'title' = tytuł.",
                   },
-                  { role: "user", content: prompt },
+                  { role: "user", content: htmlPrompt },
                 ],
                 max_tokens: 8000,
                 temperature: 0.7,
@@ -217,136 +239,44 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
               }),
             },
           );
-          if (dsResponse.ok) {
-            const dsData = await dsResponse.json();
-            const dsText = dsData.choices?.[0]?.message?.content;
-            if (dsText) {
-              const parsed = JSON.parse(dsText);
-              html = parsed.html || null;
-              title = parsed.title || rawName;
+          if (resp.ok) {
+            const data = await resp.json();
+            const text = data.choices?.[0]?.message?.content;
+            if (text) {
+              const p = JSON.parse(text);
+              html = p.html || null;
+              title = p.title || title;
             }
           } else {
-            const errText = await dsResponse.text();
-            errors.push(
-              `DeepSeek: ${dsResponse.status} ${errText.slice(0, 200)}`,
-            );
-            console.error("[build_app] DeepSeek error:", errText.slice(0, 200));
+            errors.push(`DeepSeek: ${resp.status}`);
           }
-        } catch (dsErr) {
-          const msg =
-            dsErr instanceof Error ? dsErr.message : JSON.stringify(dsErr);
-          errors.push(`DeepSeek: ${msg.slice(0, 200)}`);
-          console.error("[build_app] DeepSeek error:", msg);
+        } catch (e) {
+          errors.push(`DeepSeek: ${(e as Error).message?.slice(0, 200)}`);
         }
       }
 
-      // Fallback 4: Groq (Llama 3.3 70B — fast, free, JSON mode)
-      const groqKey = process.env.GROQ_API_KEY?.trim();
-      if (!html && groqKey) {
-        try {
-          console.log("[build_app] Trying Groq Llama 3.3 70B...");
-          const groqResponse = await fetch(
-            "https://api.groq.com/openai/v1/chat/completions",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${groqKey}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                model: "llama-3.3-70b-versatile",
-                messages: [
-                  {
-                    role: "system",
-                    content:
-                      "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy. Klucz 'html' zawiera kompletny HTML string. Klucz 'title' zawiera tytuł.",
-                  },
-                  { role: "user", content: prompt },
-                ],
-                max_tokens: 8000,
-                temperature: 0.7,
-                response_format: { type: "json_object" },
-              }),
-            },
-          );
-          if (groqResponse.ok) {
-            const groqData = await groqResponse.json();
-            const groqText = groqData.choices?.[0]?.message?.content;
-            if (groqText) {
-              const parsed = JSON.parse(groqText);
-              html = parsed.html || null;
-              title = parsed.title || rawName;
-            }
-          } else {
-            const errText = await groqResponse.text();
-            errors.push(
-              `Groq: ${groqResponse.status} ${errText.slice(0, 200)}`,
-            );
-            console.error("[build_app] Groq error:", errText.slice(0, 200));
-          }
-        } catch (groqErr) {
-          const msg =
-            groqErr instanceof Error
-              ? groqErr.message
-              : JSON.stringify(groqErr);
-          errors.push(`Groq: ${msg.slice(0, 200)}`);
-          console.error("[build_app] Groq error:", msg);
-        }
-      }
-
-      // Fallback 5: Anthropic (if credits available)
-      if (!html && anthropicKey) {
-        try {
-          const { default: Anthropic } = await import("@anthropic-ai/sdk");
-          const client = new Anthropic({ apiKey: anthropicKey });
-          const response = await client.messages.create({
-            model: "claude-haiku-4-5-20251001",
-            max_tokens: 8000,
-            system:
-              "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy. Klucz 'html' zawiera kompletny HTML string.",
-            messages: [{ role: "user", content: prompt }],
-          });
-          const block = response.content.find((c) => c.type === "text");
-          if (block && "text" in block) {
-            const raw = block.text.trim();
-            // Extract JSON from possible markdown wrapping
-            const jsonStr = raw.startsWith("{")
-              ? raw
-              : raw.match(/\{[\s\S]*\}/)?.[0] || raw;
-            const parsed = JSON.parse(jsonStr);
-            html = parsed.html || null;
-            title = parsed.title || rawName;
-          }
-        } catch (anthropicErr) {
-          const msg =
-            anthropicErr instanceof Error
-              ? anthropicErr.message
-              : JSON.stringify(anthropicErr);
-          errors.push(`Anthropic: ${msg.slice(0, 200)}`);
-          console.error("[build_app] Anthropic error:", msg);
-        }
-      }
-
+      // Even without HTML frontend, the backend app works
       if (!html) {
-        return `Nie udało się wygenerować aplikacji. Błędy: ${errors.join(" | ") || "brak kluczy AI"}`;
+        const apiUrl = `https://exoskull.xyz/api/apps/${appSlug}/data`;
+        return `✅ Aplikacja "${app.name}" utworzona z bazą danych!\n\n🗄️ Tabela: ${tableName}\n📝 Kolumny: ${columnList}\n📊 CRUD API: ${apiUrl}\n\n⚠️ Frontend HTML nie wygenerowany (${errors.join(", ")}). Dane dostępne przez API.`;
       }
 
-      // Validate it looks like HTML
+      // Validate HTML
       if (!html.includes("<html") && !html.includes("<!DOCTYPE")) {
-        return "Wygenerowany kod nie wygląda na poprawny HTML — spróbuj ponownie.";
+        const apiUrl = `https://exoskull.xyz/api/apps/${appSlug}/data`;
+        return `✅ Aplikacja "${app.name}" utworzona z bazą danych!\n\n🗄️ Tabela: ${tableName}\n📊 CRUD API: ${apiUrl}\n\n⚠️ Frontend wygenerowany nieprawidłowo. Dane dostępne przez API.`;
       }
 
-      // === Store generated app ===
+      // ── Step 3: Store frontend HTML ──
       const { getServiceSupabase } = await import("@/lib/supabase/service");
       const supabase = getServiceSupabase();
 
-      // Upsert: if slug already exists for this tenant, update it
       const { data: existing } = await supabase
         .from("exo_organism_knowledge")
         .select("id")
         .eq("tenant_id", tenantId)
         .eq("category", "generated_app")
-        .eq("source", slug)
+        .eq("source", appSlug)
         .limit(1)
         .single();
 
@@ -365,31 +295,36 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
           category: "generated_app",
           content: html,
           confidence: 1.0,
-          source: slug,
+          source: appSlug,
         });
       }
 
-      // Log the build event
+      // Log
       await supabase.from("exo_autonomy_log").insert({
         tenant_id: tenantId,
         event_type: "app_built",
         payload: {
           name: rawName,
-          slug,
+          slug: appSlug,
           title,
           description,
           features,
           goal_id: input.goal_id || null,
+          table_name: tableName,
+          columns: columns.map((c) => c.name),
           html_size: html.length,
+          backend: true,
           status: "live",
         },
       });
 
-      const appUrl = `https://exoskull.xyz/api/apps/${slug}`;
+      const appUrl = `https://exoskull.xyz/api/apps/${appSlug}`;
+      const apiUrl = `https://exoskull.xyz/api/apps/${appSlug}/data`;
 
-      return `🚀 App "${title}" jest LIVE!\n\n🔗 ${appUrl}\n\nSlug: ${slug}\nRozmiar: ${html.length} znaków\nStack: HTML5 + Tailwind CSS + vanilla JS + localStorage\n\nAplikacja jest dostępna pod powyższym linkiem. Możesz ją otworzyć w przeglądarce.`;
+      return `🚀 App "${title}" jest LIVE z prawdziwą bazą danych!\n\n🔗 Frontend: ${appUrl}\n📊 CRUD API: ${apiUrl}\n🗄️ Tabela: ${tableName}\n📝 Kolumny: ${columns.map((c) => c.name).join(", ")}\n\nDane zapisywane w Postgres (nie localStorage). Widget dodany na dashboard.`;
     } catch (err) {
       const msg = err instanceof Error ? err.message : JSON.stringify(err);
+      logger.error("[build_app] Error:", { error: msg });
       return `Błąd budowania: ${msg}`;
     }
   },
