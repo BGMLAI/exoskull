@@ -95,30 +95,36 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
 
       const errors: string[] = [];
 
-      // Try Gemini 2.5 Flash (JSON mode)
+      // Try Gemini 2.5 Flash (JSON mode) with 1 retry on 429
       if (geminiKey) {
-        try {
-          const { GoogleGenAI } = await import("@google/genai");
-          const ai = new GoogleGenAI({ apiKey: geminiKey });
-          const result = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: {
-              responseMimeType: "application/json",
-              maxOutputTokens: 8192,
-            },
-          });
-          const text = result.text;
-          if (text) {
-            const parsed = JSON.parse(text);
-            html = parsed.html || null;
-            title = parsed.title || rawName;
+        for (let attempt = 0; attempt < 2 && !html; attempt++) {
+          try {
+            if (attempt > 0) await new Promise((r) => setTimeout(r, 3000));
+            const { GoogleGenAI } = await import("@google/genai");
+            const ai = new GoogleGenAI({ apiKey: geminiKey });
+            const result = await ai.models.generateContent({
+              model: "gemini-2.5-flash",
+              contents: prompt,
+              config: {
+                responseMimeType: "application/json",
+                maxOutputTokens: 8192,
+              },
+            });
+            const text = result.text;
+            if (text) {
+              const parsed = JSON.parse(text);
+              html = parsed.html || null;
+              title = parsed.title || rawName;
+            }
+          } catch (geminiErr) {
+            const msg =
+              geminiErr instanceof Error
+                ? geminiErr.message
+                : JSON.stringify(geminiErr);
+            if (attempt === 0 && msg.includes("429")) continue; // retry on rate limit
+            errors.push(`Gemini: ${msg.slice(0, 200)}`);
+            console.error("[build_app] Gemini error:", msg);
           }
-        } catch (geminiErr) {
-          const msg =
-            geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
-          errors.push(`Gemini: ${msg.slice(0, 200)}`);
-          console.error("[build_app] Gemini error:", msg);
         }
       }
 
@@ -149,7 +155,7 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
           const msg =
             anthropicErr instanceof Error
               ? anthropicErr.message
-              : String(anthropicErr);
+              : JSON.stringify(anthropicErr);
           errors.push(`Anthropic: ${msg.slice(0, 200)}`);
           console.error("[build_app] Anthropic error:", msg);
         }
@@ -217,7 +223,8 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
 
       return `🚀 App "${title}" jest LIVE!\n\n🔗 ${appUrl}\n\nSlug: ${slug}\nRozmiar: ${html.length} znaków\nStack: HTML5 + Tailwind CSS + vanilla JS + localStorage\n\nAplikacja jest dostępna pod powyższym linkiem. Możesz ją otworzyć w przeglądarce.`;
     } catch (err) {
-      return `Błąd budowania: ${err instanceof Error ? err.message : String(err)}`;
+      const msg = err instanceof Error ? err.message : JSON.stringify(err);
+      return `Błąd budowania: ${msg}`;
     }
   },
 };

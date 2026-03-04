@@ -2,7 +2,7 @@ const { withSentryConfig } = require("@sentry/nextjs");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ['@google/genai'],
+  serverExternalPackages: ['@google/genai', '@anthropic-ai/sdk'],
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',
