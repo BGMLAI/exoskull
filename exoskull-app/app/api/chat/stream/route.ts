@@ -8,6 +8,7 @@
 import { NextRequest } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { runV3Agent } from "@/lib/v3/agent";
+import { classifyQuery, handleSimpleQuery } from "@/lib/v3/gemini-router";
 import { appendMessage } from "@/lib/unified-thread";
 import { logger } from "@/lib/logger";
 
@@ -92,9 +93,68 @@ function createStream(
           ),
         );
 
+        // ── Smart Routing: simple queries → Gemini Flash (<1s) ──
+        const complexity = classifyQuery(message);
+        logger.info("[v3:Chat] Query classified", {
+          complexity,
+          messageLength: message.length,
+        });
+
+        if (complexity === "simple") {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: "thinking_step", step: "Szybka odpowiedź...", status: "done" })}\n\n`,
+            ),
+          );
+
+          const geminiResponse = await handleSimpleQuery(message);
+          if (geminiResponse) {
+            // Stream Gemini response in chunks
+            const chunkSize = 50;
+            for (let i = 0; i < geminiResponse.length; i += chunkSize) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ type: "delta", text: geminiResponse.slice(i, i + chunkSize) })}\n\n`,
+                ),
+              );
+            }
+
+            // Persist assistant response
+            appendMessage(tenantId, {
+              role: "assistant",
+              content: geminiResponse,
+              channel: "web_chat",
+              direction: "outbound",
+              source_type: "web_chat",
+            }).catch((err) =>
+              logger.warn(
+                "[v3:Chat] Gemini thread append failed:",
+                err instanceof Error ? err.message : String(err),
+              ),
+            );
+
+            // Done
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "done",
+                  fullText: geminiResponse,
+                  toolsUsed: [],
+                })}\n\n`,
+              ),
+            );
+
+            controller.close();
+            return;
+          }
+
+          // Gemini failed → fall through to Claude
+          logger.info("[v3:Chat] Gemini Flash failed, falling back to Claude");
+        }
+
         let streamedText = "";
 
-        // Run v3 agent with streaming callbacks
+        // Run v3 agent with streaming callbacks (complex queries or Gemini fallback)
         const result = await runV3Agent({
           tenantId,
           sessionId,
