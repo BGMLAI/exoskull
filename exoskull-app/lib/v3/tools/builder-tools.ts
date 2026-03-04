@@ -47,77 +47,128 @@ const buildAppTool: V3ToolDefinition = {
     const description = input.description as string;
     const features = (input.features as string[]) || [];
 
+    // Helper: extract JSON from text that may contain markdown code blocks
+    function extractJSON(text: string): string {
+      // Try raw first
+      const trimmed = text.trim();
+      if (trimmed.startsWith("{") || trimmed.startsWith("[")) return trimmed;
+      // Strip ```json ... ``` or ``` ... ```
+      const match = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (match) return match[1].trim();
+      // Find first { to last }
+      const start = trimmed.indexOf("{");
+      const end = trimmed.lastIndexOf("}");
+      if (start !== -1 && end > start) return trimmed.slice(start, end + 1);
+      return trimmed;
+    }
+
     try {
-      const anthropicKey = process.env.ANTHROPIC_API_KEY;
-      if (!anthropicKey) return "Brak ANTHROPIC_API_KEY — nie mogę budować.";
+      const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
+      const geminiKey =
+        process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
 
-      const { default: Anthropic } = await import("@anthropic-ai/sdk");
-      const client = new Anthropic({ apiKey: anthropicKey });
+      const prdPrompt = `Napisz krótki PRD dla mini-aplikacji.
+App: "${name}". Opis: ${description}. Funkcje: ${features.join(", ") || "podstawowe"}.
+Odpowiedz TYLKO czystym JSON:
+{"title":"...","user_stories":["..."],"data_model":[{"table":"...","columns":["id uuid","name text","created_at timestamp"]}],"api_endpoints":[{"method":"GET","path":"/api/...","description":"..."}],"ui_components":["..."]}
+Limit: 1 tabela, max 3 endpointy, max 3 komponenty. MINIMALIZM. ZERO tekstu poza JSON.`;
 
-      // === PHASE 1: PM — Generate PRD (Haiku, cheap) ===
-      const prdResponse = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1500,
-        system: `Jesteś Product Managerem. Napisz krótki PRD (Product Requirements Document) dla mini-aplikacji.
-Format JSON: {"title": "...", "user_stories": ["As a user, I want to..."], "data_model": [{"table": "...", "columns": [...]}], "api_endpoints": [{"method": "GET/POST", "path": "...", "description": "..."}], "ui_components": ["..."]}
-Limit: 1 tabela DB, max 3 endpointy, max 3 komponenty UI. MINIMALIZM.`,
-        messages: [
-          {
-            role: "user",
-            content: `App: "${name}"\nOpis: ${description}\nFunkcje: ${features.join(", ")}`,
-          },
-        ],
-      });
+      // === PHASE 1: PM — Generate PRD (Gemini JSON mode first, Anthropic fallback) ===
+      let prd: Record<string, unknown> | null = null;
 
-      const prdText = prdResponse.content.find((c) => c.type === "text");
-      if (!prdText || !("text" in prdText))
-        return "Nie udało się wygenerować PRD.";
-
-      let prd: Record<string, unknown>;
-      try {
-        prd = JSON.parse(prdText.text);
-      } catch {
-        return `PM wygenerował nieprawidłowy PRD. Spróbuję ponownie przy następnym podejściu.`;
+      // Try Gemini first with JSON mode (guaranteed valid JSON)
+      if (!prd && geminiKey) {
+        try {
+          const { GoogleGenAI } = await import("@google/genai");
+          const ai = new GoogleGenAI({ apiKey: geminiKey });
+          const result = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prdPrompt,
+            config: { responseMimeType: "application/json" },
+          });
+          const text = result.text;
+          if (text) prd = JSON.parse(extractJSON(text));
+        } catch (geminiErr) {
+          console.error("[build_app] Gemini PRD error:", geminiErr);
+        }
       }
 
-      // === PHASE 2: Developer — Generate Code (Sonnet) ===
-      const codeResponse = await client.messages.create({
-        model: "claude-sonnet-4-6-20250514",
-        max_tokens: 4000,
-        system: `Jesteś senior developerem. Na podstawie PRD napisz KOMPLETNY kod aplikacji.
+      // Fallback: Anthropic
+      if (!prd && anthropicKey) {
+        try {
+          const { default: Anthropic } = await import("@anthropic-ai/sdk");
+          const client = new Anthropic({ apiKey: anthropicKey });
+          const prdResponse = await client.messages.create({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 1500,
+            system:
+              "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy, zero tekstu.",
+            messages: [{ role: "user", content: prdPrompt }],
+          });
+          const prdBlock = prdResponse.content.find((c) => c.type === "text");
+          if (prdBlock && "text" in prdBlock) {
+            prd = JSON.parse(extractJSON(prdBlock.text));
+          }
+        } catch (anthropicErr) {
+          console.error("[build_app] Anthropic PRD error:", anthropicErr);
+        }
+      }
+
+      if (!prd) return "Nie udało się wygenerować PRD — spróbuj ponownie.";
+
+      // === PHASE 2: Developer — Generate Code (Gemini JSON mode first) ===
+      const codePrompt = `Na podstawie PRD napisz KOMPLETNY kod aplikacji.
 Stack: Next.js App Router, Supabase (Postgres), Tailwind CSS.
+PRD: ${JSON.stringify(prd)}
 
-Zwróć JSON z plikami:
-{"files": [{"path": "app/apps/${name}/page.tsx", "content": "..."}, {"path": "supabase/migrations/...", "content": "..."}]}
+Odpowiedz TYLKO czystym JSON:
+{"files":[{"path":"app/apps/${name}/page.tsx","content":"'use client';\\nimport..."}]}
 
-Zasady:
-- JEDEN plik page.tsx z PEŁNYM kodem (komponent + logika + UI)
-- 'use client' na górze
-- Supabase client via createBrowserClient()
-- Tailwind dla stylów
-- KOMPLETNY, działający kod — nie stubs
-- Max 200 LOC per file`,
-        messages: [
-          {
-            role: "user",
-            content: `PRD:\n${JSON.stringify(prd, null, 2)}`,
-          },
-        ],
-      });
+Zasady: JEDEN plik page.tsx z PEŁNYM kodem, 'use client' na górze, Supabase via createBrowserClient(), Tailwind, KOMPLETNY kod, max 200 LOC. ZERO tekstu poza JSON.`;
 
-      const codeText = codeResponse.content.find((c) => c.type === "text");
-      if (!codeText || !("text" in codeText))
-        return "Developer nie wygenerował kodu.";
+      let codeResult: { files: { path: string; content: string }[] } | null =
+        null;
 
-      let codeResult: { files: { path: string; content: string }[] };
-      try {
-        codeResult = JSON.parse(codeText.text);
-      } catch {
-        return `Developer wygenerował nieprawidłowy JSON. Spróbuję ponownie.`;
+      // Try Gemini first with JSON mode
+      if (!codeResult && geminiKey) {
+        try {
+          const { GoogleGenAI } = await import("@google/genai");
+          const ai = new GoogleGenAI({ apiKey: geminiKey });
+          const result = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: codePrompt,
+            config: { responseMimeType: "application/json" },
+          });
+          const text = result.text;
+          if (text) codeResult = JSON.parse(extractJSON(text));
+        } catch (geminiErr) {
+          console.error("[build_app] Gemini code error:", geminiErr);
+        }
       }
 
-      if (!codeResult.files?.length)
-        return "Developer nie wygenerował żadnych plików.";
+      // Fallback: Anthropic
+      if (!codeResult && anthropicKey) {
+        try {
+          const { default: Anthropic } = await import("@anthropic-ai/sdk");
+          const client = new Anthropic({ apiKey: anthropicKey });
+          const codeResponse = await client.messages.create({
+            model: "claude-sonnet-4-6-20250514",
+            max_tokens: 4000,
+            system:
+              "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy.",
+            messages: [{ role: "user", content: codePrompt }],
+          });
+          const codeBlock = codeResponse.content.find((c) => c.type === "text");
+          if (codeBlock && "text" in codeBlock) {
+            codeResult = JSON.parse(extractJSON(codeBlock.text));
+          }
+        } catch (anthropicErr) {
+          console.error("[build_app] Anthropic code error:", anthropicErr);
+        }
+      }
+
+      if (!codeResult?.files?.length)
+        return "Nie udało się wygenerować kodu — spróbuj ponownie.";
 
       // === PHASE 3: Store generated app ===
       const { getServiceSupabase } = await import("@/lib/supabase/service");
