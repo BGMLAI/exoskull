@@ -44,7 +44,8 @@ export async function GET(
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "X-Frame-Options": "SAMEORIGIN",
+      "Content-Security-Policy":
+        "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; img-src * data: blob:; font-src *; connect-src *;",
     },
   });
 }
