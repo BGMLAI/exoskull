@@ -141,6 +141,169 @@ async function executeV3Tool(
 }
 
 // ============================================================================
+// GEMINI AGENT FALLBACK (with tool calling)
+// ============================================================================
+
+interface GeminiAgentOpts {
+  tenantId: string;
+  userMessage: string;
+  systemPrompt: string;
+  threadHistory: Array<{ role: string; content: string }>;
+  tools: V3ToolDefinition[];
+  geminiKey: string;
+  maxTurns: number;
+  onToolStart?: (name: string) => void;
+  onToolEnd?: (
+    name: string,
+    durationMs: number,
+    meta?: { success?: boolean; resultSummary?: string },
+  ) => void;
+  onTextDelta?: (delta: string) => void;
+}
+
+async function runGeminiAgentFallback(
+  opts: GeminiAgentOpts,
+): Promise<{ text: string; toolsUsed: string[]; turns: number }> {
+  const { GoogleGenAI } = await import("@google/genai");
+  const ai = new GoogleGenAI({ apiKey: opts.geminiKey });
+
+  // Convert tools to Gemini function declarations
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const functionDeclarations: any[] = opts.tools.map((t) => {
+    const schema = t.definition.input_schema as {
+      properties?: Record<string, unknown>;
+      required?: string[];
+    };
+    return {
+      name: t.definition.name,
+      description: t.definition.description || t.definition.name,
+      parameters: {
+        type: "OBJECT",
+        properties: schema.properties || {},
+        required: schema.required || [],
+      },
+    };
+  });
+
+  // Build Gemini message history
+  const contents: Array<{
+    role: "user" | "model";
+    parts: Array<Record<string, unknown>>;
+  }> = [];
+  for (const msg of opts.threadHistory.slice(-10)) {
+    contents.push({
+      role: msg.role === "user" ? "user" : "model",
+      parts: [{ text: typeof msg.content === "string" ? msg.content : "" }],
+    });
+  }
+  // Add current message
+  const lastMsg = contents[contents.length - 1];
+  if (!lastMsg || lastMsg.role !== "user") {
+    contents.push({ role: "user", parts: [{ text: opts.userMessage }] });
+  }
+
+  const toolsUsed: string[] = [];
+  let finalText = "";
+  let turns = 0;
+
+  while (turns < opts.maxTurns) {
+    turns++;
+
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents,
+      config: {
+        systemInstruction: opts.systemPrompt.slice(0, 8000),
+        tools: [{ functionDeclarations }],
+        maxOutputTokens: 8192,
+      },
+    });
+
+    const candidate = result.candidates?.[0];
+    if (!candidate?.content?.parts) {
+      finalText = result.text || "Brak odpowiedzi od Gemini.";
+      break;
+    }
+
+    const parts = candidate.content.parts;
+    const textParts: string[] = [];
+    const functionCalls: Array<{
+      name: string;
+      args: Record<string, unknown>;
+    }> = [];
+
+    for (const part of parts) {
+      if ("text" in part && part.text) textParts.push(part.text as string);
+      if ("functionCall" in part && part.functionCall) {
+        const fc = part.functionCall as {
+          name: string;
+          args: Record<string, unknown>;
+        };
+        functionCalls.push({ name: fc.name, args: fc.args || {} });
+      }
+    }
+
+    // No function calls → done
+    if (functionCalls.length === 0) {
+      finalText = textParts.join("");
+      if (opts.onTextDelta && finalText) {
+        const chunkSize = 50;
+        for (let i = 0; i < finalText.length; i += chunkSize) {
+          opts.onTextDelta(finalText.slice(i, i + chunkSize));
+        }
+      }
+      break;
+    }
+
+    // Add assistant response to history
+    contents.push({
+      role: "model",
+      parts: candidate.content.parts as Array<Record<string, unknown>>,
+    });
+
+    // Execute tools
+    const functionResponses: Array<Record<string, unknown>> = [];
+    for (const fc of functionCalls) {
+      if (!toolsUsed.includes(fc.name)) toolsUsed.push(fc.name);
+      opts.onToolStart?.(fc.name);
+      const toolStartMs = Date.now();
+
+      const { result: toolResult, isError } = await executeV3Tool(
+        opts.tools,
+        fc.name,
+        fc.args,
+        opts.tenantId,
+      );
+
+      const durationMs = Date.now() - toolStartMs;
+      logger.info(
+        `[v3:Gemini] Tool ${fc.name}: ${isError ? "FAIL" : "OK"} (${durationMs}ms)`,
+      );
+      opts.onToolEnd?.(fc.name, durationMs, {
+        success: !isError,
+        resultSummary: toolResult.slice(0, 200),
+      });
+
+      functionResponses.push({
+        functionResponse: {
+          name: fc.name,
+          response: { result: toolResult },
+        },
+      });
+    }
+
+    // Add tool results to history
+    contents.push({ role: "user", parts: functionResponses });
+  }
+
+  if (!finalText && turns >= opts.maxTurns) {
+    finalText = "Osiągnięto limit interakcji Gemini. Spróbuj ponownie.";
+  }
+
+  return { text: finalText, toolsUsed, turns };
+}
+
+// ============================================================================
 // MAIN AGENT FUNCTION
 // ============================================================================
 
@@ -392,36 +555,30 @@ export async function runV3Agent(
         toolsUsed,
       });
 
-      // ── Emergency Gemini fallback (no tools, conversation only) ──
+      // ── Gemini fallback WITH tool calling ──
       const geminiKey =
         process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY;
       if (geminiKey && !abortController.signal.aborted) {
         try {
-          logger.info("[v3:Agent] Falling back to Gemini...");
-          const { GoogleGenAI } = await import("@google/genai");
-          const ai = new GoogleGenAI({ apiKey: geminiKey });
-
-          // Build simple prompt with last few messages
-          const recentMsgs = threadHistory.slice(-6);
-          const historyText = recentMsgs
-            .map(
-              (m) =>
-                `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`,
-            )
-            .join("\n");
-
-          const geminiResult = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `${systemPrompt.slice(0, 4000)}\n\nHistoria:\n${historyText}\n\nUser: ${req.userMessage}\n\nOdpowiedz po polsku. Nie masz dostępu do narzędzi — odpowiadaj z wiedzy ogólnej i kontekstu rozmowy.`,
+          logger.info("[v3:Agent] Falling back to Gemini with tools...");
+          const geminiResult = await runGeminiAgentFallback({
+            tenantId: req.tenantId,
+            userMessage: req.userMessage,
+            systemPrompt,
+            threadHistory,
+            tools: V3_TOOLS,
+            geminiKey,
+            maxTurns: config.maxTurns,
+            onToolStart: req.onToolStart,
+            onToolEnd: req.onToolEnd,
+            onTextDelta: req.onTextDelta,
           });
-
-          finalText =
-            geminiResult.text || "Błąd przetwarzania. Spróbuj ponownie.";
-          if (geminiResult.text) {
-            finalText =
-              "[Gemini fallback — narzędzia niedostępne]\n\n" + finalText;
-            logger.info("[v3:Agent] Gemini fallback succeeded");
-          }
+          finalText = geminiResult.text;
+          toolsUsed.push(...geminiResult.toolsUsed);
+          logger.info("[v3:Agent] Gemini fallback succeeded", {
+            toolsUsed: geminiResult.toolsUsed,
+            turns: geminiResult.turns,
+          });
         } catch (geminiErr) {
           logger.error("[v3:Agent] Gemini fallback failed:", {
             error:
@@ -429,10 +586,10 @@ export async function runV3Agent(
                 ? geminiErr.message
                 : String(geminiErr),
           });
-          finalText = "Błąd przetwarzania. Spróbuj ponownie.";
+          finalText = `Błąd przetwarzania (Anthropic: ${errMsg.slice(0, 100)}). Spróbuj ponownie za chwilę.`;
         }
       } else {
-        finalText = "Błąd przetwarzania. Spróbuj ponownie.";
+        finalText = `Błąd przetwarzania (${errMsg.slice(0, 100)}). Brak klucza Gemini do fallback.`;
       }
     }
   } finally {
