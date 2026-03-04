@@ -134,7 +134,61 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
         }
       }
 
-      // Fallback: Anthropic
+      // Fallback 2: Groq (Llama 3.3 70B — fast, free, JSON mode)
+      const groqKey = process.env.GROQ_API_KEY?.trim();
+      if (!html && groqKey) {
+        try {
+          console.log("[build_app] Trying Groq Llama 3.3 70B...");
+          const groqResponse = await fetch(
+            "https://api.groq.com/openai/v1/chat/completions",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${groqKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "llama-3.3-70b-versatile",
+                messages: [
+                  {
+                    role: "system",
+                    content:
+                      "Odpowiadasz TYLKO czystym JSON. Zero markdown, zero komentarzy. Klucz 'html' zawiera kompletny HTML string. Klucz 'title' zawiera tytuł.",
+                  },
+                  { role: "user", content: prompt },
+                ],
+                max_tokens: 8000,
+                temperature: 0.7,
+                response_format: { type: "json_object" },
+              }),
+            },
+          );
+          if (groqResponse.ok) {
+            const groqData = await groqResponse.json();
+            const groqText = groqData.choices?.[0]?.message?.content;
+            if (groqText) {
+              const parsed = JSON.parse(groqText);
+              html = parsed.html || null;
+              title = parsed.title || rawName;
+            }
+          } else {
+            const errText = await groqResponse.text();
+            errors.push(
+              `Groq: ${groqResponse.status} ${errText.slice(0, 200)}`,
+            );
+            console.error("[build_app] Groq error:", errText.slice(0, 200));
+          }
+        } catch (groqErr) {
+          const msg =
+            groqErr instanceof Error
+              ? groqErr.message
+              : JSON.stringify(groqErr);
+          errors.push(`Groq: ${msg.slice(0, 200)}`);
+          console.error("[build_app] Groq error:", msg);
+        }
+      }
+
+      // Fallback 3: Anthropic (if credits available)
       if (!html && anthropicKey) {
         try {
           const { default: Anthropic } = await import("@anthropic-ai/sdk");

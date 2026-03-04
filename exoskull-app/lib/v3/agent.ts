@@ -321,6 +321,154 @@ async function runGeminiAgentFallback(
 }
 
 // ============================================================================
+// GROQ AGENT FALLBACK (Llama 3.3 70B with OpenAI-compatible tool calling)
+// ============================================================================
+
+interface GroqAgentOpts {
+  tenantId: string;
+  userMessage: string;
+  systemPrompt: string;
+  threadHistory: Array<{ role: string; content: string }>;
+  tools: V3ToolDefinition[];
+  groqKey: string;
+  maxTurns: number;
+  onToolStart?: (name: string) => void;
+  onToolEnd?: (
+    name: string,
+    durationMs: number,
+    meta?: { success?: boolean; resultSummary?: string },
+  ) => void;
+  onTextDelta?: (delta: string) => void;
+}
+
+async function runGroqAgentFallback(
+  opts: GroqAgentOpts,
+): Promise<{ text: string; toolsUsed: string[]; turns: number }> {
+  // Convert tools to OpenAI function format
+  const openaiTools = opts.tools.map((t) => ({
+    type: "function" as const,
+    function: {
+      name: t.definition.name,
+      description: t.definition.description || t.definition.name,
+      parameters: t.definition.input_schema,
+    },
+  }));
+
+  // Build message history (OpenAI format)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const messages: any[] = [
+    { role: "system", content: opts.systemPrompt.slice(0, 8000) },
+  ];
+  for (const msg of opts.threadHistory.slice(-10)) {
+    messages.push({
+      role: msg.role === "user" ? "user" : "assistant",
+      content: typeof msg.content === "string" ? msg.content : "",
+    });
+  }
+  const lastMsg = messages[messages.length - 1];
+  if (!lastMsg || lastMsg.role !== "user") {
+    messages.push({ role: "user", content: opts.userMessage });
+  }
+
+  const toolsUsed: string[] = [];
+  let finalText = "";
+  let turns = 0;
+
+  while (turns < opts.maxTurns) {
+    turns++;
+
+    const response = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${opts.groqKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages,
+          tools: openaiTools,
+          tool_choice: "auto",
+          max_tokens: 4096,
+          temperature: 0.7,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Groq ${response.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+    const choice = data.choices?.[0];
+    if (!choice) throw new Error("Groq: no choice in response");
+
+    const assistantMsg = choice.message;
+    const toolCalls = assistantMsg.tool_calls;
+
+    // No tool calls → done
+    if (!toolCalls || toolCalls.length === 0) {
+      finalText = assistantMsg.content || "";
+      if (opts.onTextDelta && finalText) {
+        const chunkSize = 50;
+        for (let i = 0; i < finalText.length; i += chunkSize) {
+          opts.onTextDelta(finalText.slice(i, i + chunkSize));
+        }
+      }
+      break;
+    }
+
+    // Add assistant response to history
+    messages.push(assistantMsg);
+
+    // Execute tools
+    for (const tc of toolCalls) {
+      const toolName = tc.function.name;
+      if (!toolsUsed.includes(toolName)) toolsUsed.push(toolName);
+      opts.onToolStart?.(toolName);
+      const toolStartMs = Date.now();
+
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(tc.function.arguments || "{}");
+      } catch {
+        args = {};
+      }
+
+      const { result: toolResult, isError } = await executeV3Tool(
+        opts.tools,
+        toolName,
+        args,
+        opts.tenantId,
+      );
+
+      const durationMs = Date.now() - toolStartMs;
+      logger.info(
+        `[v3:Groq] Tool ${toolName}: ${isError ? "FAIL" : "OK"} (${durationMs}ms)`,
+      );
+      opts.onToolEnd?.(toolName, durationMs, {
+        success: !isError,
+        resultSummary: toolResult.slice(0, 200),
+      });
+
+      messages.push({
+        role: "tool",
+        tool_call_id: tc.id,
+        content: toolResult,
+      });
+    }
+  }
+
+  if (!finalText && turns >= opts.maxTurns) {
+    finalText = "Osiągnięto limit interakcji. Spróbuj ponownie.";
+  }
+
+  return { text: finalText, toolsUsed, turns };
+}
+
+// ============================================================================
 // MAIN AGENT FUNCTION
 // ============================================================================
 
@@ -603,10 +751,43 @@ export async function runV3Agent(
                 ? geminiErr.message
                 : String(geminiErr),
           });
-          finalText = `Błąd przetwarzania (Anthropic: ${errMsg.slice(0, 100)}). Spróbuj ponownie za chwilę.`;
+
+          // ── Groq fallback (Llama 3.3 70B with tool calling) ──
+          const groqKey = process.env.GROQ_API_KEY?.trim();
+          if (groqKey && !abortController.signal.aborted) {
+            try {
+              logger.info("[v3:Agent] Falling back to Groq...");
+              const groqResult = await runGroqAgentFallback({
+                tenantId: req.tenantId,
+                userMessage: req.userMessage,
+                systemPrompt,
+                threadHistory,
+                tools: V3_TOOLS,
+                groqKey,
+                maxTurns: Math.min(config.maxTurns, 8),
+                onToolStart: req.onToolStart,
+                onToolEnd: req.onToolEnd,
+                onTextDelta: req.onTextDelta,
+              });
+              finalText = groqResult.text;
+              toolsUsed.push(...groqResult.toolsUsed);
+              logger.info("[v3:Agent] Groq fallback succeeded", {
+                toolsUsed: groqResult.toolsUsed,
+                turns: groqResult.turns,
+              });
+            } catch (groqErr) {
+              logger.error("[v3:Agent] Groq fallback failed:", {
+                error:
+                  groqErr instanceof Error ? groqErr.message : String(groqErr),
+              });
+              finalText = `Wszystkie modele AI niedostępne (Anthropic: brak kredytów, Gemini: rate limit, Groq: ${groqErr instanceof Error ? groqErr.message.slice(0, 50) : "error"}). Spróbuj za kilka minut.`;
+            }
+          } else {
+            finalText = `Błąd przetwarzania (Anthropic: ${errMsg.slice(0, 100)}). Spróbuj ponownie za chwilę.`;
+          }
         }
       } else {
-        finalText = `Błąd przetwarzania (${errMsg.slice(0, 100)}). Brak klucza Gemini do fallback.`;
+        finalText = `Błąd przetwarzania (${errMsg.slice(0, 100)}). Brak klucza do fallback.`;
       }
     }
   } finally {
