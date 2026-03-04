@@ -93,7 +93,9 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
       let html: string | null = null;
       let title: string = rawName;
 
-      // Try Gemini 2.5 Flash (JSON mode, thinking disabled for speed)
+      const errors: string[] = [];
+
+      // Try Gemini 2.5 Flash (JSON mode)
       if (geminiKey) {
         try {
           const { GoogleGenAI } = await import("@google/genai");
@@ -104,7 +106,6 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
             config: {
               responseMimeType: "application/json",
               maxOutputTokens: 8192,
-              thinkingConfig: { thinkingBudget: 0 },
             },
           });
           const text = result.text;
@@ -114,7 +115,10 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
             title = parsed.title || rawName;
           }
         } catch (geminiErr) {
-          console.error("[build_app] Gemini error:", geminiErr);
+          const msg =
+            geminiErr instanceof Error ? geminiErr.message : String(geminiErr);
+          errors.push(`Gemini: ${msg.slice(0, 200)}`);
+          console.error("[build_app] Gemini error:", msg);
         }
       }
 
@@ -142,13 +146,17 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
             title = parsed.title || rawName;
           }
         } catch (anthropicErr) {
-          console.error("[build_app] Anthropic error:", anthropicErr);
+          const msg =
+            anthropicErr instanceof Error
+              ? anthropicErr.message
+              : String(anthropicErr);
+          errors.push(`Anthropic: ${msg.slice(0, 200)}`);
+          console.error("[build_app] Anthropic error:", msg);
         }
       }
 
       if (!html) {
-        const keys = { gemini: !!geminiKey, anthropic: !!anthropicKey };
-        return `Nie udało się wygenerować aplikacji (klucze: ${JSON.stringify(keys)}). Spróbuj ponownie.`;
+        return `Nie udało się wygenerować aplikacji. Błędy: ${errors.join(" | ") || "brak kluczy AI"}`;
       }
 
       // Validate it looks like HTML
