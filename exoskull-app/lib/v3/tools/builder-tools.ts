@@ -95,11 +95,17 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
 
       const errors: string[] = [];
 
-      // Try Gemini 2.5 Flash (JSON mode) with 1 retry on 429
+      // Try Gemini 2.5 Flash (JSON mode) with retries on 429
       if (geminiKey) {
-        for (let attempt = 0; attempt < 2 && !html; attempt++) {
+        for (let attempt = 0; attempt < 3 && !html; attempt++) {
           try {
-            if (attempt > 0) await new Promise((r) => setTimeout(r, 3000));
+            if (attempt > 0) {
+              const delay = (attempt + 1) * 5000; // 10s, 15s
+              console.log(
+                `[build_app] Gemini retry ${attempt}/2, waiting ${delay}ms`,
+              );
+              await new Promise((r) => setTimeout(r, delay));
+            }
             const { GoogleGenAI } = await import("@google/genai");
             const ai = new GoogleGenAI({ apiKey: geminiKey });
             const result = await ai.models.generateContent({
@@ -121,7 +127,7 @@ ZERO tekstu poza JSON. Cały HTML w jednym stringu w polu "html".`;
               geminiErr instanceof Error
                 ? geminiErr.message
                 : JSON.stringify(geminiErr);
-            if (attempt === 0 && msg.includes("429")) continue; // retry on rate limit
+            if (msg.includes("429") && attempt < 2) continue; // retry on rate limit
             errors.push(`Gemini: ${msg.slice(0, 200)}`);
             console.error("[build_app] Gemini error:", msg);
           }

@@ -209,15 +209,32 @@ async function runGeminiAgentFallback(
   while (turns < opts.maxTurns) {
     turns++;
 
-    const result = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents,
-      config: {
-        systemInstruction: opts.systemPrompt.slice(0, 8000),
-        tools: [{ functionDeclarations }],
-        maxOutputTokens: 8192,
-      },
-    });
+    // Retry up to 3 times on 429 rate limit
+    let result;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = (attempt + 1) * 5000; // 10s, 15s
+          logger.info(`[v3:Gemini] Retry ${attempt}/2 after ${delay}ms`);
+          await new Promise((r) => setTimeout(r, delay));
+        }
+        result = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents,
+          config: {
+            systemInstruction: opts.systemPrompt.slice(0, 8000),
+            tools: [{ functionDeclarations }],
+            maxOutputTokens: 8192,
+          },
+        });
+        break; // success
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : JSON.stringify(err);
+        if (msg.includes("429") && attempt < 2) continue;
+        throw err; // non-retryable or final attempt
+      }
+    }
+    if (!result) throw new Error("Gemini: all retries exhausted");
 
     const candidate = result.candidates?.[0];
     if (!candidate?.content?.parts) {
