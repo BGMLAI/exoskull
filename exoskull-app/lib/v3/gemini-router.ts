@@ -79,22 +79,41 @@ const TOOL_KEYWORDS = [
   "samopoczucie",
 ];
 
-// Patterns indicating simple conversational queries
+// Patterns indicating simple conversational queries (Gemini Flash — free)
 const SIMPLE_PATTERNS = [
   /^(cześć|hej|siema|hello|hi|hey|witaj|dzień dobry|dobry|yo)\b/i,
   /^(co potrafisz|co umiesz|kim jesteś|what can you|who are you)/i,
-  /^(dzięk|thanks|thx|dziękuję)/i,
-  /^(ok|okay|dobrze|rozumiem|jasne|super|fajnie|great)\s*[.!]?$/i,
-  /^(jak się masz|co słychać|how are you)/i,
+  /^(dzięk|thanks|thx|dziękuję|spoko)/i,
+  /^(ok|okay|dobrze|rozumiem|jasne|super|fajnie|great|git|luzik)\s*[.!]?$/i,
+  /^(jak się masz|co słychać|how are you|co tam)/i,
   /^(pomoc|help)\s*$/i,
+  /^(haha|lol|xd|😂|👍|❤️|🔥)/i,
+  /^(dobranoc|pa|nara|cześć|do zobaczenia|bye)\b/i,
+  /^(co to|czym jest|what is|explain)\s.{0,30}$/i, // short "what is X" questions
 ];
 
-export type QueryComplexity = "simple" | "complex";
+export type QueryComplexity = "simple" | "medium" | "complex";
+
+// Keywords that require Sonnet (heavy tool use, building, multi-step)
+const SONNET_KEYWORDS = [
+  "zbuduj",
+  "build",
+  "aplikacj",
+  "app",
+  "generate",
+  "kurs",
+  "ebook",
+  "blog",
+  "self_extend",
+  "publish",
+  "allegro",
+];
 
 /**
- * Classify a user message as simple or complex.
- * Simple → Gemini Flash (no tools, <1s)
- * Complex → Claude Sonnet (with tools)
+ * 3-tier classification:
+ * simple  → Gemini Flash (no tools, ~$0.00)
+ * medium  → Haiku (with tools, ~$0.01)
+ * complex → Sonnet (heavy building/generation, ~$0.15)
  */
 export function classifyQuery(message: string): QueryComplexity {
   const lower = message.toLowerCase().trim();
@@ -106,22 +125,27 @@ export function classifyQuery(message: string): QueryComplexity {
     }
   }
 
-  // Check for tool-requiring keywords
-  for (const keyword of TOOL_KEYWORDS) {
+  // Sonnet-requiring keywords (building apps, generating content)
+  for (const keyword of SONNET_KEYWORDS) {
     if (lower.includes(keyword)) return "complex";
   }
 
-  // Questions about specific topics → complex
-  if (lower.includes("?") && lower.length > 50) return "complex";
+  // Tool-requiring keywords → Haiku (NOT Sonnet)
+  for (const keyword of TOOL_KEYWORDS) {
+    if (lower.includes(keyword)) return "medium";
+  }
 
-  // Commands (starting with /) → complex
-  if (lower.startsWith("/")) return "complex";
+  // Commands (starting with /) → medium (tools likely needed)
+  if (lower.startsWith("/")) return "medium";
+
+  // Questions → medium (might need tools for context)
+  if (lower.includes("?") && lower.length > 50) return "medium";
 
   // Short conversational messages without tool keywords → simple
   if (lower.length < 100 && !lower.includes("?")) return "simple";
 
-  // Default: complex (safer)
-  return "complex";
+  // Default: medium (Haiku — cheaper than Sonnet, still has tools)
+  return "medium";
 }
 
 /**

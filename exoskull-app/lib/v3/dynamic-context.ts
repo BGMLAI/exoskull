@@ -26,7 +26,7 @@ interface CachedContext {
   timestamp: number;
 }
 
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 300_000; // 5 min (was 30s — wasteful for fast conversations)
 const contextCache = new Map<string, CachedContext>();
 
 export function invalidateContextCache(tenantId: string): void {

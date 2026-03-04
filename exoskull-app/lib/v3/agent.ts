@@ -74,20 +74,25 @@ export interface V3AgentResponse {
 // CONFIGURATION
 // ============================================================================
 
-const WEB_CONFIG = {
-  maxTurns: 15,
+const WEB_SONNET_CONFIG = {
+  maxTurns: 5,
   timeoutMs: 55_000,
   model: "claude-sonnet-4-6" as const,
 };
+const WEB_HAIKU_CONFIG = {
+  maxTurns: 4,
+  timeoutMs: 30_000,
+  model: "claude-haiku-4-5-20251001" as const,
+};
 const VOICE_CONFIG = {
-  maxTurns: 6,
+  maxTurns: 3,
   timeoutMs: 40_000,
-  model: "claude-sonnet-4-6" as const,
+  model: "claude-haiku-4-5-20251001" as const,
 };
 const AUTONOMOUS_CONFIG = {
-  maxTurns: 8,
+  maxTurns: 5,
   timeoutMs: 50_000,
-  model: "claude-sonnet-4-6" as const,
+  model: "claude-haiku-4-5-20251001" as const,
 };
 
 const MAX_TOOL_RESULT_LENGTH = 50_000;
@@ -756,67 +761,145 @@ export async function runV3Agent(
   req: V3AgentRequest,
 ): Promise<V3AgentResponse> {
   const startMs = Date.now();
-  const config =
-    req.mode === "autonomous"
-      ? AUTONOMOUS_CONFIG
-      : req.channel === "voice"
-        ? VOICE_CONFIG
-        : WEB_CONFIG;
 
-  // ── Phase 0: Smart routing — simple queries via Gemini Flash ──
-  if (req.channel === "web_chat" && req.mode !== "autonomous") {
-    const complexity = classifyQuery(req.userMessage);
-    if (complexity === "simple") {
-      req.onThinkingStep?.("Szybka odpowiedź", "running");
-      const threadHistory = await getThreadContext(req.tenantId, 6);
-      const simpleHistory = threadHistory.map((m) => ({
-        role: m.role,
-        content: typeof m.content === "string" ? m.content : req.userMessage,
-      }));
-      const geminiResponse = await handleSimpleQuery(
-        req.userMessage,
-        undefined,
-        simpleHistory,
-      );
-      if (geminiResponse) {
-        req.onThinkingStep?.("Szybka odpowiedź", "done");
-        // Stream the response
-        if (req.onTextDelta) {
-          const chunkSize = 30;
-          for (let i = 0; i < geminiResponse.length; i += chunkSize) {
-            req.onTextDelta(geminiResponse.slice(i, i + chunkSize));
-          }
+  // ── Phase 0: 3-tier smart routing ──
+  // simple  → Gemini Flash (no tools, ~$0.00)
+  // medium  → DeepSeek (with tools, ~$0.002/query)
+  // complex → Sonnet (heavy building, ~$0.15/query)
+  const complexity =
+    req.mode === "autonomous"
+      ? ("medium" as const) // autonomous doesn't need Sonnet most of the time
+      : req.channel === "voice"
+        ? ("medium" as const)
+        : classifyQuery(req.userMessage);
+
+  const config =
+    complexity === "complex" ? WEB_SONNET_CONFIG : WEB_HAIKU_CONFIG; // Haiku as Claude fallback if DeepSeek fails
+
+  logger.info(
+    `[v3:Agent] Routing: ${complexity} → ${complexity === "medium" ? "deepseek" : config.model}`,
+    {
+      message: req.userMessage.slice(0, 80),
+    },
+  );
+
+  // Simple queries → Gemini Flash (free, no tools)
+  if (complexity === "simple" && req.channel === "web_chat") {
+    req.onThinkingStep?.("Szybka odpowiedź", "running");
+    const threadHistory = await getThreadContext(req.tenantId, 6);
+    const simpleHistory = threadHistory.map((m) => ({
+      role: m.role,
+      content: typeof m.content === "string" ? m.content : req.userMessage,
+    }));
+    const geminiResponse = await handleSimpleQuery(
+      req.userMessage,
+      undefined,
+      simpleHistory,
+    );
+    if (geminiResponse) {
+      req.onThinkingStep?.("Szybka odpowiedź", "done");
+      if (req.onTextDelta) {
+        const chunkSize = 30;
+        for (let i = 0; i < geminiResponse.length; i += chunkSize) {
+          req.onTextDelta(geminiResponse.slice(i, i + chunkSize));
         }
-        return {
-          text: geminiResponse,
-          toolsUsed: [],
-          costUsd: 0,
-          numTurns: 0,
-          durationMs: Date.now() - startMs,
-        };
       }
-      // Gemini failed → fall through to Claude
-      logger.info("[v3:Agent] Gemini simple routing failed, using Claude");
+      return {
+        text: geminiResponse,
+        toolsUsed: [],
+        costUsd: 0,
+        numTurns: 0,
+        durationMs: Date.now() - startMs,
+      };
+    }
+    // Gemini failed → fall through to DeepSeek
+    logger.info(
+      "[v3:Agent] Gemini simple routing failed, falling back to DeepSeek",
+    );
+  }
+
+  // ── Medium queries → DeepSeek primary (with tools, ~$0.002/query) ──
+  const deepseekKey = process.env.DEEPSEEK_API_KEY?.trim();
+  if (complexity !== "complex" && deepseekKey) {
+    try {
+      req.onThinkingStep?.("Ładuję kontekst", "running");
+      const [dynamicCtx, dsThreadHistory] = await Promise.all([
+        buildV3DynamicContext(req.tenantId),
+        getThreadContext(req.tenantId, 10),
+      ]);
+      const dsSystemPrompt = buildV3SystemPrompt(dynamicCtx.context);
+      req.onThinkingStep?.("Ładuję kontekst", "done");
+      req.onThinkingStep?.("Analizuję i odpowiadam", "running");
+
+      const dsResult = await runDeepSeekAgentFallback({
+        tenantId: req.tenantId,
+        userMessage: req.userMessage,
+        systemPrompt: dsSystemPrompt,
+        threadHistory: dsThreadHistory,
+        tools: V3_TOOLS,
+        deepseekKey,
+        maxTurns: 4,
+        onToolStart: req.onToolStart,
+        onToolEnd: req.onToolEnd,
+        onTextDelta: req.onTextDelta,
+      });
+
+      req.onThinkingStep?.("Analizuję i odpowiadam", "done");
+
+      // DeepSeek pricing: $0.27/$1.10 per MTok (estimated from turns)
+      const estimatedTokens = dsResult.turns * 5000;
+      const costUsd =
+        (estimatedTokens * 0.27 + dsResult.text.length * 0.28) / 1_000_000;
+
+      logger.info("[v3:Agent] DeepSeek primary succeeded", {
+        toolsUsed: dsResult.toolsUsed,
+        turns: dsResult.turns,
+        costUsd: costUsd.toFixed(4),
+        durationMs: Date.now() - startMs,
+      });
+
+      return {
+        text: dsResult.text,
+        toolsUsed: dsResult.toolsUsed,
+        costUsd,
+        numTurns: dsResult.turns,
+        durationMs: Date.now() - startMs,
+      };
+    } catch (dsErr) {
+      logger.warn(
+        "[v3:Agent] DeepSeek primary failed, falling back to Claude Haiku",
+        {
+          error: dsErr instanceof Error ? dsErr.message : String(dsErr),
+        },
+      );
+      // Fall through to Claude Haiku below
     }
   }
 
   req.onThinkingStep?.("Ładuję kontekst", "running");
 
-  // ── Phase 1: Load context + memory in parallel ──
+  // ── Phase 1: Load context (memory search only for complex queries) ──
+  const needsMemory =
+    req.userMessage.length > 30 ||
+    /\?|pamięt|remember|historia|wcześniej|wiesz/.test(
+      req.userMessage.toLowerCase(),
+    );
   const [dynamicCtx, threadHistory, memoryResults] = await Promise.all([
     buildV3DynamicContext(req.tenantId),
-    getThreadContext(req.tenantId, 20),
-    unifiedSearch({
-      tenantId: req.tenantId,
-      query: req.userMessage,
-      limit: 10,
-      minScore: 0.05,
-    }).catch((err) => {
-      logger.warn("[v3:Agent] Memory search failed (non-blocking):", {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return [] as UnifiedSearchResult[];
-    }),
+    getThreadContext(req.tenantId, 10), // was 20 — halved to reduce tokens
+    needsMemory
+      ? unifiedSearch({
+          tenantId: req.tenantId,
+          query: req.userMessage,
+          limit: 5, // was 10 — halved
+          minScore: 0.3, // was 0.05 — much stricter to avoid noise
+        }).catch((err) => {
+          logger.warn("[v3:Agent] Memory search failed (non-blocking):", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return [] as UnifiedSearchResult[];
+        })
+      : Promise.resolve([] as UnifiedSearchResult[]),
   ]);
 
   // ── Phase 2: Build system prompt ──
@@ -827,7 +910,7 @@ export async function runV3Agent(
       memoryResults
         .map(
           (r, i) =>
-            `[${i + 1}] (${r.type || "memory"}, score: ${r.score.toFixed(2)}) ${r.content.slice(0, 500)}`,
+            `[${i + 1}] (${r.type || "memory"}, score: ${r.score.toFixed(2)}) ${r.content.slice(0, 300)}`, // was 500
         )
         .join("\n");
   }
@@ -897,7 +980,13 @@ export async function runV3Agent(
             {
               model: config.model,
               max_tokens: req.maxTokens || 4096,
-              system: systemPrompt,
+              system: [
+                {
+                  type: "text" as const,
+                  text: systemPrompt,
+                  cache_control: { type: "ephemeral" as const },
+                },
+              ],
               messages,
               ...(anthropicTools.length > 0 ? { tools: anthropicTools } : {}),
             },
@@ -910,7 +999,7 @@ export async function runV3Agent(
 
           return stream.finalMessage();
         },
-        { maxRetries: 3, delayMs: 1500, label: "v3Agent.stream" },
+        { maxRetries: 2, delayMs: 2000, label: "v3Agent.stream" }, // was 3 retries — less wasted tokens on persistent failures
       );
 
       totalInputTokens += response.usage.input_tokens;
@@ -1148,14 +1237,19 @@ export async function runV3Agent(
 
   req.onThinkingStep?.("Analizuję i odpowiadam", "done");
 
-  // Cost calculation (Sonnet: $3/MTok in, $15/MTok out)
+  // Cost calculation — Haiku: $1/$5, Sonnet: $3/$15 per MTok
+  const isHaiku = config.model.includes("haiku");
+  const inputRate = isHaiku ? 1.0 : 3.0;
+  const outputRate = isHaiku ? 5.0 : 15.0;
   const costUsd =
-    (totalInputTokens * 3.0 + totalOutputTokens * 15.0) / 1_000_000;
+    (totalInputTokens * inputRate + totalOutputTokens * outputRate) / 1_000_000;
   const durationMs = Date.now() - startMs;
 
   logger.info("[v3:Agent] Done:", {
     tenantId: req.tenantId,
     channel: req.channel,
+    model: config.model,
+    complexity,
     toolsUsed,
     numTurns,
     tokens: { input: totalInputTokens, output: totalOutputTokens },
