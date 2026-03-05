@@ -52,6 +52,54 @@ function detectMessageLanguage(text: string): string {
 }
 
 // ============================================================================
+// CHANNEL OUTPUT ADAPTATION (J3)
+// ============================================================================
+
+/** Adapt response text for the target channel */
+function formatForChannel(text: string, channel: AgentChannel): string {
+  switch (channel) {
+    case "sms":
+      // SMS: strip markdown, truncate to ~1500 chars (3x 160-char segments max)
+      return text
+        .replace(/```[\s\S]*?```/g, "[kod]") // code blocks → placeholder
+        .replace(/\*\*(.*?)\*\*/g, "$1") // bold → plain
+        .replace(/\*(.*?)\*/g, "$1") // italic → plain
+        .replace(/#{1,6}\s+/g, "") // headers → plain
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // links → text only
+        .replace(/\n{3,}/g, "\n\n") // collapse whitespace
+        .slice(0, 1500);
+
+    case "voice":
+      // Voice: strip markdown, no URLs, concise
+      return text
+        .replace(/```[\s\S]*?```/g, "") // remove code blocks entirely
+        .replace(/\*\*(.*?)\*\*/g, "$1")
+        .replace(/\*(.*?)\*/g, "$1")
+        .replace(/#{1,6}\s+/g, "")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/https?:\/\/\S+/g, "") // strip raw URLs
+        .replace(/\n{2,}/g, ". ") // paragraphs → sentences
+        .replace(/\n/g, " ")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+
+    case "telegram":
+      // Telegram supports markdown — keep most formatting, convert to Telegram markdown
+      return text.replace(/\n{4,}/g, "\n\n\n"); // just limit excessive whitespace
+
+    case "email":
+      // Email: keep full formatting
+      return text;
+
+    case "web_chat":
+    case "autonomous":
+    default:
+      // Web chat: full markdown, no changes
+      return text;
+  }
+}
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -860,7 +908,7 @@ export async function runV3Agent(
         }
       }
       return {
-        text: geminiResponse,
+        text: formatForChannel(geminiResponse, req.channel),
         toolsUsed: [],
         costUsd: 0,
         numTurns: 0,
@@ -950,7 +998,7 @@ export async function runV3Agent(
         durationMs: Date.now() - startMs,
       });
       return {
-        text: dsResult.text,
+        text: formatForChannel(dsResult.text, req.channel),
         toolsUsed: dsResult.toolsUsed,
         costUsd,
         numTurns: dsResult.turns,
@@ -986,7 +1034,7 @@ export async function runV3Agent(
         durationMs: Date.now() - startMs,
       });
       return {
-        text: groqResult.text,
+        text: formatForChannel(groqResult.text, req.channel),
         toolsUsed: groqResult.toolsUsed,
         costUsd: 0,
         numTurns: groqResult.turns,
@@ -1307,5 +1355,8 @@ export async function runV3Agent(
     durationMs,
   });
 
-  return { text: finalText, toolsUsed, costUsd, numTurns, durationMs };
+  // J3: Adapt output for channel
+  const adaptedText = formatForChannel(finalText, req.channel);
+
+  return { text: adaptedText, toolsUsed, costUsd, numTurns, durationMs };
 }

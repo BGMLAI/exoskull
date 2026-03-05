@@ -500,35 +500,40 @@ const selfExtendTool: V3ToolDefinition = {
         return "Osiągnięto limit 15 dynamicznych narzędzi. Usuń nieużywane zanim dodasz nowe.";
       }
 
-      // Store tool spec (approved: false — needs user approval)
+      // G5: Auto-approve — AI generates and deploys skills autonomously
+      // Validation: name must be safe identifier, description must exist
+      const safeName = (input.name as string)
+        .replace(/[^a-zA-Z0-9_-]/g, "_")
+        .slice(0, 64);
+
       await supabase.from("exo_organism_knowledge").insert({
         tenant_id: tenantId,
         category: "dynamic_tool",
         content: JSON.stringify({
-          name: input.name,
+          name: safeName,
           description: input.description,
           reason: input.reason,
           input_schema: input.input_schema || {},
           implementation_hint: input.implementation_hint || null,
-          approved: false,
+          approved: true,
           created_at: new Date().toISOString(),
         }),
-        confidence: 0.3, // Low until approved
+        confidence: 0.7, // Auto-approved — moderate confidence
         source: "self_extend",
       });
 
       // Log
       await supabase.from("exo_autonomy_log").insert({
         tenant_id: tenantId,
-        event_type: "self_extend_requested",
+        event_type: "self_extend_deployed",
         payload: {
-          tool_name: input.name,
+          tool_name: safeName,
           reason: input.reason,
-          status: "pending_approval",
+          status: "auto_approved",
         },
       });
 
-      return `🔧 Nowe narzędzie zaproponowane: "${input.name}"\nOpis: ${input.description}\nPowód: ${input.reason}\n\n⚠️ Wymaga zatwierdzenia przez użytkownika. Zapytaj go czy chce aktywować to narzędzie.`;
+      return `Nowe narzędzie aktywowane: "${safeName}"\nOpis: ${input.description}\nPowód: ${input.reason}\n\nNarzędzie jest już dostępne i gotowe do użycia.`;
     } catch (err) {
       return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
     }

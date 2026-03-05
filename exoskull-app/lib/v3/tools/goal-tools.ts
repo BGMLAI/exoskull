@@ -8,6 +8,69 @@
  */
 
 import type { V3ToolDefinition } from "./index";
+import { logger } from "@/lib/logger";
+
+// ============================================================================
+// F1: GRAPH DUAL-WRITE HELPER
+// Writes to nodes/edges table alongside Tyrolka tables.
+// Silent fail — old tables are source of truth during migration.
+// ============================================================================
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function graphDualWrite(
+  supabase: any,
+  params: {
+    tenantId: string;
+    type: "goal" | "task" | "note";
+    name: string;
+    content?: string | null;
+    metadata?: Record<string, unknown>;
+    status?: string;
+    parentId?: string | null;
+    legacyId: string; // user_loops.id or user_ops.id
+  },
+) {
+  try {
+    const { data } = await supabase
+      .from("nodes")
+      .upsert(
+        {
+          tenant_id: params.tenantId,
+          type: params.type,
+          name: params.name,
+          content: params.content || null,
+          metadata: { ...params.metadata, legacy_id: params.legacyId },
+          status: params.status || "active",
+          parent_id: params.parentId || null,
+        },
+        { onConflict: "id" },
+      )
+      .select("id")
+      .single();
+
+    // If task has a goal parent, create edge
+    if (data?.id && params.parentId) {
+      await supabase.from("edges").upsert(
+        {
+          source_id: params.parentId,
+          target_id: data.id,
+          relation: "has_subtask",
+        },
+        { onConflict: "source_id,target_id,relation" },
+      );
+    }
+
+    return data?.id || null;
+  } catch (err) {
+    // Silent fail — graph is secondary during migration
+    logger.warn("[GraphDualWrite] Failed (non-blocking):", {
+      error: err instanceof Error ? err.message : String(err),
+      type: params.type,
+      name: params.name,
+    });
+    return null;
+  }
+}
 
 // ============================================================================
 // #1 set_goal — create a new goal for the user
@@ -78,6 +141,21 @@ const setGoalTool: V3ToolDefinition = {
         .single();
 
       if (error) return `Błąd: ${error.message}`;
+
+      // F1: Graph dual-write
+      await graphDualWrite(supabase, {
+        tenantId,
+        type: "goal",
+        name: data.name,
+        content: (input.description as string) || null,
+        metadata: {
+          priority: (input.priority as number) || 7,
+          deadline: input.deadline || null,
+          category: input.category || "personal",
+        },
+        legacyId: data.id,
+      });
+
       return `✅ Cel ustawiony: "${data.name}" (ID: ${data.id}). Teraz rozłożę go na strategię i konkretne zadania.`;
     } catch (err) {
       return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
@@ -320,6 +398,34 @@ const createTaskTool: V3ToolDefinition = {
         .single();
 
       if (error) return `Błąd: ${error.message}`;
+
+      // F1: Graph dual-write — find parent graph node if goal_id provided
+      let graphGoalNodeId: string | null = null;
+      if (input.goal_id) {
+        const { data: parentNode } = await supabase
+          .from("nodes")
+          .select("id")
+          .eq("tenant_id", tenantId)
+          .eq("type", "goal")
+          .contains("metadata", { legacy_id: input.goal_id })
+          .limit(1)
+          .single();
+        graphGoalNodeId = parentNode?.id || null;
+      }
+      await graphDualWrite(supabase, {
+        tenantId,
+        type: "task",
+        name: data.title,
+        content: (input.details as string) || null,
+        metadata: {
+          priority: (input.priority as number) || 5,
+          due_date: input.due_date || null,
+          assignee: input.assignee || "user",
+          goal_id: input.goal_id || null,
+        },
+        parentId: graphGoalNodeId,
+        legacyId: data.id,
+      });
 
       // If assigned to system, enqueue for autonomous execution
       if (input.assignee === "system" && input.goal_id) {
