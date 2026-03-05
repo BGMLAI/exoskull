@@ -105,13 +105,14 @@ async function heartbeatForTenant(
     data: unknown[] | null;
     error: unknown;
   }>([
+    // Graph DB: goals are nodes with type='goal'
     supabase
-      .from("user_loops")
-      .select("id, title, priority, status, metadata")
+      .from("nodes")
+      .select("id, name, status, metadata")
       .eq("tenant_id", tenantId)
       .eq("type", "goal")
       .in("status", ["active", "pending"])
-      .order("priority", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("exo_autonomy_queue")
@@ -148,12 +149,13 @@ async function heartbeatForTenant(
       recentActionsResult.error,
     );
 
-  const goals = (goalsResult.data || []) as {
-    id: string;
-    title: string;
-    priority: number;
-    metadata: unknown;
-  }[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const goals = ((goalsResult.data || []) as any[]).map((g) => ({
+    id: g.id as string,
+    title: (g.name || g.title) as string,
+    priority: (g.metadata?.priority as number) || 5,
+    metadata: g.metadata,
+  }));
   const queue = (queueResult.data || []) as {
     id: string;
     type: string;

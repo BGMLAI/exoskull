@@ -72,11 +72,12 @@ export async function buildV3DynamicContext(
       .single(),
     // 2. Thread summary (cross-channel awareness)
     getThreadSummary(tenantId).catch(() => null),
-    // 3. Active goals (Tyrolka loops)
+    // 3. Active goals (graph nodes)
     supabase
-      .from("user_loops")
-      .select("title, status, progress_percent")
+      .from("nodes")
+      .select("name, status, metadata")
       .eq("tenant_id", tenantId)
+      .eq("type", "goal")
       .in("status", ["active", "paused"])
       .order("created_at", { ascending: false })
       .limit(10),
@@ -87,13 +88,14 @@ export async function buildV3DynamicContext(
       .eq("tenant_id", tenantId)
       .order("confidence", { ascending: false })
       .limit(10),
-    // 5. Recent ops (tasks)
+    // 5. Active tasks (graph nodes)
     supabase
-      .from("user_ops")
-      .select("title, status, priority")
+      .from("nodes")
+      .select("name, status, metadata")
       .eq("tenant_id", tenantId)
+      .eq("type", "task")
       .in("status", ["pending", "active"])
-      .order("priority", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(10),
     // 6. Recent autonomy actions (last 24h)
     supabase
@@ -115,11 +117,11 @@ export async function buildV3DynamicContext(
     threadResult.status === "fulfilled" ? threadResult.value : null;
   const goals =
     goalsResult.status === "fulfilled"
-      ? (goalsResult.value.data as Array<{
-          title: string;
+      ? ((goalsResult.value.data || []) as Array<{
+          name: string;
           status: string;
-          progress_percent: number | null;
-        }> | null)
+          metadata: Record<string, unknown> | null;
+        }>)
       : null;
   const knowledge =
     knowledgeResult.status === "fulfilled"
@@ -131,11 +133,11 @@ export async function buildV3DynamicContext(
       : null;
   const ops =
     recentOpsResult.status === "fulfilled"
-      ? (recentOpsResult.value.data as Array<{
-          title: string;
+      ? ((recentOpsResult.value.data || []) as Array<{
+          name: string;
           status: string;
-          priority: number;
-        }> | null)
+          metadata: Record<string, unknown> | null;
+        }>)
       : null;
   const autonomyLog =
     autonomyLogResult.status === "fulfilled"
@@ -200,11 +202,12 @@ export async function buildV3DynamicContext(
   if (goals && goals.length > 0) {
     context += `\n## CELE UŻYTKOWNIKA (${goals.length} aktywnych)\n`;
     for (const g of goals) {
+      const meta = g.metadata || {};
       const progress =
-        g.progress_percent != null
-          ? `${Math.round(g.progress_percent)}%`
+        meta.progress != null
+          ? `${Math.round(meta.progress as number)}%`
           : "brak danych";
-      context += `- ${g.title}: ${progress} [${g.status}]\n`;
+      context += `- ${g.name}: ${progress} [${g.status}]\n`;
     }
     context += `PRIORYTET: cele zagrożone > cele na dobrej drodze. Proaktywnie proponuj akcje.\n`;
   }
@@ -213,7 +216,8 @@ export async function buildV3DynamicContext(
   if (ops && ops.length > 0) {
     context += `\n## ZADANIA (${ops.length} aktywnych)\n`;
     for (const op of ops.slice(0, 5)) {
-      context += `- [P${op.priority}] ${op.title} (${op.status})\n`;
+      const priority = (op.metadata?.priority as number) || 5;
+      context += `- [P${priority}] ${op.name} (${op.status})\n`;
     }
     if (ops.length > 5) {
       context += `  ... i ${ops.length - 5} więcej\n`;

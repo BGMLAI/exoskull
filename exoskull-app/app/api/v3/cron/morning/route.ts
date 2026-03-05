@@ -78,20 +78,23 @@ async function generateMorningBriefing(
     data: unknown[] | null;
     error: unknown;
   }>([
+    // Graph DB: goals are nodes with type='goal'
     supabase
-      .from("user_loops")
-      .select("title, priority, status, metadata")
+      .from("nodes")
+      .select("name, status, metadata")
       .eq("tenant_id", tenantId)
       .eq("type", "goal")
       .in("status", ["active", "pending"])
-      .order("priority", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(5),
+    // Graph DB: tasks are nodes with type='task'
     supabase
-      .from("user_ops")
-      .select("title, priority, status, metadata")
+      .from("nodes")
+      .select("name, status, metadata")
       .eq("tenant_id", tenantId)
+      .eq("type", "task")
       .in("status", ["pending", "active"])
-      .order("priority", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("exo_autonomy_log")
@@ -120,18 +123,20 @@ async function generateMorningBriefing(
       actionsResult.error,
     );
 
-  const goals = (goalsResult.data || []) as {
-    title: string;
-    priority: number;
-    status: string;
-    metadata: unknown;
-  }[];
-  const tasks = (tasksResult.data || []) as {
-    title: string;
-    status: string;
-    priority: number;
-    metadata: unknown;
-  }[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const goals = ((goalsResult.data || []) as any[]).map((g) => ({
+    title: (g.name || g.title) as string,
+    priority: (g.metadata?.priority as number) || 5,
+    status: g.status as string,
+    metadata: g.metadata,
+  }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tasks = ((tasksResult.data || []) as any[]).map((t) => ({
+    title: (t.name || t.title) as string,
+    status: t.status as string,
+    priority: (t.metadata?.priority as number) || 5,
+    metadata: t.metadata,
+  }));
   const actions = (actionsResult.data || []) as {
     event_type: string;
     payload: unknown;

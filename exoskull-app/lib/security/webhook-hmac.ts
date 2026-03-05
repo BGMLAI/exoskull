@@ -27,7 +27,9 @@ export function verifyMetaSignature(
   }
 
   if (!appSecret) {
-    logger.error("[WebhookHMAC] META_APP_SECRET not configured");
+    logger.error(
+      "[WebhookHMAC] App secret not configured (META_APP_SECRET or FACEBOOK_APP_SECRET)",
+    );
     return false;
   }
 

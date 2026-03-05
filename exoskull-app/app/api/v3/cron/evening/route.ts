@@ -64,10 +64,12 @@ async function generateEveningReflection(
       .eq("tenant_id", tenantId)
       .gte("created_at", dayStart.toISOString())
       .limit(50),
+    // Graph DB: completed tasks are nodes with type='task', status='completed'
     supabase
-      .from("user_ops")
-      .select("title, status")
+      .from("nodes")
+      .select("name, status")
       .eq("tenant_id", tenantId)
+      .eq("type", "task")
       .eq("status", "completed")
       .gte("updated_at", dayStart.toISOString())
       .limit(20),
@@ -80,7 +82,11 @@ async function generateEveningReflection(
   ]);
 
   const messages = messagesResult.data || [];
-  const completedTasks = tasksResult.data || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const completedTasks = ((tasksResult.data || []) as any[]).map((t) => ({
+    title: (t.name || t.title) as string,
+    status: t.status as string,
+  }));
   const actions = actionsResult.data || [];
 
   // Generate reflection via Haiku (with Gemini fallback)

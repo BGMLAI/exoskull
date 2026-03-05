@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { StreamEventRouter } from "./StreamEventRouter";
 import { VoiceInputBar } from "./VoiceInputBar";
 import { EmptyState } from "./EmptyState";
@@ -18,6 +19,8 @@ interface UnifiedStreamProps {
   spatialMode?: boolean;
   ttsEnabled?: boolean;
   onToggleTTS?: () => void;
+  /** Auto-send this message on mount (K224: chat-driven pages) */
+  initialMessage?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -29,11 +32,31 @@ export function UnifiedStream({
   spatialMode,
   ttsEnabled: ttsEnabledProp,
   onToggleTTS: onToggleTTSProp,
+  initialMessage,
 }: UnifiedStreamProps) {
   const engine = useChatEngine({
     ttsEnabled: ttsEnabledProp,
     onToggleTTS: onToggleTTSProp,
   });
+
+  // K224: Auto-send initial message (chat-driven pages)
+  const initialSent = React.useRef(false);
+  React.useEffect(() => {
+    if (
+      initialMessage &&
+      !initialSent.current &&
+      engine.historyLoaded &&
+      !engine.isLoading
+    ) {
+      initialSent.current = true;
+      engine.sendMessage(initialMessage);
+    }
+  }, [
+    initialMessage,
+    engine.historyLoaded,
+    engine.isLoading,
+    engine.sendMessage,
+  ]);
 
   // Time separator helper
   function renderTimeSeparator(event: StreamEvent, prev: StreamEvent) {

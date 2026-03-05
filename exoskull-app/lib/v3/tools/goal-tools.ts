@@ -260,6 +260,27 @@ const updateGoalTool: V3ToolDefinition = {
 
       if (error) return `Błąd: ${error.message}`;
 
+      // Sync to graph node (non-blocking)
+      const graphUpdates: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (input.status) graphUpdates.status = input.status as string;
+      if (input.progress !== undefined) {
+        graphUpdates.metadata = {
+          ...aspects,
+          progress: input.progress,
+          legacy_id: goal.id,
+        };
+      }
+      Promise.resolve(
+        supabase
+          .from("nodes")
+          .update(graphUpdates)
+          .eq("tenant_id", tenantId)
+          .eq("type", "goal")
+          .contains("metadata", { legacy_id: goal.id }),
+      ).catch(() => {});
+
       // Log progress note
       if (input.note) {
         await supabase.from("user_notes").insert({
@@ -302,16 +323,16 @@ const getGoalsTool: V3ToolDefinition = {
       const { getServiceSupabase } = await import("@/lib/supabase/service");
       const supabase = getServiceSupabase();
 
+      // Graph DB: goals are nodes with type='goal'
       let query = supabase
-        .from("user_loops")
-        .select(
-          "id, name, description, priority, is_active, aspects, created_at",
-        )
+        .from("nodes")
+        .select("id, name, content, status, metadata, created_at")
         .eq("tenant_id", tenantId)
-        .order("priority", { ascending: false });
+        .eq("type", "goal")
+        .order("created_at", { ascending: false });
 
       if (!input.include_completed) {
-        query = query.eq("is_active", true);
+        query = query.in("status", ["active", "pending", "paused"]);
       }
 
       const { data, error } = await query.limit(20);
@@ -324,17 +345,17 @@ const getGoalsTool: V3ToolDefinition = {
           (g: {
             id: string;
             name: string;
-            description: string | null;
-            priority: number;
-            is_active: boolean;
-            aspects: unknown;
+            content: string | null;
+            status: string;
+            metadata: Record<string, unknown> | null;
           }) => {
-            const asp = (g.aspects as Record<string, unknown>) || {};
-            const progress = (asp.progress as number) || 0;
+            const meta = g.metadata || {};
+            const progress = (meta.progress as number) || 0;
+            const priority = (meta.priority as number) || 5;
             const bar =
               "█".repeat(Math.floor(progress / 10)) +
               "░".repeat(10 - Math.floor(progress / 10));
-            return `[${!g.is_active ? "✅" : "🎯"}] ${g.name} (priorytet: ${g.priority}/10)\n    ${bar} ${progress}%${g.description ? `\n    ${g.description.slice(0, 100)}` : ""}`;
+            return `[${g.status === "completed" ? "✅" : "🎯"}] ${g.name} (priorytet: ${priority}/10)\n    ${bar} ${progress}%${g.content ? `\n    ${g.content.slice(0, 100)}` : ""}`;
           },
         )
         .join("\n\n");
@@ -499,6 +520,20 @@ const updateTaskTool: V3ToolDefinition = {
         .single();
 
       if (error) return `Błąd: ${error.message}`;
+
+      // Sync status to graph node (non-blocking)
+      Promise.resolve(
+        supabase
+          .from("nodes")
+          .update({
+            status: input.status as string,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("tenant_id", tenantId)
+          .eq("type", "task")
+          .contains("metadata", { legacy_id: input.task_id }),
+      ).catch(() => {});
+
       return `${input.status === "completed" ? "✅" : "📋"} "${data.title}" → ${data.status}`;
     } catch (err) {
       return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
@@ -534,11 +569,12 @@ const getTasksTool: V3ToolDefinition = {
       const { getServiceSupabase } = await import("@/lib/supabase/service");
       const supabase = getServiceSupabase();
 
+      // Graph DB: tasks are nodes with type='task'
       let query = supabase
-        .from("user_ops")
-        .select("id, title, status, priority, metadata, created_at")
+        .from("nodes")
+        .select("id, name, status, metadata, created_at")
         .eq("tenant_id", tenantId)
-        .order("priority", { ascending: false })
+        .eq("type", "task")
         .order("created_at", { ascending: false })
         .limit((input.limit as number) || 15);
 
@@ -556,8 +592,8 @@ const getTasksTool: V3ToolDefinition = {
       let filtered = data;
       if (input.goal_id) {
         filtered = data.filter(
-          (t: { metadata: unknown }) =>
-            (t.metadata as Record<string, unknown>)?.goal_id === input.goal_id,
+          (t: { metadata: Record<string, unknown> | null }) =>
+            t.metadata?.goal_id === input.goal_id,
         );
         if (!filtered.length) return "Brak zadań powiązanych z tym celem.";
       }
@@ -566,12 +602,12 @@ const getTasksTool: V3ToolDefinition = {
         .map(
           (t: {
             id: string;
-            title: string;
+            name: string;
             status: string;
-            priority: number;
-            metadata: unknown;
+            metadata: Record<string, unknown> | null;
           }) => {
-            const meta = (t.metadata as Record<string, unknown>) || {};
+            const meta = t.metadata || {};
+            const priority = (meta.priority as number) || 5;
             const assignee = meta.assignee === "system" ? "🤖" : "👤";
             const statusIcon =
               t.status === "completed"
@@ -579,7 +615,7 @@ const getTasksTool: V3ToolDefinition = {
                 : t.status === "active"
                   ? "🔄"
                   : "⏳";
-            return `${statusIcon} ${assignee} ${t.title} (p:${t.priority})${meta.due_date ? ` — do ${meta.due_date}` : ""}`;
+            return `${statusIcon} ${assignee} ${t.name} (p:${priority})${meta.due_date ? ` — do ${meta.due_date}` : ""}`;
           },
         )
         .join("\n");
