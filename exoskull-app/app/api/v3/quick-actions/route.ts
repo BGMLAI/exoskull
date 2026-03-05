@@ -26,19 +26,21 @@ export async function GET(req: NextRequest) {
 
     const supabase = getServiceSupabase();
 
-    // Get active goals
+    // Get active goals (graph nodes)
     const { data: goals } = await supabase
-      .from("user_loops")
+      .from("nodes")
       .select("name, status")
       .eq("tenant_id", tenantId)
+      .eq("type", "goal")
       .in("status", ["active", "in_progress"])
       .limit(5);
 
-    // Get pending tasks
+    // Get pending tasks (graph nodes)
     const { data: tasks } = await supabase
-      .from("user_ops")
-      .select("title, status")
+      .from("nodes")
+      .select("name, status")
       .eq("tenant_id", tenantId)
+      .eq("type", "task")
       .eq("status", "pending")
       .limit(3);
 

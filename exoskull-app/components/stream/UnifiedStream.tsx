@@ -39,14 +39,15 @@ export function UnifiedStream({
     onToggleTTS: onToggleTTSProp,
   });
 
-  // K224: Auto-send initial message (chat-driven pages)
+  // K224: Auto-send initial message ONLY when no history exists
   const initialSent = React.useRef(false);
   React.useEffect(() => {
     if (
       initialMessage &&
       !initialSent.current &&
       engine.historyLoaded &&
-      !engine.isLoading
+      !engine.isLoading &&
+      engine.events.length === 0
     ) {
       initialSent.current = true;
       engine.sendMessage(initialMessage);
@@ -55,6 +56,7 @@ export function UnifiedStream({
     initialMessage,
     engine.historyLoaded,
     engine.isLoading,
+    engine.events.length,
     engine.sendMessage,
   ]);
 
