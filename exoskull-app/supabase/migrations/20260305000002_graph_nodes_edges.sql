@@ -57,21 +57,25 @@ ALTER TABLE nodes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE edges ENABLE ROW LEVEL SECURITY;
 
 -- Nodes: tenant can only see own nodes
-CREATE POLICY IF NOT EXISTS nodes_tenant_policy ON nodes
+DROP POLICY IF EXISTS nodes_tenant_policy ON nodes;
+CREATE POLICY nodes_tenant_policy ON nodes
   FOR ALL USING (tenant_id = auth.uid())
   WITH CHECK (tenant_id = auth.uid());
 
 -- Service role bypass
-CREATE POLICY IF NOT EXISTS nodes_service_policy ON nodes
+DROP POLICY IF EXISTS nodes_service_policy ON nodes;
+CREATE POLICY nodes_service_policy ON nodes
   FOR ALL USING (auth.role() = 'service_role');
 
 -- Edges: visible if source node is visible
-CREATE POLICY IF NOT EXISTS edges_read_policy ON edges
+DROP POLICY IF EXISTS edges_read_policy ON edges;
+CREATE POLICY edges_read_policy ON edges
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM nodes WHERE nodes.id = edges.source_id AND nodes.tenant_id = auth.uid())
   );
 
-CREATE POLICY IF NOT EXISTS edges_service_policy ON edges
+DROP POLICY IF EXISTS edges_service_policy ON edges;
+CREATE POLICY edges_service_policy ON edges
   FOR ALL USING (auth.role() = 'service_role');
 
 -- =====================================================
