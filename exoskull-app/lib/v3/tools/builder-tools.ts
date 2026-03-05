@@ -541,6 +541,60 @@ const selfExtendTool: V3ToolDefinition = {
 };
 
 // ============================================================================
+// #4 download_app — Get download link for a built app
+// ============================================================================
+
+const downloadAppTool: V3ToolDefinition = {
+  definition: {
+    name: "download_app",
+    description:
+      "Pobierz zbudowaną aplikację jako plik HTML (standalone) lub ZIP (HTML + SQL + dane + README). Użyj gdy user chce pobrać/wyeksportować swoją apkę.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        slug: {
+          type: "string",
+          description: "Slug aplikacji (np. 'habit-tracker')",
+        },
+        format: {
+          type: "string",
+          enum: ["html", "zip"],
+          description:
+            "Format: html (standalone strona) lub zip (pełny pakiet z danymi i schematem)",
+        },
+      },
+      required: ["slug"],
+    },
+  },
+  async execute(input, tenantId) {
+    const slug = (input.slug as string)
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "-");
+    const format = (input.format as string) || "html";
+
+    // Verify app exists
+    const { getServiceSupabase } = await import("@/lib/supabase/service");
+    const supabase = getServiceSupabase();
+
+    const { data: app } = await supabase
+      .from("exo_generated_apps")
+      .select("slug, name")
+      .eq("tenant_id", tenantId)
+      .eq("slug", slug)
+      .eq("status", "active")
+      .single();
+
+    if (!app) {
+      return `Nie znaleziono aplikacji "${slug}". Sprawdź nazwę lub zbuduj ją najpierw.`;
+    }
+
+    const downloadUrl = `https://exoskull.xyz/api/apps/${app.slug}/download?format=${format}`;
+
+    return `📥 Link do pobrania "${app.name || slug}":\n\n🔗 ${downloadUrl}\n\nFormat: ${format === "zip" ? "ZIP (HTML + SQL + dane + README)" : "HTML (standalone strona z danymi)"}\n\nKliknij link żeby pobrać. Link wymaga zalogowania.`;
+  },
+};
+
+// ============================================================================
 // EXPORT
 // ============================================================================
 
@@ -548,4 +602,5 @@ export const builderTools: V3ToolDefinition[] = [
   buildAppTool,
   generateContentTool,
   selfExtendTool,
+  downloadAppTool,
 ];
