@@ -818,46 +818,74 @@ export async function runV3Agent(
     );
   }
 
-  // ── Medium queries → DeepSeek primary (with tools, ~$0.002/query) ──
+  // ── ALL queries → DeepSeek primary, Groq fallback (no Anthropic in main path) ──
   const deepseekKey = process.env.DEEPSEEK_API_KEY?.trim();
-  if (complexity !== "complex" && deepseekKey) {
-    try {
-      req.onThinkingStep?.("Ładuję kontekst", "running");
-      const [dynamicCtx, dsThreadHistory] = await Promise.all([
-        buildV3DynamicContext(req.tenantId),
-        getThreadContext(req.tenantId, 10),
-      ]);
-      const dsSystemPrompt = buildV3SystemPrompt(dynamicCtx.context);
-      req.onThinkingStep?.("Ładuję kontekst", "done");
-      req.onThinkingStep?.("Analizuję i odpowiadam", "running");
+  const groqKey = process.env.GROQ_API_KEY?.trim();
 
+  // Load context once, reuse for DeepSeek and Groq
+  req.onThinkingStep?.("Ładuję kontekst", "running");
+  const needsMemory =
+    req.userMessage.length > 30 ||
+    /\?|pamięt|remember|historia|wcześniej|wiesz/.test(
+      req.userMessage.toLowerCase(),
+    );
+  const [sharedDynamicCtx, sharedThreadHistory, sharedMemoryResults] =
+    await Promise.all([
+      buildV3DynamicContext(req.tenantId),
+      getThreadContext(req.tenantId, 10),
+      needsMemory
+        ? unifiedSearch({
+            tenantId: req.tenantId,
+            query: req.userMessage,
+            limit: 5,
+            minScore: 0.3,
+          }).catch(() => [] as UnifiedSearchResult[])
+        : Promise.resolve([] as UnifiedSearchResult[]),
+    ]);
+  let memCtx = "";
+  if (sharedMemoryResults.length > 0) {
+    memCtx =
+      "\n\n## Relevant Memory\n" +
+      sharedMemoryResults
+        .map(
+          (r, i) =>
+            `[${i + 1}] (${r.type || "memory"}, score: ${r.score.toFixed(2)}) ${r.content.slice(0, 300)}`,
+        )
+        .join("\n");
+  }
+  const sharedSystemPrompt = buildV3SystemPrompt(
+    sharedDynamicCtx.context + memCtx,
+  );
+  req.onThinkingStep?.("Ładuję kontekst", "done");
+
+  const maxTurnsForQuery = complexity === "complex" ? 5 : 4;
+
+  // ── Try 1: DeepSeek ──
+  if (deepseekKey) {
+    try {
+      req.onThinkingStep?.("Analizuję i odpowiadam", "running");
       const dsResult = await runDeepSeekAgentFallback({
         tenantId: req.tenantId,
         userMessage: req.userMessage,
-        systemPrompt: dsSystemPrompt,
-        threadHistory: dsThreadHistory,
+        systemPrompt: sharedSystemPrompt,
+        threadHistory: sharedThreadHistory,
         tools: V3_TOOLS,
         deepseekKey,
-        maxTurns: 4,
+        maxTurns: maxTurnsForQuery,
         onToolStart: req.onToolStart,
         onToolEnd: req.onToolEnd,
         onTextDelta: req.onTextDelta,
       });
-
       req.onThinkingStep?.("Analizuję i odpowiadam", "done");
-
-      // DeepSeek pricing: $0.27/$1.10 per MTok (estimated from turns)
-      const estimatedTokens = dsResult.turns * 5000;
       const costUsd =
-        (estimatedTokens * 0.27 + dsResult.text.length * 0.28) / 1_000_000;
-
+        (dsResult.turns * 5000 * 0.27 + dsResult.text.length * 0.28) /
+        1_000_000;
       logger.info("[v3:Agent] DeepSeek primary succeeded", {
         toolsUsed: dsResult.toolsUsed,
         turns: dsResult.turns,
         costUsd: costUsd.toFixed(4),
         durationMs: Date.now() - startMs,
       });
-
       return {
         text: dsResult.text,
         toolsUsed: dsResult.toolsUsed,
@@ -866,73 +894,65 @@ export async function runV3Agent(
         durationMs: Date.now() - startMs,
       };
     } catch (dsErr) {
-      logger.warn(
-        "[v3:Agent] DeepSeek primary failed, falling back to Claude Haiku",
-        {
-          error: dsErr instanceof Error ? dsErr.message : String(dsErr),
-        },
-      );
-      // Fall through to Claude Haiku below
+      logger.warn("[v3:Agent] DeepSeek failed, trying Groq", {
+        error: dsErr instanceof Error ? dsErr.message : String(dsErr),
+      });
     }
   }
 
-  req.onThinkingStep?.("Ładuję kontekst", "running");
-
-  // ── Phase 1: Load context (memory search only for complex queries) ──
-  const needsMemory =
-    req.userMessage.length > 30 ||
-    /\?|pamięt|remember|historia|wcześniej|wiesz/.test(
-      req.userMessage.toLowerCase(),
-    );
-  const [dynamicCtx, threadHistory, memoryResults] = await Promise.all([
-    buildV3DynamicContext(req.tenantId),
-    getThreadContext(req.tenantId, 10), // was 20 — halved to reduce tokens
-    needsMemory
-      ? unifiedSearch({
-          tenantId: req.tenantId,
-          query: req.userMessage,
-          limit: 5, // was 10 — halved
-          minScore: 0.3, // was 0.05 — much stricter to avoid noise
-        }).catch((err) => {
-          logger.warn("[v3:Agent] Memory search failed (non-blocking):", {
-            error: err instanceof Error ? err.message : String(err),
-          });
-          return [] as UnifiedSearchResult[];
-        })
-      : Promise.resolve([] as UnifiedSearchResult[]),
-  ]);
-
-  // ── Phase 2: Build system prompt ──
-  let memoryContext = "";
-  if (memoryResults && memoryResults.length > 0) {
-    memoryContext =
-      "\n\n## Relevant Memory\n" +
-      memoryResults
-        .map(
-          (r, i) =>
-            `[${i + 1}] (${r.type || "memory"}, score: ${r.score.toFixed(2)}) ${r.content.slice(0, 300)}`, // was 500
-        )
-        .join("\n");
+  // ── Try 2: Groq (Llama 3.3 70B) ──
+  if (groqKey) {
+    try {
+      req.onThinkingStep?.("Analizuję i odpowiadam (Groq)", "running");
+      const groqResult = await runGroqAgentFallback({
+        tenantId: req.tenantId,
+        userMessage: req.userMessage,
+        systemPrompt: sharedSystemPrompt,
+        threadHistory: sharedThreadHistory,
+        tools: V3_TOOLS,
+        groqKey,
+        maxTurns: maxTurnsForQuery,
+        onToolStart: req.onToolStart,
+        onToolEnd: req.onToolEnd,
+        onTextDelta: req.onTextDelta,
+      });
+      req.onThinkingStep?.("Analizuję i odpowiadam (Groq)", "done");
+      logger.info("[v3:Agent] Groq fallback succeeded", {
+        toolsUsed: groqResult.toolsUsed,
+        turns: groqResult.turns,
+        durationMs: Date.now() - startMs,
+      });
+      return {
+        text: groqResult.text,
+        toolsUsed: groqResult.toolsUsed,
+        costUsd: 0,
+        numTurns: groqResult.turns,
+        durationMs: Date.now() - startMs,
+      };
+    } catch (groqErr) {
+      logger.warn(
+        "[v3:Agent] Groq failed, falling back to Anthropic (last resort)",
+        {
+          error: groqErr instanceof Error ? groqErr.message : String(groqErr),
+        },
+      );
+    }
   }
 
-  const systemPrompt = buildV3SystemPrompt(dynamicCtx.context + memoryContext);
+  // ── Last resort: Anthropic (only if both DeepSeek AND Groq fail) ──
+  if (!deepseekKey && !groqKey) {
+    logger.warn("[v3:Agent] No DeepSeek/Groq keys, using Anthropic directly");
+  }
 
-  const contextMs = Date.now() - startMs;
-  logger.info(
-    `[v3:Agent] Context loaded in ${contextMs}ms, ${V3_TOOLS.length} tools`,
+  // ── Anthropic last-resort path — reuse context already loaded above ──
+  const systemPrompt = sharedSystemPrompt;
+  const threadHistory = sharedThreadHistory;
+
+  logger.info("[v3:Agent] Using Anthropic last-resort path");
+  req.onThinkingStep?.(
+    "Analizuję i odpowiadam (Anthropic fallback)",
+    "running",
   );
-  req.onThinkingStep?.("Ładuję kontekst", "done");
-
-  // Emit memory context info
-  if (memoryResults && memoryResults.length > 0) {
-    req.onThinkingStep?.(
-      `Znalazłem ${memoryResults.length} wspomnienia powiązane z Twoim pytaniem`,
-      "done",
-    );
-  }
-
-  // ── Phase 3: Tool loop ──
-  req.onThinkingStep?.("Analizuję i odpowiadam", "running");
 
   const abortController = new AbortController();
   const timeout = req.timeoutMs || config.timeoutMs;
