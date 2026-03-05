@@ -27,18 +27,11 @@ export async function dispatchToHandler(
       const { handleProactive } = await import("./proactive");
       return handleProactive(item);
     }
-    case "observation": {
-      const { handleObservation } = await import("./observation");
-      return handleObservation(item);
-    }
-    case "optimization": {
-      const { handleOptimization } = await import("./optimization");
-      return handleOptimization(item);
-    }
-    case "maintenance": {
-      const { handleMaintenance } = await import("./maintenance");
-      return handleMaintenance(item);
-    }
+    case "observation":
+    case "optimization":
+    case "maintenance":
+      logger.warn("[Petla] Deprecated sub_loop:", item.sub_loop);
+      return { handled: false, error: `Deprecated sub_loop: ${item.sub_loop}` };
     default:
       logger.warn("[Petla] Unknown sub_loop:", item.sub_loop);
       return { handled: false, error: `Unknown sub_loop: ${item.sub_loop}` };

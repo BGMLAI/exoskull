@@ -329,18 +329,11 @@ async function executeAction(
     }
 
     case "monitor": {
-      // Run MAPE-K for monitoring
-      const { runMapeKCycle } = await import("@/lib/autonomy/mape-k-loop");
-      const mapekResult = await runMapeKCycle(
-        tenantId,
-        "cron",
-        "goal-orchestrator",
-      );
       return {
         goalId: action.goalId,
         action: action.type,
         success: true,
-        detail: `MAPE-K: ${mapekResult.execute.interventionsExecuted} interventions`,
+        detail: "Monitor action (MAPE-K removed in v3)",
       };
     }
 
