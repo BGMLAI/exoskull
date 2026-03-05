@@ -395,7 +395,8 @@ async function runGeminiAgentFallback(
   }
 
   if (!finalText && turns >= opts.maxTurns) {
-    finalText = "Osiągnięto limit interakcji Gemini. Spróbuj ponownie.";
+    finalText =
+      "Przekroczono limit kroków agenta (Gemini). Spróbuj prostsze pytanie lub podziel na części.";
   }
 
   return { text: finalText, toolsUsed, turns };
@@ -543,7 +544,8 @@ async function runGroqAgentFallback(
   }
 
   if (!finalText && turns >= opts.maxTurns) {
-    finalText = "Osiągnięto limit interakcji. Spróbuj ponownie.";
+    finalText =
+      "Przekroczono limit kroków agenta (Groq). Spróbuj prostsze pytanie lub podziel na części.";
   }
 
   return { text: finalText, toolsUsed, turns };
@@ -683,7 +685,8 @@ async function runOpenAIAgentFallback(
   }
 
   if (!finalText && turns >= opts.maxTurns) {
-    finalText = "Osiągnięto limit interakcji. Spróbuj ponownie.";
+    finalText =
+      "Przekroczono limit kroków agenta (OpenAI). Spróbuj prostsze pytanie lub podziel na części.";
   }
 
   return { text: finalText, toolsUsed, turns };
@@ -823,7 +826,8 @@ async function runDeepSeekAgentFallback(
   }
 
   if (!finalText && turns >= opts.maxTurns) {
-    finalText = "Osiągnięto limit interakcji DeepSeek. Spróbuj ponownie.";
+    finalText =
+      "Przekroczono limit kroków agenta (DeepSeek). Spróbuj prostsze pytanie lub podziel na części.";
   }
 
   return { text: finalText, toolsUsed, turns };
@@ -969,7 +973,7 @@ export async function runV3Agent(
   );
   req.onThinkingStep?.("Ładuję kontekst", "done");
 
-  const maxTurnsForQuery = complexity === "complex" ? 5 : 4;
+  const maxTurnsForQuery = complexity === "complex" ? 10 : 8;
 
   // ── Try 1: DeepSeek ──
   if (deepseekKey) {
@@ -1204,7 +1208,7 @@ export async function runV3Agent(
 
     if (!finalText && numTurns >= config.maxTurns) {
       finalText =
-        "Osiągnięto limit interakcji. Spróbuj ponownie z prostszym pytaniem.";
+        "Przekroczono limit kroków agenta (Anthropic). Spróbuj prostsze pytanie lub podziel na części.";
     }
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);

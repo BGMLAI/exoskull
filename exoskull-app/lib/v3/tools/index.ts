@@ -5,13 +5,13 @@
  * Phase 2: +4 knowledge tools (import, list, get, learn_pattern)
  * Phase 3: +6 goal tools (set_goal, update_goal, get_goals, create_task, update_task, get_tasks)
  * Phase 4: +5 autonomy tools (enqueue_action, check_permissions, send_notification, log_autonomy, get_autonomy_log)
- * Phase 5: +3 builder tools (build_app, generate_content, self_extend_tool)
+ * Phase 5: +4 builder tools (build_app, generate_content, self_extend_tool, scan_receipt)
  * Phase 6: +3 channel tools (send_sms, send_email, make_call)
  * Phase 7: +2 evolution tools (get_capabilities, reflexion_evaluate)
  *
  * Phase 8: +1 marketplace tool (publish_to_allegro)
  *
- * Current: 34 tools (Phase 1-8)
+ * Current: 35 tools (Phase 1-8)
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
@@ -51,7 +51,7 @@ export const V3_TOOLS: V3ToolDefinition[] = [
   ...knowledgeTools, // 4: import_url, list_knowledge, get_document, learn_pattern
   ...goalTools, // 6: set_goal, update_goal (with name resolution), get_goals, create_task, update_task, get_tasks
   ...autonomyTools, // 5: enqueue_action, check_permissions, send_notification, log_autonomy, get_autonomy_log
-  ...builderTools, // 3: build_app, generate_content, self_extend_tool
+  ...builderTools, // 4: build_app, generate_content, self_extend_tool, scan_receipt
   ...channelTools, // 3: send_sms, send_email, make_call
   ...evolutionTools, // 2: get_capabilities, reflexion_evaluate
   ...marketplaceTools, // 1: publish_to_allegro

@@ -484,7 +484,11 @@ const updateTaskTool: V3ToolDefinition = {
     input_schema: {
       type: "object" as const,
       properties: {
-        task_id: { type: "string", description: "UUID zadania" },
+        task_id: {
+          type: "string",
+          description:
+            "UUID zadania LUB nazwa/fragment nazwy (system sam znajdzie po nazwie)",
+        },
         status: {
           type: "string",
           enum: ["pending", "active", "completed", "dropped", "blocked"],
@@ -500,6 +504,49 @@ const updateTaskTool: V3ToolDefinition = {
       const { getServiceSupabase } = await import("@/lib/supabase/service");
       const supabase = getServiceSupabase();
 
+      // ── Resolve task_id: accept UUID or fuzzy name match ──
+      let taskId = input.task_id as string;
+      const isUUID =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          taskId,
+        );
+
+      if (!isUUID) {
+        // AI passed a name/title instead of UUID — resolve it
+        const { data: found } = await supabase
+          .from("user_ops")
+          .select("id, title")
+          .eq("tenant_id", tenantId)
+          .eq("type", "task")
+          .ilike("title", `%${taskId}%`)
+          .limit(1)
+          .single();
+
+        if (found) {
+          taskId = found.id;
+        } else {
+          // Try graph nodes table
+          const { data: node } = await supabase
+            .from("nodes")
+            .select("id, name, metadata")
+            .eq("tenant_id", tenantId)
+            .eq("type", "task")
+            .ilike("name", `%${taskId}%`)
+            .limit(1)
+            .single();
+
+          if (
+            node?.metadata &&
+            typeof node.metadata === "object" &&
+            "legacy_id" in node.metadata
+          ) {
+            taskId = (node.metadata as Record<string, string>).legacy_id;
+          } else {
+            return `Nie znaleziono zadania "${input.task_id}". Użyj get_tasks żeby zobaczyć listę z UUID.`;
+          }
+        }
+      }
+
       const updates: Record<string, unknown> = {
         status: input.status as string,
         updated_at: new Date().toISOString(),
@@ -514,7 +561,7 @@ const updateTaskTool: V3ToolDefinition = {
       const { data, error } = await supabase
         .from("user_ops")
         .update(updates)
-        .eq("id", input.task_id as string)
+        .eq("id", taskId)
         .eq("tenant_id", tenantId)
         .select("title, status")
         .single();
@@ -531,7 +578,7 @@ const updateTaskTool: V3ToolDefinition = {
           })
           .eq("tenant_id", tenantId)
           .eq("type", "task")
-          .contains("metadata", { legacy_id: input.task_id }),
+          .contains("metadata", { legacy_id: taskId }),
       ).catch(() => {});
 
       return `${input.status === "completed" ? "✅" : "📋"} "${data.title}" → ${data.status}`;

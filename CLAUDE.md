@@ -3,6 +3,14 @@
 > **Global instructions:** `~/.claude/CLAUDE.md` (planning vs execution, permissions, agents, protocols)
 > **Home instructions:** `~/CLAUDE.md` (GOTCHA framework, file structure)
 
+## ⚠️ OBOWIĄZKOWE DO PRZECZYTANIA NA STARCIE SESJI
+1. **`PRODUCT_DECISIONS_v1.md`** — 74 decyzje produktowe (zatwierdzone przez usera, 446 pytań)
+2. **`MVP_EXECUTION_PLAN.md`** — 10-fazowy plan wykonawczy
+3. **`ARCHITECTURE.md`** — Pełny status implementacji (co działa, co nie)
+4. **`LEARNINGS.md`** — Gotchas i wzorce z poprzednich sesji
+
+**NIE MÓW "nie wiem co ustaliliśmy".** Odpowiedzi na WSZYSTKIE pytania są w tych plikach.
+
 ---
 
 ## What is ExoSkull?
@@ -126,132 +134,76 @@ Connect → Listen → Archive → Wire → Sense
 
 ---
 
-## Multi-Model AI Routing (2026-03-04)
+## Multi-Model AI Routing (AKTUALNY 2026-03-06)
 
-Smart routing: simple queries → fast/cheap, complex → powerful.
+3-tier classification: simple/medium/complex → odpowiedni model.
 
-| Tier | Model | Use For |
-|------|-------|---------|
-| 1 | Gemini 2.5 Flash | Simple chat, classification, routing (<1s) |
-| 2 | Claude Haiku 4.5 | Pattern detection, summarization |
-| 3 | Claude Sonnet 4.6 | Complex tasks with tools (V3 agent) |
-| 4 | Claude Opus 4.6 | Meta-coordination, gap detection, crisis |
+| Tier | Model | Use For | Cost |
+|------|-------|---------|------|
+| Simple | Gemini 2.5 Flash | Chat bez narzędzi, klasyfikacja (<1s) | $0 |
+| Medium | DeepSeek V3.2 | Chat z narzędziami, standardowe zadania | $0.002 |
+| Complex | DeepSeek V3.2 | build_app, multi-tool, autonomia | $0.002 |
+| Fallback 1 | Groq (Llama 3.3 70B) | Gdy DeepSeek padnie | $0 |
+| Fallback 2 | Gemini 2.5 Flash | Gdy Groq padnie | $0 |
+| Fallback 3 | OpenAI GPT-4o-mini | Gdy Gemini padnie | ~$0.01 |
+| LAST RESORT | Anthropic Claude | Gdy WSZYSTKO inne padnie | $$$ |
 
-**Smart Routing:** Classify query complexity BEFORE calling model. Simple → Gemini Flash (no tools, <1s). Complex → Claude Sonnet (with tools, async if >5s).
-**Emergency Fallback:** Gemini 2.5 Flash when Anthropic credits exhausted (conversation-only mode).
-**Prompt Caching:** Static context cached for 90% savings. Only dynamic context sent fresh.
-
----
-
-## Skill Library System (2026-03-04)
-
-ExoSkull builds skills on-demand when a goal requires capabilities the system doesn't have yet.
-
-- **Core Skills:** Built-in (task_manager, memory, knowledge, goals)
-- **Dynamic Skills:** AI detects need → generates → validates → USES without asking user
-- **Proactive:** AI generates and deploys skills autonomously when goals require them
-- **Felix Pattern:** Full automation — AI achieves complex goals (research → plan → build → market → sell → support). AI estimates cost and asks before spending.
+**Anthropic = LAST RESORT.** User preferuje tanie modele. DeepSeek V3.2 primary.
 
 ---
 
-## Data Lake Architecture
-
-Implemented from DAY 1. Total Recall requires full data history.
-
-**Bronze (Raw) - Cloudflare R2:**
-- Everything as it arrives, NEVER deleted
-- Parquet format, `r2://exoskull/{tenant_id}/bronze/{data_type}/year={YYYY}/month={MM}/day={DD}/`
-
-**Silver (Cleaned) - Supabase Postgres:**
-- Dedup, validate, normalize timestamps (UTC). Hourly via Edge Function.
-
-**Gold (Aggregated) - Supabase Materialized Views:**
-- Daily/weekly/monthly summaries. <100ms query speed. Daily update at 02:00 UTC.
-
-**Query Engine:** DuckDB (embedded in Edge Function) for Parquet on R2.
-**Privacy:** Per-tenant isolation, AES-256 at rest, TLS 1.3 in transit, GDPR export.
+> **Product vision details** (Data Lake, Autonomous Actions, CRONs, Shared Workspace, Graph Knowledge, Tenant Isolation, Channels, Skill Library) → see `ARCHITECTURE.md` and `PRODUCT_DECISIONS_v1.md`
 
 ---
 
-## Autonomous Actions (2026-03-04)
+## Gotchas (PRZECZYTAJ ZANIM COKOLWIEK ZROBISZ)
 
-ExoSkull acts on user's behalf with **fully adaptive autonomy**.
+### Architektura agentów
+- **DWA endpointy chat:** `/api/chat/stream` (UI, runV3Agent) vs `/api/chat/send` (gateway, runExoSkullAgent) — NIE mieszaj
+- **DWA rejestry narzędzi:** V3_TOOLS (36) i IORS_EXTENSION_TOOLS (~150+), mostek przez `marketplace-tools`
+- **V3 fallback chain (AKTUALNY):** DeepSeek V3.2 → Groq → Gemini → OpenAI → Anthropic (LAST RESORT)
+- **ExoSkullAgent fallback:** Anthropic → DeepSeek (tools) → Kimi (tools) → DeepSeek (no tools)
+- **Anthropic = LAST RESORT.** User preferuje DeepSeek/Groq. Anthropic tylko gdy wszystko inne padnie
+- **maxTurns:** complex=10, medium=8. Jeśli agent wyczerpie turny → "Przekroczono limit kroków agenta". To NIE jest błąd providera API — to nasz kod w `lib/v3/agent.ts`
+- **update_task UUID bug:** AI model często przekazuje tekst zamiast UUID. Tool powinien mieć fuzzy name lookup
 
-**Permission Model:** User defines rules in chat → AI records and generates workspace view.
-- Example: "Emaile do X wysyłaj sam, SMS zawsze pytaj, telefony blokuj"
-- AI decides WHEN and WHAT to propose — based on goals, behavior, preferences
-- AI generates and USES skills without asking — if goal requires it
-- Before large spend: AI estimates cost and asks ("Szacuję ~$30 AI. OK?")
+### Deploy
+- **`vercel --prod`** MUSI być z `exoskull/` (monorepo root), NIE z `exoskull/exoskull-app/` — ścieżka się duplikuje
+- **`next build` pada lokalnie** ("Array buffer allocation failed") — używaj Vercel build
 
-**Outbound:** emails, SMS, calls (user + strangers), negotiations (AI solo or AI+user per situation)
-**CRONs:** Must do CONCRETE things (check deadlines, emails, goals, calendar). Not abstract wellness.
-
----
-
-## CRON & Scheduled Operations
-
-All scheduled operations are **goal-driven** — CRONs must do CONCRETE things.
-
-**Current v3 CRONs:** heartbeat (5min), morning briefing, evening reflection, nightly consolidation
-**Goal-derived:** System analyzes active goals → generates relevant check-ins, reminders, and reviews automatically.
-**Event-driven:** Triggered by goal-relevant conditions (deadline approaching, metric off-track, blocked task).
-**MAPE-K + Ralph Loop = one unified loop.** Signal Triage is part of Monitor phase.
-
-**Adaptive:** Learn optimal times, don't interrupt deep work, batch notifications. No schedule without a goal behind it.
+### Inne
+- **CrossDevice folder** (Samsung sync) wymaga uruchomionego cloud providera
+- **Allegro OAuth** z lumpx.pro zwraca `invalid_request` — wymaga re-auth
+- **Kimi/Moonshot** — kod fallback gotowy, brak API key na Vercel
 
 ---
 
-## Shared Workspace (2026-03-04)
+## IORS vs Claude Code — KTO CO ROBI
 
-Split layout: Left = Chat/Unified Stream, Right = Shared Workspace.
+**Claude Code (ty)** = piszesz KOD platformy. Endpointy, agenta, narzędzia, infrastrukturę.
+**IORS (agent w ExoSkull)** = UŻYWA tych narzędzi żeby robić rzeczy dla usera.
 
-**Workspace contains:**
-- Virtual browser (Chrome on VPS via CDP + WebRTC live stream) — AI controls, user sees and can take over
-- Expanded links/files from unified stream
-- AI-generated dashboards/pages (zero precoded pages)
-- VPS terminal, code execution output
-- Document previews, visualizations
+Gdy user mówi "IORS ma to zrobić" / "niech zrobi" = user chce żeby PRODUKT (IORS) miał tę zdolność.
+- NIE buduj rzeczy ręcznie za usera
+- Dodaj NARZĘDZIE do IORS (`V3_TOOLS`) żeby IORS mógł to sam
+- Albo ulepsz istniejące narzędzie
+- Potem DEPLOYUJ i TESTUJ w Playwright (wyślij komendę w chacie, sprawdź czy IORS to ogarnia)
 
-**Mobile:** Chat-first. Workspace auto-opens when agent shows something.
-**Tech:** Chrome DevTools Protocol for interaction + WebRTC for live view.
-
----
-
-## Graph-Based Knowledge (2026-03-04)
-
-**Tyrolka framework REMOVED.** Replaced by graph model in Postgres.
-
-```
-nodes (id, tenant_id, type, name, content, metadata JSONB, embedding vector(1536), parent_id, created_at)
-  type: 'goal', 'task', 'note', 'memory', 'pattern', 'document', 'tag'
-
-edges (id, source_id, target_id, relation, metadata JSONB)
-  relation: 'has_subtask', 'tagged_with', 'related_to', 'blocks', 'depends_on'
-```
-
-**#Hashtags** = simultaneously tag + semantic key + knowledge graph node. Multi-nested hierarchy.
-**pgvector embeddings** on nodes → semantic search + graph traversal.
-**Dashboard** = interactive hashtag tree (not traditional pages).
+**Przykład:**
+- User: "niech robi rozpoznawanie paragonów" → dodaj `scan_receipt` tool do V3_TOOLS → deploy → testuj w chacie
+- User: "niech buduje lepsze apki" → ulepsz `build_app` prompt/model → deploy → testuj
+- **NIE:** ręcznie budujesz apkę za usera, ręcznie skanujesz paragon, ręcznie robisz CRUD
 
 ---
 
-## Tenant Instance Isolation (2026-03-04)
+## KONKRETNE REGUŁY Z SESJI 2026-03-06
 
-Parent/child model for self-modification:
-
-**Platform core (IMMUTABLE):** auth, billing, middleware, agent engine, security, DB migrations, infrastructure
-**Tenant instance (MODIFIABLE by agent):** skills, UI, config, prompts, new API routes (sandbox), generated apps
-
-Each IORS agent can modify EVERYTHING in its user's instance but NOTHING in the platform core.
-
----
-
-## Channels: Omnichannel (2026-03-04)
-
-ALL channels available from day 1 via separate adapters (NO GoHighLevel):
-- Web chat, SMS, Email, WhatsApp, Telegram, Discord, Messenger, Instagram, Slack, iMessage
-- Same tools on ALL channels. Output adapted per channel (voice=describes, web=shows, SMS=brief)
-- Onboarding: conversational, omnichannel. AI decides what to ask adaptively
+1. **Nie kłam o przyczynach błędów.** "Osiągnięto limit DeepSeek" to był NASZ maxTurns=4, nie API rate limit. ZAWSZE czytaj kod zanim przypisujesz winę zewnętrznemu serwisowi.
+2. **Nie mów "DeepSeek rate limit" / "provider error" bez sprawdzenia.** Grep po komunikacie → znajdź źródło → napraw.
+3. **Deploy z `exoskull/`** (monorepo root), NIE z `exoskull/exoskull-app/`.
+4. **Gdy user mówi "IORS ma to zrobić"** → dodaj tool do V3_TOOLS, nie buduj ręcznie.
+5. **Nie pytaj 5 razy o to samo.** Jeśli user powiedział co chce, RÓB. Nie pytaj "czy o to chodzi?".
+6. **maxTurns** — complex=10, medium=8. Stary limit (4/5) powodował fałszywe errory.
 
 ---
 
