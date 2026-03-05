@@ -1,5 +1,34 @@
 # Session Log
 
+## [2026-03-05] Audit Fixes Batch 4 — Graph DB Full Migration + K224 (-1791 lines)
+
+### Completed
+
+- **K224 (PASS):** 5 precoded pages → thin ChatView wrappers with initialMessage auto-send
+- **F1 (PASS):** CRONs (heartbeat/morning/evening) migrated to read from graph `nodes`
+- **F1 (PASS):** dynamic-context.ts reads from graph nodes instead of Tyrolka
+- **F1 (PASS):** get_goals/get_tasks read from `nodes`; update_goal/update_task sync status to graph
+- **J-ENV (PASS):** webhook-hmac.ts log message fixed
+- **A8 (ALREADY FIXED):** DeepSeek double retry was already handled
+
+### Stats
+
+- Deleted: 1,791 lines (mostly precoded pages)
+- Added: 201 lines
+- Commits: `582a47c` (Batch 4), `3f17649` (Batch 3)
+- TS errors: 0
+
+---
+
+## [2026-03-05] Audit Fixes Batch 3 — M1 Settings + J1 Channels
+
+### Completed
+
+- **M1 (PASS):** Wired 5 DB fields into V3 agent context (personality, language, custom instructions, override, assistant_name)
+- **J1 (VERIFIED):** All 3 channels (Telegram/Discord/Slack) have routes + proper verification + env vars on Vercel
+
+---
+
 ## [2026-03-05] Audit Fixes Batch 2 — P1/P2 (4 items)
 
 ### Completed

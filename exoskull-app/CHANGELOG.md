@@ -4,6 +4,26 @@ All notable changes to this project.
 
 ---
 
+## [2026-03-05] Audit Batch 4 — Graph DB Migration + K224 Zero Precoded Pages
+
+- **K224** Replaced 5 precoded pages (goals 828L, knowledge 770L, skills 135L, apps, integrations) with chat-driven wrappers — `-1791 lines`
+- **NEW** `initialMessage` prop on ChatView/UnifiedStream — auto-sends context message on mount
+- **MIGRATED** CRONs (heartbeat/morning/evening) read from graph `nodes` table instead of Tyrolka
+- **MIGRATED** `dynamic-context.ts` reads goals/tasks from graph nodes
+- **MIGRATED** `goal-tools.ts`: get_goals/get_tasks now read from `nodes`, update_goal/update_task sync status back
+- **FIX** webhook-hmac.ts log message for env var clarity
+
+---
+
+## [2026-03-05] Audit Batch 3 — DB Settings + Channel Verification
+
+- **WIRED** dynamic-context.ts expanded SELECT: assistant_name, language, iors_personality, iors_custom_instructions, iors_system_prompt_override
+- **WIRED** Context injection for all 5 new tenant fields (M1 audit fix)
+- **VERIFIED** Telegram/Discord/Slack webhook routes exist at `app/api/gateway/{telegram,discord,slack}/route.ts`
+- **VERIFIED** All 6 channel env vars confirmed on Vercel
+
+---
+
 ## [2026-03-05] Audit P1-P2 Fixes — Channel Adaptation, Graph DB, Auto-Approve
 
 - **NEW** `formatForChannel()` in agent.ts — adapts output for SMS (truncated, no markdown), voice (plain text, no URLs), telegram, email, web_chat
