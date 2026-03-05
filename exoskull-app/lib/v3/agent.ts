@@ -24,6 +24,34 @@ import { logger } from "@/lib/logger";
 import { classifyQuery, handleSimpleQuery } from "./gemini-router";
 
 // ============================================================================
+// LANGUAGE DETECTION (A6)
+// ============================================================================
+
+/** Simple heuristic language detection — checks common words/patterns */
+function detectMessageLanguage(text: string): string {
+  const lower = text.toLowerCase();
+  // Polish indicators (diacritics + common words)
+  const plMarkers =
+    /[ąćęłńóśźż]|(\b(cześć|dzień|dobry|jak|mam|jest|czy|nie|tak|proszę|dziękuję|zrób|pokaż|sprawdź|napisz|pomóż)\b)/;
+  // English indicators
+  const enMarkers =
+    /\b(the|is|are|was|were|have|has|been|will|would|could|should|can|do|does|what|how|please|thanks|help|show|check|write|make|create)\b/;
+  // Spanish indicators
+  const esMarkers =
+    /[ñ]|\b(hola|cómo|estás|gracias|por favor|necesito|quiero)\b/;
+  // German indicators
+  const deMarkers = /[äöü]|\b(ich|bin|habe|bitte|danke|wie|was|können)\b/;
+
+  if (plMarkers.test(lower)) return "pl";
+  if (enMarkers.test(lower)) return "en";
+  if (esMarkers.test(lower)) return "es";
+  if (deMarkers.test(lower)) return "de";
+
+  // Default to Polish (primary user base)
+  return "pl";
+}
+
+// ============================================================================
 // TYPES
 // ============================================================================
 
@@ -754,6 +782,33 @@ async function runDeepSeekAgentFallback(
 }
 
 // ============================================================================
+// PROVIDER HEALTH CACHE — skip providers with recent 429/errors for cooldown
+// ============================================================================
+
+const providerCooldowns: Record<string, number> = {};
+const COOLDOWN_MS = 120_000; // 2 min cooldown after rate limit
+
+function isProviderAvailable(name: string): boolean {
+  const cooldownUntil = providerCooldowns[name];
+  if (!cooldownUntil) return true;
+  if (Date.now() > cooldownUntil) {
+    delete providerCooldowns[name];
+    return true;
+  }
+  return false;
+}
+
+function markProviderDown(name: string, errorMsg: string): void {
+  // Only cooldown on rate limits (429) or auth errors (401/403)
+  if (/429|rate.limit|too.many|401|403|credit|insufficient/i.test(errorMsg)) {
+    providerCooldowns[name] = Date.now() + COOLDOWN_MS;
+    logger.info(
+      `[v3:Health] ${name} marked down for ${COOLDOWN_MS / 1000}s: ${errorMsg.slice(0, 80)}`,
+    );
+  }
+}
+
+// ============================================================================
 // MAIN AGENT FUNCTION
 // ============================================================================
 
@@ -853,8 +908,16 @@ export async function runV3Agent(
         )
         .join("\n");
   }
+
+  // A6: Detect user language from message (simple heuristic)
+  const detectedLang = detectMessageLanguage(req.userMessage);
+  const langCtx =
+    detectedLang !== "pl"
+      ? `\n\n## Language\nUser is writing in ${detectedLang}. RESPOND IN ${detectedLang.toUpperCase()}.`
+      : "";
+
   const sharedSystemPrompt = buildV3SystemPrompt(
-    sharedDynamicCtx.context + memCtx,
+    sharedDynamicCtx.context + memCtx + langCtx,
   );
   req.onThinkingStep?.("Ładuję kontekst", "done");
 
@@ -1203,52 +1266,19 @@ export async function runV3Agent(
                         : String(openaiErr),
                   });
 
-                  // ── DeepSeek fallback (OpenAI-compatible API) ──
-                  const deepseekKey = process.env.DEEPSEEK_API_KEY?.trim();
-                  if (deepseekKey && !abortController.signal.aborted) {
-                    try {
-                      logger.info("[v3:Agent] Falling back to DeepSeek...");
-                      const deepseekResult = await runDeepSeekAgentFallback({
-                        tenantId: req.tenantId,
-                        userMessage: req.userMessage,
-                        systemPrompt,
-                        threadHistory,
-                        tools: V3_TOOLS,
-                        deepseekKey,
-                        maxTurns: Math.min(config.maxTurns, 8),
-                        onToolStart: req.onToolStart,
-                        onToolEnd: req.onToolEnd,
-                        onTextDelta: req.onTextDelta,
-                      });
-                      finalText = deepseekResult.text;
-                      toolsUsed.push(...deepseekResult.toolsUsed);
-                      logger.info("[v3:Agent] DeepSeek fallback succeeded", {
-                        toolsUsed: deepseekResult.toolsUsed,
-                        turns: deepseekResult.turns,
-                      });
-                    } catch (deepseekErr) {
-                      logger.error("[v3:Agent] DeepSeek fallback failed:", {
-                        error:
-                          deepseekErr instanceof Error
-                            ? deepseekErr.message
-                            : String(deepseekErr),
-                      });
-                      finalText = `Wszystkie modele AI niedostępne (Anthropic: brak kredytów, Gemini: rate limit, Groq: ${groqErr instanceof Error ? groqErr.message.slice(0, 50) : "error"}, OpenAI: ${openaiErr instanceof Error ? openaiErr.message.slice(0, 50) : "error"}, DeepSeek: ${deepseekErr instanceof Error ? deepseekErr.message.slice(0, 50) : "error"}). Spróbuj za kilka minut.`;
-                    }
-                  } else {
-                    finalText = `Wszystkie modele AI niedostępne (Anthropic: brak kredytów, Gemini: rate limit, Groq: ${groqErr instanceof Error ? groqErr.message.slice(0, 50) : "error"}, OpenAI: ${openaiErr instanceof Error ? openaiErr.message.slice(0, 50) : "error"}). Spróbuj za kilka minut.`;
-                  }
+                  // DeepSeek already tried as primary (line 888) — skip duplicate
+                  finalText = `Przepraszam, wszystkie modele AI są chwilowo niedostępne. Spróbuj ponownie za kilka minut.`;
                 }
               } else {
-                finalText = `Wszystkie modele AI niedostępne (Anthropic: brak kredytów, Gemini: rate limit, Groq: ${groqErr instanceof Error ? groqErr.message.slice(0, 50) : "error"}). Spróbuj za kilka minut.`;
+                finalText = `Przepraszam, wszystkie modele AI są chwilowo niedostępne. Spróbuj ponownie za kilka minut.`;
               }
             }
           } else {
-            finalText = `Błąd przetwarzania (Anthropic: ${errMsg.slice(0, 100)}). Spróbuj ponownie za chwilę.`;
+            finalText = `Przepraszam, wystąpił błąd przetwarzania. Spróbuj ponownie za chwilę.`;
           }
         }
       } else {
-        finalText = `Błąd przetwarzania (${errMsg.slice(0, 100)}). Brak klucza do fallback.`;
+        finalText = `Przepraszam, wystąpił błąd przetwarzania. Spróbuj ponownie za chwilę.`;
       }
     }
   } finally {

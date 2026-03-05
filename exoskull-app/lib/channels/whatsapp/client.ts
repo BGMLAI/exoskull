@@ -565,14 +565,18 @@ let _whatsappClient: WhatsAppClient | null = null;
 export function getWhatsAppClient(): WhatsAppClient | null {
   if (_whatsappClient) return _whatsappClient;
 
-  const token = process.env.META_WHATSAPP_TOKEN;
+  const token =
+    process.env.META_WHATSAPP_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneNumberId = process.env.META_PHONE_NUMBER_ID;
 
   if (!token || !phoneNumberId) {
-    logger.error("[WhatsApp] Missing env vars:", {
-      hasToken: !!token,
-      hasPhoneNumberId: !!phoneNumberId,
-    });
+    logger.warn(
+      "[WhatsApp] Missing env vars (META_WHATSAPP_TOKEN + META_PHONE_NUMBER_ID)",
+      {
+        hasToken: !!token,
+        hasPhoneNumberId: !!phoneNumberId,
+      },
+    );
     return null;
   }
 

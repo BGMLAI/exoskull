@@ -119,7 +119,7 @@ export function useDictation(
         if (avg > 5) {
           hadAudioRef.current = true;
           silenceStartRef.current = null;
-          setInterimTranscript("Nagrywam...");
+          // B34: no status text — visual animation only (WaveformBars handles UI)
         } else if (hadAudioRef.current) {
           if (!silenceStartRef.current) {
             silenceStartRef.current = Date.now();
@@ -131,10 +131,9 @@ export function useDictation(
             }
             return;
           }
-          const remaining = Math.ceil((SILENCE_TIMEOUT_MS - silentFor) / 1000);
-          setInterimTranscript(`Cisza... auto-wysylka za ${remaining}s`);
+          // B34: no status text during silence countdown
         } else if (!hadAudioRef.current) {
-          setInterimTranscript("Mikrofon nie lapie dzwieku");
+          // B34: no status text for "no audio detected"
         }
       }, 300);
     } catch {
@@ -157,9 +156,7 @@ export function useDictation(
   // --------------------------------------------------------------------------
 
   const transcribeAudio = useCallback(async (audioBlob: Blob) => {
-    setInterimTranscript(
-      `Przetwarzam... (${Math.round(audioBlob.size / 1024)}KB)`,
-    );
+    // B34: no status text — animation-only during processing
     try {
       const formData = new FormData();
       formData.append("audio", audioBlob, "audio.webm");
@@ -240,7 +237,7 @@ export function useDictation(
         if (duration < 1000 || audioBlob.size < 1000) {
           // Too short — in continuous mode, just restart
           if (continuousRef.current) {
-            setInterimTranscript("Slucham...");
+            // B34: no status text in continuous mode restart
             restartTimerRef.current = setTimeout(() => {
               startRecording();
             }, RESTART_DELAY_MS);
@@ -257,7 +254,7 @@ export function useDictation(
         // Transcribe, then restart if continuous
         transcribeAudio(audioBlob).finally(() => {
           if (continuousRef.current) {
-            setInterimTranscript("Slucham...");
+            // B34: no status text in continuous mode restart
             restartTimerRef.current = setTimeout(() => {
               startRecording();
             }, RESTART_DELAY_MS);
@@ -268,9 +265,7 @@ export function useDictation(
       mediaRecorder.start(250);
       recordStartRef.current = Date.now();
       setIsListening(true);
-      setInterimTranscript(
-        continuousRef.current ? "Slucham..." : "Nagrywam...",
-      );
+      // B34: no status text — isListening triggers visual animation
     } catch (err) {
       console.error("[useDictation] getUserMedia failed:", err);
       onErrorRef.current?.(

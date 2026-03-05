@@ -16,9 +16,9 @@ export default function GlobalError({
   return (
     <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6">
       <div className="max-w-md text-center space-y-4">
-        <h1 className="text-2xl font-bold">Cos poszlo nie tak</h1>
+        <h1 className="text-2xl font-bold">Coś poszło nie tak</h1>
         <p className="text-muted-foreground">
-          Wystapil nieoczekiwany blad. Sprobuj ponownie.
+          Wystąpił nieoczekiwany błąd. Spróbuj ponownie.
         </p>
         {error.digest && (
           <p className="text-xs text-muted-foreground font-mono">
@@ -30,13 +30,13 @@ export default function GlobalError({
             onClick={reset}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:opacity-90 transition"
           >
-            Sprobuj ponownie
+            Spróbuj ponownie
           </button>
           <a
             href="/dashboard"
             className="px-4 py-2 border border-border rounded-md text-sm hover:bg-muted transition"
           >
-            Wroc do dashboard
+            Wróć do dashboard
           </a>
         </div>
       </div>
