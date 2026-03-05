@@ -1,5 +1,21 @@
 # ExoSkull Learnings
 
+## K224 initialMessage Must Check History Length (2026-03-05)
+
+- Chat-driven pages (K224) auto-send a context message via `initialMessage` prop on UnifiedStream.
+- **Bug:** `useRef(false)` resets on every mount — navigating to the page fires the message EVERY TIME, not just once.
+- This caused 5+ API calls in 10 seconds when browser-testing all pages, triggering DeepSeek rate limits.
+- **Fix:** Add `engine.events.length === 0` check — only auto-send when conversation has no history.
+- **Pattern:** Any "run once on mount" effect that depends on external state (API, DB) must guard against repeat invocations from React remounts. `useRef` alone is NOT sufficient if the component unmounts between navigations.
+
+## Vercel Deploy: Push to v3-origin Triggers Production (2026-03-05)
+
+- `git push v3-origin v3:main` auto-deploys to Production for the `exoskull-v3` project.
+- `npx vercel --prod` from repo root deploys to WRONG project (`exoskull-app`, not `exoskull-v3`).
+- `npx vercel --prod` from `exoskull-app/` fails with double-nesting error (rootDirectory config).
+- **Alternative:** `cd exoskull-app && echo "y" | npx vercel promote <preview-url>` triggers a new production build.
+- **Pattern:** Always verify which Vercel project you're deploying to. Multiple `.vercel/project.json` in a monorepo = multiple projects.
+
 ## V3 Agent Token Cost — Main Waste Sources (2026-03-05)
 
 - **maxTurns too high** was the #1 waste. 15 turns × full context (system prompt + 34 tools + history) = up to 120K tokens per simple question. Most queries resolve in 1-3 turns.
