@@ -4,6 +4,15 @@ All notable changes to this project.
 
 ---
 
+## [2026-03-05] Audit Batch 5 — InitialMessage Fix + Quick Actions Graph
+
+- **FIX** `initialMessage` only fires when `events.length === 0` — prevents API spam on every page visit
+- **MIGRATED** `/api/v3/quick-actions` from Tyrolka tables to graph `nodes` table
+- **VERIFIED** A-ERROR (clean error messages), B34 (no status text), A6 (language detection), A3 (adaptive quick actions) — all already fixed
+- **DEPLOYED** Production build promoted, verified in browser
+
+---
+
 ## [2026-03-05] Audit Batch 4 — Graph DB Migration + K224 Zero Precoded Pages
 
 - **K224** Replaced 5 precoded pages (goals 828L, knowledge 770L, skills 135L, apps, integrations) with chat-driven wrappers — `-1791 lines`

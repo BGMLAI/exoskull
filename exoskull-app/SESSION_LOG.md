@@ -1,5 +1,34 @@
 # Session Log
 
+## [2026-03-05] Audit Fixes Batch 5 — Browser Testing + InitialMessage Fix
+
+### Completed
+
+- **K224 BROWSER VERIFIED:** All 5 chat-driven pages confirmed live on exoskull.xyz (goals, knowledge, skills, apps, integrations)
+- **Settings preserved:** Form-based settings page unchanged at /dashboard/settings
+- **InitialMessage fix:** Only fires when events.length === 0 (prevents API spam on navigation)
+- **Quick-actions graph migration:** /api/v3/quick-actions reads from `nodes` instead of Tyrolka
+- **A-ERROR (ALREADY FIXED):** Error messages are clean Polish text in current code
+- **B34 (ALREADY FIXED):** No status text during recording — all replaced with comments
+- **A6 (ALREADY FIXED):** Language detection in mission-prompt.ts line 27
+- **A3 (ALREADY FIXED):** Adaptive quick actions via /api/v3/quick-actions endpoint
+- **DeepSeek WORKS:** Confirmed working with $4 balance — rate limit was temporary from initialMessage burst
+- **Production deploy:** `vercel promote` trick to deploy non-main branch to production
+
+### Stats
+
+- Commits: `42c06e9` (Batch 5)
+- TS errors: 0
+- Production deploys: 2 (promote + auto-deploy from push)
+
+### Vercel Deploy Gotcha (NEW LEARNING)
+
+- Push to `v3-origin v3:main` auto-deploys to Production for `exoskull-v3`
+- Previous `vercel promote <preview-url>` also works
+- Deploy from root `npx vercel --prod` goes to WRONG project (exoskull-app)
+
+---
+
 ## [2026-03-05] Audit Fixes Batch 4 — Graph DB Full Migration + K224 (-1791 lines)
 
 ### Completed
