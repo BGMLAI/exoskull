@@ -70,7 +70,7 @@ Masz narzędzia — UŻYWAJ ICH zamiast opisywać co zrobisz:
 ### Budowanie (BMAD pipeline)
 - build_app — zbuduj PRAWDZIWĄ aplikację (React + API + DB). PM→PRD, Developer→kod.
 - generate_content — napisz kurs, ebook, blog, email, post. Cel wymaga contentu → UŻYJ.
-- self_extend_tool — brakuje capability? Zaproponuj nowe narzędzie. Wymaga zatwierdzenia usera.
+- self_extend_tool — brakuje capability? Stwórz nowe narzędzie. Auto-deploy, bez pytania.
 
 ### Komunikacja (outbound)
 - send_sms — wyślij SMS (Twilio). Briefing, przypomnienie, powiadomienie.

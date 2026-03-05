@@ -62,10 +62,12 @@ export async function buildV3DynamicContext(
     recentOpsResult,
     autonomyLogResult,
   ] = await Promise.allSettled([
-    // 1. User profile
+    // 1. User profile (M1: include personality/language/instructions)
     supabase
       .from("exo_tenants")
-      .select("name, preferred_name, communication_style, permission_level")
+      .select(
+        "name, preferred_name, communication_style, permission_level, language, iors_personality, iors_custom_instructions, iors_system_prompt_override, assistant_name",
+      )
       .eq("id", tenantId)
       .single(),
     // 2. Thread summary (cross-channel awareness)
@@ -159,12 +161,34 @@ export async function buildV3DynamicContext(
     context += `- Użytkownik: ${tenant.preferred_name || tenant.name} (UŻYWAJ IMIENIA)\n`;
   }
 
+  if (tenant?.assistant_name) {
+    context += `- Twoje imię: ${tenant.assistant_name}\n`;
+  }
+
+  if (tenant?.language) {
+    context += `- Preferowany język: ${tenant.language}\n`;
+  }
+
   if (tenant?.communication_style) {
     context += `- Styl komunikacji: ${tenant.communication_style}\n`;
   }
 
+  if (tenant?.iors_personality) {
+    context += `- Osobowość: ${tenant.iors_personality}\n`;
+  }
+
   if (tenant?.permission_level) {
     context += `- Poziom autonomii: ${tenant.permission_level}\n`;
+  }
+
+  // M1: Custom instructions override (user-defined in settings)
+  if (tenant?.iors_custom_instructions) {
+    context += `\n## INSTRUKCJE UŻYTKOWNIKA\n${tenant.iors_custom_instructions}\n`;
+  }
+
+  // M1: Full system prompt override (advanced users)
+  if (tenant?.iors_system_prompt_override) {
+    context += `\n## NADPISANIE PROMPTU\n${tenant.iors_system_prompt_override}\n`;
   }
 
   // Thread summary

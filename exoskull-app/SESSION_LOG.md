@@ -1,5 +1,27 @@
 # Session Log
 
+## [2026-03-05] Audit Fixes Batch 2 — P1/P2 (4 items)
+
+### Completed
+
+- **J3 (PASS):** `formatForChannel()` — SMS strips markdown/truncates, voice removes URLs/code, web keeps full markdown
+- **Q1 (PASS):** Removed oura, fitbit, notion, todoist from `lib/rigs/index.ts` (SuperIntegrator only)
+- **G5 (PASS):** `self_extend_tool` now auto-approves (`approved: true`, `confidence: 0.7`) with name sanitization
+- **F1 (PASS):** Graph DB — migration applied (`nodes` + `edges` tables), dual-write from `set_goal`/`create_task`
+
+### Migration
+
+- `20260305000002_graph_nodes_edges.sql` applied to Supabase prod
+- Had version conflict with existing `20260305000001` — renamed to `000002`
+- Tables verified: `nodes` OK, `edges` OK
+
+### Commits
+
+- `c9cada5` feat: audit P1-P2 fixes — channel adaptation, graph DB, auto-approve, remove dead rigs
+- `9bb8287` fix: rename graph DB migration to avoid version conflict
+
+---
+
 ## [2026-03-05] Comprehensive Production Audit — 29% PASS rate
 
 ### What happened

@@ -1,5 +1,16 @@
 # ExoSkull Learnings
 
+## V3 Agent Token Cost — Main Waste Sources (2026-03-05)
+
+- **maxTurns too high** was the #1 waste. 15 turns × full context (system prompt + 34 tools + history) = up to 120K tokens per simple question. Most queries resolve in 1-3 turns.
+- **Tool schemas are expensive** — 34 tools ≈ 3400 tokens overhead PER TURN. Multiply by turns for real cost.
+- **Memory search on every query** is wasteful. "Cześć" doesn't need vector search. Gate it: only search if message >30 chars or contains memory-related keywords.
+- **Duplicate routing** — stream/route.ts and agent.ts both classified queries and called Gemini independently. One classification point is enough.
+- **Context cache 30s** was too short for conversational flow. 5 min covers most back-and-forth without stale data issues.
+- **Prompt caching (`cache_control: ephemeral`)** saves ~90% on static system prompt across turns. Use it whenever system prompt >1K tokens.
+- **DeepSeek is 11-14x cheaper than Sonnet** with comparable tool calling quality for standard tasks. Use expensive models only for complex generation (build_app).
+- **Pattern:** For cost-sensitive agents, route by complexity BEFORE choosing model. Most queries are simple/medium and don't need the most expensive model.
+
 ## Next.js Route Files Can Only Export HTTP Handlers (2026-03-02)
 
 - Putting helper functions (`registerConversation`, `getActiveConversationCount`) alongside `POST` handler in a route file caused TS error: `Property 'registerConversation' is incompatible with index signature`.

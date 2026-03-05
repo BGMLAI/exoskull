@@ -4,6 +4,34 @@ All notable changes to this project.
 
 ---
 
+## [2026-03-05] Audit P1-P2 Fixes — Channel Adaptation, Graph DB, Auto-Approve
+
+- **NEW** `formatForChannel()` in agent.ts — adapts output for SMS (truncated, no markdown), voice (plain text, no URLs), telegram, email, web_chat
+- **NEW** Graph DB migration — `nodes` + `edges` tables with pgvector, RLS, semantic search function `search_graph_nodes()`
+- **NEW** Dual-write in `goal-tools.ts` — set_goal and create_task now write to both Tyrolka tables AND new graph nodes
+- **FIX** `self_extend_tool` auto-approves with validation (was `approved: false` — now `approved: true` per G5)
+- **REMOVED** oura, fitbit, notion, todoist from `lib/rigs/index.ts` — SuperIntegrator only per Q1
+- **Files changed:** `lib/v3/agent.ts`, `lib/rigs/index.ts`, `lib/v3/tools/builder-tools.ts`, `lib/v3/tools/goal-tools.ts`
+- **Migration:** `20260305000002_graph_nodes_edges.sql` — applied to production
+
+---
+
+## [2026-03-05] Token Cost Optimization — DeepSeek Primary, Anthropic Eliminated
+
+- **PERF** 3-tier routing: simple→Gemini Flash, medium/complex→DeepSeek, Groq fallback
+- **PERF** DeepSeek Chat as primary model (was Claude Sonnet) — 11x cheaper input, 14x cheaper output
+- **PERF** Anthropic moved to last-resort only (both DeepSeek AND Groq must fail)
+- **PERF** `maxTurns` reduced: web 15→5, voice 6→3, autonomous 8→5
+- **PERF** Memory search conditional (skip for short/simple queries), limit 10→5, minScore 0.05→0.3
+- **PERF** Thread history 20→10 messages
+- **PERF** Prompt caching via `cache_control: ephemeral` on system prompt
+- **PERF** Dynamic context cache TTL 30s→5min
+- **FIX** Removed duplicate Gemini routing (stream/route.ts was classifying queries independently of agent.ts)
+- **FIX** Context loaded once and shared across DeepSeek/Groq/Anthropic paths (was loading 3x)
+- **Files changed:** `lib/v3/agent.ts`, `lib/v3/gemini-router.ts`, `lib/v3/dynamic-context.ts`, `app/api/chat/stream/route.ts`
+
+---
+
 ## [2026-03-04] Gemini Smart Routing + Improved Reasoning Display
 
 - **NEW** `lib/v3/gemini-router.ts` — Smart query classification
