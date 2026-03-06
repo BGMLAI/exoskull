@@ -150,8 +150,24 @@ async function sendSmsReply(to: string, text: string): Promise<void> {
     return;
   }
 
-  // Twilio SMS limit is 1600 chars — truncate if needed
-  const truncated = text.length > 1500 ? text.substring(0, 1497) + "..." : text;
+  // Twilio SMS limit is 1600 chars — truncate at sentence/word boundary
+  let truncated = text;
+  if (text.length > 1500) {
+    const slice = text.slice(0, 1500);
+    const lastSentence = Math.max(
+      slice.lastIndexOf(". "),
+      slice.lastIndexOf("! "),
+      slice.lastIndexOf("? "),
+      slice.lastIndexOf(".\n"),
+    );
+    if (lastSentence > 750) {
+      truncated = slice.slice(0, lastSentence + 1);
+    } else {
+      const lastSpace = slice.lastIndexOf(" ");
+      truncated =
+        lastSpace > 750 ? slice.slice(0, lastSpace) + "..." : slice + "...";
+    }
+  }
 
   const statusCallbackUrl = process.env.NEXT_PUBLIC_APP_URL
     ? `${process.env.NEXT_PUBLIC_APP_URL}/api/twilio/sms-status`

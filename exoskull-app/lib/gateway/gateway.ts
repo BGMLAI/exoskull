@@ -4,19 +4,15 @@
  * Central routing for ALL inbound messages.
  * Every channel adapter calls handleInboundMessage() which:
  * 1. Appends to unified thread (inbound)
- * 2. Runs full AI pipeline (Claude Agent SDK + IORS MCP tools)
+ * 2. Runs V3 AI pipeline (DeepSeek → Groq → Anthropic fallback, 34 tools)
  * 3. Appends to unified thread (outbound)
  * 4. Returns response for adapter to send back
  */
 
-import {
-  getOrCreateSession,
-  updateSession,
-  findTenantByPhone,
-} from "../voice/conversation-handler";
+import { findTenantByPhone } from "../voice/conversation-handler";
 import type { ProcessingCallback } from "../voice/conversation-handler";
-import { runExoSkullAgent } from "@/lib/agent-sdk";
-import type { AgentChannel } from "@/lib/agent-sdk";
+import { runV3Agent } from "@/lib/v3/agent";
+import type { AgentChannel } from "@/lib/v3/agent";
 import { appendMessage } from "../unified-thread";
 import { isBirthPending, handleBirthMessage } from "@/lib/iors/birth-flow";
 import { findOrCreateLead, handleLeadMessage } from "@/lib/iors/lead-manager";
@@ -26,13 +22,10 @@ import type { GatewayChannel, GatewayMessage, GatewayResponse } from "./types";
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { emitEvent } from "@/lib/iors/loop";
 import { grantPermission } from "@/lib/iors/autonomy";
-import { WEB_CHAT_SYSTEM_OVERRIDE } from "../voice/system-prompt";
 import { sanitizeUserInput } from "@/lib/security/safety-guardrails";
 
 import { logger } from "@/lib/logger";
 import { logActivity } from "@/lib/activity-log";
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // Map GatewayChannel → UnifiedChannel for unified-thread.ts
 // Now that UnifiedChannel includes telegram/slack/discord, this is a direct pass-through
@@ -247,10 +240,10 @@ export async function handleInboundMessage(
   callback?: ProcessingCallback,
 ): Promise<GatewayResponse> {
   const startTime = Date.now();
+  let tenantId = msg.tenantId; // Hoist for catch block access
 
   try {
     // 1. Resolve tenant
-    let tenantId = msg.tenantId;
     if (!tenantId || tenantId === "unknown") {
       const tenant = await resolveTenant(msg.channel, msg.from, msg.senderName);
       if (tenant) {
@@ -419,23 +412,29 @@ export async function handleInboundMessage(
       };
     }
 
-    // 6. Sync path: process with timeout safety net
+    // 6. Sync path: V3 agent with multi-provider fallback (DeepSeek → Groq → Anthropic)
     const SYNC_TIMEOUT_MS = 50_000; // 50s — leaves 10s buffer before Vercel's 60s
 
-    // ── Agent SDK path (ALL channels) ──
+    // Map GatewayChannel → V3 AgentChannel (V3 supports: web_chat, voice, sms, telegram, email, autonomous)
+    const v3Channel: AgentChannel = (
+      ["web_chat", "voice", "sms", "telegram", "email", "autonomous"].includes(
+        msg.channel,
+      )
+        ? msg.channel
+        : "sms"
+    ) as AgentChannel; // Default non-listed channels to sms (text-based)
+
     const result = await Promise.race([
-      runExoSkullAgent({
+      runV3Agent({
         tenantId,
         sessionId,
         userMessage: sanitizeUserInput(msg.text),
-        channel: msg.channel as AgentChannel,
+        channel: v3Channel,
         skipThreadAppend: true,
         onTextDelta: callback?.onTextDelta,
         onThinkingStep: callback?.onThinkingStep,
         onToolStart: callback?.onToolStart,
         onToolEnd: callback?.onToolEnd,
-        onCustomEvent: callback?.onCustomEvent,
-        systemPromptPrefix: WEB_CHAT_SYSTEM_OVERRIDE,
         maxTokens: 4096,
         timeoutMs: SYNC_TIMEOUT_MS - 2_000, // 2s buffer for gateway overhead
       }),
@@ -477,23 +476,36 @@ export async function handleInboundMessage(
         });
       }
 
+      const timeoutText =
+        "To zajmie więcej czasu niż myślałem. Przetwarzam w tle — dam znać jak skończę.";
+
+      // Record timeout response in unified thread
+      await appendMessage(tenantId, {
+        role: "assistant",
+        content: timeoutText,
+        channel: unifiedChannel,
+        direction: "outbound",
+        metadata: { gateway_channel: msg.channel, async_escalation: true },
+      });
+
       return {
-        text: "To zajmie więcej czasu niż myślałem. Przetwarzam w tle — dam znać jak skończę.",
+        text: timeoutText,
         toolsUsed: ["async_queue_timeout"],
         channel: msg.channel,
       };
     }
 
-    // 7. Update session + append outbound to unified thread
-    // updateSession only accepts "voice" | "web_chat", map other channels to "web_chat"
-    const sessionChannel: "voice" | "web_chat" =
-      msg.channel === "voice" ? "voice" : "web_chat";
-
-    // SDK path doesn't create a VoiceSession — create one now for session tracking
-    const sessionForUpdate = await getOrCreateSession(sessionId, tenantId);
-    await updateSession(sessionForUpdate.id, msg.text, result.text, {
-      channel: sessionChannel,
-      skipUserAppend: true, // Gateway already wrote user message at step 2
+    // 7. Append outbound response to unified thread
+    await appendMessage(tenantId, {
+      role: "assistant",
+      content: result.text,
+      channel: unifiedChannel,
+      direction: "outbound",
+      metadata: {
+        gateway_channel: msg.channel,
+        tools_used: result.toolsUsed,
+        cost_usd: result.costUsd,
+      },
     });
 
     const durationMs = Date.now() - startTime;
@@ -550,8 +562,21 @@ export async function handleInboundMessage(
     // Classify error for client-side retry logic
     const errorCode = classifyGatewayError(err);
 
+    const errorText = "Wystąpił błąd przetwarzania. Spróbuj ponownie.";
+
+    // Record error response in unified thread (fire-and-forget)
+    if (tenantId && tenantId !== "unknown") {
+      appendMessage(tenantId, {
+        role: "assistant",
+        content: errorText,
+        channel: toUnifiedChannel(msg.channel),
+        direction: "outbound",
+        metadata: { gateway_channel: msg.channel, error: true, errorCode },
+      }).catch(() => {}); // Best effort — don't fail the response
+    }
+
     return {
-      text: "Wystąpił błąd przetwarzania. Spróbuj ponownie.",
+      text: errorText,
       toolsUsed: [],
       channel: msg.channel,
       errorCode,
