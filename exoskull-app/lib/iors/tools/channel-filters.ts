@@ -28,9 +28,10 @@ export const CORE_TOOL_NAMES = new Set([
   "check_goals",
   // Knowledge
   "search_knowledge",
-  // Communication (basic)
+  // Communication (basic + call)
   "send_sms",
   "send_email",
+  "make_call",
   // Planning
   "plan_action",
   // Mods / Apps (data logging)
@@ -228,6 +229,12 @@ const KEYWORD_TO_PACK: Record<string, string[]> = {
   call: ["communication"],
   sms: ["communication"],
   whatsapp: ["communication"],
+  zadzwoń: ["communication"],
+  zadzwon: ["communication"],
+  pizza: ["communication"],
+  zamów: ["communication"],
+  zamow: ["communication"],
+  telefon: ["communication"],
   code: ["code"],
   deploy: ["code"],
   programming: ["code"],
