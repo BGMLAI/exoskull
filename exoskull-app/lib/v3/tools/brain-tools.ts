@@ -4,7 +4,7 @@
  * 7 tools: search_brain, remember, log_note, search_web, fetch_url, analyze_image, extract_text_from_image
  */
 
-import type { V3ToolDefinition } from "./index";
+import { type V3ToolDefinition, errMsg } from "./index";
 
 // ============================================================================
 // #1 search_brain — unified search across ALL memory
@@ -59,7 +59,7 @@ const searchBrainTool: V3ToolDefinition = {
           )
           .join("\n\n");
       } catch (err) {
-        return `Błąd wyszukiwania: ${err instanceof Error ? err.message : String(err)}`;
+        return `Błąd wyszukiwania: ${errMsg(err)}`;
       }
     }
   },
@@ -113,7 +113,7 @@ const rememberTool: V3ToolDefinition = {
 
       return `Zapamiętano: "${content}" [${category}]`;
     } catch (err) {
-      return `Błąd zapisu: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd zapisu: ${errMsg(err)}`;
     }
   },
 };
@@ -158,7 +158,7 @@ const logNoteTool: V3ToolDefinition = {
       if (error) throw error;
       return `Notatka zapisana: "${title}"`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -211,7 +211,7 @@ const searchWebTool: V3ToolDefinition = {
       }
       return output || "Brak wyników.";
     } catch (err) {
-      return `Błąd wyszukiwania: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd wyszukiwania: ${errMsg(err)}`;
     }
   },
   timeoutMs: 15_000,
@@ -248,7 +248,7 @@ const fetchUrlTool: V3ToolDefinition = {
         const result = await importUrl(url, tenantId);
         return `Zaimportowano do bazy wiedzy (ID: ${result.documentId}). Przetwarzanie w tle.`;
       } catch (err) {
-        return `Błąd importu: ${err instanceof Error ? err.message : String(err)}`;
+        return `Błąd importu: ${errMsg(err)}`;
       }
     }
 
@@ -278,7 +278,7 @@ const fetchUrlTool: V3ToolDefinition = {
         .trim();
       return text.slice(0, 4000) || "Brak treści.";
     } catch (err) {
-      return `Błąd pobierania: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd pobierania: ${errMsg(err)}`;
     }
   },
   timeoutMs: 20_000,
@@ -315,7 +315,7 @@ const analyzeImageTool: V3ToolDefinition = {
       });
       return `**Analiza obrazu:**\n${result.text}\n\n_Model: ${result.model}, ${result.durationMs}ms_`;
     } catch (err) {
-      return `Błąd analizy: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd analizy: ${errMsg(err)}`;
     }
   },
   timeoutMs: 30_000,
@@ -347,7 +347,7 @@ const extractTextTool: V3ToolDefinition = {
       );
       return text || "Nie znaleziono tekstu w obrazie.";
     } catch (err) {
-      return `Błąd OCR: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd OCR: ${errMsg(err)}`;
     }
   },
   timeoutMs: 30_000,
@@ -488,7 +488,7 @@ const getDailySummaryTool: V3ToolDefinition = {
 
       return summary;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -537,7 +537,7 @@ const correctDailySummaryTool: V3ToolDefinition = {
       if (error) throw error;
       return `📝 Korekta zapisana dla ${dateStr}: "${(input.correction as string).slice(0, 100)}"`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };

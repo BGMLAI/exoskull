@@ -29,6 +29,14 @@ export interface V3ToolDefinition {
   timeoutMs?: number;
 }
 
+/** Extract message from Error, Supabase PostgrestError, or unknown */
+export function errMsg(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === "object" && "message" in err)
+    return String((err as Record<string, unknown>).message);
+  return String(err);
+}
+
 // ============================================================================
 // TOOL IMPORTS
 // ============================================================================

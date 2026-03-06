@@ -4,7 +4,7 @@
  * 4 tools: import_document, import_url, list_knowledge, get_document
  */
 
-import type { V3ToolDefinition } from "./index";
+import { type V3ToolDefinition, errMsg } from "./index";
 
 // ============================================================================
 // #1 import_url — fetch URL and save to knowledge base
@@ -37,12 +37,9 @@ const importUrlTool: V3ToolDefinition = {
     try {
       if (save) {
         const { importUrl } = await import("@/lib/knowledge/url-processor");
-        const result = await importUrl(
-          tenantId,
-          url,
-          input.title as string | undefined,
-        );
-        return `Zaimportowano "${url}" (zaimportowano). ID: ${result.documentId}`;
+        const result = await importUrl(url, tenantId, "url");
+        if (!result.success) return `Błąd importu: ${result.error}`;
+        return `Zaimportowano "${url}". ID: ${result.documentId}`;
       }
 
       // Just fetch and return content
@@ -65,7 +62,7 @@ const importUrlTool: V3ToolDefinition = {
       const text = await response.text();
       return text.slice(0, 8000);
     } catch (err) {
-      return `Błąd importu URL: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd importu URL: ${errMsg(err)}`;
     }
   },
 };
@@ -126,7 +123,7 @@ const listKnowledgeTool: V3ToolDefinition = {
         )
         .join("\n");
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -196,7 +193,7 @@ const getDocumentTool: V3ToolDefinition = {
 
       return `📄 ${data.original_name} (strona ${page}/${totalPages})\n\n${slice}`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -249,7 +246,7 @@ const learnPatternTool: V3ToolDefinition = {
       const emoji = input.category === "anti_pattern" ? "🍋" : "🍯";
       return `${emoji} Zapisano ${input.category}: "${(input.content as string).slice(0, 100)}"`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };

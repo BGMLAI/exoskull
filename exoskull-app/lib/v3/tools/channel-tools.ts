@@ -5,7 +5,7 @@
  * Thin wrappers around existing Twilio/Resend infrastructure.
  */
 
-import type { V3ToolDefinition } from "./index";
+import { type V3ToolDefinition, errMsg } from "./index";
 
 // ============================================================================
 // #1 send_sms — Twilio SMS
@@ -116,7 +116,7 @@ const sendSmsTool: V3ToolDefinition = {
 
       return `📱 SMS wysłany do ${toNumber}: "${message.slice(0, 100)}${message.length > 100 ? "..." : ""}" (SID: ${result.sid})`;
     } catch (err) {
-      return `Błąd SMS: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd SMS: ${errMsg(err)}`;
     }
   },
 };
@@ -222,7 +222,7 @@ const sendEmailTool: V3ToolDefinition = {
 
       return `📧 Email wysłany do ${toEmail}: "${input.subject}" (ID: ${result.id})`;
     } catch (err) {
-      return `Błąd email: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd email: ${errMsg(err)}`;
     }
   },
 };
@@ -348,7 +348,7 @@ const makeCallTool: V3ToolDefinition = {
 
       return `📞 Dzwonię na ${toNumber} — "${input.purpose}". Call SID: ${result.sid}. Status: ${result.status}.`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };

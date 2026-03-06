@@ -6,7 +6,7 @@
  * These tools let the agent take autonomous actions toward user goals.
  */
 
-import type { V3ToolDefinition } from "./index";
+import { type V3ToolDefinition, errMsg } from "./index";
 
 // ============================================================================
 // #1 enqueue_action — add to autonomy queue for background execution
@@ -67,7 +67,7 @@ const enqueueActionTool: V3ToolDefinition = {
       if (error) return `Błąd: ${error.message}`;
       return `🔄 Dodano do kolejki: "${(input.description as string).slice(0, 80)}" (ID: ${data.id}). Heartbeat wykona przy najbliższej iteracji.`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -123,7 +123,7 @@ const checkPermissionsTool: V3ToolDefinition = {
           .join("\n") || "  (brak — użyj poziomu globalnego)"
       }`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -189,7 +189,7 @@ const sendNotificationTool: V3ToolDefinition = {
 
       return `🔔 Powiadomienie zapisane (${channel}): "${(input.message as string).slice(0, 200)}"`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -246,7 +246,7 @@ const logAutonomyTool: V3ToolDefinition = {
       if (error) return `Błąd logowania: ${error.message}`;
       return `📝 Zalogowano: ${input.event_type} — "${(input.description as string).slice(0, 100)}" [${input.result || "success"}]`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -320,7 +320,7 @@ const getAutonomyLogTool: V3ToolDefinition = {
 
       return output;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };

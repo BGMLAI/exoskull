@@ -7,7 +7,7 @@
  * user_quests (milestones), user_ops (tasks), user_notes (notes)
  */
 
-import type { V3ToolDefinition } from "./index";
+import { type V3ToolDefinition, errMsg } from "./index";
 import { logger } from "@/lib/logger";
 
 // ============================================================================
@@ -64,7 +64,7 @@ async function graphDualWrite(
   } catch (err) {
     // Silent fail — graph is secondary during migration
     logger.warn("[GraphDualWrite] Failed (non-blocking):", {
-      error: err instanceof Error ? err.message : String(err),
+      error: errMsg(err),
       type: params.type,
       name: params.name,
     });
@@ -158,7 +158,7 @@ const setGoalTool: V3ToolDefinition = {
 
       return `✅ Cel ustawiony: "${data.name}" (ID: ${data.id}). Teraz rozłożę go na strategię i konkretne zadania.`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -293,7 +293,7 @@ const updateGoalTool: V3ToolDefinition = {
 
       return `📊 Cel "${goal.name}" zaktualizowany.${input.progress !== undefined ? ` Postęp: ${input.progress}%` : ""}${input.status ? ` Status: ${input.status}` : ""}`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -360,7 +360,7 @@ const getGoalsTool: V3ToolDefinition = {
         )
         .join("\n\n");
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -467,7 +467,7 @@ const createTaskTool: V3ToolDefinition = {
       const emoji = input.assignee === "system" ? "🤖" : "📋";
       return `${emoji} Zadanie: "${data.title}"${input.assignee === "system" ? " → dodano do kolejki autonomii (ExoSkull wykona sam)" : " → czeka na użytkownika"}`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -583,7 +583,7 @@ const updateTaskTool: V3ToolDefinition = {
 
       return `${input.status === "completed" ? "✅" : "📋"} "${data.title}" → ${data.status}`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -667,7 +667,7 @@ const getTasksTool: V3ToolDefinition = {
         )
         .join("\n");
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };

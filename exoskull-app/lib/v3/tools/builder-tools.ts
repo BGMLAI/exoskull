@@ -7,7 +7,7 @@
  * 3 tools: build_app, generate_content, self_extend_tool
  */
 
-import type { V3ToolDefinition } from "./index";
+import { type V3ToolDefinition, errMsg } from "./index";
 import { logger } from "@/lib/logger";
 
 // ============================================================================
@@ -527,7 +527,7 @@ Pisz konkretnie, z wartością merytoryczną. ZERO puchu. Formatuj w Markdown.`;
 
       return `✍️ Content wygenerowany i zapisany!\n\nTyp: ${input.type}\nTytuł: ${input.title}\n\n${text.text.slice(0, 3000)}${text.text.length > 3000 ? "\n\n[...obcięto — pełna treść w notatkach]" : ""}`;
     } catch (err) {
-      return `Błąd generowania: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd generowania: ${errMsg(err)}`;
     }
   },
 };
@@ -613,7 +613,7 @@ const selfExtendTool: V3ToolDefinition = {
 
       return `Nowe narzędzie aktywowane: "${safeName}"\nOpis: ${input.description}\nPowód: ${input.reason}\n\nNarzędzie jest już dostępne i gotowe do użycia.`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -882,7 +882,7 @@ ZERO tekstu poza JSON.`;
 
       return lines.join("\n");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = errMsg(err);
       logger.error("[scan_receipt] Error:", { error: msg });
       return `Błąd skanowania: ${msg}`;
     }
