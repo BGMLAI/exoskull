@@ -255,7 +255,7 @@ const updateGoalTool: V3ToolDefinition = {
       const { error } = await supabase
         .from("user_loops")
         .update(updates)
-        .eq("id", input.goal_id as string)
+        .eq("id", goal.id)
         .eq("tenant_id", tenantId);
 
       if (error) return `Błąd: ${error.message}`;
