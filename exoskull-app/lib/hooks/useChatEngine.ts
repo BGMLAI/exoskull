@@ -373,6 +373,100 @@ export function useChatEngine(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Cross-channel polling (SMS, voice, etc. show in web chat) ───────────
+
+  const lastPollTsRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!historyLoaded) return;
+    let cancelled = false;
+
+    // Poll every 8 seconds for new cross-channel messages
+    const interval = setInterval(async () => {
+      if (cancelled || state.isLoading) return;
+      try {
+        const since =
+          lastPollTsRef.current || new Date(Date.now() - 60_000).toISOString();
+        const res = await fetch(
+          `/api/unified-thread?limit=10&since=${encodeURIComponent(since)}`,
+        );
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        const messages = data.messages || data || [];
+        if (messages.length === 0) return;
+
+        const newEvents: StreamEvent[] = [];
+        for (const msg of messages) {
+          if (!msg.content) continue;
+          const evtId = `poll-${msg.id || Date.now()}`;
+          // Skip if already in events (by message ID)
+          if (
+            state.events.some(
+              (e) => e.id === evtId || e.id === `hist-${msg.id}`,
+            )
+          )
+            continue;
+          const evtTs = new Date(msg.created_at || Date.now());
+          const channel: string = msg.channel || "web_chat";
+
+          // Only add cross-channel messages (web_chat messages come through SSE)
+          if (channel !== "web_chat") {
+            if (channel === "voice" && msg.metadata?.call_transcript) {
+              newEvents.push({
+                id: evtId,
+                timestamp: evtTs,
+                data: {
+                  type: "call_transcript",
+                  direction:
+                    msg.direction ||
+                    (msg.role === "user" ? "inbound" : "outbound"),
+                  callerName:
+                    msg.metadata?.sender_name || msg.metadata?.caller_name,
+                  transcript: msg.content,
+                  durationSec: msg.metadata?.duration_sec,
+                  recordingUrl: msg.metadata?.recording_url,
+                },
+              });
+            } else {
+              newEvents.push({
+                id: evtId,
+                timestamp: evtTs,
+                data: {
+                  type: "channel_message",
+                  channel: channel as ChannelType,
+                  direction:
+                    msg.direction ||
+                    (msg.role === "user" ? "inbound" : "outbound"),
+                  content: msg.content,
+                  senderName: msg.metadata?.sender_name,
+                  from: msg.metadata?.from,
+                },
+              });
+            }
+          }
+        }
+
+        if (newEvents.length > 0 && !cancelled) {
+          // Use addEvent for each new cross-channel message
+          for (const evt of newEvents) {
+            addEvent(evt);
+          }
+        }
+
+        // Update poll timestamp to latest message
+        const latestTs = messages[messages.length - 1]?.created_at;
+        if (latestTs) lastPollTsRef.current = latestTs;
+      } catch {
+        // Silent fail — polling is best-effort
+      }
+    }, 8000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [historyLoaded, state.isLoading, state.events, addEvent]);
+
   // ── Reply handler ────────────────────────────────────────────────────────
 
   const handleReply = useCallback(

@@ -62,11 +62,19 @@ const TOOL_KEYWORDS = [
   "autonomi",
   "zaplanuj",
   "powiadomienie",
-  // Evolution
+  // Evolution & self-awareness
   "zdolności",
   "capabilities",
   "oceń",
   "reflexion",
+  "potrafisz",
+  "umiesz",
+  "kim jesteś",
+  "who are you",
+  "what can you",
+  "możliwości",
+  "funkcj",
+  "narzędzi",
   // Vision
   "obraz",
   "image",
@@ -82,7 +90,7 @@ const TOOL_KEYWORDS = [
 // Patterns indicating simple conversational queries (Gemini Flash — free)
 const SIMPLE_PATTERNS = [
   /^(cześć|hej|siema|hello|hi|hey|witaj|dzień dobry|dobry|yo)\b/i,
-  /^(co potrafisz|co umiesz|kim jesteś|what can you|who are you)/i,
+  // NOTE: "co potrafisz/co umiesz/kim jesteś" moved to TOOL_KEYWORDS — need tools to answer accurately
   /^(dzięk|thanks|thx|dziękuję|spoko)/i,
   /^(ok|okay|dobrze|rozumiem|jasne|super|fajnie|great|git|luzik)\s*[.!]?$/i,
   /^(jak się masz|co słychać|how are you|co tam)/i,

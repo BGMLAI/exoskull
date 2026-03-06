@@ -738,13 +738,13 @@ export async function runExoSkullAgent(
         finalText = textParts.join("");
 
         // Anti-hallucination guard: BLOCK action-promising text without tool calls
+        // Covers Polish AND English action verbs, fires on ANY turn where no tools were used
         const actionPatterns =
-          /\b(buduję|tworzę|piszę kod|konfiguruję|instaluję|wdrażam|deployuję|importuję|integruję|publikuję|koduję|generuję|implementuję)\b/i;
+          /\b(buduję|tworzę|piszę kod|konfiguruję|instaluję|wdrażam|deployuję|importuję|integruję|publikuję|koduję|generuję|implementuję|building|creating|writing|configuring|installing|deploying|importing|integrating|publishing|coding|generating|implementing|sending|calling|searching|analyzing|I'm building|I'm creating|I'm sending|I am building|I am creating)\b/i;
         if (
           finalText &&
           actionPatterns.test(finalText) &&
-          toolsUsed.length === 0 &&
-          numTurns === 1
+          toolsUsed.length === 0
         ) {
           logger.warn(
             "[ExoSkullAgent] Anti-hallucination: BLOCKED action text without tool calls",
@@ -1109,11 +1109,15 @@ function threadToOAIMessages(
     }
   }
 
-  // Ensure last message is user
-  const lastRole =
-    messages.length > 1 ? messages[messages.length - 1].role : null;
-  if (lastRole !== "user") {
-    messages.push({ role: "user", content: userMessage });
+  // Ensure last message is user with BIEŻĄCE POLECENIE marker
+  const lastMsg = messages.length > 1 ? messages[messages.length - 1] : null;
+  if (lastMsg && lastMsg.role === "user" && lastMsg.content === userMessage) {
+    lastMsg.content = `[BIEŻĄCE POLECENIE] ${userMessage}`;
+  } else {
+    messages.push({
+      role: "user",
+      content: `[BIEŻĄCE POLECENIE] ${userMessage}`,
+    });
   }
 
   return messages;
@@ -1177,7 +1181,7 @@ async function runOAIToolLoop(opts: {
     const body: Record<string, unknown> = {
       model,
       messages,
-      temperature: 0.7,
+      temperature: 0.4,
       max_tokens: 4096,
     };
     if (tools.length > 0) {
@@ -1207,7 +1211,36 @@ async function runOAIToolLoop(opts: {
 
     // No tool calls → final answer
     if (!toolCalls || toolCalls.length === 0) {
-      return { text: assistantMsg.content || "", toolsUsed };
+      const responseText = assistantMsg.content || "";
+      // Anti-hallucination guard for fallback providers
+      const actionPatterns =
+        /\b(buduję|tworzę|piszę kod|konfiguruję|instaluję|wdrażam|deployuję|importuję|integruję|publikuję|koduję|generuję|implementuję|building|creating|writing|configuring|installing|deploying|importing|integrating|publishing|coding|generating|implementing|sending|calling|I'm building|I'm creating|I'm sending)\b/i;
+      if (
+        responseText &&
+        actionPatterns.test(responseText) &&
+        toolsUsed.length === 0 &&
+        turns === 1
+      ) {
+        // Model is describing actions without calling tools — inject correction
+        logger.warn(
+          `[${label}] Anti-hallucination: action text without tool calls`,
+          {
+            textSnippet: responseText.slice(0, 200),
+          },
+        );
+        messages.push(
+          { role: "assistant", content: responseText },
+          {
+            role: "user",
+            content:
+              "[SYSTEM] Twoja odpowiedź opisuje działanie, ale NIE wywołałeś żadnego narzędzia. " +
+              "NIGDY nie opisuj budowania/tworzenia bez wywołania tool_use. " +
+              "Wywołaj odpowiednie narzędzie TERAZ albo powiedz szczerze co możesz zrobić.",
+          },
+        );
+        continue; // Retry with correction
+      }
+      return { text: responseText, toolsUsed };
     }
 
     // Add assistant message with tool_calls to history

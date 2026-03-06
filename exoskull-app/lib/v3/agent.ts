@@ -628,7 +628,7 @@ async function runOpenAIAgentFallback(
         tools: openaiTools,
         tool_choice: "auto",
         max_tokens: 4096,
-        temperature: 0.7,
+        temperature: 0.4,
       }),
     });
 
