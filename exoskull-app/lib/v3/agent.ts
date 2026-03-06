@@ -586,7 +586,7 @@ async function runOpenAIAgentFallback(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const messages: any[] = [
-    { role: "system", content: opts.systemPrompt.slice(0, 16000) },
+    { role: "system", content: opts.systemPrompt.slice(0, 24000) },
   ];
   for (const msg of opts.threadHistory.slice(-10)) {
     messages.push({
@@ -594,9 +594,19 @@ async function runOpenAIAgentFallback(
       content: typeof msg.content === "string" ? msg.content : "",
     });
   }
+  // Always mark current message clearly so model focuses on it
   const lastMsg = messages[messages.length - 1];
-  if (!lastMsg || lastMsg.role !== "user") {
-    messages.push({ role: "user", content: opts.userMessage });
+  if (
+    lastMsg &&
+    lastMsg.role === "user" &&
+    lastMsg.content === opts.userMessage
+  ) {
+    lastMsg.content = `[BIEŻĄCE POLECENIE] ${opts.userMessage}`;
+  } else {
+    messages.push({
+      role: "user",
+      content: `[BIEŻĄCE POLECENIE] ${opts.userMessage}`,
+    });
   }
 
   const toolsUsed: string[] = [];
@@ -727,7 +737,7 @@ async function runDeepSeekAgentFallback(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const messages: any[] = [
-    { role: "system", content: opts.systemPrompt.slice(0, 16000) },
+    { role: "system", content: opts.systemPrompt.slice(0, 24000) },
   ];
   for (const msg of opts.threadHistory.slice(-10)) {
     messages.push({
@@ -735,9 +745,19 @@ async function runDeepSeekAgentFallback(
       content: typeof msg.content === "string" ? msg.content : "",
     });
   }
+  // Always mark current message clearly so model focuses on it
   const lastMsg = messages[messages.length - 1];
-  if (!lastMsg || lastMsg.role !== "user") {
-    messages.push({ role: "user", content: opts.userMessage });
+  if (
+    lastMsg &&
+    lastMsg.role === "user" &&
+    lastMsg.content === opts.userMessage
+  ) {
+    lastMsg.content = `[BIEŻĄCE POLECENIE] ${opts.userMessage}`;
+  } else {
+    messages.push({
+      role: "user",
+      content: `[BIEŻĄCE POLECENIE] ${opts.userMessage}`,
+    });
   }
 
   const toolsUsed: string[] = [];
@@ -759,7 +779,7 @@ async function runDeepSeekAgentFallback(
         tools: dsTools,
         tool_choice: "auto",
         max_tokens: 4096,
-        temperature: 0.7,
+        temperature: 0.4,
       }),
     });
 
