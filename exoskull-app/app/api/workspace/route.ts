@@ -17,6 +17,7 @@ import {
   getPanels,
   removePanel,
   takeScreenshot,
+  isVpsAvailable,
 } from "@/lib/workspace/workspace-engine";
 import { logger } from "@/lib/logger";
 import { withApiLog } from "@/lib/api/request-logger";
@@ -31,7 +32,10 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
     if (!auth.ok) return auth.response;
 
     const session = await getOrCreateSession(auth.tenantId);
-    const panels = await getPanels(session.id);
+    const [panels, vpsAvailable] = await Promise.all([
+      getPanels(session.id),
+      isVpsAvailable(),
+    ]);
 
     return NextResponse.json({
       session: {
@@ -45,6 +49,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
         terminal_output: session.terminal_output,
       },
       panels,
+      vps_available: vpsAvailable,
     });
   } catch (error) {
     logger.error("[Workspace API] GET error:", error);

@@ -38,28 +38,31 @@ const openWorkspaceTool: V3ToolDefinition = {
   timeoutMs: 30_000,
   async execute(input, tenantId) {
     try {
-      const { getOrCreateSession, executeBrowserAction, addPanel } =
-        await import("@/lib/workspace/workspace-engine");
+      const {
+        getOrCreateSession,
+        executeBrowserAction,
+        addPanel,
+        isVpsAvailable,
+      } = await import("@/lib/workspace/workspace-engine");
 
       const session = await getOrCreateSession(tenantId);
       const url = input.url as string;
       const title = (input.title as string) || url;
+      const vpsUp = await isVpsAvailable();
 
-      // Try to navigate browser
-      try {
+      // VPS mode: navigate via CDP
+      if (vpsUp) {
         const result = await executeBrowserAction(session.id, tenantId, {
           type: "navigate",
           target: url,
         });
 
         if (result.success) {
-          return `Otworzyłem "${result.title || url}" w Shared Workspace. ${result.screenshot_url ? "Screenshot dostępny." : ""}`;
+          return `Otworzyłem "${result.title || url}" w Shared Workspace (VPS). ${result.screenshot_url ? "Screenshot dostępny." : ""}`;
         }
-      } catch {
-        // VPS not available — fall back to panel mode
       }
 
-      // Fallback: add as link preview panel (no VPS needed)
+      // Fallback: add as link preview panel (iframe, no VPS needed)
       await addPanel(session.id, tenantId, {
         panel_type: "link_preview",
         title,
@@ -68,7 +71,7 @@ const openWorkspaceTool: V3ToolDefinition = {
         position: { x: 0, y: 0, w: 12, h: 8 },
       });
 
-      return `Dodałem "${title}" jako panel w Shared Workspace. URL: ${url}`;
+      return `Dodałem "${title}" jako panel w Shared Workspace (iframe). URL: ${url}${!vpsUp ? " [VPS offline — tryb iframe]" : ""}`;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error("[WorkspaceTool] open_workspace failed:", { error: msg });
@@ -120,8 +123,12 @@ const workspaceActionTool: V3ToolDefinition = {
   timeoutMs: 30_000,
   async execute(input, tenantId) {
     try {
-      const { getOrCreateSession, executeBrowserAction } =
+      const { getOrCreateSession, executeBrowserAction, isVpsAvailable } =
         await import("@/lib/workspace/workspace-engine");
+
+      if (!(await isVpsAvailable())) {
+        return `VPS offline — akcja "${input.action}" wymaga wirtualnej przeglądarki na VPS. Użyj open_workspace aby otworzyć URL w iframe, lub poczekaj aż VPS będzie dostępny.`;
+      }
 
       const session = await getOrCreateSession(tenantId);
       const result = await executeBrowserAction(session.id, tenantId, {
@@ -179,8 +186,12 @@ const workspaceTerminalTool: V3ToolDefinition = {
   timeoutMs: 35_000,
   async execute(input, tenantId) {
     try {
-      const { getOrCreateSession, executeTerminal } =
+      const { getOrCreateSession, executeTerminal, isVpsAvailable } =
         await import("@/lib/workspace/workspace-engine");
+
+      if (!(await isVpsAvailable())) {
+        return `VPS offline — terminal wymaga działającego VPS. Komenda "${input.command}" nie może być wykonana.`;
+      }
 
       const session = await getOrCreateSession(tenantId);
       const result = await executeTerminal(

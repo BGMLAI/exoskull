@@ -164,10 +164,16 @@ export async function executeBrowserAction(
     const session = await ensureContainer(sessionId, tenantId);
 
     // Execute action on VPS
-    const result = await vpsRequest("/workspace/browser-action", {
+    const raw = await vpsRequest("/workspace/browser-action", {
       container_id: session.vps_container_id,
       action,
     });
+    const result = raw as {
+      url?: string;
+      title?: string;
+      screenshot_url?: string;
+      content?: string;
+    };
 
     const duration = Date.now() - startMs;
 
@@ -231,18 +237,25 @@ export async function executeTerminal(
   const supabase = getServiceSupabase();
   const session = await ensureContainer(sessionId, tenantId);
 
-  const result = await vpsRequest("/workspace/terminal", {
+  const raw = await vpsRequest("/workspace/terminal", {
     container_id: session.vps_container_id,
     command,
     timeout_ms: 30_000,
   });
+  const result = raw as {
+    stdout?: string;
+    stderr?: string;
+    exit_code?: number;
+  };
+
+  const output = result.stdout || result.stderr || "";
 
   // Update terminal output buffer
   await supabase
     .from("exo_workspace_sessions")
     .update({
       terminal_enabled: true,
-      terminal_output: result.stdout || result.stderr,
+      terminal_output: output,
       updated_at: new Date().toISOString(),
     })
     .eq("id", sessionId);
@@ -254,11 +267,11 @@ export async function executeTerminal(
     actor: "ai",
     action_type: "terminal_cmd",
     target: command,
-    result: (result.stdout || result.stderr)?.slice(0, 2000),
+    result: output.slice(0, 2000),
   });
 
   return {
-    output: result.stdout || result.stderr || "",
+    output,
     exitCode: result.exit_code || 0,
   };
 }
@@ -346,10 +359,11 @@ async function ensureContainer(
   }
 
   // Spin up new Chrome container on VPS
-  const result = await vpsRequest("/workspace/create", {
+  const raw = await vpsRequest("/workspace/create", {
     session_id: sessionId,
     tenant_id: tenantId,
   });
+  const result = raw as { container_id: string; cdp_endpoint: string };
 
   // Store container info
   await supabase
@@ -393,6 +407,32 @@ async function vpsRequest(
   }
 
   return response.json();
+}
+
+// ============================================================================
+// VPS HEALTH CHECK
+// ============================================================================
+
+let vpsStatusCache: { available: boolean; checkedAt: number } | null = null;
+const VPS_CACHE_TTL = 5 * 60 * 1000; // 5 min
+
+/** Check if VPS executor is reachable (cached 5 min) */
+export async function isVpsAvailable(): Promise<boolean> {
+  if (vpsStatusCache && Date.now() - vpsStatusCache.checkedAt < VPS_CACHE_TTL) {
+    return vpsStatusCache.available;
+  }
+
+  try {
+    const res = await fetch(`${VPS_URL}/health`, {
+      signal: AbortSignal.timeout(3_000),
+    });
+    const available = res.ok;
+    vpsStatusCache = { available, checkedAt: Date.now() };
+    return available;
+  } catch {
+    vpsStatusCache = { available: false, checkedAt: Date.now() };
+    return false;
+  }
 }
 
 // ============================================================================

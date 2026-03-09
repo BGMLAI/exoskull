@@ -11,10 +11,12 @@ import {
   RefreshCw,
   ArrowLeft,
   ArrowRight,
-  ChevronLeft,
   Monitor,
   Eye,
   MousePointer,
+  AlertTriangle,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 // ============================================================================
@@ -58,13 +60,16 @@ export function SharedWorkspace({
 }) {
   const [session, setSession] = useState<WorkspaceSession | null>(null);
   const [panels, setPanels] = useState<WorkspacePanel[]>([]);
+  const [vpsAvailable, setVpsAvailable] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<"browser" | "terminal" | "panels">(
     "browser",
   );
   const [terminalInput, setTerminalInput] = useState("");
   const [terminalHistory, setTerminalHistory] = useState<string[]>([]);
   const [urlInput, setUrlInput] = useState("");
+  const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<NodeJS.Timeout>();
 
@@ -72,24 +77,31 @@ export function SharedWorkspace({
   const fetchWorkspace = useCallback(async () => {
     try {
       const res = await fetch("/api/workspace");
-      if (!res.ok) return;
+      if (!res.ok) {
+        if (res.status === 401) {
+          setError("Nie zalogowano. Zaloguj się ponownie.");
+        }
+        return;
+      }
       const data = await res.json();
       setSession(data.session);
       setPanels(data.panels || []);
+      setVpsAvailable(data.vps_available ?? false);
+      setError(null);
       if (data.session?.browser_url && !urlInput) {
         setUrlInput(data.session.browser_url);
       }
     } catch {
-      // Silently ignore fetch errors
+      setError("Brak połączenia z serwerem.");
     } finally {
       setIsLoading(false);
     }
   }, [urlInput]);
 
-  // Poll for updates every 3s
+  // Poll for updates every 5s
   useEffect(() => {
     fetchWorkspace();
-    pollRef.current = setInterval(fetchWorkspace, 3000);
+    pollRef.current = setInterval(fetchWorkspace, 5000);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
@@ -101,23 +113,43 @@ export function SharedWorkspace({
     const fullUrl = url.startsWith("http") ? url : `https://${url}`;
     setUrlInput(fullUrl);
 
-    try {
-      const res = await fetch("/api/workspace", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "navigate", target: fullUrl }),
-      });
-      const data = await res.json();
-      if (data.url) setUrlInput(data.url);
-      fetchWorkspace();
-    } catch {
-      // Ignore
+    if (vpsAvailable) {
+      // VPS mode: navigate via CDP
+      try {
+        const res = await fetch("/api/workspace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "navigate", target: fullUrl }),
+        });
+        const data = await res.json();
+        if (data.url) setUrlInput(data.url);
+        if (!data.success) {
+          setError(`Nawigacja nie powiodła się: ${data.error || "unknown"}`);
+        }
+        fetchWorkspace();
+      } catch {
+        setError("Błąd połączenia z VPS.");
+      }
+    } else {
+      // Iframe mode: load directly
+      setIframeUrl(fullUrl);
     }
   };
 
   // Execute terminal command
   const handleTerminal = async () => {
     if (!terminalInput.trim()) return;
+
+    if (!vpsAvailable) {
+      setTerminalHistory((prev) => [
+        ...prev,
+        `$ ${terminalInput}`,
+        "Error: VPS offline — terminal niedostępny.",
+      ]);
+      setTerminalInput("");
+      return;
+    }
+
     const cmd = terminalInput;
     setTerminalInput("");
     setTerminalHistory((prev) => [...prev, `$ ${cmd}`]);
@@ -137,10 +169,24 @@ export function SharedWorkspace({
       ]);
     }
 
-    // Auto-scroll terminal
     setTimeout(() => {
       terminalRef.current?.scrollTo(0, terminalRef.current.scrollHeight);
     }, 100);
+  };
+
+  // Browser action helper (back/forward/refresh)
+  const browserAction = async (action: string) => {
+    if (!vpsAvailable) return;
+    try {
+      await fetch("/api/workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      fetchWorkspace();
+    } catch {
+      // ignore
+    }
   };
 
   // Toggle control mode
@@ -154,7 +200,21 @@ export function SharedWorkspace({
       });
       fetchWorkspace();
     } catch {
-      // Ignore
+      // ignore
+    }
+  };
+
+  // Remove panel
+  const handleRemovePanel = async (panelId: string) => {
+    try {
+      await fetch("/api/workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove_panel", panel_id: panelId }),
+      });
+      setPanels((prev) => prev.filter((p) => p.id !== panelId));
+    } catch {
+      // ignore
     }
   };
 
@@ -169,11 +229,27 @@ export function SharedWorkspace({
         <div className="flex items-center gap-2">
           <Monitor className="w-4 h-4 text-cyan-400" />
           <span className="text-xs font-medium text-cyan-300 tracking-wide uppercase">
-            Shared Workspace
+            Workspace
           </span>
+          {/* VPS status badge */}
+          {vpsAvailable !== null && (
+            <span
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                vpsAvailable
+                  ? "bg-green-500/10 text-green-400"
+                  : "bg-yellow-500/10 text-yellow-400"
+              }`}
+            >
+              {vpsAvailable ? (
+                <Wifi className="w-2.5 h-2.5" />
+              ) : (
+                <WifiOff className="w-2.5 h-2.5" />
+              )}
+              {vpsAvailable ? "VPS" : "iframe"}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
-          {/* Control mode indicator */}
           <button
             onClick={handleControlToggle}
             className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors ${
@@ -210,6 +286,14 @@ export function SharedWorkspace({
         </div>
       </div>
 
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border-b border-red-500/20 text-xs text-red-400">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+          {error}
+        </div>
+      )}
+
       {/* Tab bar */}
       <div className="flex border-b border-cyan-900/20 bg-[#0d0d15]">
         {(
@@ -235,6 +319,11 @@ export function SharedWorkspace({
                 {panels.length}
               </span>
             )}
+            {key === "terminal" && !vpsAvailable && (
+              <span className="ml-1 px-1 py-0.5 bg-yellow-500/10 rounded text-[9px] text-yellow-500">
+                offline
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -256,36 +345,24 @@ export function SharedWorkspace({
                 {/* URL Bar */}
                 <div className="flex items-center gap-2 px-2 py-1.5 bg-[#111118] border-b border-cyan-900/20">
                   <button
-                    onClick={() =>
-                      fetch("/api/workspace", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ action: "back" }),
-                      }).then(() => fetchWorkspace())
-                    }
-                    className="p-1 hover:bg-white/5 rounded"
+                    onClick={() => browserAction("back")}
+                    className="p-1 hover:bg-white/5 rounded disabled:opacity-30"
+                    disabled={!vpsAvailable}
                   >
                     <ArrowLeft className="w-3.5 h-3.5 text-gray-500" />
                   </button>
                   <button
-                    onClick={() =>
-                      fetch("/api/workspace", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ action: "forward" }),
-                      }).then(() => fetchWorkspace())
-                    }
-                    className="p-1 hover:bg-white/5 rounded"
+                    onClick={() => browserAction("forward")}
+                    className="p-1 hover:bg-white/5 rounded disabled:opacity-30"
+                    disabled={!vpsAvailable}
                   >
                     <ArrowRight className="w-3.5 h-3.5 text-gray-500" />
                   </button>
                   <button
                     onClick={() =>
-                      fetch("/api/workspace", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ action: "refresh" }),
-                      }).then(() => fetchWorkspace())
+                      vpsAvailable
+                        ? browserAction("refresh")
+                        : iframeUrl && setIframeUrl(iframeUrl)
                     }
                     className="p-1 hover:bg-white/5 rounded"
                   >
@@ -302,21 +379,30 @@ export function SharedWorkspace({
                       type="text"
                       value={urlInput}
                       onChange={(e) => setUrlInput(e.target.value)}
-                      placeholder="Enter URL or search..."
+                      placeholder="Enter URL..."
                       className="w-full px-3 py-1 bg-[#1a1a25] border border-cyan-900/20 rounded text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-cyan-500/40"
                     />
                   </form>
                 </div>
 
                 {/* Browser content */}
-                <div className="flex-1 overflow-auto">
-                  {session?.browser_screenshot_url ? (
+                <div className="flex-1 overflow-auto relative">
+                  {vpsAvailable && session?.browser_screenshot_url ? (
+                    // VPS mode: show screenshot
                     <img
                       src={session.browser_screenshot_url}
                       alt={session.browser_title || "Browser"}
                       className="w-full"
                     />
-                  ) : session?.browser_url ? (
+                  ) : iframeUrl || (!vpsAvailable && urlInput) ? (
+                    // Iframe mode: load URL directly
+                    <iframe
+                      src={iframeUrl || urlInput}
+                      className="w-full h-full border-0"
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                      title="Workspace Browser"
+                    />
+                  ) : session?.browser_url && vpsAvailable ? (
                     <div className="flex items-center justify-center h-full text-xs text-gray-500">
                       Loading {session.browser_url}...
                     </div>
@@ -327,8 +413,9 @@ export function SharedWorkspace({
                         No page loaded yet
                       </p>
                       <p className="text-xs text-gray-600 max-w-xs text-center">
-                        Ask IORS to open a URL, or type one above. AI can browse
-                        the web and you can watch in real-time.
+                        {vpsAvailable
+                          ? "Ask IORS to open a URL, or type one above. AI can browse the web and you can watch in real-time."
+                          : "Type a URL above to browse. VPS is offline — using iframe mode (some sites may block embedding)."}
                       </p>
                     </div>
                   )}
@@ -339,6 +426,12 @@ export function SharedWorkspace({
             {/* Terminal Tab */}
             {activeTab === "terminal" && (
               <div className="flex flex-col h-full">
+                {!vpsAvailable && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/5 border-b border-yellow-500/10 text-xs text-yellow-500">
+                    <WifiOff className="w-3.5 h-3.5" />
+                    VPS offline — terminal niedostępny
+                  </div>
+                )}
                 <div
                   ref={terminalRef}
                   className="flex-1 overflow-auto p-3 font-mono text-xs bg-[#0a0a0f]"
@@ -348,7 +441,9 @@ export function SharedWorkspace({
                       <div className="text-gray-600">
                         <p>ExoSkull VPS Terminal</p>
                         <p className="mt-1">
-                          Type a command below or ask IORS to run something.
+                          {vpsAvailable
+                            ? "Type a command below or ask IORS to run something."
+                            : "VPS is offline. Terminal will work when VPS is back online."}
                         </p>
                         <p className="mt-1 text-cyan-700">$ _</p>
                       </div>
@@ -387,8 +482,11 @@ export function SharedWorkspace({
                     type="text"
                     value={terminalInput}
                     onChange={(e) => setTerminalInput(e.target.value)}
-                    placeholder="Enter command..."
-                    className="flex-1 px-1 py-2 bg-transparent text-xs text-gray-200 font-mono placeholder-gray-600 focus:outline-none"
+                    placeholder={
+                      vpsAvailable ? "Enter command..." : "VPS offline..."
+                    }
+                    disabled={!vpsAvailable}
+                    className="flex-1 px-1 py-2 bg-transparent text-xs text-gray-200 font-mono placeholder-gray-600 focus:outline-none disabled:opacity-40"
                   />
                 </form>
               </div>
@@ -423,26 +521,35 @@ export function SharedWorkspace({
                               {panel.title}
                             </span>
                           </div>
+                          <button
+                            onClick={() => handleRemovePanel(panel.id)}
+                            className="p-0.5 hover:bg-white/5 rounded"
+                          >
+                            <X className="w-3 h-3 text-gray-500" />
+                          </button>
                         </div>
                         {/* Panel content */}
-                        <div className="p-3 max-h-80 overflow-auto">
+                        <div className="max-h-96 overflow-auto">
                           {panel.url && (
-                            <a
-                              href={panel.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-cyan-400 hover:underline"
-                            >
-                              {panel.url}
-                            </a>
+                            <iframe
+                              src={panel.url}
+                              className="w-full h-64 border-0"
+                              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                              title={panel.title}
+                            />
                           )}
                           {panel.content && (
-                            <div
-                              className="text-xs text-gray-300 prose prose-invert prose-sm max-w-none"
-                              dangerouslySetInnerHTML={{
-                                __html: panel.content,
-                              }}
+                            <iframe
+                              srcDoc={panel.content}
+                              className="w-full h-64 border-0 bg-white"
+                              sandbox="allow-scripts"
+                              title={panel.title}
                             />
+                          )}
+                          {!panel.url && !panel.content && (
+                            <div className="p-3 text-xs text-gray-500">
+                              Empty panel
+                            </div>
                           )}
                         </div>
                       </div>
