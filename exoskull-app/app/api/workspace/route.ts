@@ -28,9 +28,7 @@ export const maxDuration = 60;
 export const GET = withApiLog(async function GET(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
-    if (!auth.tenantId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (!auth.ok) return auth.response;
 
     const session = await getOrCreateSession(auth.tenantId);
     const panels = await getPanels(session.id);
@@ -61,9 +59,7 @@ export const GET = withApiLog(async function GET(req: NextRequest) {
 export const POST = withApiLog(async function POST(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
-    if (!auth.tenantId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (!auth.ok) return auth.response;
 
     const body = await req.json();
     const { action } = body;
@@ -162,9 +158,7 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
 export const DELETE = withApiLog(async function DELETE(req: NextRequest) {
   try {
     const auth = await verifyTenantAuth(req);
-    if (!auth.tenantId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (!auth.ok) return auth.response;
 
     const session = await getOrCreateSession(auth.tenantId);
     await endSession(session.id);
