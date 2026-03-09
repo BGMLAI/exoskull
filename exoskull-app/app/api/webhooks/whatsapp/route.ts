@@ -114,10 +114,11 @@ export const POST = withApiLog(async function POST(req: NextRequest) {
     const rawBody = await req.text();
 
     // Verify X-Hub-Signature-256 (mandatory)
-    const appSecret = process.env.META_APP_SECRET;
+    const appSecret =
+      process.env.META_APP_SECRET || process.env.FACEBOOK_APP_SECRET;
     if (!appSecret) {
       logger.error(
-        "[WhatsApp] META_APP_SECRET not configured — rejecting request",
+        "[WhatsApp] META_APP_SECRET / FACEBOOK_APP_SECRET not configured — rejecting request",
       );
       return NextResponse.json({ error: "Not configured" }, { status: 500 });
     }

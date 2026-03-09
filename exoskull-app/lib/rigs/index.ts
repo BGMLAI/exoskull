@@ -65,51 +65,7 @@ export const RIG_DEFINITIONS = {
     },
   },
 
-  oura: {
-    slug: "oura" as const,
-    name: "Oura Ring",
-    description: "Sleep, HRV, readiness, and activity data",
-    icon: "💍",
-    category: "health" as const,
-    oauth: {
-      authUrl: "https://cloud.ouraring.com/oauth/authorize",
-      tokenUrl: "https://api.ouraring.com/oauth/token",
-      scopes: ["daily", "heartrate", "workout", "tag", "session"],
-      clientIdEnv: "OURA_CLIENT_ID",
-      clientSecretEnv: "OURA_CLIENT_SECRET",
-    },
-    api: {
-      baseUrl: "https://api.ouraring.com/v2",
-      rateLimit: { requests: 1000, period: "day" as const },
-    },
-    sync: {
-      frequency: "hourly" as const,
-      dataTypes: ["sleep", "activity", "readiness", "heart_rate"],
-    },
-  },
-
-  fitbit: {
-    slug: "fitbit" as const,
-    name: "Fitbit",
-    description: "Steps, sleep, heart rate from Fitbit devices",
-    icon: "⌚",
-    category: "health" as const,
-    oauth: {
-      authUrl: "https://www.fitbit.com/oauth2/authorize",
-      tokenUrl: "https://api.fitbit.com/oauth2/token",
-      scopes: ["activity", "heartrate", "sleep", "profile"],
-      clientIdEnv: "FITBIT_CLIENT_ID",
-      clientSecretEnv: "FITBIT_CLIENT_SECRET",
-    },
-    api: {
-      baseUrl: "https://api.fitbit.com/1/user/-",
-      rateLimit: { requests: 150, period: "hour" as const },
-    },
-    sync: {
-      frequency: "daily" as const,
-      dataTypes: ["sleep", "activity", "heart_rate"],
-    },
-  },
+  // Q1: oura, fitbit REMOVED — SuperIntegrator only (PRODUCT_DECISIONS_v1.md)
 
   "google-calendar": {
     slug: "google-calendar" as const,
@@ -137,51 +93,7 @@ export const RIG_DEFINITIONS = {
     },
   },
 
-  notion: {
-    slug: "notion" as const,
-    name: "Notion",
-    description: "Databases, pages, and notes",
-    icon: "📓",
-    category: "productivity" as const,
-    oauth: {
-      authUrl: "https://api.notion.com/v1/oauth/authorize",
-      tokenUrl: "https://api.notion.com/v1/oauth/token",
-      scopes: [],
-      clientIdEnv: "NOTION_CLIENT_ID",
-      clientSecretEnv: "NOTION_CLIENT_SECRET",
-    },
-    api: {
-      baseUrl: "https://api.notion.com/v1",
-      rateLimit: { requests: 3, period: "second" as const },
-    },
-    sync: {
-      frequency: "hourly" as const,
-      dataTypes: ["databases", "pages"],
-    },
-  },
-
-  todoist: {
-    slug: "todoist" as const,
-    name: "Todoist",
-    description: "Tasks and projects",
-    icon: "✅",
-    category: "productivity" as const,
-    oauth: {
-      authUrl: "https://todoist.com/oauth/authorize",
-      tokenUrl: "https://todoist.com/oauth/access_token",
-      scopes: ["data:read_write"],
-      clientIdEnv: "TODOIST_CLIENT_ID",
-      clientSecretEnv: "TODOIST_CLIENT_SECRET",
-    },
-    api: {
-      baseUrl: "https://api.todoist.com/rest/v2",
-      rateLimit: { requests: 450, period: "minute" as const },
-    },
-    sync: {
-      frequency: "realtime" as const,
-      dataTypes: ["tasks", "projects"],
-    },
-  },
+  // Q1: notion, todoist REMOVED — SuperIntegrator only (PRODUCT_DECISIONS_v1.md)
 
   "philips-hue": {
     slug: "philips-hue" as const,

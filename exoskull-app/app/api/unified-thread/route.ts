@@ -24,6 +24,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
     const channel = searchParams.get("channel"); // email, sms, voice, web_chat, etc.
     const direction = searchParams.get("direction"); // inbound, outbound
     const unreadOnly = searchParams.get("unread") === "true";
+    const since = searchParams.get("since"); // ISO timestamp — return only messages after this time
     const limit = Math.min(
       parseInt(searchParams.get("limit") || "50", 10),
       100,
@@ -37,7 +38,7 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
       .from("exo_unified_messages")
       .select("*", { count: "exact" })
       .eq("tenant_id", tenantId)
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: since ? true : false })
       .range(offset, offset + limit - 1);
 
     // Apply filters
@@ -47,6 +48,10 @@ export const GET = withApiLog(async function GET(request: NextRequest) {
 
     if (direction) {
       query = query.eq("direction", direction);
+    }
+
+    if (since) {
+      query = query.gt("created_at", since);
     }
 
     if (unreadOnly) {

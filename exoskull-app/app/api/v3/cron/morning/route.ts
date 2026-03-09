@@ -21,10 +21,20 @@ export async function GET(req: Request) {
   const results: { tenantId: string; status: string }[] = [];
 
   try {
-    const { data: tenants } = await supabase
+    const { data: tenants, error: tenantsError } = await supabase
       .from("exo_tenants")
       .select("id, name, preferred_channel, quiet_hours_start, quiet_hours_end")
-      .not("subscription_status", "in", "(cancelled,suspended)");
+      .in("subscription_status", ["active", "trialing", "trial"]);
+
+    if (tenantsError) {
+      console.error("[Morning] Failed to fetch tenants:", {
+        error: tenantsError,
+      });
+      return NextResponse.json(
+        { error: "Failed to fetch tenants" },
+        { status: 500 },
+      );
+    }
 
     if (!tenants?.length) {
       return NextResponse.json({ message: "No active tenants", results: [] });
@@ -64,21 +74,27 @@ async function generateMorningBriefing(
   userName: string | null,
 ) {
   // Gather context: goals, tasks, yesterday's actions
-  const [goalsResult, tasksResult, actionsResult] = await Promise.all([
+  const [goalsResult, tasksResult, actionsResult] = await Promise.all<{
+    data: unknown[] | null;
+    error: unknown;
+  }>([
+    // Graph DB: goals are nodes with type='goal'
     supabase
-      .from("user_loops")
-      .select("title, priority, status, metadata")
+      .from("nodes")
+      .select("name, status, metadata")
       .eq("tenant_id", tenantId)
       .eq("type", "goal")
       .in("status", ["active", "pending"])
-      .order("priority", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(5),
+    // Graph DB: tasks are nodes with type='task'
     supabase
-      .from("user_ops")
-      .select("title, priority, status, metadata")
+      .from("nodes")
+      .select("name, status, metadata")
       .eq("tenant_id", tenantId)
+      .eq("type", "task")
       .in("status", ["pending", "active"])
-      .order("priority", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("exo_autonomy_log")
@@ -91,9 +107,40 @@ async function generateMorningBriefing(
       .limit(10),
   ]);
 
-  const goals = goalsResult.data || [];
-  const tasks = tasksResult.data || [];
-  const actions = actionsResult.data || [];
+  if (goalsResult.error)
+    console.error(
+      `[Morning] Goals query failed for ${tenantId}:`,
+      goalsResult.error,
+    );
+  if (tasksResult.error)
+    console.error(
+      `[Morning] Tasks query failed for ${tenantId}:`,
+      tasksResult.error,
+    );
+  if (actionsResult.error)
+    console.error(
+      `[Morning] Actions query failed for ${tenantId}:`,
+      actionsResult.error,
+    );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const goals = ((goalsResult.data || []) as any[]).map((g) => ({
+    title: (g.name || g.title) as string,
+    priority: (g.metadata?.priority as number) || 5,
+    status: g.status as string,
+    metadata: g.metadata,
+  }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tasks = ((tasksResult.data || []) as any[]).map((t) => ({
+    title: (t.name || t.title) as string,
+    status: t.status as string,
+    priority: (t.metadata?.priority as number) || 5,
+    metadata: t.metadata,
+  }));
+  const actions = (actionsResult.data || []) as {
+    event_type: string;
+    payload: unknown;
+  }[];
 
   if (!goals.length && !tasks.length) return; // Nothing to brief about
 

@@ -229,7 +229,7 @@ async function handler(req: NextRequest) {
                   source: "loop-15",
                   payload: {
                     reason: parsed.reason,
-                    handler: "run_mape_k",
+                    handler: "observation",
                   },
                   dedupKey: `loop15:observation:${tenant.tenant_id}:${new Date().toISOString().slice(0, 13)}`,
                 });
@@ -361,62 +361,7 @@ async function handler(req: NextRequest) {
       }
     }
 
-    // Step 5: Baseline Monitor — suggest goals for tenants with <3 goals
-    // Only run if genuinely enough time (non-critical, can skip)
-    let baselineResult = null;
-    if (activeTenantForGoals && hasTime(12_000)) {
-      try {
-        const { getServiceSupabase } = await import("@/lib/supabase/service");
-        const sb = getServiceSupabase();
-        const { count } = await sb
-          .from("exo_user_goals")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", activeTenantForGoals.tenantId)
-          .eq("is_active", true);
-
-        if ((count || 0) < 3) {
-          const { runBaselineMonitor } =
-            await import("@/lib/goals/baseline-monitor");
-          baselineResult = await runBaselineMonitor(
-            activeTenantForGoals.tenantId,
-          );
-        }
-      } catch (baselineErr) {
-        logger.error("[Loop15] Baseline monitor failed:", {
-          error:
-            baselineErr instanceof Error ? baselineErr.message : baselineErr,
-        });
-      }
-    }
-
-    // Step 6: MAPE-K fallback — only for observation tenants if significant time remains
-    // This is expensive (multiple AI calls), skip aggressively to prevent timeout.
-    let mapekResult = null;
-    const observationTenants = evaluationResults.filter(
-      (r) =>
-        r.action === "observation" &&
-        r.tenantId !== activeTenantForGoals?.tenantId,
-    );
-    if (observationTenants.length > 0 && hasTime(15_000)) {
-      try {
-        const { runAutonomyCycle } = await import("@/lib/autonomy/mape-k-loop");
-        mapekResult = await runAutonomyCycle(
-          observationTenants[0].tenantId,
-          "cron",
-          "loop-15-observation",
-        );
-        logger.info("[Loop15] MAPE-K cycle completed:", {
-          tenantId: observationTenants[0].tenantId,
-          proposed: mapekResult.plan.interventions.length,
-          executed: mapekResult.execute.interventionsExecuted,
-          durationMs: mapekResult.durationMs,
-        });
-      } catch (mapekErr) {
-        logger.error("[Loop15] MAPE-K cycle failed:", {
-          error: mapekErr instanceof Error ? mapekErr.message : mapekErr,
-        });
-      }
-    }
+    // Steps 5-6: baseline-monitor + MAPE-K removed in v3 cleanup
 
     return NextResponse.json({
       ok: true,
@@ -429,22 +374,6 @@ async function handler(req: NextRequest) {
             actionsExecuted: goalOrchResult.actionsExecuted,
             outcomes: goalOrchResult.outcomes.length,
             durationMs: goalOrchResult.durationMs,
-          }
-        : null,
-      baseline: baselineResult
-        ? {
-            suggestions: baselineResult.suggestions.length,
-            notified: baselineResult.notified,
-          }
-        : null,
-      mapek: mapekResult
-        ? {
-            tenantId: mapekResult.tenantId,
-            issues: mapekResult.analyze.issues.length,
-            proposed: mapekResult.plan.interventions.length,
-            executed: mapekResult.execute.interventionsExecuted,
-            learnings: mapekResult.knowledge.learnings.length,
-            durationMs: mapekResult.durationMs,
           }
         : null,
       evaluations: evaluationResults,

@@ -82,7 +82,8 @@ export function BehaviorPresetsSection() {
         const res = await fetch("/api/settings/personality");
         if (!res.ok) throw new Error("Nie udalo sie pobrac danych");
         const data = await res.json();
-        setActivePresets(data.behaviorPresets || []);
+        const presets = data.behaviorPresets;
+        setActivePresets(Array.isArray(presets) ? presets : []);
       } catch (err) {
         console.error("[BehaviorPresetsSection] Load error:", {
           error: err instanceof Error ? err.message : err,

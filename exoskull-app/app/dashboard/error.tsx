@@ -16,9 +16,9 @@ export default function DashboardError({
   return (
     <div className="flex items-center justify-center h-full min-h-[50vh] p-6">
       <div className="max-w-md text-center space-y-4">
-        <h2 className="text-xl font-semibold">Blad ladowania</h2>
+        <h2 className="text-xl font-semibold">Błąd ładowania</h2>
         <p className="text-muted-foreground text-sm">
-          Nie udalo sie zaladowac tej strony. Sprobuj ponownie.
+          Nie udało się załadować tej strony. Spróbuj ponownie.
         </p>
         {error.digest && (
           <p className="text-xs text-muted-foreground font-mono">
@@ -29,7 +29,7 @@ export default function DashboardError({
           onClick={reset}
           className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:opacity-90 transition"
         >
-          Sprobuj ponownie
+          Spróbuj ponownie
         </button>
       </div>
     </div>

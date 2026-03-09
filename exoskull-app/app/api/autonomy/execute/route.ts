@@ -11,12 +11,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
-import {
-  runAutonomyCycle,
-  executeAction,
-  getPermissionModel,
-} from "@/lib/autonomy";
-import { detectGaps, optimizeSystem, checkAndSpawnAgents } from "@/lib/agents";
+import { executeAction, getPermissionModel } from "@/lib/autonomy";
+import { detectGaps, checkAndSpawnAgents } from "@/lib/agents";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 import { logger } from "@/lib/logger";
@@ -186,20 +182,8 @@ async function handleRunCycle(
   const trigger = (params.trigger as "cron" | "event" | "manual") || "manual";
   const triggerEvent = params.triggerEvent as string | undefined;
 
-  logger.info(`[Autonomy Execute] Running MAPE-K cycle for ${tenantId}`);
-
-  const result = await runAutonomyCycle(tenantId, trigger, triggerEvent);
-
-  return {
-    success: result.success,
-    cycleId: result.cycleId,
-    durationMs: result.durationMs,
-    interventionsProposed: result.plan.interventions.length,
-    interventionsExecuted: result.execute.interventionsExecuted,
-    issues: result.analyze.issues.length,
-    gaps: result.analyze.gaps.length,
-    error: result.error,
-  };
+  logger.info(`[Autonomy Execute] MAPE-K cycle deprecated for ${tenantId}`);
+  return { success: false, error: "MAPE-K cycle removed in v3" };
 }
 
 async function handleExecuteAction(
@@ -387,15 +371,10 @@ async function handleOptimize(
 ): Promise<Record<string, unknown>> {
   const forceRun = (params.forceRun as boolean) ?? true;
 
-  logger.info(`[Autonomy Execute] Running self-optimization for ${tenantId}`);
-
-  const result = await optimizeSystem(tenantId, forceRun);
-
-  return {
-    success: result.success,
-    result: result.result,
-    error: result.error,
-  };
+  logger.info(
+    `[Autonomy Execute] Self-optimization deprecated for ${tenantId}`,
+  );
+  return { success: false, error: "Self-optimization removed in v3" };
 }
 
 async function handleSpawnAgents(

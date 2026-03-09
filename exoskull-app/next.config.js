@@ -2,6 +2,7 @@ const { withSentryConfig } = require("@sentry/nextjs");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ['@google/genai', '@anthropic-ai/sdk'],
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',
@@ -27,7 +28,21 @@ const nextConfig = {
   async headers() {
     return [
       {
-        source: '/(.*)',
+        // Generated apps — permissive CSP (allow CDN scripts like Tailwind)
+        source: '/api/apps/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; img-src * data: blob:; font-src *; connect-src *; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com;"
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN'
+          }
+        ]
+      },
+      {
+        source: '/((?!api/apps/).*)',
         headers: [
           {
             key: 'Content-Security-Policy',

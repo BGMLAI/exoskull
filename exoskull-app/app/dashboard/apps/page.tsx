@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
-import { AppGallery } from "@/components/apps/AppGallery";
+import { ChatView } from "@/components/stream/ChatView";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Aplikacje" };
 
+/**
+ * K224: Apps page — chat-driven.
+ * AI uses build_app tool to create and list user apps.
+ */
 export default function AppsPage() {
-  return <AppGallery />;
+  return (
+    <ChatView initialMessage="Pokaż moje aplikacje — co zostało zbudowane?" />
+  );
 }

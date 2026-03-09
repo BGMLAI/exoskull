@@ -20,7 +20,7 @@ import { logger } from "@/lib/logger";
 export const taskTools: ToolDefinition[] = [
   {
     definition: {
-      name: "add_task",
+      name: "create_task",
       description: "Dodaj nowe zadanie do listy użytkownika",
       input_schema: {
         type: "object" as const,

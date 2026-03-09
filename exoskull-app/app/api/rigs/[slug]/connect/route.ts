@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
-import { createClient } from "@/lib/supabase/server";
+import { getServiceSupabase } from "@/lib/supabase/service";
 import { getOAuthConfig, buildAuthUrl, supportsOAuth } from "@/lib/rigs/oauth";
 import { randomBytes } from "crypto";
 
@@ -59,41 +59,60 @@ export const GET = withApiLog(async function GET(
     // Generate state token
     const state = randomBytes(32).toString("hex");
 
-    // Store state in database for verification
-    const supabase = await createClient();
-    const { error: stateError } = await supabase
-      .from("exo_rig_connections")
-      .upsert(
-        {
-          tenant_id: tenantId,
-          rig_slug: slug,
-          metadata: {
-            oauth_state: state,
-            oauth_initiated_at: new Date().toISOString(),
-          },
-          sync_status: "pending",
-        },
-        {
-          onConflict: "tenant_id,rig_slug",
-        },
-      );
+    // Store state in database for verification (service role to bypass RLS)
+    const supabase = getServiceSupabase();
 
-    if (stateError) {
-      logger.error("[OAuth] Failed to store state:", stateError);
-      return NextResponse.json(
-        { error: "Failed to initiate OAuth flow" },
-        { status: 500 },
-      );
+    // Bug 5 fix: Don't overwrite if pending state < 5 min old (retry protection)
+    const { data: existingConn } = await supabase
+      .from("exo_rig_connections")
+      .select("metadata")
+      .eq("tenant_id", tenantId)
+      .eq("rig_slug", slug)
+      .single();
+
+    const pendingState = existingConn?.metadata?.oauth_state;
+    const initiatedAt = existingConn?.metadata?.oauth_initiated_at;
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const reusePendingState =
+      pendingState && initiatedAt && initiatedAt > fiveMinAgo;
+    const effectiveState = reusePendingState ? pendingState : state;
+
+    if (!reusePendingState) {
+      const { error: stateError } = await supabase
+        .from("exo_rig_connections")
+        .upsert(
+          {
+            tenant_id: tenantId,
+            rig_slug: slug,
+            metadata: {
+              oauth_state: effectiveState,
+              oauth_initiated_at: new Date().toISOString(),
+            },
+            sync_status: "pending",
+          },
+          {
+            onConflict: "tenant_id,rig_slug",
+          },
+        );
+
+      if (stateError) {
+        logger.error("[OAuth] Failed to store state:", stateError);
+        return NextResponse.json(
+          { error: "Failed to initiate OAuth flow" },
+          { status: 500 },
+        );
+      }
     }
 
     // Build auth URL and redirect
-    const authUrl = buildAuthUrl(config, state);
+    const authUrl = buildAuthUrl(config, effectiveState);
 
     logger.info(`[OAuth] Redirecting to ${slug} auth`, {
       userId: tenantId,
       redirectUri: config.redirectUri,
       scopeCount: config.scopes.length,
       authUrlLength: authUrl.length,
+      reusedState: !!reusePendingState,
     });
 
     return NextResponse.redirect(authUrl);

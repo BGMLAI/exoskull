@@ -5,7 +5,7 @@
  * Thin wrappers around existing Twilio/Resend infrastructure.
  */
 
-import type { V3ToolDefinition } from "./index";
+import { type V3ToolDefinition, errMsg } from "./index";
 
 // ============================================================================
 // #1 send_sms — Twilio SMS
@@ -55,10 +55,10 @@ const sendSmsTool: V3ToolDefinition = {
         const supabase = getServiceSupabase();
         const { data } = await supabase
           .from("exo_tenants")
-          .select("phone_number")
+          .select("phone")
           .eq("id", tenantId)
           .single();
-        toNumber = data?.phone_number || toNumber;
+        toNumber = data?.phone || toNumber;
       }
 
       if (!toNumber)
@@ -116,7 +116,7 @@ const sendSmsTool: V3ToolDefinition = {
 
       return `📱 SMS wysłany do ${toNumber}: "${message.slice(0, 100)}${message.length > 100 ? "..." : ""}" (SID: ${result.sid})`;
     } catch (err) {
-      return `Błąd SMS: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd SMS: ${errMsg(err)}`;
     }
   },
 };
@@ -172,24 +172,37 @@ const sendEmailTool: V3ToolDefinition = {
       if (!toEmail)
         return "Brak adresu email. Podaj email lub ustaw w profilu.";
 
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${resendKey}`,
-        },
-        body: JSON.stringify({
-          from: "ExoSkull <noreply@exoskull.app>",
-          to: [toEmail],
-          subject: input.subject as string,
-          text: input.body as string,
-        }),
-        signal: AbortSignal.timeout(10_000),
-      });
+      // Try verified domain first, fallback to Resend test address
+      const fromAddresses = [
+        "ExoSkull <noreply@exoskull.xyz>",
+        "Onboarding <onboarding@resend.dev>",
+      ];
 
-      if (!response.ok) {
-        const err = await response.text();
-        return `Błąd email: ${response.status} — ${err.slice(0, 200)}`;
+      let response: Response | null = null;
+      let lastErr = "";
+
+      for (const fromAddr of fromAddresses) {
+        response = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${resendKey}`,
+          },
+          body: JSON.stringify({
+            from: fromAddr,
+            to: [toEmail],
+            subject: input.subject as string,
+            text: input.body as string,
+          }),
+          signal: AbortSignal.timeout(10_000),
+        });
+
+        if (response.ok) break;
+        lastErr = await response.text();
+      }
+
+      if (!response?.ok) {
+        return `Błąd email: ${response?.status} — ${lastErr.slice(0, 200)}`;
       }
 
       const result = await response.json();
@@ -209,7 +222,7 @@ const sendEmailTool: V3ToolDefinition = {
 
       return `📧 Email wysłany do ${toEmail}: "${input.subject}" (ID: ${result.id})`;
     } catch (err) {
-      return `Błąd email: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd email: ${errMsg(err)}`;
     }
   },
 };
@@ -266,10 +279,10 @@ const makeCallTool: V3ToolDefinition = {
         const supabase = getServiceSupabase();
         const { data } = await supabase
           .from("exo_tenants")
-          .select("phone_number")
+          .select("phone")
           .eq("id", tenantId)
           .single();
-        toNumber = data?.phone_number || toNumber;
+        toNumber = data?.phone || toNumber;
       }
 
       if (!toNumber) return "Brak numeru telefonu.";
@@ -281,18 +294,21 @@ const makeCallTool: V3ToolDefinition = {
       }
 
       // Get the base URL for the voice webhook
-      const baseUrl =
-        process.env.NEXT_PUBLIC_APP_URL ||
-        process.env.VERCEL_URL ||
-        "https://exoskull.app";
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exoskull.xyz";
 
       // Make outbound call via Twilio REST API
       const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`;
+      const purposeParam = encodeURIComponent(
+        (input.purpose as string).slice(0, 200),
+      );
+      const instructionsParam = input.instructions
+        ? `&instructions=${encodeURIComponent((input.instructions as string).slice(0, 500))}`
+        : "";
       const body = new URLSearchParams({
         To: toNumber,
         From: fromNumber,
-        Url: `${baseUrl}/api/twilio/voice?action=start&tenant_id=${tenantId}&purpose=${encodeURIComponent((input.purpose as string).slice(0, 200))}`,
-        StatusCallback: `${baseUrl}/api/twilio/voice?action=end`,
+        Url: `${baseUrl}/api/twilio/voice?action=start&tenant_id=${tenantId}&purpose=${purposeParam}${instructionsParam}`,
+        StatusCallback: `${baseUrl}/api/twilio/voice?action=end&tenant_id=${tenantId}`,
         Timeout: "30",
       });
 
@@ -332,7 +348,7 @@ const makeCallTool: V3ToolDefinition = {
 
       return `📞 Dzwonię na ${toNumber} — "${input.purpose}". Call SID: ${result.sid}. Status: ${result.status}.`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };

@@ -8,10 +8,12 @@
 import { NextRequest } from "next/server";
 import { verifyTenantAuth } from "@/lib/auth/verify-tenant";
 import { runV3Agent } from "@/lib/v3/agent";
+
 import { appendMessage } from "@/lib/unified-thread";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 // ============================================================================
 // TOOL LABELS (human-readable tool names for UI)
@@ -92,9 +94,12 @@ function createStream(
           ),
         );
 
+        // Smart routing is now handled inside runV3Agent (3-tier: Gemini/Haiku/Sonnet)
+        // Removed duplicate Gemini routing that was here — it caused double API calls
+
         let streamedText = "";
 
-        // Run v3 agent with streaming callbacks
+        // Run v3 agent with streaming callbacks (complex queries or Gemini fallback)
         const result = await runV3Agent({
           tenantId,
           sessionId,
@@ -118,7 +123,7 @@ function createStream(
           onToolEnd: (toolName, durationMs, meta) => {
             controller.enqueue(
               encoder.encode(
-                `data: ${JSON.stringify({ type: "tool_end", tool: toolName, durationMs, success: meta?.success })}\n\n`,
+                `data: ${JSON.stringify({ type: "tool_end", tool: toolName, durationMs, success: meta?.success, resultSummary: meta?.resultSummary?.slice(0, 100) })}\n\n`,
               ),
             );
           },

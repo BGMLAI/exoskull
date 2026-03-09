@@ -6,7 +6,7 @@
  * These tools let the agent take autonomous actions toward user goals.
  */
 
-import type { V3ToolDefinition } from "./index";
+import { type V3ToolDefinition, errMsg } from "./index";
 
 // ============================================================================
 // #1 enqueue_action — add to autonomy queue for background execution
@@ -67,7 +67,7 @@ const enqueueActionTool: V3ToolDefinition = {
       if (error) return `Błąd: ${error.message}`;
       return `🔄 Dodano do kolejki: "${(input.description as string).slice(0, 80)}" (ID: ${data.id}). Heartbeat wykona przy najbliższej iteracji.`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -123,7 +123,7 @@ const checkPermissionsTool: V3ToolDefinition = {
           .join("\n") || "  (brak — użyj poziomu globalnego)"
       }`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -189,7 +189,7 @@ const sendNotificationTool: V3ToolDefinition = {
 
       return `🔔 Powiadomienie zapisane (${channel}): "${(input.message as string).slice(0, 200)}"`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -246,7 +246,81 @@ const logAutonomyTool: V3ToolDefinition = {
       if (error) return `Błąd logowania: ${error.message}`;
       return `📝 Zalogowano: ${input.event_type} — "${(input.description as string).slice(0, 100)}" [${input.result || "success"}]`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
+    }
+  },
+};
+
+// ============================================================================
+// #5 get_autonomy_log — retrieve history of autonomous actions
+// ============================================================================
+
+const getAutonomyLogTool: V3ToolDefinition = {
+  definition: {
+    name: "get_autonomy_log",
+    description:
+      "Pokaż historię autonomicznych akcji systemu. Co ExoSkull robił samodzielnie: emaile, zadania, cele, budowanie app.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        limit: { type: "number", description: "Ile wyników (domyślnie 15)" },
+        event_type: {
+          type: "string",
+          description:
+            "Filtruj po typie (np. 'email_sent', 'app_built', 'goal_progress', 'morning_briefing')",
+        },
+        hours_ago: {
+          type: "number",
+          description: "Ostatnie N godzin (domyślnie 24)",
+        },
+      },
+      required: [],
+    },
+  },
+  async execute(input, tenantId) {
+    try {
+      const { getServiceSupabase } = await import("@/lib/supabase/service");
+      const supabase = getServiceSupabase();
+
+      const hoursAgo = (input.hours_ago as number) || 24;
+      const since = new Date(
+        Date.now() - hoursAgo * 60 * 60 * 1000,
+      ).toISOString();
+
+      let query = supabase
+        .from("exo_autonomy_log")
+        .select("event_type, payload, created_at")
+        .eq("tenant_id", tenantId)
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit((input.limit as number) || 15);
+
+      if (input.event_type) {
+        query = query.eq("event_type", input.event_type as string);
+      }
+
+      const { data, error } = await query;
+      if (error) return `Błąd: ${error.message}`;
+      if (!data?.length)
+        return `Brak autonomicznych akcji w ostatnich ${hoursAgo}h.`;
+
+      let output = `📋 **Log autonomii** (ostatnie ${hoursAgo}h, ${data.length} akcji):\n\n`;
+      for (const entry of data) {
+        const payload = (entry.payload as Record<string, unknown>) || {};
+        const time = new Date(entry.created_at).toLocaleTimeString("pl-PL", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const desc =
+          (payload.description as string) ||
+          (payload.message as string) ||
+          JSON.stringify(payload).slice(0, 100);
+        output += `[${time}] **${entry.event_type}** — ${desc}\n`;
+      }
+
+      return output;
+    } catch (err) {
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -260,4 +334,5 @@ export const autonomyTools: V3ToolDefinition[] = [
   checkPermissionsTool,
   sendNotificationTool,
   logAutonomyTool,
+  getAutonomyLogTool,
 ];

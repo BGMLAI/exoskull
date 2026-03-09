@@ -7,7 +7,70 @@
  * user_quests (milestones), user_ops (tasks), user_notes (notes)
  */
 
-import type { V3ToolDefinition } from "./index";
+import { type V3ToolDefinition, errMsg } from "./index";
+import { logger } from "@/lib/logger";
+
+// ============================================================================
+// F1: GRAPH DUAL-WRITE HELPER
+// Writes to nodes/edges table alongside Tyrolka tables.
+// Silent fail — old tables are source of truth during migration.
+// ============================================================================
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function graphDualWrite(
+  supabase: any,
+  params: {
+    tenantId: string;
+    type: "goal" | "task" | "note";
+    name: string;
+    content?: string | null;
+    metadata?: Record<string, unknown>;
+    status?: string;
+    parentId?: string | null;
+    legacyId: string; // user_loops.id or user_ops.id
+  },
+) {
+  try {
+    const { data } = await supabase
+      .from("nodes")
+      .upsert(
+        {
+          tenant_id: params.tenantId,
+          type: params.type,
+          name: params.name,
+          content: params.content || null,
+          metadata: { ...params.metadata, legacy_id: params.legacyId },
+          status: params.status || "active",
+          parent_id: params.parentId || null,
+        },
+        { onConflict: "id" },
+      )
+      .select("id")
+      .single();
+
+    // If task has a goal parent, create edge
+    if (data?.id && params.parentId) {
+      await supabase.from("edges").upsert(
+        {
+          source_id: params.parentId,
+          target_id: data.id,
+          relation: "has_subtask",
+        },
+        { onConflict: "source_id,target_id,relation" },
+      );
+    }
+
+    return data?.id || null;
+  } catch (err) {
+    // Silent fail — graph is secondary during migration
+    logger.warn("[GraphDualWrite] Failed (non-blocking):", {
+      error: errMsg(err),
+      type: params.type,
+      name: params.name,
+    });
+    return null;
+  }
+}
 
 // ============================================================================
 // #1 set_goal — create a new goal for the user
@@ -48,29 +111,54 @@ const setGoalTool: V3ToolDefinition = {
       const { getServiceSupabase } = await import("@/lib/supabase/service");
       const supabase = getServiceSupabase();
 
+      // Generate slug from title (URL-safe, lowercase, no diacritics)
+      const slug = (input.title as string)
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 60);
+
       const { data, error } = await supabase
         .from("user_loops")
         .insert({
           tenant_id: tenantId,
-          title: input.title as string,
+          slug,
+          name: input.title as string,
           description: (input.description as string) || null,
           priority: (input.priority as number) || 7,
-          status: "active",
-          type: "goal",
-          metadata: {
+          is_active: true,
+          aspects: {
+            type: "goal",
             deadline: input.deadline || null,
             category: input.category || "personal",
             strategies: [],
             progress: 0,
           },
         })
-        .select("id, title")
+        .select("id, name")
         .single();
 
       if (error) return `Błąd: ${error.message}`;
-      return `✅ Cel ustawiony: "${data.title}" (ID: ${data.id}). Teraz rozłożę go na strategię i konkretne zadania.`;
+
+      // F1: Graph dual-write
+      await graphDualWrite(supabase, {
+        tenantId,
+        type: "goal",
+        name: data.name,
+        content: (input.description as string) || null,
+        metadata: {
+          priority: (input.priority as number) || 7,
+          deadline: input.deadline || null,
+          category: input.category || "personal",
+        },
+        legacyId: data.id,
+      });
+
+      return `✅ Cel ustawiony: "${data.name}" (ID: ${data.id}). Teraz rozłożę go na strategię i konkretne zadania.`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -83,11 +171,15 @@ const updateGoalTool: V3ToolDefinition = {
   definition: {
     name: "update_goal",
     description:
-      "Zaktualizuj postęp lub status celu. Użyj po każdej akcji przybliżającej cel.",
+      "Zaktualizuj postęp lub status celu. Użyj po każdej akcji przybliżającej cel. Podaj goal_id (UUID) LUB goal_name (nazwę) — system sam znajdzie cel.",
     input_schema: {
       type: "object" as const,
       properties: {
         goal_id: { type: "string", description: "UUID celu" },
+        goal_name: {
+          type: "string",
+          description: "Nazwa celu (jeśli nie znasz UUID)",
+        },
         progress: { type: "number", description: "Postęp 0-100%" },
         status: {
           type: "string",
@@ -96,7 +188,7 @@ const updateGoalTool: V3ToolDefinition = {
         },
         note: { type: "string", description: "Notatka o postępie" },
       },
-      required: ["goal_id"],
+      required: [],
     },
   },
   async execute(input, tenantId) {
@@ -104,57 +196,104 @@ const updateGoalTool: V3ToolDefinition = {
       const { getServiceSupabase } = await import("@/lib/supabase/service");
       const supabase = getServiceSupabase();
 
-      // Get current goal
-      const { data: goal } = await supabase
-        .from("user_loops")
-        .select("id, title, metadata")
-        .eq("id", input.goal_id as string)
-        .eq("tenant_id", tenantId)
-        .single();
+      // Resolve goal: try UUID first, then name search
+      let goal: { id: string; name: string; aspects: unknown } | null = null;
+
+      if (input.goal_id) {
+        const { data } = await supabase
+          .from("user_loops")
+          .select("id, name, aspects")
+          .eq("id", input.goal_id as string)
+          .eq("tenant_id", tenantId)
+          .single();
+        goal = data;
+      }
+
+      if (!goal && input.goal_name) {
+        // Fuzzy match by name (case-insensitive, partial match)
+        const { data } = await supabase
+          .from("user_loops")
+          .select("id, name, aspects")
+          .eq("tenant_id", tenantId)
+          .eq("is_active", true)
+          .ilike("name", `%${input.goal_name as string}%`)
+          .limit(1)
+          .single();
+        goal = data;
+      }
+
+      if (!goal && !input.goal_id && !input.goal_name) {
+        return "Podaj goal_id (UUID) lub goal_name (nazwę celu) żebym mógł go znaleźć.";
+      }
 
       if (!goal) return "Nie znaleziono celu.";
 
-      const metadata = (goal.metadata as Record<string, unknown>) || {};
+      const aspects = (goal.aspects as Record<string, unknown>) || {};
       const updates: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
       };
 
       if (input.progress !== undefined) {
-        metadata.progress = input.progress as number;
-        updates.metadata = metadata;
+        aspects.progress = input.progress as number;
+        updates.aspects = aspects;
       }
       if (input.status) {
-        updates.status = input.status as string;
-        if (input.status === "completed") {
-          updates.completed_at = new Date().toISOString();
+        if (
+          input.status === "completed" ||
+          input.status === "dropped" ||
+          input.status === "paused"
+        ) {
+          updates.is_active = false;
+        } else {
+          updates.is_active = true;
         }
       }
-      if (Object.keys(updates).length > 1) {
-        updates.metadata = metadata;
+      if (input.progress !== undefined) {
+        updates.aspects = aspects;
       }
 
       const { error } = await supabase
         .from("user_loops")
         .update(updates)
-        .eq("id", input.goal_id as string)
+        .eq("id", goal.id)
         .eq("tenant_id", tenantId);
 
       if (error) return `Błąd: ${error.message}`;
+
+      // Sync to graph node (non-blocking)
+      const graphUpdates: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (input.status) graphUpdates.status = input.status as string;
+      if (input.progress !== undefined) {
+        graphUpdates.metadata = {
+          ...aspects,
+          progress: input.progress,
+          legacy_id: goal.id,
+        };
+      }
+      Promise.resolve(
+        supabase
+          .from("nodes")
+          .update(graphUpdates)
+          .eq("tenant_id", tenantId)
+          .eq("type", "goal")
+          .contains("metadata", { legacy_id: goal.id }),
+      ).catch(() => {});
 
       // Log progress note
       if (input.note) {
         await supabase.from("user_notes").insert({
           tenant_id: tenantId,
-          type: "progress",
-          title: `Postęp: ${goal.title}`,
+          title: `Postęp: ${goal.name}`,
           content: input.note as string,
           metadata: { goal_id: goal.id },
         });
       }
 
-      return `📊 Cel "${goal.title}" zaktualizowany.${input.progress !== undefined ? ` Postęp: ${input.progress}%` : ""}${input.status ? ` Status: ${input.status}` : ""}`;
+      return `📊 Cel "${goal.name}" zaktualizowany.${input.progress !== undefined ? ` Postęp: ${input.progress}%` : ""}${input.status ? ` Status: ${input.status}` : ""}`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -184,17 +323,16 @@ const getGoalsTool: V3ToolDefinition = {
       const { getServiceSupabase } = await import("@/lib/supabase/service");
       const supabase = getServiceSupabase();
 
+      // Graph DB: goals are nodes with type='goal'
       let query = supabase
-        .from("user_loops")
-        .select(
-          "id, title, description, priority, status, metadata, created_at",
-        )
+        .from("nodes")
+        .select("id, name, content, status, metadata, created_at")
         .eq("tenant_id", tenantId)
         .eq("type", "goal")
-        .order("priority", { ascending: false });
+        .order("created_at", { ascending: false });
 
       if (!input.include_completed) {
-        query = query.in("status", ["active", "pending"]);
+        query = query.in("status", ["active", "pending", "paused"]);
       }
 
       const { data, error } = await query.limit(20);
@@ -206,23 +344,23 @@ const getGoalsTool: V3ToolDefinition = {
         .map(
           (g: {
             id: string;
-            title: string;
-            description: string | null;
-            priority: number;
+            name: string;
+            content: string | null;
             status: string;
-            metadata: unknown;
+            metadata: Record<string, unknown> | null;
           }) => {
-            const meta = (g.metadata as Record<string, unknown>) || {};
+            const meta = g.metadata || {};
             const progress = (meta.progress as number) || 0;
+            const priority = (meta.priority as number) || 5;
             const bar =
               "█".repeat(Math.floor(progress / 10)) +
               "░".repeat(10 - Math.floor(progress / 10));
-            return `[${g.status === "completed" ? "✅" : "🎯"}] ${g.title} (priorytet: ${g.priority}/10)\n    ${bar} ${progress}%${g.description ? `\n    ${g.description.slice(0, 100)}` : ""}`;
+            return `[${g.status === "completed" ? "✅" : "🎯"}] ${g.name} (priorytet: ${priority}/10)\n    ${bar} ${progress}%${g.content ? `\n    ${g.content.slice(0, 100)}` : ""}`;
           },
         )
         .join("\n\n");
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -269,10 +407,10 @@ const createTaskTool: V3ToolDefinition = {
           title: input.title as string,
           status: "pending",
           priority: (input.priority as number) || 5,
-          type: "task",
+          due_date: (input.due_date as string) || null,
           metadata: {
+            type: "task",
             goal_id: input.goal_id || null,
-            due_date: input.due_date || null,
             assignee: input.assignee || "user",
             details: input.details || null,
           },
@@ -281,6 +419,34 @@ const createTaskTool: V3ToolDefinition = {
         .single();
 
       if (error) return `Błąd: ${error.message}`;
+
+      // F1: Graph dual-write — find parent graph node if goal_id provided
+      let graphGoalNodeId: string | null = null;
+      if (input.goal_id) {
+        const { data: parentNode } = await supabase
+          .from("nodes")
+          .select("id")
+          .eq("tenant_id", tenantId)
+          .eq("type", "goal")
+          .contains("metadata", { legacy_id: input.goal_id })
+          .limit(1)
+          .single();
+        graphGoalNodeId = parentNode?.id || null;
+      }
+      await graphDualWrite(supabase, {
+        tenantId,
+        type: "task",
+        name: data.title,
+        content: (input.details as string) || null,
+        metadata: {
+          priority: (input.priority as number) || 5,
+          due_date: input.due_date || null,
+          assignee: input.assignee || "user",
+          goal_id: input.goal_id || null,
+        },
+        parentId: graphGoalNodeId,
+        legacyId: data.id,
+      });
 
       // If assigned to system, enqueue for autonomous execution
       if (input.assignee === "system" && input.goal_id) {
@@ -301,7 +467,7 @@ const createTaskTool: V3ToolDefinition = {
       const emoji = input.assignee === "system" ? "🤖" : "📋";
       return `${emoji} Zadanie: "${data.title}"${input.assignee === "system" ? " → dodano do kolejki autonomii (ExoSkull wykona sam)" : " → czeka na użytkownika"}`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -318,7 +484,11 @@ const updateTaskTool: V3ToolDefinition = {
     input_schema: {
       type: "object" as const,
       properties: {
-        task_id: { type: "string", description: "UUID zadania" },
+        task_id: {
+          type: "string",
+          description:
+            "UUID zadania LUB nazwa/fragment nazwy (system sam znajdzie po nazwie)",
+        },
         status: {
           type: "string",
           enum: ["pending", "active", "completed", "dropped", "blocked"],
@@ -334,6 +504,49 @@ const updateTaskTool: V3ToolDefinition = {
       const { getServiceSupabase } = await import("@/lib/supabase/service");
       const supabase = getServiceSupabase();
 
+      // ── Resolve task_id: accept UUID or fuzzy name match ──
+      let taskId = input.task_id as string;
+      const isUUID =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          taskId,
+        );
+
+      if (!isUUID) {
+        // AI passed a name/title instead of UUID — resolve it
+        const { data: found } = await supabase
+          .from("user_ops")
+          .select("id, title")
+          .eq("tenant_id", tenantId)
+          .eq("type", "task")
+          .ilike("title", `%${taskId}%`)
+          .limit(1)
+          .single();
+
+        if (found) {
+          taskId = found.id;
+        } else {
+          // Try graph nodes table
+          const { data: node } = await supabase
+            .from("nodes")
+            .select("id, name, metadata")
+            .eq("tenant_id", tenantId)
+            .eq("type", "task")
+            .ilike("name", `%${taskId}%`)
+            .limit(1)
+            .single();
+
+          if (
+            node?.metadata &&
+            typeof node.metadata === "object" &&
+            "legacy_id" in node.metadata
+          ) {
+            taskId = (node.metadata as Record<string, string>).legacy_id;
+          } else {
+            return `Nie znaleziono zadania "${input.task_id}". Użyj get_tasks żeby zobaczyć listę z UUID.`;
+          }
+        }
+      }
+
       const updates: Record<string, unknown> = {
         status: input.status as string,
         updated_at: new Date().toISOString(),
@@ -348,15 +561,29 @@ const updateTaskTool: V3ToolDefinition = {
       const { data, error } = await supabase
         .from("user_ops")
         .update(updates)
-        .eq("id", input.task_id as string)
+        .eq("id", taskId)
         .eq("tenant_id", tenantId)
         .select("title, status")
         .single();
 
       if (error) return `Błąd: ${error.message}`;
+
+      // Sync status to graph node (non-blocking)
+      Promise.resolve(
+        supabase
+          .from("nodes")
+          .update({
+            status: input.status as string,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("tenant_id", tenantId)
+          .eq("type", "task")
+          .contains("metadata", { legacy_id: taskId }),
+      ).catch(() => {});
+
       return `${input.status === "completed" ? "✅" : "📋"} "${data.title}" → ${data.status}`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -389,11 +616,12 @@ const getTasksTool: V3ToolDefinition = {
       const { getServiceSupabase } = await import("@/lib/supabase/service");
       const supabase = getServiceSupabase();
 
+      // Graph DB: tasks are nodes with type='task'
       let query = supabase
-        .from("user_ops")
-        .select("id, title, status, priority, metadata, created_at")
+        .from("nodes")
+        .select("id, name, status, metadata, created_at")
         .eq("tenant_id", tenantId)
-        .order("priority", { ascending: false })
+        .eq("type", "task")
         .order("created_at", { ascending: false })
         .limit((input.limit as number) || 15);
 
@@ -411,8 +639,8 @@ const getTasksTool: V3ToolDefinition = {
       let filtered = data;
       if (input.goal_id) {
         filtered = data.filter(
-          (t: { metadata: unknown }) =>
-            (t.metadata as Record<string, unknown>)?.goal_id === input.goal_id,
+          (t: { metadata: Record<string, unknown> | null }) =>
+            t.metadata?.goal_id === input.goal_id,
         );
         if (!filtered.length) return "Brak zadań powiązanych z tym celem.";
       }
@@ -421,12 +649,12 @@ const getTasksTool: V3ToolDefinition = {
         .map(
           (t: {
             id: string;
-            title: string;
+            name: string;
             status: string;
-            priority: number;
-            metadata: unknown;
+            metadata: Record<string, unknown> | null;
           }) => {
-            const meta = (t.metadata as Record<string, unknown>) || {};
+            const meta = t.metadata || {};
+            const priority = (meta.priority as number) || 5;
             const assignee = meta.assignee === "system" ? "🤖" : "👤";
             const statusIcon =
               t.status === "completed"
@@ -434,12 +662,12 @@ const getTasksTool: V3ToolDefinition = {
                 : t.status === "active"
                   ? "🔄"
                   : "⏳";
-            return `${statusIcon} ${assignee} ${t.title} (p:${t.priority})${meta.due_date ? ` — do ${meta.due_date}` : ""}`;
+            return `${statusIcon} ${assignee} ${t.name} (p:${priority})${meta.due_date ? ` — do ${meta.due_date}` : ""}`;
           },
         )
         .join("\n");
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };

@@ -26,7 +26,7 @@ interface CachedContext {
   timestamp: number;
 }
 
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 300_000; // 5 min (was 30s — wasteful for fast conversations)
 const contextCache = new Map<string, CachedContext>();
 
 export function invalidateContextCache(tenantId: string): void {
@@ -62,19 +62,22 @@ export async function buildV3DynamicContext(
     recentOpsResult,
     autonomyLogResult,
   ] = await Promise.allSettled([
-    // 1. User profile
+    // 1. User profile (M1: include personality/language/instructions)
     supabase
       .from("exo_tenants")
-      .select("name, preferred_name, communication_style, permission_level")
+      .select(
+        "name, preferred_name, communication_style, permission_level, language, iors_personality, iors_custom_instructions, iors_system_prompt_override, assistant_name",
+      )
       .eq("id", tenantId)
       .single(),
     // 2. Thread summary (cross-channel awareness)
     getThreadSummary(tenantId).catch(() => null),
-    // 3. Active goals (Tyrolka loops)
+    // 3. Active goals (graph nodes)
     supabase
-      .from("user_loops")
-      .select("title, status, progress_percent")
+      .from("nodes")
+      .select("name, status, metadata")
       .eq("tenant_id", tenantId)
+      .eq("type", "goal")
       .in("status", ["active", "paused"])
       .order("created_at", { ascending: false })
       .limit(10),
@@ -85,13 +88,14 @@ export async function buildV3DynamicContext(
       .eq("tenant_id", tenantId)
       .order("confidence", { ascending: false })
       .limit(10),
-    // 5. Recent ops (tasks)
+    // 5. Active tasks (graph nodes)
     supabase
-      .from("user_ops")
-      .select("title, status, priority")
+      .from("nodes")
+      .select("name, status, metadata")
       .eq("tenant_id", tenantId)
+      .eq("type", "task")
       .in("status", ["pending", "active"])
-      .order("priority", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(10),
     // 6. Recent autonomy actions (last 24h)
     supabase
@@ -113,11 +117,11 @@ export async function buildV3DynamicContext(
     threadResult.status === "fulfilled" ? threadResult.value : null;
   const goals =
     goalsResult.status === "fulfilled"
-      ? (goalsResult.value.data as Array<{
-          title: string;
+      ? ((goalsResult.value.data || []) as Array<{
+          name: string;
           status: string;
-          progress_percent: number | null;
-        }> | null)
+          metadata: Record<string, unknown> | null;
+        }>)
       : null;
   const knowledge =
     knowledgeResult.status === "fulfilled"
@@ -129,11 +133,11 @@ export async function buildV3DynamicContext(
       : null;
   const ops =
     recentOpsResult.status === "fulfilled"
-      ? (recentOpsResult.value.data as Array<{
-          title: string;
+      ? ((recentOpsResult.value.data || []) as Array<{
+          name: string;
           status: string;
-          priority: number;
-        }> | null)
+          metadata: Record<string, unknown> | null;
+        }>)
       : null;
   const autonomyLog =
     autonomyLogResult.status === "fulfilled"
@@ -159,12 +163,34 @@ export async function buildV3DynamicContext(
     context += `- Użytkownik: ${tenant.preferred_name || tenant.name} (UŻYWAJ IMIENIA)\n`;
   }
 
+  if (tenant?.assistant_name) {
+    context += `- Twoje imię: ${tenant.assistant_name}\n`;
+  }
+
+  if (tenant?.language) {
+    context += `- Preferowany język: ${tenant.language}\n`;
+  }
+
   if (tenant?.communication_style) {
     context += `- Styl komunikacji: ${tenant.communication_style}\n`;
   }
 
+  if (tenant?.iors_personality) {
+    context += `- Osobowość: ${tenant.iors_personality}\n`;
+  }
+
   if (tenant?.permission_level) {
     context += `- Poziom autonomii: ${tenant.permission_level}\n`;
+  }
+
+  // M1: Custom instructions override (user-defined in settings)
+  if (tenant?.iors_custom_instructions) {
+    context += `\n## INSTRUKCJE UŻYTKOWNIKA\n${tenant.iors_custom_instructions}\n`;
+  }
+
+  // M1: Full system prompt override (advanced users)
+  if (tenant?.iors_system_prompt_override) {
+    context += `\n## NADPISANIE PROMPTU\n${tenant.iors_system_prompt_override}\n`;
   }
 
   // Thread summary
@@ -176,11 +202,12 @@ export async function buildV3DynamicContext(
   if (goals && goals.length > 0) {
     context += `\n## CELE UŻYTKOWNIKA (${goals.length} aktywnych)\n`;
     for (const g of goals) {
+      const meta = g.metadata || {};
       const progress =
-        g.progress_percent != null
-          ? `${Math.round(g.progress_percent)}%`
+        meta.progress != null
+          ? `${Math.round(meta.progress as number)}%`
           : "brak danych";
-      context += `- ${g.title}: ${progress} [${g.status}]\n`;
+      context += `- ${g.name}: ${progress} [${g.status}]\n`;
     }
     context += `PRIORYTET: cele zagrożone > cele na dobrej drodze. Proaktywnie proponuj akcje.\n`;
   }
@@ -189,7 +216,8 @@ export async function buildV3DynamicContext(
   if (ops && ops.length > 0) {
     context += `\n## ZADANIA (${ops.length} aktywnych)\n`;
     for (const op of ops.slice(0, 5)) {
-      context += `- [P${op.priority}] ${op.title} (${op.status})\n`;
+      const priority = (op.metadata?.priority as number) || 5;
+      context += `- [P${priority}] ${op.name} (${op.status})\n`;
     }
     if (ops.length > 5) {
       context += `  ... i ${ops.length - 5} więcej\n`;

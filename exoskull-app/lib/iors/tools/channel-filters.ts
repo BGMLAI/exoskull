@@ -15,7 +15,7 @@
 
 export const CORE_TOOL_NAMES = new Set([
   // Tasks
-  "add_task",
+  "create_task",
   "complete_task",
   "list_tasks",
   // Memory & Context
@@ -28,9 +28,10 @@ export const CORE_TOOL_NAMES = new Set([
   "check_goals",
   // Knowledge
   "search_knowledge",
-  // Communication (basic)
+  // Communication (basic + call)
   "send_sms",
   "send_email",
+  "make_call",
   // Planning
   "plan_action",
   // Mods / Apps (data logging)
@@ -186,6 +187,21 @@ export const TOOL_PACKS: Record<string, Set<string>> = {
   ]),
   debate: new Set(["start_debate"]),
   values: new Set(["manage_values", "view_value_tree"]),
+  self_evolution: new Set([
+    "trigger_source_evolution",
+    "view_dev_journal",
+    "trigger_ralph_cycle",
+    "set_development_priority",
+    "self_modify",
+    "view_modifications",
+  ]),
+  media_capture: new Set([
+    "request_screenshot",
+    "request_camera_photo",
+    "analyze_image",
+  ]),
+  agent_coordination: new Set(["auto_delegate", "coordinate_agents"]),
+  learning: new Set(["reflexion_evaluate", "get_learned_patterns"]),
   feedback: new Set(["submit_feedback", "get_feedback_summary"]),
   quests: new Set(["create_quest", "list_quests"]),
   apps: new Set(["build_app", "list_apps", "app_log_data", "app_get_data"]),
@@ -213,6 +229,12 @@ const KEYWORD_TO_PACK: Record<string, string[]> = {
   call: ["communication"],
   sms: ["communication"],
   whatsapp: ["communication"],
+  zadzwoń: ["communication"],
+  zadzwon: ["communication"],
+  pizza: ["communication"],
+  zamów: ["communication"],
+  zamow: ["communication"],
+  telefon: ["communication"],
   code: ["code"],
   deploy: ["code"],
   programming: ["code"],
@@ -280,6 +302,18 @@ const KEYWORD_TO_PACK: Record<string, string[]> = {
   debata: ["debate"],
   wartości: ["values"],
   aplikacja: ["apps"],
+  // Self-evolution keywords
+  evolution: ["self_evolution"],
+  modify: ["self_evolution"],
+  evolve: ["self_evolution"],
+  napraw: ["self_evolution"],
+  ulepsz: ["self_evolution"],
+  rozwijaj: ["self_evolution"],
+  // Learning/reflexion keywords
+  learn: ["learning"],
+  reflect: ["learning"],
+  ucz: ["learning"],
+  wzorzec: ["learning"],
 };
 
 // ============================================================================
@@ -300,6 +334,10 @@ export const VOICE_TOOL_NAMES = new Set([
   "log_weight",
   "log_workout",
   "make_call",
+  // Code tools — voice users can say "deploy my app"
+  "execute_code",
+  "code_bash",
+  "generate_fullstack_app",
 ]);
 
 // ============================================================================
@@ -344,6 +382,9 @@ export function getToolFilterForChannel(
   // Async tasks get all tools (no filter)
   if (isAsync) return null;
 
+  // Autonomous channel: ALL tools available for proactive action
+  if (channel === "autonomous") return null;
+
   if (channel === "voice") return VOICE_TOOL_NAMES;
 
   // Web + other channels: core + relevant packs
@@ -369,6 +410,8 @@ export function getToolFilterForChannel(
       "dashboard",
       "self_config",
       "feedback",
+      "self_evolution",
+      "learning",
     ];
     for (const packName of defaultPacks) {
       const pack = TOOL_PACKS[packName];

@@ -138,6 +138,24 @@ async function sendViaImessage(address: string, text: string): Promise<void> {
   await imessageAdapter.sendResponse(address, text);
 }
 
+/** Truncate text at sentence or word boundary for SMS */
+function truncateForSms(text: string, maxLen = 1500): string {
+  if (text.length <= maxLen) return text;
+  // Try to cut at last sentence boundary (. ! ?) before limit
+  const slice = text.slice(0, maxLen);
+  const lastSentence = Math.max(
+    slice.lastIndexOf(". "),
+    slice.lastIndexOf("! "),
+    slice.lastIndexOf("? "),
+    slice.lastIndexOf(".\n"),
+  );
+  if (lastSentence > maxLen * 0.5) return slice.slice(0, lastSentence + 1);
+  // Fall back to last word boundary
+  const lastSpace = slice.lastIndexOf(" ");
+  if (lastSpace > maxLen * 0.5) return slice.slice(0, lastSpace) + "...";
+  return slice + "...";
+}
+
 async function sendViaSms(
   phone: string,
   text: string,
@@ -153,7 +171,7 @@ async function sendViaSms(
   const params: Record<string, string> = {
     To: phone,
     From: fromNumber,
-    Body: text,
+    Body: truncateForSms(text),
   };
   if (statusCallbackUrl) {
     params.StatusCallback = statusCallbackUrl;
@@ -277,6 +295,8 @@ async function sendToChannel(
 
 /**
  * Dispatch a report to a tenant via their preferred channel with fallback.
+ * Includes content-level deduplication: skips if the same text was sent
+ * to this tenant within the last 6 hours.
  */
 export async function dispatchReport(
   tenantId: string,
@@ -284,6 +304,42 @@ export async function dispatchReport(
   reportType: ReportType,
 ): Promise<DispatchReportResult> {
   const supabase = getAdminClient();
+
+  // ── Content-level deduplication ──
+  // Check if we already sent the same (or very similar) message recently
+  const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+  try {
+    const { data: recentMessages } = await supabase
+      .from("exo_unified_messages")
+      .select("content")
+      .eq("tenant_id", tenantId)
+      .eq("role", "assistant")
+      .eq("direction", "outbound")
+      .gte("created_at", sixHoursAgo)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (recentMessages?.length) {
+      // Normalize for comparison: trim, collapse whitespace, lowercase
+      const normalize = (s: string) =>
+        s.trim().replace(/\s+/g, " ").toLowerCase();
+      const normalized = normalize(reportText);
+      const isDuplicate = recentMessages.some(
+        (m: { content: string }) => normalize(m.content) === normalized,
+      );
+      if (isDuplicate) {
+        logger.info(
+          `[ReportDispatcher] Skipping duplicate ${reportType} for ${tenantId} (same content sent <6h ago)`,
+        );
+        return { success: true, channel: "dedup_skip" };
+      }
+    }
+  } catch (dedupErr) {
+    // Dedup check is optional — don't block sending
+    logger.warn("[ReportDispatcher] Dedup check failed (non-blocking):", {
+      error: dedupErr instanceof Error ? dedupErr.message : String(dedupErr),
+    });
+  }
 
   // Fetch tenant channel info
   const { data: tenant, error: tenantErr } = await supabase

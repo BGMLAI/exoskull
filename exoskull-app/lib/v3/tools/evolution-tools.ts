@@ -7,7 +7,7 @@
  * Reflexion: evaluate outcomes and learn from them.
  */
 
-import type { V3ToolDefinition } from "./index";
+import { type V3ToolDefinition, errMsg } from "./index";
 
 // ============================================================================
 // #1 get_capabilities — self-awareness: what can I do?
@@ -97,7 +97,7 @@ ${limitations.map((l) => `- ${l}`).join("\n")}
 ### Nauczone wzorce
 ${learnedPatterns || "Jeszcze niczego nie nauczyłem się z doświadczenia."}`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };
@@ -192,7 +192,7 @@ const reflexionEvaluateTool: V3ToolDefinition = {
             : "📊";
       return `${emoji} Refleksja zapisana: "${(input.action_description as string).slice(0, 80)}" → ${input.outcome}${input.what_worked ? `\n  Sweet: ${(input.what_worked as string).slice(0, 100)}` : ""}${input.what_failed ? `\n  Sour: ${(input.what_failed as string).slice(0, 100)}` : ""}${input.strategy_change ? `\n  Zmiana: ${(input.strategy_change as string).slice(0, 100)}` : ""}`;
     } catch (err) {
-      return `Błąd: ${err instanceof Error ? err.message : String(err)}`;
+      return `Błąd: ${errMsg(err)}`;
     }
   },
 };

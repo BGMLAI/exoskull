@@ -28,6 +28,7 @@ import { analyzeEmotion } from "@/lib/emotion";
 import { detectCrisis } from "@/lib/emotion/crisis-detector";
 import { getAdaptivePrompt } from "@/lib/emotion/adaptive-responses";
 import { logEmotion } from "@/lib/emotion/logger";
+import { sanitizeUserInput } from "@/lib/security/safety-guardrails";
 import { getToolFilterForChannel } from "@/lib/iors/tools/channel-filters";
 import { getThreadContext } from "@/lib/unified-thread";
 import { unifiedSearch } from "@/lib/memory/unified-search";
@@ -39,6 +40,13 @@ import { getServiceSupabase } from "@/lib/supabase/service";
 import { runBGMLPipeline, shouldEscalate } from "@/lib/bgml/pipeline";
 import { generatePlan, type ExecutionPlan } from "@/lib/ai/planning/planner";
 import { buildToolDescriptions } from "@/lib/iors/tools/tool-descriptions";
+import { modulatePrompt } from "@/lib/emotion/response-modulator";
+import {
+  getTauMatrix,
+  updateTauMatrix,
+  inferTauFromMessage,
+  tauMatrixToContext,
+} from "@/lib/ai/tau-matrix";
 
 // ============================================================================
 // TYPES
@@ -58,7 +66,8 @@ export type AgentChannel =
   | "imessage"
   | "android_app"
   | "messenger"
-  | "instagram";
+  | "instagram"
+  | "autonomous";
 
 export interface AgentRequest {
   tenantId: string;
@@ -309,6 +318,10 @@ export async function runExoSkullAgent(
   req: AgentRequest,
 ): Promise<AgentResponse> {
   const startMs = Date.now();
+  // Defense-in-depth: sanitize user input even if gateway already did
+  if (req.userMessage) {
+    req.userMessage = sanitizeUserInput(req.userMessage);
+  }
   const config = req.isAsync
     ? ASYNC_CONFIG
     : req.channel === "voice"
@@ -404,6 +417,14 @@ export async function runExoSkullAgent(
     })
     .catch(() => {});
 
+  // Fire-and-forget Tau Matrix update from message signals
+  const msgHour = new Date().getUTCHours();
+  const tauSignal = inferTauFromMessage(req.userMessage, msgHour);
+  updateTauMatrix(req.tenantId, tauSignal).catch(() => {});
+
+  // Load Tau Matrix for context injection
+  const tauMatrix = await getTauMatrix(req.tenantId).catch(() => null);
+
   // ── Phase 2b: Format memory context ──
   let memoryContext = "";
   if (memoryResults && memoryResults.length > 0) {
@@ -474,7 +495,7 @@ export async function runExoSkullAgent(
         t.definition.name === "generate_fullstack_app" ||
         t.definition.name === "execute_code",
     );
-    if (req.channel !== "voice" && hasCodeTools) {
+    if (hasCodeTools) {
       parts.push(
         `You have full coding capabilities via VPS tools.\n` +
           `Admin workspace: /root/projects/exoskull/\n` +
@@ -488,6 +509,8 @@ export async function runExoSkullAgent(
     if (memoryContext) parts.push(memoryContext);
     // Append app autodetekcja context (unconnected apps mentioned by user)
     if (appDetection.contextFragment) parts.push(appDetection.contextFragment);
+    // Inject Tau Matrix user profile context
+    if (tauMatrix) parts.push(tauMatrixToContext(tauMatrix));
 
     // ── Planner Context Injection (pre-search + execution plan) ──
     if (planResult?.contextInjection) {
@@ -548,6 +571,11 @@ export async function runExoSkullAgent(
     systemPrompt = parts.join("\n\n");
   }
 
+  // Apply emotion-driven prompt modulation (non-crisis only)
+  if (!crisis.detected) {
+    systemPrompt = modulatePrompt(emotionState, systemPrompt);
+  }
+
   // ── Phase 4: Direct Anthropic API tool loop ──
   req.onThinkingStep?.("Generuję odpowiedź", "running");
 
@@ -560,6 +588,44 @@ export async function runExoSkullAgent(
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let numTurns = 0;
+  const isHaikuModel = config.model.includes("haiku");
+
+  // C3: Budget limit check — switch to cheaper model if exceeded
+  let effectiveModel: string = config.model;
+  try {
+    const budgetDb = getServiceSupabase();
+    const { data: tenantData } = await budgetDb
+      .from("exo_tenants")
+      .select("metadata")
+      .eq("id", req.tenantId)
+      .single();
+    const meta = tenantData?.metadata as Record<string, unknown> | null;
+    const monthlyBudget = meta?.monthly_budget_usd as number | undefined;
+    if (monthlyBudget && monthlyBudget > 0) {
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setUTCHours(0, 0, 0, 0);
+      const { data: usageData } = await budgetDb
+        .from("exo_ai_usage")
+        .select("estimated_cost")
+        .eq("tenant_id", req.tenantId)
+        .gte("created_at", monthStart.toISOString());
+      const totalSpent = (usageData || []).reduce(
+        (sum, r) => sum + ((r.estimated_cost as number) || 0),
+        0,
+      );
+      if (totalSpent >= monthlyBudget) {
+        effectiveModel = "claude-haiku-4-5-20251001";
+        logger.info("[ExoSkullAgent] Budget exceeded, switching to Haiku:", {
+          tenantId: req.tenantId,
+          totalSpent,
+          monthlyBudget,
+        });
+      }
+    }
+  } catch {
+    // Budget check is optional
+  }
 
   // ── Fallback strategy: track tool errors ──
   // After 2x same tool error → suggest build_tool(). After 5 total errors → STOP + explain.
@@ -607,7 +673,7 @@ export async function runExoSkullAgent(
         async () => {
           const stream = client.messages.stream(
             {
-              model: config.model,
+              model: effectiveModel,
               max_tokens: req.maxTokens || 4096,
               system: systemPrompt,
               messages,
@@ -630,6 +696,31 @@ export async function runExoSkullAgent(
       totalInputTokens += response.usage.input_tokens;
       totalOutputTokens += response.usage.output_tokens;
 
+      // C2: Emit cost metadata via SSE
+      if (req.onCustomEvent) {
+        const turnInputCost =
+          (response.usage.input_tokens * (isHaikuModel ? 0.8 : 3.0)) /
+          1_000_000;
+        const turnOutputCost =
+          (response.usage.output_tokens * (isHaikuModel ? 4.0 : 15.0)) /
+          1_000_000;
+        req.onCustomEvent({
+          type: "cost",
+          input_tokens: response.usage.input_tokens,
+          output_tokens: response.usage.output_tokens,
+          model: config.model,
+          cost_usd:
+            Math.round((turnInputCost + turnOutputCost) * 10000) / 10000,
+          cumulative_cost_usd:
+            Math.round(
+              ((totalInputTokens * (isHaikuModel ? 0.8 : 3.0) +
+                totalOutputTokens * (isHaikuModel ? 4.0 : 15.0)) /
+                1_000_000) *
+                10000,
+            ) / 10000,
+        });
+      }
+
       // Separate text and tool_use blocks
       const textParts: string[] = [];
       const toolUseBlocks: Anthropic.ToolUseBlock[] = [];
@@ -647,13 +738,13 @@ export async function runExoSkullAgent(
         finalText = textParts.join("");
 
         // Anti-hallucination guard: BLOCK action-promising text without tool calls
+        // Covers Polish AND English action verbs, fires on ANY turn where no tools were used
         const actionPatterns =
-          /\b(buduję|tworzę|piszę kod|konfiguruję|instaluję|wdrażam|deployuję|importuję|integruję|publikuję|koduję|generuję|implementuję)\b/i;
+          /\b(buduję|tworzę|piszę kod|konfiguruję|instaluję|wdrażam|deployuję|importuję|integruję|publikuję|koduję|generuję|implementuję|building|creating|writing|configuring|installing|deploying|importing|integrating|publishing|coding|generating|implementing|sending|calling|searching|analyzing|I'm building|I'm creating|I'm sending|I am building|I am creating)\b/i;
         if (
           finalText &&
           actionPatterns.test(finalText) &&
-          toolsUsed.length === 0 &&
-          numTurns === 1
+          toolsUsed.length === 0
         ) {
           logger.warn(
             "[ExoSkullAgent] Anti-hallucination: BLOCKED action text without tool calls",
@@ -688,6 +779,18 @@ export async function runExoSkullAgent(
         content: response.content as Anthropic.ContentBlockParam[],
       });
 
+      // C5: Emit decision reasoning SSE before tool calls
+      if (req.onCustomEvent && toolUseBlocks.length > 0) {
+        for (const toolUse of toolUseBlocks) {
+          req.onCustomEvent({
+            type: "decision",
+            tool: toolUse.name,
+            reason: `Agent calling ${toolUse.name} with ${JSON.stringify(toolUse.input).slice(0, 200)}`,
+            turn: numTurns,
+          });
+        }
+      }
+
       // Execute all requested tools in parallel
       const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
         toolUseBlocks.map(async (toolUse) => {
@@ -713,6 +816,16 @@ export async function runExoSkullAgent(
             success: !isError,
             resultSummary: result.slice(0, 200),
           });
+
+          // C5: Emit result summary SSE
+          if (req.onCustomEvent) {
+            req.onCustomEvent({
+              type: "result_summary",
+              tool: toolName,
+              success: !isError,
+              duration_ms: durationMs,
+            });
+          }
 
           return {
             type: "tool_result" as const,
@@ -757,7 +870,7 @@ export async function runExoSkullAgent(
       // Add tool results to message history
       messages.push({ role: "user", content: toolResults });
 
-      // After 2x same tool error → inject build_tool suggestion
+      // After 2x same tool error → inject build_tool suggestion + auto-reflexion
       if (failedTools.length > 0) {
         const suggestion =
           `[SYSTEM] Narzędzia ${failedTools.join(", ")} zawiodły 2+ razy. ` +
@@ -768,6 +881,29 @@ export async function runExoSkullAgent(
           failedTools,
           tenantId: req.tenantId,
         });
+
+        // A2: Auto-reflexion — log failure patterns for learning
+        try {
+          const reflexionDb = getServiceSupabase();
+          await reflexionDb.from("exo_dev_journal").insert({
+            tenant_id: req.tenantId,
+            entry_type: "learning",
+            title: `Auto-reflexion: tools failed (${failedTools.join(", ")})`,
+            details: {
+              task: req.userMessage.slice(0, 200),
+              sweet: [],
+              sour: failedTools.map(
+                (t) =>
+                  `${t} failed ${toolErrorCounts.get(t) || 0}x — consider alternative`,
+              ),
+              tags: ["auto_reflexion", "tool_failure"],
+              evaluated_at: new Date().toISOString(),
+            },
+            outcome: "failed",
+          });
+        } catch {
+          // Auto-reflexion is non-blocking
+        }
       }
     }
 
@@ -794,12 +930,13 @@ export async function runExoSkullAgent(
         historyLength: threadHistory.length,
       });
 
-      // ── Emergency Gemini fallback (with conversation history) ──
+      // ── Emergency fallback chain: DeepSeek (tools) → Kimi (tools) → DeepSeek (no tools) ──
       const geminiText = await emergencyGeminiFallback(
         req,
         systemPrompt,
         emotionState,
         threadHistory,
+        filteredTools,
       );
       if (geminiText) {
         finalText = geminiText;
@@ -895,101 +1032,413 @@ export async function runExoSkullAgent(
 }
 
 // ============================================================================
-// EMERGENCY DEEPSEEK FALLBACK
+// EMERGENCY FALLBACK CHAIN: DeepSeek (tools) → Kimi (tools) → DeepSeek (no tools)
 // ============================================================================
 
+/** OpenAI-compatible tool format */
+interface OAITool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+/** OpenAI-compatible message */
+interface OAIMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }>;
+  tool_call_id?: string;
+}
+
+/** OpenAI-compatible response */
+interface OAIResponse {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+      tool_calls?: Array<{
+        id: string;
+        type: "function";
+        function: { name: string; arguments: string };
+      }>;
+    };
+    finish_reason?: string;
+  }>;
+}
+
 /**
- * Last-resort fallback when Anthropic API fails completely.
- * Uses DeepSeek V3 (OpenAI-compatible) for a no-tools conversational response.
- * Includes conversation history for context continuity.
+ * Convert Anthropic thread history to OpenAI-compatible messages.
+ */
+function threadToOAIMessages(
+  systemPrompt: string,
+  threadHistory: Anthropic.MessageParam[] | undefined,
+  userMessage: string,
+): OAIMessage[] {
+  const messages: OAIMessage[] = [
+    { role: "system", content: systemPrompt.slice(0, 64000) },
+  ];
+
+  if (threadHistory && threadHistory.length > 0) {
+    for (const msg of threadHistory.slice(-10)) {
+      const text =
+        typeof msg.content === "string"
+          ? msg.content
+          : Array.isArray(msg.content)
+            ? msg.content
+                .filter(
+                  (b) =>
+                    "text" in b &&
+                    typeof (b as unknown as { text: unknown }).text ===
+                      "string",
+                )
+                .map((b) => (b as unknown as { text: string }).text)
+                .join("\n")
+            : "";
+      if (text) {
+        messages.push({
+          role: msg.role === "assistant" ? "assistant" : "user",
+          content: text,
+        });
+      }
+    }
+  }
+
+  // Ensure last message is user with BIEŻĄCE POLECENIE marker
+  const lastMsg = messages.length > 1 ? messages[messages.length - 1] : null;
+  if (lastMsg && lastMsg.role === "user" && lastMsg.content === userMessage) {
+    lastMsg.content = `[BIEŻĄCE POLECENIE] ${userMessage}`;
+  } else {
+    messages.push({
+      role: "user",
+      content: `[BIEŻĄCE POLECENIE] ${userMessage}`,
+    });
+  }
+
+  return messages;
+}
+
+/**
+ * Convert IORS tools to OpenAI function-calling format.
+ */
+function toolsToOAIFormat(tools: ToolDefinition[]): OAITool[] {
+  return tools.slice(0, 64).map((t) => ({
+    type: "function" as const,
+    function: {
+      name: t.definition.name,
+      description: (t.definition.description || t.definition.name).slice(
+        0,
+        1024,
+      ),
+      parameters: t.definition.input_schema as Record<string, unknown>,
+    },
+  }));
+}
+
+/**
+ * Run a multi-turn tool-calling loop against an OpenAI-compatible API.
+ * Returns final text or null on failure.
+ */
+async function runOAIToolLoop(opts: {
+  apiUrl: string;
+  apiKey: string;
+  model: string;
+  messages: OAIMessage[];
+  tools: OAITool[];
+  iorTools: ToolDefinition[];
+  tenantId: string;
+  maxTurns: number;
+  label: string;
+  onToolStart?: (name: string) => void;
+  onToolEnd?: (
+    name: string,
+    durationMs: number,
+    meta?: { success?: boolean },
+  ) => void;
+}): Promise<{ text: string; toolsUsed: string[] } | null> {
+  const {
+    apiUrl,
+    apiKey,
+    model,
+    messages,
+    tools,
+    iorTools,
+    tenantId,
+    maxTurns,
+    label,
+  } = opts;
+  const toolsUsed: string[] = [];
+  let turns = 0;
+
+  while (turns < maxTurns) {
+    turns++;
+
+    const body: Record<string, unknown> = {
+      model,
+      messages,
+      temperature: 0.4,
+      max_tokens: 4096,
+    };
+    if (tools.length > 0) {
+      body.tools = tools;
+      body.tool_choice = "auto";
+    }
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`${label} API error: ${response.status}`);
+    }
+
+    const data = (await response.json()) as OAIResponse;
+    const choice = data.choices?.[0];
+    if (!choice?.message) throw new Error(`${label}: empty response`);
+
+    const assistantMsg = choice.message;
+    const toolCalls = assistantMsg.tool_calls;
+
+    // No tool calls → final answer
+    if (!toolCalls || toolCalls.length === 0) {
+      const responseText = assistantMsg.content || "";
+      // Anti-hallucination guard for fallback providers
+      const actionPatterns =
+        /\b(buduję|tworzę|piszę kod|konfiguruję|instaluję|wdrażam|deployuję|importuję|integruję|publikuję|koduję|generuję|implementuję|building|creating|writing|configuring|installing|deploying|importing|integrating|publishing|coding|generating|implementing|sending|calling|I'm building|I'm creating|I'm sending)\b/i;
+      if (
+        responseText &&
+        actionPatterns.test(responseText) &&
+        toolsUsed.length === 0 &&
+        turns === 1
+      ) {
+        // Model is describing actions without calling tools — inject correction
+        logger.warn(
+          `[${label}] Anti-hallucination: action text without tool calls`,
+          {
+            textSnippet: responseText.slice(0, 200),
+          },
+        );
+        messages.push(
+          { role: "assistant", content: responseText },
+          {
+            role: "user",
+            content:
+              "[SYSTEM] Twoja odpowiedź opisuje działanie, ale NIE wywołałeś żadnego narzędzia. " +
+              "NIGDY nie opisuj budowania/tworzenia bez wywołania tool_use. " +
+              "Wywołaj odpowiednie narzędzie TERAZ albo powiedz szczerze co możesz zrobić.",
+          },
+        );
+        continue; // Retry with correction
+      }
+      return { text: responseText, toolsUsed };
+    }
+
+    // Add assistant message with tool_calls to history
+    messages.push({
+      role: "assistant",
+      content: assistantMsg.content || null,
+      tool_calls: toolCalls,
+    });
+
+    // Execute each tool call
+    for (const tc of toolCalls) {
+      const toolName = tc.function.name;
+      if (!toolsUsed.includes(toolName)) toolsUsed.push(toolName);
+
+      opts.onToolStart?.(toolName);
+      const startMs = Date.now();
+
+      let result: string;
+      try {
+        const input = JSON.parse(tc.function.arguments || "{}");
+        const toolDef = iorTools.find((t) => t.definition.name === toolName);
+        if (!toolDef) {
+          result = `Tool not found: ${toolName}`;
+        } else {
+          const timeout = toolDef.timeoutMs ?? 10_000;
+          result = await Promise.race([
+            toolDef.execute(input, tenantId),
+            new Promise<string>((_, reject) =>
+              setTimeout(
+                () => reject(new Error(`Tool ${toolName} timed out`)),
+                timeout,
+              ),
+            ),
+          ]);
+        }
+      } catch (e) {
+        result = `Error: ${e instanceof Error ? e.message : String(e)}`;
+      }
+
+      const durationMs = Date.now() - startMs;
+      opts.onToolEnd?.(toolName, durationMs, {
+        success: !result.startsWith("Error:"),
+      });
+
+      // Truncate large results
+      if (result.length > 50_000) {
+        result = result.slice(0, 50_000) + "\n[Truncated]";
+      }
+
+      messages.push({
+        role: "tool",
+        content: result,
+        tool_call_id: tc.id,
+      });
+    }
+  }
+
+  return null; // Max turns exhausted
+}
+
+/**
+ * Emergency fallback chain when Anthropic API fails.
+ *
+ * Chain: DeepSeek (with tools) → Kimi (with tools) → DeepSeek (no tools)
+ * Each provider gets the full tool suite so IORS can still use tools like
+ * publish_to_allegro even when Anthropic is down.
  */
 async function emergencyGeminiFallback(
   req: AgentRequest,
   systemPrompt: string,
   _emotionState: EmotionState,
   threadHistory?: Anthropic.MessageParam[],
+  filteredTools?: ToolDefinition[],
 ): Promise<string | null> {
-  try {
-    const deepseekKey = process.env.DEEPSEEK_API_KEY;
-    if (!deepseekKey) return null;
+  const oaiMessages = threadToOAIMessages(
+    systemPrompt,
+    threadHistory,
+    req.userMessage,
+  );
+  const iorTools = filteredTools || [];
+  const oaiTools = iorTools.length > 0 ? toolsToOAIFormat(iorTools) : [];
 
-    logger.info(
-      "[ExoSkullAgent] Primary provider failed — emergency DeepSeek fallback (no tools)",
-      { tenantId: req.tenantId },
-    );
-    req.onThinkingStep?.("Tryb awaryjny", "running");
+  // ── Attempt 1: DeepSeek WITH tool calling ──
+  const deepseekKey = process.env.DEEPSEEK_API_KEY;
+  if (deepseekKey) {
+    try {
+      logger.info("[ExoSkullAgent] Fallback #1: DeepSeek with tools", {
+        tenantId: req.tenantId,
+        toolCount: oaiTools.length,
+      });
+      req.onThinkingStep?.("Tryb awaryjny (DeepSeek)", "running");
 
-    // Build OpenAI-compatible messages from thread history
-    const messages: Array<{ role: string; content: string }> = [
-      { role: "system", content: systemPrompt.slice(0, 64000) },
-    ];
-
-    if (threadHistory && threadHistory.length > 0) {
-      const recentHistory = threadHistory.slice(-10);
-      for (const msg of recentHistory) {
-        const text =
-          typeof msg.content === "string"
-            ? msg.content
-            : Array.isArray(msg.content)
-              ? msg.content
-                  .filter(
-                    (b) =>
-                      "text" in b &&
-                      typeof (b as unknown as { text: unknown }).text ===
-                        "string",
-                  )
-                  .map((b) => (b as unknown as { text: string }).text)
-                  .join("\n")
-              : "";
-        if (text) {
-          messages.push({
-            role: msg.role === "assistant" ? "assistant" : "user",
-            content: text,
-          });
-        }
-      }
-    }
-
-    // Ensure last message is user message
-    const lastRole =
-      messages.length > 1 ? messages[messages.length - 1].role : null;
-    if (lastRole !== "user") {
-      messages.push({ role: "user", content: req.userMessage });
-    }
-
-    const response = await fetch("https://api.deepseek.com/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${deepseekKey}`,
-      },
-      body: JSON.stringify({
+      const result = await runOAIToolLoop({
+        apiUrl: "https://api.deepseek.com/chat/completions",
+        apiKey: deepseekKey,
         model: "deepseek-chat",
-        messages,
-        temperature: 0.7,
-        max_tokens: 1024,
-      }),
-    });
+        messages: structuredClone(oaiMessages),
+        tools: oaiTools,
+        iorTools,
+        tenantId: req.tenantId,
+        maxTurns: 8,
+        label: "DeepSeek",
+        onToolStart: req.onToolStart,
+        onToolEnd: req.onToolEnd,
+      });
 
-    if (!response.ok) {
-      throw new Error(`DeepSeek API error: ${response.status}`);
+      if (result?.text) {
+        req.onThinkingStep?.("Tryb awaryjny (DeepSeek)", "done");
+        return result.text;
+      }
+    } catch (e) {
+      logger.warn("[ExoSkullAgent] Fallback #1 (DeepSeek+tools) failed:", {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
-
-    const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const text = data.choices?.[0]?.message?.content || "";
-    req.onThinkingStep?.("Tryb awaryjny", "done");
-
-    return text || null;
-  } catch (emergencyError) {
-    logger.error("[ExoSkullAgent] Emergency DeepSeek fallback also failed:", {
-      error:
-        emergencyError instanceof Error
-          ? emergencyError.message
-          : String(emergencyError),
-      tenantId: req.tenantId,
-    });
-    return null;
   }
+
+  // ── Attempt 2: Kimi/Moonshot WITH tool calling ──
+  const moonshotKey = process.env.MOONSHOT_API_KEY || process.env.KIMI_API_KEY;
+  if (moonshotKey) {
+    try {
+      logger.info("[ExoSkullAgent] Fallback #2: Kimi/Moonshot with tools", {
+        tenantId: req.tenantId,
+        toolCount: oaiTools.length,
+      });
+      req.onThinkingStep?.("Tryb awaryjny (Kimi)", "running");
+
+      const result = await runOAIToolLoop({
+        apiUrl: "https://api.moonshot.cn/v1/chat/completions",
+        apiKey: moonshotKey,
+        model: "moonshot-v1-32k",
+        messages: structuredClone(oaiMessages),
+        tools: oaiTools,
+        iorTools,
+        tenantId: req.tenantId,
+        maxTurns: 8,
+        label: "Kimi",
+        onToolStart: req.onToolStart,
+        onToolEnd: req.onToolEnd,
+      });
+
+      if (result?.text) {
+        req.onThinkingStep?.("Tryb awaryjny (Kimi)", "done");
+        return result.text;
+      }
+    } catch (e) {
+      logger.warn("[ExoSkullAgent] Fallback #2 (Kimi+tools) failed:", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  // ── Attempt 3: DeepSeek NO tools (last resort — conversation only) ──
+  if (deepseekKey) {
+    try {
+      logger.info(
+        "[ExoSkullAgent] Fallback #3: DeepSeek no tools (last resort)",
+        {
+          tenantId: req.tenantId,
+        },
+      );
+      req.onThinkingStep?.("Tryb awaryjny", "running");
+
+      const response = await fetch(
+        "https://api.deepseek.com/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${deepseekKey}`,
+          },
+          body: JSON.stringify({
+            model: "deepseek-chat",
+            messages: oaiMessages,
+            temperature: 0.7,
+            max_tokens: 2048,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`DeepSeek API error: ${response.status}`);
+      }
+
+      const data = (await response.json()) as OAIResponse;
+      const text = data.choices?.[0]?.message?.content || "";
+      req.onThinkingStep?.("Tryb awaryjny", "done");
+      return text || null;
+    } catch (e) {
+      logger.error(
+        "[ExoSkullAgent] Fallback #3 (DeepSeek no-tools) also failed:",
+        {
+          error: e instanceof Error ? e.message : String(e),
+          tenantId: req.tenantId,
+        },
+      );
+    }
+  }
+
+  return null;
 }

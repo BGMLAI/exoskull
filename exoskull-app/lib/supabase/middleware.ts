@@ -100,9 +100,11 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/webhooks/") ||
     pathname.startsWith("/api/cron/") ||
+    pathname.startsWith("/api/v3/") ||
     pathname.startsWith("/api/public/") ||
     pathname.startsWith("/api/twilio/") ||
     pathname.startsWith("/api/gateway/") || // External messaging webhooks (Telegram, Discord, Slack, Signal, iMessage)
+    pathname.startsWith("/api/integrations/webhook/") || // Superintegrator inbound webhooks (signature verified in route)
     pathname.startsWith("/api/rigs/") || // OAuth connect/callback + sync (routes verify JWT internally)
     pathname.startsWith("/api/meta/") || // Meta deauth/pages (routes verify JWT internally)
     pathname === "/api/pulse" ||
@@ -114,7 +116,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/voice/") || // Voice endpoints — Bearer JWT auth verified in routes (verifyTenantAuth)
     pathname.startsWith("/api/debug/") || // Debug endpoints — own CRON_SECRET auth
     pathname.startsWith("/api/internal/") || // Service-to-service — VPS_AGENT_SECRET auth
-    pathname.startsWith("/api/v3/"); // v3 endpoints — own auth via verifyTenantAuth
+    pathname.startsWith("/api/apps/"); // Generated apps — public, served as HTML
 
   // ============================================================================
   // AUTH GUARD: Redirect unauthenticated users to login

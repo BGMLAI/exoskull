@@ -29,13 +29,14 @@ async function getAppConfig(tenantId: string, slug: string) {
 
 export const GET = withApiLog(async function GET(
   _request: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
   const auth = await verifyTenantAuth(_request);
   if (!auth.ok) return auth.response;
   const tenantId = auth.tenantId;
+  const { slug } = await params;
 
-  const app = await getAppConfig(tenantId, params.slug);
+  const app = await getAppConfig(tenantId, slug);
   if (!app) {
     return NextResponse.json({ error: "App not found" }, { status: 404 });
   }
@@ -67,13 +68,14 @@ export const GET = withApiLog(async function GET(
 
 export const POST = withApiLog(async function POST(
   request: NextRequest,
-  { params }: { params: { slug: string } },
+  { params }: { params: Promise<{ slug: string }> },
 ) {
   const auth = await verifyTenantAuth(request);
   if (!auth.ok) return auth.response;
   const tenantId = auth.tenantId;
+  const { slug } = await params;
 
-  const app = await getAppConfig(tenantId, params.slug);
+  const app = await getAppConfig(tenantId, slug);
   if (!app) {
     return NextResponse.json({ error: "App not found" }, { status: 404 });
   }
@@ -113,7 +115,7 @@ export const POST = withApiLog(async function POST(
     .from("exo_generated_apps")
     .update({ last_used_at: new Date().toISOString() })
     .eq("tenant_id", tenantId)
-    .eq("slug", params.slug)
+    .eq("slug", slug)
     .then(() => {});
 
   return NextResponse.json({ entry }, { status: 201 });

@@ -471,8 +471,42 @@ export async function ensureFreshToken(connection: {
     throw new Error(`[OAuth] No access token for ${connection.rig_slug}`);
   }
 
-  // If no expiry info, assume token is valid
+  // If no expiry info but refresh_token exists, try refreshing proactively
+  // (some providers don't return expires_in but tokens still expire)
   if (!connection.expires_at) {
+    if (connection.refresh_token) {
+      const config = getOAuthConfig(connection.rig_slug);
+      if (config) {
+        try {
+          logger.info(
+            `[OAuth] No expires_at for ${connection.rig_slug}, refreshing proactively`,
+          );
+          const tokens = await refreshAccessToken(
+            config,
+            connection.refresh_token,
+          );
+          const newExpiresAt = tokens.expires_in
+            ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
+            : null;
+          const supabase = getServiceSupabase();
+          await supabase
+            .from("exo_rig_connections")
+            .update({
+              access_token: tokens.access_token,
+              refresh_token: tokens.refresh_token || connection.refresh_token,
+              expires_at: newExpiresAt,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", connection.id);
+          return tokens.access_token;
+        } catch {
+          // Refresh failed — fall through and return existing token
+          logger.warn(
+            `[OAuth] Proactive refresh failed for ${connection.rig_slug}, using existing token`,
+          );
+        }
+      }
+    }
     return connection.access_token;
   }
 

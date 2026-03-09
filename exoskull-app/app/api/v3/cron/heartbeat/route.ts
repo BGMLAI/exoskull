@@ -29,12 +29,22 @@ export async function GET(req: Request) {
 
   try {
     // Get active tenants with autonomous permission
-    const { data: tenants } = await supabase
+    const { data: tenants, error: tenantsError } = await supabase
       .from("exo_tenants")
       .select(
-        "id, name, permission_level, quiet_hours_start, quiet_hours_end, preferred_channel",
+        "id, name, permission_level, quiet_hours_start, quiet_hours_end, preferred_channel, metadata",
       )
-      .not("subscription_status", "in", "(cancelled,suspended)");
+      .in("subscription_status", ["active", "trialing", "trial"]);
+
+    if (tenantsError) {
+      console.error("[Heartbeat] Failed to fetch tenants:", {
+        error: tenantsError,
+      });
+      return NextResponse.json(
+        { error: "Failed to fetch tenants" },
+        { status: 500 },
+      );
+    }
 
     if (!tenants?.length) {
       return NextResponse.json({ message: "No active tenants", results: [] });
@@ -45,11 +55,16 @@ export async function GET(req: Request) {
       if (isQuietHours(tenant.quiet_hours_start, tenant.quiet_hours_end))
         continue;
 
-      // Skip if permission is manual (no autonomy)
-      if (tenant.permission_level === "manual") continue;
+      // Skip if permission is manual or NULL (no autonomy for new/unset tenants)
+      if (!tenant.permission_level || tenant.permission_level === "manual")
+        continue;
 
       try {
-        const action = await heartbeatForTenant(supabase, tenant.id);
+        const action = await heartbeatForTenant(
+          supabase,
+          tenant.id,
+          (tenant.metadata as Record<string, unknown>) || {},
+        );
         results.push({
           tenantId: tenant.id,
           action: action || "no_action",
@@ -82,17 +97,22 @@ function isQuietHours(start: number | null, end: number | null): boolean {
 async function heartbeatForTenant(
   supabase: ReturnType<typeof getServiceSupabase>,
   tenantId: string,
+  tenantMetadata?: Record<string, unknown>,
 ): Promise<string | null> {
   // === STEP 1: OBSERVE — Check goals, queue, recent activity ===
 
-  const [goalsResult, queueResult, recentActionsResult] = await Promise.all([
+  const [goalsResult, queueResult, recentActionsResult] = await Promise.all<{
+    data: unknown[] | null;
+    error: unknown;
+  }>([
+    // Graph DB: goals are nodes with type='goal'
     supabase
-      .from("user_loops")
-      .select("id, title, priority, status, metadata")
+      .from("nodes")
+      .select("id, name, status, metadata")
       .eq("tenant_id", tenantId)
       .eq("type", "goal")
       .in("status", ["active", "pending"])
-      .order("priority", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("exo_autonomy_queue")
@@ -113,9 +133,42 @@ async function heartbeatForTenant(
       .limit(10),
   ]);
 
-  const goals = goalsResult.data || [];
-  const queue = queueResult.data || [];
-  const recentActions = recentActionsResult.data || [];
+  if (goalsResult.error)
+    console.error(
+      `[Heartbeat] Goals query failed for ${tenantId}:`,
+      goalsResult.error,
+    );
+  if (queueResult.error)
+    console.error(
+      `[Heartbeat] Queue query failed for ${tenantId}:`,
+      queueResult.error,
+    );
+  if (recentActionsResult.error)
+    console.error(
+      `[Heartbeat] Recent actions query failed for ${tenantId}:`,
+      recentActionsResult.error,
+    );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const goals = ((goalsResult.data || []) as any[]).map((g) => ({
+    id: g.id as string,
+    title: (g.name || g.title) as string,
+    priority: (g.metadata?.priority as number) || 5,
+    metadata: g.metadata,
+  }));
+  const queue = (queueResult.data || []) as {
+    id: string;
+    type: string;
+    payload: unknown;
+    priority: number;
+    retry_count: number;
+    max_retries: number;
+  }[];
+  const recentActions = (recentActionsResult.data || []) as {
+    event_type: string;
+    payload: unknown;
+    created_at: string;
+  }[];
 
   // Nothing to do
   if (!goals.length && !queue.length) return null;
@@ -130,7 +183,13 @@ async function heartbeatForTenant(
 
   // Priority 2: Check goal progress and take proactive action
   if (goals.length > 0) {
-    return evaluateGoals(supabase, tenantId, goals, recentActions);
+    return evaluateGoals(
+      supabase,
+      tenantId,
+      goals,
+      recentActions,
+      tenantMetadata,
+    );
   }
 
   return null;
@@ -218,12 +277,14 @@ async function evaluateGoals(
   tenantId: string,
   goals: { id: string; title: string; priority: number; metadata: unknown }[],
   recentActions: { event_type: string; payload: unknown; created_at: string }[],
+  tenantMetadata?: Record<string, unknown>,
 ): Promise<string | null> {
-  // Rate limit: max 4 proactive actions per day
+  // Rate limit: configurable per tenant, default 12 proactive actions per day
+  const maxDaily = (tenantMetadata?.max_daily_autonomy_actions as number) || 12;
   const todayActions = recentActions.filter(
     (a) => a.event_type === "proactive_action",
   );
-  if (todayActions.length >= 4) return "rate_limited";
+  if (todayActions.length >= maxDaily) return "rate_limited";
 
   // Use Haiku to decide what to do (cheap)
   const anthropicKey = process.env.ANTHROPIC_API_KEY;

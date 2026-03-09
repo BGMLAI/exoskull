@@ -1,5 +1,53 @@
 # ExoSkull Learnings
 
+## K224 initialMessage Must Check History Length (2026-03-05)
+
+- Chat-driven pages (K224) auto-send a context message via `initialMessage` prop on UnifiedStream.
+- **Bug:** `useRef(false)` resets on every mount — navigating to the page fires the message EVERY TIME, not just once.
+- This caused 5+ API calls in 10 seconds when browser-testing all pages, triggering DeepSeek rate limits.
+- **Fix:** Add `engine.events.length === 0` check — only auto-send when conversation has no history.
+- **Pattern:** Any "run once on mount" effect that depends on external state (API, DB) must guard against repeat invocations from React remounts. `useRef` alone is NOT sufficient if the component unmounts between navigations.
+
+## Vercel Deploy: Push to v3-origin Triggers Production (2026-03-05)
+
+- `git push v3-origin v3:main` auto-deploys to Production for the `exoskull-v3` project.
+- `npx vercel --prod` from repo root deploys to WRONG project (`exoskull-app`, not `exoskull-v3`).
+- `npx vercel --prod` from `exoskull-app/` fails with double-nesting error (rootDirectory config).
+- **Alternative:** `cd exoskull-app && echo "y" | npx vercel promote <preview-url>` triggers a new production build.
+- **Pattern:** Always verify which Vercel project you're deploying to. Multiple `.vercel/project.json` in a monorepo = multiple projects.
+
+## V3 Agent Token Cost — Main Waste Sources (2026-03-05)
+
+- **maxTurns too high** was the #1 waste. 15 turns × full context (system prompt + 34 tools + history) = up to 120K tokens per simple question. Most queries resolve in 1-3 turns.
+- **Tool schemas are expensive** — 34 tools ≈ 3400 tokens overhead PER TURN. Multiply by turns for real cost.
+- **Memory search on every query** is wasteful. "Cześć" doesn't need vector search. Gate it: only search if message >30 chars or contains memory-related keywords.
+- **Duplicate routing** — stream/route.ts and agent.ts both classified queries and called Gemini independently. One classification point is enough.
+- **Context cache 30s** was too short for conversational flow. 5 min covers most back-and-forth without stale data issues.
+- **Prompt caching (`cache_control: ephemeral`)** saves ~90% on static system prompt across turns. Use it whenever system prompt >1K tokens.
+- **DeepSeek is 11-14x cheaper than Sonnet** with comparable tool calling quality for standard tasks. Use expensive models only for complex generation (build_app).
+- **Pattern:** For cost-sensitive agents, route by complexity BEFORE choosing model. Most queries are simple/medium and don't need the most expensive model.
+
+## Next.js Route Files Can Only Export HTTP Handlers (2026-03-02)
+
+- Putting helper functions (`registerConversation`, `getActiveConversationCount`) alongside `POST` handler in a route file caused TS error: `Property 'registerConversation' is incompatible with index signature`.
+- Next.js App Router validates that route files only export: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, plus `config`, `generateStaticParams`, etc.
+- **Solution:** Extract shared state/helpers to a separate module (`lib/chat/active-conversations.ts`) and import in the route.
+- **Pattern:** Route files are API boundaries — keep them thin. Business logic, shared state, and utilities belong in `lib/`.
+
+## Supabase Migration History Needs Manual Repair for Prod Drift (2026-03-02)
+
+- `supabase db push` fails when remote has migration versions not found locally (e.g., applied directly via SQL Editor or different branch).
+- Error: "Remote migration versions not found in local migrations directory."
+- **Solution:** `supabase migration repair --status reverted <version>` for remote-only entries, `--status applied <version>` for objects that already exist.
+- Always use `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, and `DO $$ BEGIN CREATE POLICY ... EXCEPTION WHEN duplicate_object THEN NULL; END $$` for idempotent migrations.
+- **Pattern:** Production databases drift from migration files. Make every migration idempotent (IF NOT EXISTS everywhere) so re-running is safe.
+
+## Vercel Outages Block Git-Based Deploys But Code Is Safe (2026-03-02)
+
+- Vercel "internal error" during "Deploying outputs" = platform issue, not code issue. Build succeeds, deployment fails.
+- 6 redeploy attempts over 20 minutes — all same error. Redeploying old known-good builds also fails.
+- Code is in git → will auto-deploy when Vercel recovers.
+- **Pattern:** For CI/CD, always have a way to verify: (1) code compiles, (2) tests pass — independently of the deployment platform. Don't block E2E testing on a single deploy target if you can test subsets against existing prod.
 ## Vercel CRONs Always Send GET (2026-03-02)
 
 - All 4 v3 cron routes used `export async function POST` — Vercel CRONs always send GET requests.
@@ -188,6 +236,19 @@
   - Punctuation must be stripped before word splitting
   - Threshold `>=0.5` catches "word word word other" (3/4 = 75%)
   - Single "Halo?" is legitimate — require `{3,}` repetitions for short greetings
+
+## .vercelignore Patterns Are Recursive Like .gitignore (2026-03-02)
+
+- `supabase/` in `.vercelignore` matches ALL directories named `supabase` at ANY depth — including `lib/supabase/` which contains `client.ts`, `server.ts`, `middleware.ts`.
+- Similarly, `tools/` matches `lib/iors/tools/` — the entire IORS tool library.
+- **Solution:** Prefix with `/` for root-only matching: `/supabase/`, `/tools/`, `/scripts/`.
+- **Pattern:** `.vercelignore` (like `.gitignore`) treats bare directory names as recursive patterns. Always use `/dirname/` (leading slash) for top-level-only exclusions. This silently broke the build with "Module not found" errors.
+
+## Vercel Deploys From Specific GitHub Repo (2026-03-02)
+
+- Two remotes: `origin` (exoskull.git) and `v3-origin` (exoskull-v3.git). Vercel project `exoskull-v3` deploys from `v3-origin`, NOT `origin`.
+- Pushing to `origin/v3` does NOT trigger Vercel deployment. Must push to `v3-origin/main`.
+- **Pattern:** Always verify which remote/branch Vercel is connected to before assuming deployment was triggered. Check `exoskull-app/.vercel/project.json` for project ID, then cross-reference with Vercel dashboard.
 
 ## Bash in Claude Code on Windows
 

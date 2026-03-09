@@ -278,10 +278,15 @@ export async function detectMomentum(
 ): Promise<Momentum> {
   const supabase = createServiceClient();
 
-  const { data: checkpoints } = await supabase.rpc(
-    "get_goal_checkpoint_history",
-    { p_goal_id: goalId, p_days: days },
-  );
+  const since = new Date(Date.now() - days * 86400000)
+    .toISOString()
+    .split("T")[0];
+  const { data: checkpoints } = await supabase
+    .from("exo_goal_checkpoints")
+    .select("*")
+    .eq("goal_id", goalId)
+    .gte("checkpoint_date", since)
+    .order("checkpoint_date", { ascending: true });
 
   if (!checkpoints || checkpoints.length < 3) return "stable";
 
@@ -383,53 +388,67 @@ export function forecastCompletion(
 export async function getGoalStatus(tenantId: string): Promise<GoalStatus[]> {
   const supabase = createServiceClient();
 
-  const { data: rows } = await supabase.rpc("get_active_goals_with_status", {
-    p_tenant_id: tenantId,
-  });
+  // Direct query — no RPC dependency
+  const { data: goals, error } = await supabase
+    .from("exo_user_goals")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(20);
 
-  if (!rows || rows.length === 0) return [];
+  if (error) {
+    logger.error("[GoalEngine] getGoalStatus query failed:", {
+      error: error.message,
+      tenantId,
+    });
+    return [];
+  }
+
+  if (!goals || goals.length === 0) return [];
 
   const statuses: GoalStatus[] = [];
 
-  for (const row of rows as Record<string, unknown>[]) {
-    // Load recent checkpoints for forecast
-    const { data: checkpoints } = await supabase.rpc(
-      "get_goal_checkpoint_history",
-      { p_goal_id: row.goal_id, p_days: 30 },
-    );
-
-    // Load full goal object (dual-read: Tyrolka first, legacy fallback)
-    const dualG = await dualReadGoal(row.goal_id as string, tenantId);
-    if (!dualG) continue;
-
-    // TODO Phase 4: migrate to goal-service when Goal interface enriched with target_value, baseline_value, direction, frequency
-    // Needs full UserGoal fields for forecastCompletion + trajectory calculation
-    const { data: goal } = await supabase
-      .from("exo_user_goals")
+  for (const goal of goals as UserGoal[]) {
+    // Get latest checkpoint
+    const { data: checkpoints } = await supabase
+      .from("exo_goal_checkpoints")
       .select("*")
-      .eq("id", row.goal_id)
-      .single();
+      .eq("goal_id", goal.id)
+      .order("checkpoint_date", { ascending: false })
+      .limit(30);
 
-    if (!goal) continue;
+    const cps = (checkpoints || []) as GoalCheckpoint[];
+    const latest = cps[0];
+    const progressPercent = latest?.progress_percent ?? 0;
+    const momentum = latest?.momentum ?? "stable";
 
-    const forecast = forecastCompletion(
-      goal as UserGoal,
-      (checkpoints || []) as GoalCheckpoint[],
+    const trajectory = determineTrajectory(
+      goal,
+      progressPercent,
+      momentum as Momentum,
     );
 
-    // Calculate streak (consecutive days with checkpoints)
-    const streak = calculateStreak((checkpoints || []) as GoalCheckpoint[]);
+    const daysRemaining = goal.target_date
+      ? Math.max(
+          0,
+          Math.ceil(
+            (new Date(goal.target_date).getTime() - Date.now()) / 86400000,
+          ),
+        )
+      : null;
+
+    const forecast = forecastCompletion(goal, cps);
+    const streak = calculateStreak(cps);
 
     statuses.push({
-      goal: goal as UserGoal,
-      progress_percent: (row.progress_percent as number) || 0,
-      momentum: (row.momentum as Momentum) || "stable",
-      trajectory: (row.trajectory as Trajectory) || "on_track",
-      days_remaining: row.days_remaining as number | null,
+      goal,
+      progress_percent: progressPercent,
+      momentum: momentum as Momentum,
+      trajectory,
+      days_remaining: daysRemaining,
       forecast_date: forecast,
-      last_checkpoint: (checkpoints as GoalCheckpoint[])?.[
-        (checkpoints as GoalCheckpoint[]).length - 1
-      ],
+      last_checkpoint: latest,
       streak_days: streak,
     });
   }
