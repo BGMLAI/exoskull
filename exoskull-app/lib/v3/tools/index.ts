@@ -8,7 +8,6 @@
  * Phase 5: +4 builder tools (build_app, generate_content, self_extend_tool, scan_receipt)
  * Phase 6: +3 channel tools (send_sms, send_email, make_call)
  * Phase 7: +2 evolution tools (get_capabilities, reflexion_evaluate)
- *
  * Phase 8: +1 marketplace tool (publish_to_allegro)
  *
  * Current: 35 tools (Phase 1-8)

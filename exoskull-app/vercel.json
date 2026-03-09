@@ -28,7 +28,7 @@
     "app/api/models/**/*.ts": {
       "maxDuration": 30
     },
-    "app/api/v3/cron/**/*.ts": {
+    "app/api/v3/**/*.ts": {
       "maxDuration": 60
     }
   },

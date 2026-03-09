@@ -359,6 +359,57 @@ complex → DeepSeek Chat    → $0.002/query (build_app etc, more turns)
 - TypeScript literal type narrowing: `let effectiveModel: string = config.model` (not inferred literal)
 - Supabase migration history: 16 mismatches repaired (`migration repair --status applied|reverted`)
 - Process conductor migration: `CREATE INDEX` without `IF NOT EXISTS` → fixed
+## [2026-03-02] Autonomy Auditor Agent v2
+
+### Agent Rewrite (14 Dimensions)
+
+- Expanded from 8 → 14 dimensions (D1-D14): **SUCCESS**
+- New: D6 Outbound+Superintegration, D9 UX, D11 Cost Optimization, D12 Health Monitoring, D13 Multimodality, D14 Transparency
+- 10 scenario-based E2E tests with cross-verification (Browser × DB × Logs × External): **SUCCESS**
+- Identity section: user obedience, perceived satisfaction, continuous development, cost optimization, multimodality, transparency
+- Anti-patterns updated with real bugs from this session (POST vs GET, non-existent columns)
+- Saved to `~/.claude/agents/autonomy-auditor.md` + `exoskull/.claude/agents/autonomy-auditor.md`: **SUCCESS**
+- Commit `945b740`: **SUCCESS**
+
+---
+
+## [2026-03-02] Activate v3 Autonomy Engine
+
+### Autonomy Auditor Agent Created
+
+- Created `~/.claude/agents/autonomy-auditor.md` (OAF 8-dimension framework): **SUCCESS**
+- Based on `bgml.ai bible.md` (762KB) — OpenClaw, Felix, BMAD, CLAWS, heartbeat, QMD, Reflexion
+
+### Autonomy Audit (v3)
+
+- 5 parallel agents scanned all 8 dimensions: **SUCCESS**
+- Score: 65/80 (Grade A), Level 4 (Manager)
+- But: **nothing actually worked** — code existed but was dead
+
+### Root Cause Diagnosis
+
+- v3 CRONs NOT in vercel.json: **FOUND + FIXED**
+- test-autonomy/route.ts empty (0 bytes): **FOUND + FIXED**
+- All 4 cron routes POST instead of GET: **FOUND + FIXED**
+- `.eq("active", true)` on non-existent column: **FOUND + FIXED**
+
+### Deployment
+
+- Commit `a3ab40e` (wire crons + test endpoint): **SUCCESS**
+- Commit `0f167aa` (POST→GET): **SUCCESS**
+- Commit `84260a1` (active column fix): **SUCCESS**
+- All pushed to main, deployed to production: **SUCCESS**
+
+### Verification
+
+- `/api/v3/health` → 200, 14/14 PASS: **SUCCESS**
+- `/api/v3/cron/heartbeat` manual trigger → processes tenant: **SUCCESS**
+- Quiet hours disabled for Bogumił tenant: **SUCCESS**
+
+### Retries
+
+- Grep tool encoding issues with v3 cron files → used Bash grep: 1 retry
+- Preview URL Vercel auth wall → switched to production domain: 1 retry
 
 ---
 

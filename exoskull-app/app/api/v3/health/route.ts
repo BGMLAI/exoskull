@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/service";
 
 export const maxDuration = 30;
+export const dynamic = "force-dynamic";
 
 interface HealthCheck {
   name: string;
@@ -17,7 +18,7 @@ interface HealthCheck {
   error?: string;
 }
 
-export async function GET(req: Request) {
+export async function GET() {
   const checks: HealthCheck[] = [];
   const startTime = Date.now();
 
@@ -40,7 +41,36 @@ export async function GET(req: Request) {
     });
   }
 
-  // 2. Anthropic API
+  // 2. Supabase RPC functions
+  try {
+    const rpcStart = Date.now();
+    const supabase = getServiceSupabase();
+    const { error } = await supabase.rpc("hybrid_search", {
+      query_text: "test",
+      query_embedding: JSON.stringify(new Array(1536).fill(0)),
+      match_tenant_id: "00000000-0000-0000-0000-000000000000",
+      match_threshold: 0.01,
+      match_count: 1,
+      source_types: null,
+      recency_weight: 0.1,
+      keyword_weight: 0.2,
+      vector_weight: 0.7,
+    });
+    checks.push({
+      name: "rpc_hybrid_search",
+      status: error ? "degraded" : "healthy",
+      latency_ms: Date.now() - rpcStart,
+      error: error?.message,
+    });
+  } catch (err) {
+    checks.push({
+      name: "rpc_hybrid_search",
+      status: "down",
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // 3. Anthropic API
   try {
     const apiStart = Date.now();
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -81,7 +111,22 @@ export async function GET(req: Request) {
     });
   }
 
-  // 3. Resend (email)
+  // 4. API keys presence check
+  const keyChecks = [
+    { name: "OPENAI_API_KEY", key: process.env.OPENAI_API_KEY },
+    { name: "GOOGLE_AI_API_KEY", key: process.env.GOOGLE_AI_API_KEY },
+    { name: "TAVILY_API_KEY", key: process.env.TAVILY_API_KEY },
+    { name: "GITHUB_TOKEN", key: process.env.GITHUB_TOKEN },
+  ];
+  for (const { name, key } of keyChecks) {
+    checks.push({
+      name,
+      status: key && !key.startsWith("op://") ? "healthy" : "degraded",
+      error: !key ? "not set" : key.startsWith("op://") ? "unresolved 1Password ref" : undefined,
+    });
+  }
+
+  // 5. Resend (email)
   try {
     const resendKey = process.env.RESEND_API_KEY;
     if (!resendKey) {
@@ -110,7 +155,7 @@ export async function GET(req: Request) {
     });
   }
 
-  // 4. VPS (code execution)
+  // 6. VPS (code execution)
   try {
     const vpsUrl = process.env.VPS_EXECUTOR_URL;
     if (!vpsUrl) {
@@ -143,10 +188,13 @@ export async function GET(req: Request) {
   const hasDegraded = checks.some((c) => c.status === "degraded");
   const overallStatus = hasDown ? "down" : hasDegraded ? "degraded" : "healthy";
 
-  return NextResponse.json({
-    status: overallStatus,
-    timestamp: new Date().toISOString(),
-    total_latency_ms: Date.now() - startTime,
-    checks,
-  });
+  return NextResponse.json(
+    {
+      status: overallStatus,
+      timestamp: new Date().toISOString(),
+      total_latency_ms: Date.now() - startTime,
+      checks,
+    },
+    { status: overallStatus === "healthy" ? 200 : 503 },
+  );
 }

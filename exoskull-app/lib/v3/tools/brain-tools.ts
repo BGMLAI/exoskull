@@ -28,6 +28,7 @@ const searchBrainTool: V3ToolDefinition = {
       required: ["query"],
     },
   },
+  timeoutMs: 25_000,
   async execute(input, tenantId) {
     const query = input.query as string;
 

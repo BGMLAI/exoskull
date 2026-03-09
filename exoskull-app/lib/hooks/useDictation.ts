@@ -9,6 +9,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 interface UseDictationOptions {
   onFinalTranscript?: (text: string) => void;
   onError?: (error: string) => void;
+  authToken?: string;
 }
 
 interface UseDictationReturn {
@@ -34,7 +35,7 @@ interface UseDictationReturn {
 export function useDictation(
   options: UseDictationOptions = {},
 ): UseDictationReturn {
-  const { onFinalTranscript, onError } = options;
+  const { onFinalTranscript, onError, authToken } = options;
 
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
@@ -52,6 +53,7 @@ export function useDictation(
   const silenceStartRef = useRef<number | null>(null);
   const onFinalTranscriptRef = useRef(onFinalTranscript);
   const onErrorRef = useRef(onError);
+  const authTokenRef = useRef(authToken);
   const continuousRef = useRef(false);
   const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -62,6 +64,7 @@ export function useDictation(
   // Keep refs fresh
   onFinalTranscriptRef.current = onFinalTranscript;
   onErrorRef.current = onError;
+  authTokenRef.current = authToken;
 
   const setContinuous = useCallback((on: boolean) => {
     setContinuousState(on);
@@ -161,8 +164,14 @@ export function useDictation(
       const formData = new FormData();
       formData.append("audio", audioBlob, "audio.webm");
 
+      const headers: Record<string, string> = {};
+      if (authTokenRef.current) {
+        headers["Authorization"] = `Bearer ${authTokenRef.current}`;
+      }
+
       const response = await fetch("/api/voice/transcribe", {
         method: "POST",
+        headers,
         body: formData,
       });
 
