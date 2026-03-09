@@ -14,7 +14,7 @@
 import { getServiceSupabase } from "@/lib/supabase/service";
 import { logger } from "@/lib/logger";
 
-const VPS_URL = process.env.VPS_EXECUTOR_URL || "http://57.128.253.15:3500";
+const VPS_URL = process.env.VPS_EXECUTOR_URL || "http://178.104.28.71:3500";
 const VPS_SECRET = process.env.VPS_EXECUTOR_SECRET || "";
 
 // ============================================================================

@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const VPS_EXECUTOR_URL =
-  process.env.VPS_EXECUTOR_URL || "http://57.128.253.15:3500";
+  process.env.VPS_EXECUTOR_URL || "http://178.104.28.71:3500";
 const VPS_EXECUTOR_SECRET = process.env.VPS_EXECUTOR_SECRET || "";
 
 function getServiceClient() {

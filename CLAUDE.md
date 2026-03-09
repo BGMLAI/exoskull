@@ -120,7 +120,7 @@ Like in games: **2D HUD overlay in the foreground (map, quests, equipment) + 3D 
 - 219 API routes, 43 CRONs, 101 IORS tools, 51 tool files
 - Next.js 14.2.35, TypeScript 5, Supabase (Postgres + Auth + Storage)
 - Deployed on Railway (web + voice WS) | Desktop: Tauri v2 (Windows/macOS/Linux)
-- VPS: OVH Warsaw (57.128.253.15:3500) for sandboxed code execution
+- VPS: Hetzner Nuremberg (178.104.28.71:3500) for sandboxed code execution
 
 ---
 
