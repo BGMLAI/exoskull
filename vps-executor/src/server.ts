@@ -16,6 +16,7 @@ import express from "express";
 import { DockerRunner } from "./docker-runner";
 import { codeRouter } from "./routes/code";
 import { agentCodeRouter } from "./routes/agent-code";
+import { workspaceRouter } from "./routes/workspace";
 import { v4 as uuid } from "uuid";
 
 const app = express();
@@ -89,6 +90,9 @@ app.use("/api/code", authenticate, codeRouter);
 
 // Agent Code routes (Claude Code — SSE streaming agent)
 app.use("/api/agent/code", authenticate, agentCodeRouter);
+
+// Workspace routes (Chrome headless browser control)
+app.use("/workspace", authenticate, workspaceRouter);
 
 app.get("/health", (_req, res) => {
   res.json({

@@ -75,6 +75,15 @@ const TOOL_KEYWORDS = [
   "możliwości",
   "funkcj",
   "narzędzi",
+  // Workspace
+  "workspace",
+  "przeglądark",
+  "browser",
+  "terminal",
+  "panel",
+  "dashboard",
+  "otwórz stronę",
+  "pokaż stronę",
   // Vision
   "obraz",
   "image",

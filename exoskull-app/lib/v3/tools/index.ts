@@ -9,8 +9,9 @@
  * Phase 6: +3 channel tools (send_sms, send_email, make_call)
  * Phase 7: +2 evolution tools (get_capabilities, reflexion_evaluate)
  * Phase 8: +1 marketplace tool (publish_to_allegro)
+ * Phase 9: +4 workspace tools (open_workspace, workspace_action, workspace_terminal, show_in_workspace)
  *
- * Current: 35 tools (Phase 1-8)
+ * Current: 39 tools (Phase 1-9)
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
@@ -48,6 +49,7 @@ import { builderTools } from "./builder-tools";
 import { channelTools } from "./channel-tools";
 import { evolutionTools } from "./evolution-tools";
 import { marketplaceTools } from "./marketplace-tools";
+import { workspaceTools } from "./workspace-tools";
 
 // ============================================================================
 // MERGED REGISTRY
@@ -62,6 +64,7 @@ export const V3_TOOLS: V3ToolDefinition[] = [
   ...channelTools, // 3: send_sms, send_email, make_call
   ...evolutionTools, // 2: get_capabilities, reflexion_evaluate
   ...marketplaceTools, // 1: publish_to_allegro
+  ...workspaceTools, // 4: open_workspace, workspace_action, workspace_terminal, show_in_workspace
 ];
 
 /**

@@ -122,16 +122,54 @@ export const integrationTools: ToolDefinition[] = [
       try {
         const { connectService } =
           await import("@/lib/integrations/superintegrator");
+        const { findService } =
+          await import("@/lib/integrations/service-registry");
+
+        // Auto-fill from service registry if available
+        const slug = input.service_slug as string;
+        const registryEntry =
+          findService(slug) || findService(input.service_name as string);
+
+        const authMethod =
+          (input.auth_method as string) || registryEntry?.auth_method;
+        const apiBaseUrl =
+          (input.api_base_url as string) || registryEntry?.api_base_url;
+        const authorizationUrl =
+          (input.authorization_url as string) ||
+          registryEntry?.oauth2?.authorization_url;
+        const tokenUrl =
+          (input.token_url as string) || registryEntry?.oauth2?.token_url;
+        const scopes =
+          (input.scopes as string[]) || registryEntry?.oauth2?.scopes;
+        const clientId =
+          (input.client_id as string) ||
+          (registryEntry?.env_client_id
+            ? process.env[registryEntry.env_client_id]
+            : undefined);
+        const clientSecret =
+          (input.client_secret as string) ||
+          (registryEntry?.env_client_secret
+            ? process.env[registryEntry.env_client_secret]
+            : undefined);
+
+        if (registryEntry) {
+          logger.info("[IntegrationTools] Auto-filled from registry:", {
+            service: registryEntry.name,
+            auth: registryEntry.auth_method,
+          });
+        }
+
         const result = await connectService(tenantId, {
-          service_name: input.service_name as string,
-          service_slug: input.service_slug as string,
-          auth_method: input.auth_method as "oauth2" | "api_key" | "webhook",
-          api_base_url: input.api_base_url as string | undefined,
-          authorization_url: input.authorization_url as string | undefined,
-          token_url: input.token_url as string | undefined,
-          client_id: input.client_id as string | undefined,
-          client_secret: input.client_secret as string | undefined,
-          scopes: input.scopes as string[] | undefined,
+          service_name:
+            (input.service_name as string) || registryEntry?.name || slug,
+          service_slug: slug,
+          auth_method: authMethod as "oauth2" | "api_key" | "webhook",
+          api_base_url: apiBaseUrl,
+          authorization_url: authorizationUrl,
+          token_url: tokenUrl,
+          client_id: clientId,
+          client_secret: clientSecret,
+          scopes,
           api_key: input.api_key as string | undefined,
         });
 
@@ -204,8 +242,31 @@ export const integrationTools: ToolDefinition[] = [
         // Superintegrator not available yet
       }
 
-      parts.push('\nAby podłączyć nową usługę: "podłącz [nazwa]"');
-      parts.push("Dowolna usługa z API: użyj connect_service");
+      // Service Registry (auto-configurable)
+      try {
+        const { SERVICE_REGISTRY, isServiceConfigured } =
+          await import("@/lib/integrations/service-registry");
+        parts.push("\nDostępne w rejestrze (auto-konfiguracja):");
+        const byCategory = new Map<string, string[]>();
+        for (const s of SERVICE_REGISTRY) {
+          const configured = isServiceConfigured(s);
+          const status = configured ? "✅" : "⚙️";
+          const cat = s.category;
+          if (!byCategory.has(cat)) byCategory.set(cat, []);
+          byCategory.get(cat)!.push(`  ${status} ${s.icon} ${s.name}`);
+        }
+        for (const [cat, services] of byCategory.entries()) {
+          parts.push(`\n  ${cat.toUpperCase()}:`);
+          parts.push(services.join("\n"));
+        }
+        parts.push(
+          "\n✅ = gotowe do podłączenia, ⚙️ = wymaga konfiguracji env vars",
+        );
+      } catch {
+        // Registry not available
+      }
+
+      parts.push('\nAby podłączyć: "podłącz [nazwa]" lub connect_service');
       return parts.join("\n");
     },
   },

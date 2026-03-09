@@ -21,6 +21,8 @@ interface UnifiedStreamProps {
   onToggleTTS?: () => void;
   /** Auto-send this message on mount (K224: chat-driven pages) */
   initialMessage?: string;
+  /** Workspace toggle button (rendered above input bar) */
+  workspaceToggle?: React.ReactNode;
 }
 
 // ---------------------------------------------------------------------------
@@ -33,6 +35,7 @@ export function UnifiedStream({
   ttsEnabled: ttsEnabledProp,
   onToggleTTS: onToggleTTSProp,
   initialMessage,
+  workspaceToggle,
 }: UnifiedStreamProps) {
   const engine = useChatEngine({
     ttsEnabled: ttsEnabledProp,
@@ -195,7 +198,10 @@ export function UnifiedStream({
         </div>
       )}
 
-      {/* Input bar */}
+      {/* Workspace toggle + Input bar */}
+      {workspaceToggle && (
+        <div className="flex items-center px-4 pt-1">{workspaceToggle}</div>
+      )}
       <VoiceInputBar
         onSendText={(text) => engine.sendMessage(text, "text")}
         onSendVoice={(transcript) =>
