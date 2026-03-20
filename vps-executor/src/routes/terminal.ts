@@ -14,8 +14,9 @@
  */
 
 import { Router } from "express";
-import { WebSocketServer, WebSocket } from "ws";
+import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server } from "http";
+import type { IncomingMessage } from "http";
 import { v4 as uuid } from "uuid";
 
 // node-pty is a native module — optional require for environments where it's not built
@@ -155,7 +156,7 @@ export function initTerminalWebSocket(_httpServer?: Server): void {
   wss = new WebSocketServer({ port: WS_PORT });
   console.log(`[Terminal] WebSocket server listening on :${WS_PORT}`);
 
-  wss.on("connection", (ws, req) => {
+  wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     const url = new URL(req.url || "/", `http://localhost:${WS_PORT}`);
     const token = url.searchParams.get("token");
 
@@ -216,7 +217,7 @@ export function initTerminalWebSocket(_httpServer?: Server): void {
       }
     });
 
-    pty.onExit(({ exitCode }) => {
+    pty.onExit(({ exitCode }: { exitCode: number }) => {
       console.log(
         `[Terminal] PTY exited (code ${exitCode}) for session ${sessionId}`,
       );
@@ -230,7 +231,7 @@ export function initTerminalWebSocket(_httpServer?: Server): void {
     });
 
     // WebSocket → PTY
-    ws.on("message", (rawData) => {
+    ws.on("message", (rawData: RawData) => {
       session.lastActivity = Date.now();
 
       // Try to parse as JSON (for resize commands)
@@ -258,7 +259,7 @@ export function initTerminalWebSocket(_httpServer?: Server): void {
       sessions.delete(sessionId);
     });
 
-    ws.on("error", (err) => {
+    ws.on("error", (err: Error) => {
       console.error(`[Terminal] WebSocket error for ${sessionId}:`, err.message);
       pty.kill();
       sessions.delete(sessionId);
