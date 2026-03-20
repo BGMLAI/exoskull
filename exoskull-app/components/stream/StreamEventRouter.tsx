@@ -38,6 +38,11 @@ import { RichContentEvent } from "./events/RichContentEvent";
 import { DiffViewer } from "./events/DiffViewer";
 import { FileChangeEvent } from "./events/FileChangeEvent";
 
+// Inline workspace artifacts
+import { WorkspaceFile } from "./events/WorkspaceFile";
+import { WorkspacePreview } from "./events/WorkspacePreview";
+import { WorkspaceTerminal } from "./events/WorkspaceTerminal";
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -100,6 +105,12 @@ function EventContent({ event }: { event: StreamEvent }) {
       return <FileChangeEvent event={event} />;
     case "diff_view":
       return <DiffViewer event={event} />;
+    case "workspace_file":
+      return <WorkspaceFile event={event} />;
+    case "workspace_preview":
+      return <WorkspacePreview event={event} />;
+    case "workspace_terminal":
+      return <WorkspaceTerminal event={event} />;
     default:
       return null;
   }
@@ -136,6 +147,9 @@ const SELF_BORDERED_TYPES = new Set([
   "rich_content",
   "file_change",
   "diff_view",
+  "workspace_file",
+  "workspace_preview",
+  "workspace_terminal",
 ]);
 
 // ---------------------------------------------------------------------------

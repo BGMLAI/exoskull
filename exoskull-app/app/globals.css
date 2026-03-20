@@ -125,6 +125,45 @@
     --orb-glow-opacity: 0.7;
   }
 
+  /* ===== Theme E: Cyberpunk (dark, neon-soaked) ===== */
+  .cyberpunk {
+    --background: 230 30% 6%;
+    --foreground: 200 20% 92%;
+    --card: 230 25% 10%;
+    --card-foreground: 200 20% 95%;
+    --popover: 230 28% 8%;
+    --popover-foreground: 200 20% 95%;
+    --primary: 340 100% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 270 40% 14%;
+    --secondary-foreground: 200 20% 92%;
+    --muted: 230 20% 16%;
+    --muted-foreground: 200 10% 55%;
+    --accent: 185 100% 50%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 90% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 230 20% 18%;
+    --input: 230 20% 18%;
+    --ring: 340 100% 60%;
+
+    --sidebar-bg: 230 30% 4%;
+    --sidebar-border: 230 20% 15%;
+    --sidebar-text: 200 20% 85%;
+    --sidebar-muted: 200 10% 45%;
+    --sidebar-active: 340 100% 60%;
+    --sidebar-active-text: 0 0% 100%;
+    --glow-color: 340 100% 60%;
+    --bg-void: 230 35% 4%;
+    --orb-glow-opacity: 0.9;
+
+    --cyber-pink: #ff2d6f;
+    --cyber-cyan: #00f0ff;
+    --cyber-yellow: #f5e642;
+    --cyber-purple: #bd00ff;
+    --cyber-green: #39ff14;
+  }
+
   /* ===== Theme D: Gemini Hybrid (light, multi-color accents) ===== */
   .gemini-hybrid {
     --background: 220 14% 96%;
@@ -252,12 +291,67 @@
   background-size: 24px 24px;
 }
 
+/* Cyberpunk: Neon glow cards */
+.cyberpunk .card-glow:hover {
+  box-shadow:
+    0 0 20px hsl(340 100% 60% / 0.2),
+    0 0 4px hsl(340 100% 60% / 0.15),
+    inset 0 0 20px hsl(340 100% 60% / 0.03);
+  border-color: hsl(340 100% 60% / 0.4);
+}
+
+/* Cyberpunk: Background with scanlines */
+.cyberpunk body,
+.cyberpunk {
+  background: linear-gradient(180deg, hsl(230 30% 6%) 0%, hsl(230 40% 3%) 100%);
+}
+
+/* Cyberpunk: Scanline overlay */
+.cyberpunk .neural-bg {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      hsl(340 100% 60% / 0.015) 2px,
+      hsl(340 100% 60% / 0.015) 4px
+    ),
+    radial-gradient(hsl(185 100% 50% / 0.03) 1px, transparent 1px);
+  background-size:
+    100% 4px,
+    20px 20px;
+}
+
+/* Cyberpunk: Neon gradient text */
+.cyberpunk .gradient-text {
+  background: linear-gradient(135deg, #ff2d6f, #00f0ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Cyberpunk: Glass cards */
+.cyberpunk .glass-card {
+  backdrop-filter: blur(16px);
+  background: hsl(230 25% 10% / 0.7);
+  border: 1px solid hsl(340 100% 60% / 0.15);
+}
+
+/* Cyberpunk: Gamma line */
+.cyberpunk .gamma-line-glow {
+  background: linear-gradient(180deg, #ff2d6f 0%, #00f0ff 100%);
+  box-shadow:
+    0 0 8px 2px hsl(340 100% 60% / 0.25),
+    0 0 16px 4px hsl(185 100% 50% / 0.1);
+}
+
 /* Smooth theme transitions */
 body,
 .dark-ops,
 .xo-minimal,
 .neural,
-.gemini-hybrid {
+.gemini-hybrid,
+.cyberpunk {
   transition:
     background-color 200ms ease,
     color 200ms ease;

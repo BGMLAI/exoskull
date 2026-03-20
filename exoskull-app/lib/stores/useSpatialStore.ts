@@ -31,6 +31,25 @@ export interface HUDWidgetConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Scene mode — determines 3D background
+// ---------------------------------------------------------------------------
+
+export type SceneMode = "graph" | "orb";
+
+export interface ActiveTask {
+  /** Quest or Op title */
+  title: string;
+  /** Loop/domain this belongs to */
+  loopSlug?: string;
+  /** Related hashtags/tags */
+  tags: string[];
+  /** Related document IDs (orbit around orb) */
+  relatedDocIds?: string[];
+  /** When IORS started this task */
+  startedAt: number;
+}
+
+// ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
@@ -39,6 +58,10 @@ interface SpatialState {
   commandPaletteOpen: boolean;
   activeHashtag: string | null;
   is3DMode: boolean;
+
+  // Scene mode: graph (idle) vs orb (active)
+  sceneMode: SceneMode;
+  activeTask: ActiveTask | null;
 
   // Widget HUD
   widgets: HUDWidgetConfig[];
@@ -52,6 +75,12 @@ interface SpatialState {
   setActiveHashtag: (tag: string | null) => void;
   toggleHashtag: (tag: string) => void;
   toggle3DMode: () => void;
+
+  // Scene mode actions
+  setSceneMode: (mode: SceneMode) => void;
+  setActiveTask: (task: ActiveTask | null) => void;
+  startTask: (task: Omit<ActiveTask, "startedAt">) => void;
+  clearTask: () => void;
 
   // Widget actions
   addWidget: (w: HUDWidgetConfig) => void;
@@ -92,6 +121,10 @@ export const useSpatialStore = create<SpatialState>((set) => ({
   activeHashtag: null,
   is3DMode: true,
 
+  // Scene defaults
+  sceneMode: "graph",
+  activeTask: null,
+
   // Widget HUD
   widgets: DEFAULT_WIDGETS,
   widgetHudVisible: true,
@@ -107,6 +140,20 @@ export const useSpatialStore = create<SpatialState>((set) => ({
       activeHashtag: s.activeHashtag === tag ? null : tag,
     })),
   toggle3DMode: () => set((s) => ({ is3DMode: !s.is3DMode })),
+
+  // Scene mode
+  setSceneMode: (mode) => set({ sceneMode: mode }),
+  setActiveTask: (task) =>
+    set({
+      activeTask: task,
+      sceneMode: task ? "orb" : "graph",
+    }),
+  startTask: (task) =>
+    set({
+      activeTask: { ...task, startedAt: Date.now() },
+      sceneMode: "orb",
+    }),
+  clearTask: () => set({ activeTask: null, sceneMode: "graph" }),
 
   // Widget actions
   addWidget: (w) => set((s) => ({ widgets: [...s.widgets, w] })),

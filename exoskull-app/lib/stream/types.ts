@@ -62,7 +62,10 @@ export type StreamEventData =
   | SearchResultsData
   | RichContentEventData
   | FileChangeData
-  | DiffViewData;
+  | DiffViewData
+  | WorkspaceFileData
+  | WorkspacePreviewData
+  | WorkspaceTerminalData;
 
 // ---------------------------------------------------------------------------
 // Message events
@@ -414,6 +417,34 @@ export interface DiffViewData {
 }
 
 // ---------------------------------------------------------------------------
+// Workspace inline artifacts — replace separate workspace panel
+// ---------------------------------------------------------------------------
+
+export interface WorkspaceFileData {
+  type: "workspace_file";
+  filePath: string;
+  language?: string;
+  content?: string;
+}
+
+export interface WorkspacePreviewData {
+  type: "workspace_preview";
+  url?: string;
+  html?: string;
+  title?: string;
+}
+
+export interface WorkspaceTerminalData {
+  type: "workspace_terminal";
+  /** Session ID for the terminal connection */
+  sessionId?: string;
+  /** Initial command to show */
+  initialCommand?: string;
+  /** Static output (for completed commands) */
+  output?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Notification category resolver — maps event type to category
 // ---------------------------------------------------------------------------
 
@@ -444,6 +475,10 @@ export function getNotificationCategory(
     case "search_results":
     case "rich_content":
       return "ai_insight";
+    case "workspace_file":
+    case "workspace_preview":
+    case "workspace_terminal":
+      return "task";
     default:
       return "system";
   }
@@ -535,4 +570,8 @@ export type SSEEventType =
   | "file_change"
   | "diff_view"
   // Workspace events (from workspace_control IORS tool)
-  | "workspace_update";
+  | "workspace_update"
+  // Inline workspace artifacts
+  | "workspace_file"
+  | "workspace_preview"
+  | "workspace_terminal";

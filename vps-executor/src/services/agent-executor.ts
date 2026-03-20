@@ -426,13 +426,35 @@ async function executeTool(
       case "write_file": {
         const filePath = resolve(input.file_path as string);
         const content = input.content as string;
+        const isNew = !fs.existsSync(filePath);
         const result = await writeFile(filePath, content);
+        const lang = getLanguageFromPath(filePath);
+
         emit({
           type: "file_change",
           filePath: input.file_path as string,
-          language: getLanguageFromPath(filePath),
-          operation: fs.existsSync(filePath) ? "edit" : "create",
+          language: lang,
+          operation: isNew ? "create" : "edit",
         });
+
+        // Show file content inline in chat stream
+        emit({
+          type: "workspace_file",
+          filePath: input.file_path as string,
+          language: lang,
+          content: content.slice(0, 10_000),
+        });
+
+        // Auto-preview for HTML/web files
+        const ext = path.extname(filePath).toLowerCase();
+        if ([".html", ".htm", ".svg"].includes(ext)) {
+          emit({
+            type: "workspace_preview",
+            html: content.slice(0, 50_000),
+            title: path.basename(filePath),
+          });
+        }
+
         return { result: JSON.stringify(result), isError: false };
       }
 
@@ -479,6 +501,18 @@ async function executeTool(
           workspaceDir,
           Math.min((input.timeout_ms as number) || 30_000, 60_000),
         );
+
+        // Emit terminal output inline in chat stream
+        const bashOutput = (result.stdout || "") + (result.stderr ? `\n${result.stderr}` : "");
+        if (bashOutput.trim()) {
+          emit({
+            type: "workspace_terminal",
+            command: input.command as string,
+            output: bashOutput.slice(0, 10_000),
+            exitCode: result.exit_code,
+          });
+        }
+
         return { result: JSON.stringify(result), isError: result.exit_code !== 0 };
       }
 

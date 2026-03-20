@@ -3,7 +3,6 @@
 import { useRef, useEffect, useCallback, useState, useMemo } from "react";
 import { useStreamState } from "@/lib/hooks/useStreamState";
 import { useAppStore } from "@/lib/stores/useAppStore";
-import { useWorkspaceStore } from "@/lib/stores/useWorkspaceStore";
 import { toast } from "sonner";
 import type {
   StreamEvent,
@@ -733,29 +732,105 @@ export function useChatEngine(
                   break;
                 }
 
+                // Direct workspace events from VPS executor
+                case "workspace_file": {
+                  addEvent({
+                    id: `ws-file-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                    timestamp: new Date(),
+                    data: {
+                      type: "workspace_file" as const,
+                      filePath: data.filePath,
+                      language: data.language,
+                      content: data.content,
+                    },
+                  });
+                  break;
+                }
+
+                case "workspace_preview": {
+                  addEvent({
+                    id: `ws-preview-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                    timestamp: new Date(),
+                    data: {
+                      type: "workspace_preview" as const,
+                      url: data.url,
+                      html: data.html,
+                      title: data.title,
+                    },
+                  });
+                  break;
+                }
+
+                case "workspace_terminal": {
+                  addEvent({
+                    id: `ws-term-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                    timestamp: new Date(),
+                    data: {
+                      type: "workspace_terminal" as const,
+                      output: data.output,
+                      initialCommand: data.command,
+                    },
+                  });
+                  break;
+                }
+
+                case "diff_view": {
+                  addEvent({
+                    id: `ws-diff-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                    timestamp: new Date(),
+                    data: {
+                      type: "diff_view" as const,
+                      filePath: data.filePath,
+                      before: data.before || "",
+                      after: data.after || "",
+                      hunks: data.hunks || [],
+                    },
+                  });
+                  break;
+                }
+
                 case "workspace_update": {
-                  const ws = useWorkspaceStore.getState();
+                  // Legacy: inline workspace artifacts from IORS chat stream
                   switch (data.action) {
                     case "open_file":
-                      ws.openFile(data.filePath);
+                      addEvent({
+                        id: `ws-file-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                        timestamp: new Date(),
+                        data: {
+                          type: "workspace_file" as const,
+                          filePath: data.filePath,
+                          language: data.language,
+                          content: data.content,
+                        },
+                      });
                       break;
                     case "show_preview":
-                      ws.showPreview({
-                        url: data.url,
-                        html: data.html,
+                      addEvent({
+                        id: `ws-preview-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                        timestamp: new Date(),
+                        data: {
+                          type: "workspace_preview" as const,
+                          url: data.url,
+                          html: data.html,
+                          title: data.title,
+                        },
+                      });
+                      break;
+                    case "show_diff":
+                      addEvent({
+                        id: `ws-diff-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                        timestamp: new Date(),
+                        data: {
+                          type: "diff_view" as const,
+                          filePath: data.filePath,
+                          before: data.before || "",
+                          after: data.after || "",
+                          hunks: data.hunks || [],
+                        },
                       });
                       break;
                     case "switch_tab":
-                      ws.setActiveTab(data.tab);
-                      ws.setOpen(true);
-                      break;
-                    case "show_diff":
-                      ws.showDiff({
-                        filePath: data.filePath,
-                        before: data.before || "",
-                        after: data.after || "",
-                        hunks: data.hunks || [],
-                      });
+                      // No-op: tabs no longer exist, artifacts are inline
                       break;
                   }
                   break;

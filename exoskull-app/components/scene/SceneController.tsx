@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { OrbitControls } from "@react-three/drei";
 
 /**
@@ -7,6 +8,34 @@ import { OrbitControls } from "@react-three/drei";
  * Constrained orbit: pan disabled, zoom limited, vertical angle limited.
  */
 export function SceneController() {
+  // Detect theme for fog color
+  const [fogColor, setFogColor] = useState("#000000");
+
+  useEffect(() => {
+    function updateFog() {
+      if (typeof document === "undefined") return;
+      const html = document.documentElement;
+      if (html.classList.contains("cyberpunk")) {
+        setFogColor("#0a0e1a");
+      } else if (
+        html.classList.contains("gemini-hybrid") ||
+        html.classList.contains("xo-minimal")
+      ) {
+        setFogColor("#0f1218");
+      } else {
+        setFogColor("#000000");
+      }
+    }
+    updateFog();
+    // Watch for theme changes
+    const observer = new MutationObserver(updateFog);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <>
       <perspectiveCamera position={[0, 8, 12]} fov={50} />
@@ -21,7 +50,7 @@ export function SceneController() {
       />
       <ambientLight intensity={0.4} />
       <directionalLight position={[5, 10, 5]} intensity={0.6} />
-      <fog attach="fog" args={["#000000", 20, 60]} />
+      <fog attach="fog" args={[fogColor, 20, 60]} />
     </>
   );
 }
