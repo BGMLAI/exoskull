@@ -3,6 +3,7 @@
 import { useRef, useEffect, useCallback, useState, useMemo } from "react";
 import { useStreamState } from "@/lib/hooks/useStreamState";
 import { useAppStore } from "@/lib/stores/useAppStore";
+import { useWorkspaceStore } from "@/lib/stores/useWorkspaceStore";
 import { toast } from "sonner";
 import type {
   StreamEvent,
@@ -729,6 +730,34 @@ export function useChatEngine(
 
                 case "file_change": {
                   useAppStore.getState().notifyFileChange(data.filePath);
+                  break;
+                }
+
+                case "workspace_update": {
+                  const ws = useWorkspaceStore.getState();
+                  switch (data.action) {
+                    case "open_file":
+                      ws.openFile(data.filePath);
+                      break;
+                    case "show_preview":
+                      ws.showPreview({
+                        url: data.url,
+                        html: data.html,
+                      });
+                      break;
+                    case "switch_tab":
+                      ws.setActiveTab(data.tab);
+                      ws.setOpen(true);
+                      break;
+                    case "show_diff":
+                      ws.showDiff({
+                        filePath: data.filePath,
+                        before: data.before || "",
+                        after: data.after || "",
+                        hunks: data.hunks || [],
+                      });
+                      break;
+                  }
                   break;
                 }
 

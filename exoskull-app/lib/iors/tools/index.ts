@@ -64,6 +64,7 @@ import { goalStrategyTools } from "./goal-strategy-tools";
 import { selfBuildTools } from "./self-build-tools";
 import { selfModificationTools } from "./self-modification-tools";
 import { mediaCaptureTools } from "./media-capture-tools";
+import { workspaceTools } from "./workspace-tools";
 
 // V3 tools bridge — marketplace tools (publish_to_allegro)
 // Uses same ToolDefinition shape (definition + execute + timeoutMs)
@@ -146,6 +147,8 @@ export const IORS_EXTENSION_TOOLS = [
   ...mediaCaptureTools,
   // V3 bridge — Marketplace tools (publish_to_allegro)
   ...marketplaceTools,
+  // Workspace control tools — open files, preview, switch tabs
+  ...workspaceTools,
 ];
 
 // Register tools and dynamic resolver in the shared registry so

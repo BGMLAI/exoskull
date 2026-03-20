@@ -533,4 +533,6 @@ export type SSEEventType =
   | "mcp_tool_end"
   // Claude Code events (from /api/claude-code/chat)
   | "file_change"
-  | "diff_view";
+  | "diff_view"
+  // Workspace events (from workspace_control IORS tool)
+  | "workspace_update";

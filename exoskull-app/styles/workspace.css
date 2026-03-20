@@ -144,6 +144,39 @@
   }
 }
 
+/* Terminal container — xterm.js integration */
+.terminal-container {
+  height: 100%;
+  padding: 0;
+}
+
+.terminal-container .xterm {
+  height: 100%;
+  padding: 4px;
+}
+
+.terminal-container .xterm-viewport {
+  overflow-y: auto !important;
+}
+
+.terminal-container .xterm-viewport::-webkit-scrollbar {
+  width: 3px;
+}
+
+.terminal-container .xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
+  background: hsl(var(--glow-color) / 0.15);
+  border-radius: 2px;
+}
+
+/* Mobile workspace overlay */
+.workspace-overlay {
+  z-index: 50;
+}
+
 /* Scrollbar for panels */
 .panel-scroll::-webkit-scrollbar {
   width: 3px;

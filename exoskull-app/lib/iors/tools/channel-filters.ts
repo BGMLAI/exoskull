@@ -117,6 +117,7 @@ export const TOOL_PACKS: Record<string, Set<string>> = {
     "modify_code",
     "run_tests",
     "deploy_app",
+    "workspace_control",
   ]),
   social: new Set([
     "publish_page_post",

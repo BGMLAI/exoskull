@@ -16,6 +16,7 @@ import express from "express";
 import { DockerRunner } from "./docker-runner";
 import { codeRouter } from "./routes/code";
 import { agentCodeRouter } from "./routes/agent-code";
+import { terminalRouter, initTerminalWebSocket } from "./routes/terminal";
 import { v4 as uuid } from "uuid";
 
 const app = express();
@@ -89,6 +90,9 @@ app.use("/api/code", authenticate, codeRouter);
 
 // Agent Code routes (Claude Code — SSE streaming agent)
 app.use("/api/agent/code", authenticate, agentCodeRouter);
+
+// Terminal routes (PTY session creation)
+app.use("/api/terminal", authenticate, terminalRouter);
 
 app.get("/health", (_req, res) => {
   res.json({
@@ -219,4 +223,7 @@ setInterval(() => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`[ExoSkull VPS Executor] Running on port ${PORT}`);
   console.log(`[ExoSkull VPS Executor] Docker: ${runner.isAvailable() ? "connected" : "NOT connected"}`);
+
+  // Initialize terminal WebSocket server on :3501
+  initTerminalWebSocket();
 });
